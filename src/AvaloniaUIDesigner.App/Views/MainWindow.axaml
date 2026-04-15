@@ -67,9 +67,40 @@
                         <TextBlock Text="Design Surface" FontWeight="SemiBold" Foreground="#CCCCCC"/>
                     </Border>
                     <Border Background="#252526" Margin="24" BorderBrush="#3F3F46" BorderThickness="1">
-                        <TextBlock Text="{Binding Canvas.PlaceholderText}"
-                                   HorizontalAlignment="Center" VerticalAlignment="Center"
-                                   Foreground="#6D6D6D" FontStyle="Italic"/>
+                        <Panel>
+                            <TextBlock Text="{Binding Canvas.PlaceholderText}"
+                                       HorizontalAlignment="Center" VerticalAlignment="Center"
+                                       Foreground="#6D6D6D" FontStyle="Italic"
+                                       IsHitTestVisible="False"
+                                       IsVisible="{Binding !Canvas.HasElements}"/>
+                            <ItemsControl Name="DesignHost"
+                                          ItemsSource="{Binding Canvas.Elements}"
+                                          Background="Transparent"
+                                          PointerPressed="OnDesignHostPointerPressed">
+                                <ItemsControl.ItemsPanel>
+                                    <ItemsPanelTemplate>
+                                        <Canvas Background="Transparent"/>
+                                    </ItemsPanelTemplate>
+                                </ItemsControl.ItemsPanel>
+                                <ItemsControl.Styles>
+                                    <Style Selector="ContentPresenter">
+                                        <Setter Property="Canvas.Left" Value="{ReflectionBinding X}"/>
+                                        <Setter Property="Canvas.Top" Value="{ReflectionBinding Y}"/>
+                                    </Style>
+                                </ItemsControl.Styles>
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate x:DataType="vm:DesignElement">
+                                        <Border BorderBrush="DodgerBlue"
+                                                BorderThickness="{Binding SelectionThickness}"
+                                                Width="{Binding Width}"
+                                                Height="{Binding Height}"
+                                                PointerPressed="OnElementPointerPressed">
+                                            <ContentPresenter Content="{Binding Visual}"/>
+                                        </Border>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </Panel>
                     </Border>
                 </DockPanel>
             </Border>

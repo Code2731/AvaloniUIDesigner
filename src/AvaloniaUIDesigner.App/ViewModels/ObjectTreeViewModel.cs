@@ -4,11 +4,21 @@ namespace AvaloniaUIDesigner.App.ViewModels;
 
 public partial class ObjectTreeViewModel : ViewModelBase
 {
-    // v0.1 골격. 실제 디자인 트리 연동은 이후 단계.
-    public ObservableCollection<ObjectNodeViewModel> Nodes { get; } = new()
+    public ObjectTreeViewModel()
     {
-        new ObjectNodeViewModel("Window (루트)"),
-    };
+        Root = new ObjectNodeViewModel("Window (루트)");
+        Nodes = new ObservableCollection<ObjectNodeViewModel> { Root };
+    }
+
+    public ObservableCollection<ObjectNodeViewModel> Nodes { get; }
+    public ObjectNodeViewModel Root { get; }
+
+    public ObjectNodeViewModel Add(DesignElement element)
+    {
+        var node = new ObjectNodeViewModel(element.DisplayName) { Element = element };
+        Root.Children.Add(node);
+        return node;
+    }
 }
 
 public partial class ObjectNodeViewModel : ViewModelBase
@@ -19,6 +29,6 @@ public partial class ObjectNodeViewModel : ViewModelBase
     }
 
     public string DisplayName { get; }
-
+    public DesignElement? Element { get; init; }
     public ObservableCollection<ObjectNodeViewModel> Children { get; } = new();
 }
