@@ -1,0 +1,112 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:AvaloniaUIDesigner.App.ViewModels"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        mc:Ignorable="d" d:DesignWidth="1280" d:DesignHeight="800"
+        x:Class="AvaloniaUIDesigner.App.Views.MainWindow"
+        x:DataType="vm:MainWindowViewModel"
+        Icon="/Assets/avalonia-logo.ico"
+        Title="Avalonia UI Designer"
+        Width="1280" Height="800">
+
+    <Design.DataContext>
+        <vm:MainWindowViewModel/>
+    </Design.DataContext>
+
+    <DockPanel>
+        <!-- 상단 메뉴바 -->
+        <Menu DockPanel.Dock="Top">
+            <MenuItem Header="파일(_F)">
+                <MenuItem Header="새 폼(_N)"/>
+                <MenuItem Header="열기(_O)..."/>
+                <MenuItem Header="저장(_S)"/>
+                <Separator/>
+                <MenuItem Header="종료(_X)"/>
+            </MenuItem>
+            <MenuItem Header="편집(_E)">
+                <MenuItem Header="실행 취소(_U)"/>
+                <MenuItem Header="다시 실행(_R)"/>
+            </MenuItem>
+            <MenuItem Header="보기(_V)"/>
+            <MenuItem Header="도움말(_H)"/>
+        </Menu>
+
+        <!-- 하단 상태바 -->
+        <Border DockPanel.Dock="Bottom" Height="24" Background="#2D2D30" BorderBrush="#3F3F46" BorderThickness="0,1,0,0">
+            <TextBlock Text="{Binding StatusText}" VerticalAlignment="Center" Margin="8,0" Foreground="#CCCCCC"/>
+        </Border>
+
+        <!-- 4-Pane 영역 -->
+        <Grid ColumnDefinitions="220,4,*,4,280">
+            <!-- 좌: 툴박스 -->
+            <Border Grid.Column="0" Background="#252526" BorderBrush="#3F3F46" BorderThickness="0,0,1,0">
+                <DockPanel>
+                    <Border DockPanel.Dock="Top" Background="#2D2D30" Padding="8,6">
+                        <TextBlock Text="Toolbox" FontWeight="SemiBold" Foreground="#CCCCCC"/>
+                    </Border>
+                    <ListBox ItemsSource="{Binding Toolbox.Items}"
+                             SelectedItem="{Binding Toolbox.SelectedItem}"
+                             Background="Transparent" BorderThickness="0">
+                        <ListBox.ItemTemplate>
+                            <DataTemplate>
+                                <TextBlock Text="{Binding DisplayName}" Padding="4,2"/>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+                </DockPanel>
+            </Border>
+
+            <GridSplitter Grid.Column="1" Background="#3F3F46" ResizeDirection="Columns"/>
+
+            <!-- 중: 캔버스 -->
+            <Border Grid.Column="2" Background="#1E1E1E">
+                <DockPanel>
+                    <Border DockPanel.Dock="Top" Background="#2D2D30" Padding="8,6"
+                            BorderBrush="#3F3F46" BorderThickness="0,0,0,1">
+                        <TextBlock Text="Design Surface" FontWeight="SemiBold" Foreground="#CCCCCC"/>
+                    </Border>
+                    <Border Background="#252526" Margin="24" BorderBrush="#3F3F46" BorderThickness="1">
+                        <TextBlock Text="{Binding Canvas.PlaceholderText}"
+                                   HorizontalAlignment="Center" VerticalAlignment="Center"
+                                   Foreground="#6D6D6D" FontStyle="Italic"/>
+                    </Border>
+                </DockPanel>
+            </Border>
+
+            <GridSplitter Grid.Column="3" Background="#3F3F46" ResizeDirection="Columns"/>
+
+            <!-- 우: 오브젝트 트리 + 속성 검사기 -->
+            <Grid Grid.Column="4" RowDefinitions="*,4,*">
+                <Border Grid.Row="0" Background="#252526" BorderBrush="#3F3F46" BorderThickness="1,0,0,0">
+                    <DockPanel>
+                        <Border DockPanel.Dock="Top" Background="#2D2D30" Padding="8,6">
+                            <TextBlock Text="Object Tree" FontWeight="SemiBold" Foreground="#CCCCCC"/>
+                        </Border>
+                        <TreeView ItemsSource="{Binding ObjectTree.Nodes}"
+                                  Background="Transparent" BorderThickness="0">
+                            <TreeView.ItemTemplate>
+                                <TreeDataTemplate ItemsSource="{Binding Children}">
+                                    <TextBlock Text="{Binding DisplayName}"/>
+                                </TreeDataTemplate>
+                            </TreeView.ItemTemplate>
+                        </TreeView>
+                    </DockPanel>
+                </Border>
+
+                <GridSplitter Grid.Row="1" Background="#3F3F46" ResizeDirection="Rows"/>
+
+                <Border Grid.Row="2" Background="#252526" BorderBrush="#3F3F46" BorderThickness="1,0,0,0">
+                    <DockPanel>
+                        <Border DockPanel.Dock="Top" Background="#2D2D30" Padding="8,6">
+                            <TextBlock Text="Properties" FontWeight="SemiBold" Foreground="#CCCCCC"/>
+                        </Border>
+                        <TextBlock Text="{Binding PropertyInspector.PlaceholderText}"
+                                   HorizontalAlignment="Center" VerticalAlignment="Center"
+                                   Foreground="#6D6D6D" FontStyle="Italic"/>
+                    </DockPanel>
+                </Border>
+            </Grid>
+        </Grid>
+    </DockPanel>
+</Window>

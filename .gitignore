@@ -1,0 +1,35 @@
+# .NET / Avalonia
+bin/
+obj/
+*.user
+*.suo
+.vs/
+.vscode/
+.idea/
+*.userprefs
+
+# Build output
+**/bin/
+**/obj/
+**/publish/
+**/out/
+
+# NuGet
+*.nupkg
+**/packages/
+!**/packages/build/
+project.lock.json
+project.fragment.lock.json
+artifacts/
+
+# Test results
+[Tt]est[Rr]esult*/
+[Cc]overage*/
+
+# OS
+Thumbs.db
+.DS_Store
+desktop.ini
+
+# Claude
+.claude/
