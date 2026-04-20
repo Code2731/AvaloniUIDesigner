@@ -21,7 +21,10 @@ public partial class CanvasViewModel : ViewModelBase
     private bool _hasElements;
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsSelectionActive))]
     private DesignElement? _selectedElement;
+
+    public bool IsSelectionActive => SelectedElement is not null;
 
     public DesignElement PlaceElement(ToolboxItem item, double x, double y)
     {

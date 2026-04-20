@@ -1,6 +1,7 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vm="using:AvaloniaUIDesigner.App.ViewModels"
+        xmlns:pg="using:Avalonia.PropertyGrid.Controls"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         mc:Ignorable="d" d:DesignWidth="1280" d:DesignHeight="800"
@@ -76,7 +77,9 @@
                             <ItemsControl Name="DesignHost"
                                           ItemsSource="{Binding Canvas.Elements}"
                                           Background="Transparent"
-                                          PointerPressed="OnDesignHostPointerPressed">
+                                          PointerPressed="OnDesignHostPointerPressed"
+                                          PointerMoved="OnDragPointerMoved"
+                                          PointerReleased="OnDragPointerReleased">
                                 <ItemsControl.ItemsPanel>
                                     <ItemsPanelTemplate>
                                         <Canvas Background="Transparent"/>
@@ -100,6 +103,18 @@
                                     </DataTemplate>
                                 </ItemsControl.ItemTemplate>
                             </ItemsControl>
+                            <!-- 선택 기즈모: 8방향 리사이즈 핸들 (위치는 code-behind에서 갱신) -->
+                            <Canvas Name="SelectionOverlay"
+                                    IsVisible="{Binding Canvas.IsSelectionActive}">
+                                <Rectangle Name="HandleNW" Tag="NW" Width="10" Height="10" Fill="DodgerBlue" PointerPressed="OnHandlePressed"/>
+                                <Rectangle Name="HandleN"  Tag="N"  Width="10" Height="10" Fill="DodgerBlue" PointerPressed="OnHandlePressed"/>
+                                <Rectangle Name="HandleNE" Tag="NE" Width="10" Height="10" Fill="DodgerBlue" PointerPressed="OnHandlePressed"/>
+                                <Rectangle Name="HandleE"  Tag="E"  Width="10" Height="10" Fill="DodgerBlue" PointerPressed="OnHandlePressed"/>
+                                <Rectangle Name="HandleSE" Tag="SE" Width="10" Height="10" Fill="DodgerBlue" PointerPressed="OnHandlePressed"/>
+                                <Rectangle Name="HandleS"  Tag="S"  Width="10" Height="10" Fill="DodgerBlue" PointerPressed="OnHandlePressed"/>
+                                <Rectangle Name="HandleSW" Tag="SW" Width="10" Height="10" Fill="DodgerBlue" PointerPressed="OnHandlePressed"/>
+                                <Rectangle Name="HandleW"  Tag="W"  Width="10" Height="10" Fill="DodgerBlue" PointerPressed="OnHandlePressed"/>
+                            </Canvas>
                         </Panel>
                     </Border>
                 </DockPanel>
@@ -132,9 +147,9 @@
                         <Border DockPanel.Dock="Top" Background="#2D2D30" Padding="8,6">
                             <TextBlock Text="Properties" FontWeight="SemiBold" Foreground="#CCCCCC"/>
                         </Border>
-                        <TextBlock Text="{Binding PropertyInspector.PlaceholderText}"
-                                   HorizontalAlignment="Center" VerticalAlignment="Center"
-                                   Foreground="#6D6D6D" FontStyle="Italic"/>
+                        <pg:PropertyGrid Name="PropGrid"
+                                         IsQuickFilterVisible="False"
+                                         IsHeaderVisible="False"/>
                     </DockPanel>
                 </Border>
             </Grid>
