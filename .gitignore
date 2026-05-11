@@ -33,3 +33,6 @@ desktop.ini
 
 # Claude
 .claude/
+
+# Codex local build home
+.codex-dotnet-home/

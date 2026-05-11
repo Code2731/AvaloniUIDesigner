@@ -1,19 +1,23 @@
-using System;
+﻿using System;
+using System.Collections.Specialized;
 using System.ComponentModel;
+using System.IO;
+using System.Threading.Tasks;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.Shapes;
 using Avalonia.Input;
+using Avalonia.Platform.Storage;
+using Avalonia.Threading;
 using AvaloniaUIDesigner.App.ViewModels;
 
 namespace AvaloniaUIDesigner.App.Views;
 
 public partial class MainWindow : Window
 {
-    // 드래그 모드 = Move(본체 이동) + 8방향 리사이즈
     private enum DragMode { None, Move, N, S, E, W, NE, NW, SE, SW }
 
-    private const double HandleHalf = 5; // 핸들 10x10 → 중심 정렬 오프셋
+    private const double HandleHalf = 5;
     private const double MinSize = 10;
 
     private DragMode _dragMode = DragMode.None;
@@ -23,51 +27,293 @@ public partial class MainWindow : Window
 
     private CanvasViewModel? _boundCanvas;
     private DesignElement? _boundElement;
+    private Control? _boundVisual;
+    private MainWindowViewModel? _boundVm;
+
+    private readonly DispatcherTimer _propertyEditTimer;
+    private bool _hasPendingPropertyEdit;
 
     public MainWindow()
     {
         InitializeComponent();
+        _propertyEditTimer = new DispatcherTimer
+        {
+            Interval = TimeSpan.FromMilliseconds(450)
+        };
+        _propertyEditTimer.Tick += OnPropertyEditTimerTick;
+
         DataContextChanged += OnDataContextChanged;
-        // 생성 시점에 이미 DataContext가 세팅된 경우 대비
         OnDataContextChanged(this, EventArgs.Empty);
     }
 
     private MainWindowViewModel? Vm => DataContext as MainWindowViewModel;
 
+    private async void OnOpenMenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        if (Vm is null)
+        {
+            return;
+        }
+
+        FlushPendingPropertyHistory();
+
+        var files = await StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
+        {
+            Title = "Open AXAML",
+            AllowMultiple = false,
+            FileTypeFilter =
+            [
+                new FilePickerFileType("AXAML") { Patterns = ["*.axaml", "*.xaml"] }
+            ]
+        });
+
+        if (files.Count == 0)
+        {
+            return;
+        }
+
+        await OpenStorageFileAsync(files[0]);
+    }
+
+    private async void OnSaveMenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        await SaveDocumentAsync(forceSaveAs: false);
+    }
+
+    private async void OnSaveAsMenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        await SaveDocumentAsync(forceSaveAs: true);
+    }
+
+    private void OnNewMenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        FlushPendingPropertyHistory();
+        Vm?.NewDocument();
+    }
+
+    private void OnExitMenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        FlushPendingPropertyHistory();
+        Close();
+    }
+
+    private void OnUndoMenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        FlushPendingPropertyHistory();
+        Vm?.Undo();
+    }
+
+    private void OnRedoMenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        FlushPendingPropertyHistory();
+        Vm?.Redo();
+    }
+
+    private void OnDeleteMenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        FlushPendingPropertyHistory();
+        Vm?.RemoveSelectedElement();
+    }
+
+    private void OnWindowKeyDown(object? sender, KeyEventArgs e)
+    {
+        if (Vm is null)
+        {
+            return;
+        }
+
+        if (e.Key == Key.Delete)
+        {
+            FlushPendingPropertyHistory();
+            Vm.RemoveSelectedElement();
+            e.Handled = true;
+        }
+    }
+
     private void OnDataContextChanged(object? sender, EventArgs e)
     {
         if (_boundCanvas is not null)
+        {
             _boundCanvas.PropertyChanged -= OnCanvasPropertyChanged;
+        }
 
-        _boundCanvas = Vm?.Canvas;
+        if (_boundVm is not null)
+        {
+            _boundVm.RecentFiles.CollectionChanged -= OnRecentFilesChanged;
+        }
+
+        _boundVm = Vm;
+        _boundCanvas = _boundVm?.Canvas;
 
         if (_boundCanvas is not null)
+        {
             _boundCanvas.PropertyChanged += OnCanvasPropertyChanged;
+        }
 
+        if (_boundVm is not null)
+        {
+            _boundVm.RecentFiles.CollectionChanged += OnRecentFilesChanged;
+        }
+
+        RebuildRecentFilesMenu();
         RebindSelection();
+    }
+
+    private void OnRecentFilesChanged(object? sender, NotifyCollectionChangedEventArgs e)
+    {
+        RebuildRecentFilesMenu();
+    }
+
+    private void RebuildRecentFilesMenu()
+    {
+        if (_boundVm is null || _boundVm.RecentFiles.Count == 0)
+        {
+            OpenRecentMenu.IsEnabled = false;
+            OpenRecentMenu.ItemsSource = null;
+            return;
+        }
+
+        OpenRecentMenu.IsEnabled = true;
+        var items = new System.Collections.Generic.List<MenuItem>();
+
+        for (var i = 0; i < _boundVm.RecentFiles.Count; i++)
+        {
+            var path = _boundVm.RecentFiles[i];
+            var item = new MenuItem
+            {
+                Header = $"{i + 1}. {path}",
+                Tag = path,
+            };
+            item.Click += OnOpenRecentMenuItemClicked;
+            items.Add(item);
+        }
+
+        OpenRecentMenu.ItemsSource = items;
+    }
+
+    private async void OnOpenRecentMenuItemClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        if (Vm is null || sender is not MenuItem { Tag: string path })
+        {
+            return;
+        }
+
+        FlushPendingPropertyHistory();
+
+        if (!File.Exists(path))
+        {
+            Vm.RemoveRecentFile(path);
+            Vm.StatusText = $"Recent file not found: {path}";
+            return;
+        }
+
+        var content = await File.ReadAllTextAsync(path);
+        if (!Vm.TryImportDraftAxaml(content, out var error))
+        {
+            Vm.StatusText = $"Open failed: {error}";
+            return;
+        }
+
+        Vm.MarkDocumentLoaded(path);
+        Vm.StatusText = $"Opened {Path.GetFileName(path)}";
     }
 
     private void OnCanvasPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
         if (e.PropertyName == nameof(CanvasViewModel.SelectedElement))
+        {
             RebindSelection();
+        }
     }
 
-    // SelectedElement 교체 시 기즈모 + PropertyGrid 모두 갱신
     private void RebindSelection()
     {
+        FlushPendingPropertyHistory();
+
+        if (_boundVisual is not null)
+        {
+            _boundVisual.PropertyChanged -= OnSelectedVisualPropertyChanged;
+        }
+
         if (_boundElement is not null)
+        {
             _boundElement.PropertyChanged -= OnElementPropertyChanged;
+        }
 
         _boundElement = _boundCanvas?.SelectedElement;
+        _boundVisual = _boundElement?.Visual;
 
         if (_boundElement is not null)
+        {
             _boundElement.PropertyChanged += OnElementPropertyChanged;
+        }
 
-        // PropertyGrid에 실제 Avalonia Control 전달 (선택 해제 시 null → 빈 상태)
+        if (_boundVisual is not null)
+        {
+            _boundVisual.PropertyChanged += OnSelectedVisualPropertyChanged;
+        }
+
         PropGrid.Content = _boundElement?.Visual;
-
         UpdateHandlePositions();
+    }
+
+    private void OnSelectedVisualPropertyChanged(object? sender, AvaloniaPropertyChangedEventArgs e)
+    {
+        if (sender is not Control control || !IsUndoTrackedVisualProperty(control, e.Property.Name))
+        {
+            return;
+        }
+
+        if (!_hasPendingPropertyEdit)
+        {
+            Vm?.BeginCanvasMutation(MainWindowViewModel.HistoryActionType.EditProperty, "Updated control properties.");
+            _hasPendingPropertyEdit = true;
+        }
+
+        _propertyEditTimer.Stop();
+        _propertyEditTimer.Start();
+    }
+
+    private void OnPropertyEditTimerTick(object? sender, EventArgs e)
+    {
+        _propertyEditTimer.Stop();
+        FlushPendingPropertyHistory();
+    }
+
+    private void FlushPendingPropertyHistory()
+    {
+        if (!_hasPendingPropertyEdit)
+        {
+            return;
+        }
+
+        _hasPendingPropertyEdit = false;
+        Vm?.CommitCanvasMutation();
+    }
+
+    private static bool IsUndoTrackedVisualProperty(Control control, string propertyName)
+    {
+        if (control is Button)
+        {
+            return propertyName == "Content";
+        }
+
+        if (control is TextBox)
+        {
+            return propertyName is "Text" or "Watermark";
+        }
+
+        if (control is StackPanel)
+        {
+            return propertyName is "Orientation" or "Spacing";
+        }
+
+        if (control is Grid)
+        {
+            return propertyName == "ShowGridLines";
+        }
+
+        return false;
     }
 
     private void OnElementPropertyChanged(object? sender, PropertyChangedEventArgs e)
@@ -84,59 +330,70 @@ public partial class MainWindow : Window
     private void UpdateHandlePositions()
     {
         var el = _boundElement;
-        if (el is null) return;
+        if (el is null)
+        {
+            return;
+        }
 
-        double left = el.X;
-        double top = el.Y;
-        double right = el.X + el.Width;
-        double bottom = el.Y + el.Height;
-        double midX = el.X + el.Width / 2;
-        double midY = el.Y + el.Height / 2;
+        var left = el.X;
+        var top = el.Y;
+        var right = el.X + el.Width;
+        var bottom = el.Y + el.Height;
+        var midX = el.X + el.Width / 2;
+        var midY = el.Y + el.Height / 2;
 
         Place(HandleNW, left, top);
-        Place(HandleN,  midX, top);
+        Place(HandleN, midX, top);
         Place(HandleNE, right, top);
-        Place(HandleE,  right, midY);
+        Place(HandleE, right, midY);
         Place(HandleSE, right, bottom);
-        Place(HandleS,  midX, bottom);
+        Place(HandleS, midX, bottom);
         Place(HandleSW, left, bottom);
-        Place(HandleW,  left, midY);
+        Place(HandleW, left, midY);
     }
 
-    private static void Place(Rectangle r, double cx, double cy)
+    private static void Place(Rectangle rectangle, double cx, double cy)
     {
-        Canvas.SetLeft(r, cx - HandleHalf);
-        Canvas.SetTop(r, cy - HandleHalf);
+        Canvas.SetLeft(rectangle, cx - HandleHalf);
+        Canvas.SetTop(rectangle, cy - HandleHalf);
     }
 
-    // 빈 캔버스 클릭 → 툴박스에서 컨트롤 배치
     private void OnDesignHostPointerPressed(object? sender, PointerPressedEventArgs e)
     {
-        if (Vm is null) return;
-        if (sender is not Control host) return;
+        if (Vm is null || sender is not Control host)
+        {
+            return;
+        }
 
         var point = e.GetPosition(host);
         Vm.PlaceFromToolbox(point.X, point.Y);
         e.Handled = true;
     }
 
-    // 요소 본체 클릭 → 선택 + Move 드래그 시작
     private void OnElementPointerPressed(object? sender, PointerPressedEventArgs e)
     {
-        if (Vm is null) return;
-        if (sender is not Control { DataContext: DesignElement element }) return;
+        if (Vm is null || sender is not Control { DataContext: DesignElement element })
+        {
+            return;
+        }
 
         Vm.SelectElement(element);
         BeginDrag(DragMode.Move, element, e);
         e.Handled = true;
     }
 
-    // 핸들 클릭 → 해당 방향 Resize 드래그 시작
     private void OnHandlePressed(object? sender, PointerPressedEventArgs e)
     {
-        if (sender is not Rectangle { Tag: string tag }) return;
+        if (sender is not Rectangle { Tag: string tag })
+        {
+            return;
+        }
+
         var target = _boundElement;
-        if (target is null) return;
+        if (target is null)
+        {
+            return;
+        }
 
         var mode = tag switch
         {
@@ -150,7 +407,11 @@ public partial class MainWindow : Window
             "SW" => DragMode.SW,
             _ => DragMode.None,
         };
-        if (mode == DragMode.None) return;
+
+        if (mode == DragMode.None)
+        {
+            return;
+        }
 
         BeginDrag(mode, target, e);
         e.Handled = true;
@@ -165,24 +426,31 @@ public partial class MainWindow : Window
         _origY = target.Y;
         _origW = target.Width;
         _origH = target.Height;
-        // DesignHost에 포인터 캡처 → 이후 Moved/Released가 항상 DesignHost로 라우팅
+
+        Vm?.BeginCanvasMutation(MainWindowViewModel.HistoryActionType.TransformElement, "Updated element position/size.");
         e.Pointer.Capture(DesignHost);
     }
 
     private void OnDragPointerMoved(object? sender, PointerEventArgs e)
     {
-        if (_dragMode == DragMode.None || _dragTarget is null) return;
+        if (_dragMode == DragMode.None || _dragTarget is null)
+        {
+            return;
+        }
 
         var p = e.GetPosition(DesignHost);
-        double dx = p.X - _dragStart.X;
-        double dy = p.Y - _dragStart.Y;
+        var dx = p.X - _dragStart.X;
+        var dy = p.Y - _dragStart.Y;
 
         ApplyDrag(dx, dy);
     }
 
     private void ApplyDrag(double dx, double dy)
     {
-        if (_dragTarget is null) return;
+        if (_dragTarget is null)
+        {
+            return;
+        }
 
         switch (_dragMode)
         {
@@ -221,11 +489,14 @@ public partial class MainWindow : Window
         }
     }
 
-    // 왼쪽 엣지 드래그: 폭은 줄이고 X는 늘려 오른쪽 엣지 고정. 최소 크기에 닿으면 X를 클램프
     private void ResizeLeft(double dx)
     {
-        if (_dragTarget is null) return;
-        double newW = _origW - dx;
+        if (_dragTarget is null)
+        {
+            return;
+        }
+
+        var newW = _origW - dx;
         if (newW < MinSize)
         {
             _dragTarget.Width = MinSize;
@@ -240,8 +511,12 @@ public partial class MainWindow : Window
 
     private void ResizeTop(double dy)
     {
-        if (_dragTarget is null) return;
-        double newH = _origH - dy;
+        if (_dragTarget is null)
+        {
+            return;
+        }
+
+        var newH = _origH - dy;
         if (newH < MinSize)
         {
             _dragTarget.Height = MinSize;
@@ -256,10 +531,98 @@ public partial class MainWindow : Window
 
     private void OnDragPointerReleased(object? sender, PointerReleasedEventArgs e)
     {
-        if (_dragMode == DragMode.None) return;
+        if (_dragMode == DragMode.None)
+        {
+            return;
+        }
+
         _dragMode = DragMode.None;
         _dragTarget = null;
         e.Pointer.Capture(null);
         e.Handled = true;
+
+        Vm?.CommitCanvasMutation();
+    }
+
+    private async Task OpenStorageFileAsync(IStorageFile file)
+    {
+        if (Vm is null)
+        {
+            return;
+        }
+
+        await using var stream = await file.OpenReadAsync();
+        using var reader = new StreamReader(stream);
+        var content = await reader.ReadToEndAsync();
+
+        if (!Vm.TryImportDraftAxaml(content, out var error))
+        {
+            Vm.StatusText = $"Open failed: {error}";
+            return;
+        }
+
+        var localPath = file.TryGetLocalPath();
+        if (!string.IsNullOrWhiteSpace(localPath))
+        {
+            Vm.MarkDocumentLoaded(localPath);
+            Vm.StatusText = $"Opened {Path.GetFileName(localPath)}";
+        }
+        else
+        {
+            Vm.StatusText = $"Opened {file.Name}";
+        }
+    }
+
+    private async Task SaveDocumentAsync(bool forceSaveAs)
+    {
+        if (Vm is null)
+        {
+            return;
+        }
+
+        FlushPendingPropertyHistory();
+
+        var targetPath = forceSaveAs ? null : Vm.CurrentDocumentPath;
+        if (string.IsNullOrWhiteSpace(targetPath))
+        {
+            var file = await StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
+            {
+                Title = "Save AXAML",
+                SuggestedFileName = "design-draft.axaml",
+                DefaultExtension = "axaml",
+                FileTypeChoices =
+                [
+                    new FilePickerFileType("AXAML") { Patterns = ["*.axaml"] }
+                ]
+            });
+
+            if (file is null)
+            {
+                return;
+            }
+
+            await using var stream = await file.OpenWriteAsync();
+            stream.SetLength(0);
+            using var writer = new StreamWriter(stream);
+            await writer.WriteAsync(Vm.ExportFullAxaml());
+            await writer.FlushAsync();
+
+            var pickedPath = file.TryGetLocalPath();
+            if (!string.IsNullOrWhiteSpace(pickedPath))
+            {
+                Vm.MarkDocumentSaved(pickedPath);
+                Vm.StatusText = $"Saved {Path.GetFileName(pickedPath)}";
+            }
+            else
+            {
+                Vm.StatusText = $"Saved {file.Name}";
+            }
+
+            return;
+        }
+
+        await File.WriteAllTextAsync(targetPath, Vm.ExportFullAxaml());
+        Vm.MarkDocumentSaved(targetPath);
+        Vm.StatusText = $"Saved {Path.GetFileName(targetPath)}";
     }
 }

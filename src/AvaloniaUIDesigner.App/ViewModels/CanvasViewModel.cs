@@ -1,6 +1,14 @@
+﻿using System;
+using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Collections.Specialized;
+using System.Globalization;
+using System.Text.Json;
 using Avalonia.Controls;
+using Avalonia.Layout;
+using AvaloniaUIDesigner.App.Designer.Contracts;
+using AvaloniaUIDesigner.App.Designer.Core;
+using AvaloniaUIDesigner.App.Designer.Services;
 using AvaloniaUIDesigner.App.Models;
 using CommunityToolkit.Mvvm.ComponentModel;
 
@@ -8,14 +16,24 @@ namespace AvaloniaUIDesigner.App.ViewModels;
 
 public partial class CanvasViewModel : ViewModelBase
 {
+    private readonly IComponentCatalog _componentCatalog;
+    private readonly IControlRenderer _renderer;
+
     public CanvasViewModel()
+        : this(new BuiltInComponentCatalog(), new DefaultControlRenderer())
     {
+    }
+
+    public CanvasViewModel(IComponentCatalog componentCatalog, IControlRenderer renderer)
+    {
+        _componentCatalog = componentCatalog;
+        _renderer = renderer;
         Elements.CollectionChanged += OnElementsChanged;
     }
 
     public ObservableCollection<DesignElement> Elements { get; } = new();
 
-    public string PlaceholderText { get; } = "툴박스에서 컨트롤을 선택 후 캔버스를 클릭하세요";
+    public string PlaceholderText { get; } = "Select a control in Toolbox, then click the canvas.";
 
     [ObservableProperty]
     private bool _hasElements;
@@ -28,10 +46,84 @@ public partial class CanvasViewModel : ViewModelBase
 
     public DesignElement PlaceElement(ToolboxItem item, double x, double y)
     {
-        var (visual, width, height) = CreateVisual(item);
+        var (visual, width, height) = CreateVisualByType(item.AvaloniaTypeName, item.DisplayName);
+        return AddElement(item.DisplayName, item.AvaloniaTypeName, visual, x, y, width, height, select: true);
+    }
+
+    public DesignElement AddElementFromSnapshot(DesignerElementSnapshot snapshot, bool select = false)
+    {
+        var (visual, defaultWidth, defaultHeight) = CreateVisualByType(snapshot.TypeName, snapshot.DisplayName);
+        var width = snapshot.Width > 0 ? snapshot.Width : defaultWidth;
+        var height = snapshot.Height > 0 ? snapshot.Height : defaultHeight;
+
+        ApplyVisualProperties(visual, snapshot.VisualProperties);
+
+        return AddElement(
+            snapshot.DisplayName,
+            snapshot.TypeName,
+            visual,
+            snapshot.X,
+            snapshot.Y,
+            width,
+            height,
+            select,
+            preserveDisplayName: true);
+    }
+
+    public void Clear()
+    {
+        Elements.Clear();
+        SelectedElement = null;
+    }
+
+    public void Select(DesignElement? element) => SelectedElement = element;
+
+    public bool RemoveElement(DesignElement element)
+    {
+        var removed = Elements.Remove(element);
+        if (!removed)
+        {
+            return false;
+        }
+
+        if (ReferenceEquals(SelectedElement, element))
+        {
+            SelectedElement = null;
+        }
+
+        return true;
+    }
+
+    partial void OnSelectedElementChanged(DesignElement? oldValue, DesignElement? newValue)
+    {
+        if (oldValue is not null)
+        {
+            oldValue.IsSelected = false;
+        }
+
+        if (newValue is not null)
+        {
+            newValue.IsSelected = true;
+        }
+    }
+
+    private void OnElementsChanged(object? sender, NotifyCollectionChangedEventArgs e)
+        => HasElements = Elements.Count > 0;
+
+    private DesignElement AddElement(
+        string displayPrefix,
+        string typeName,
+        Control visual,
+        double x,
+        double y,
+        double width,
+        double height,
+        bool select,
+        bool preserveDisplayName = false)
+    {
         var element = new DesignElement(
-            displayName: $"{item.DisplayName}{Elements.Count + 1}",
-            typeName: item.AvaloniaTypeName,
+            displayName: preserveDisplayName ? displayPrefix : BuildUniqueDisplayName(displayPrefix),
+            typeName: typeName,
             visual: visual,
             x: x,
             y: y,
@@ -39,30 +131,149 @@ public partial class CanvasViewModel : ViewModelBase
             height: height);
 
         Elements.Add(element);
-        SelectedElement = element;
+        if (select)
+        {
+            SelectedElement = element;
+        }
+
         return element;
     }
 
-    public void Select(DesignElement? element) => SelectedElement = element;
-
-    partial void OnSelectedElementChanged(DesignElement? oldValue, DesignElement? newValue)
+    private (Control Visual, double Width, double Height) CreateVisualByType(string typeName, string displayName)
     {
-        if (oldValue is not null) oldValue.IsSelected = false;
-        if (newValue is not null) newValue.IsSelected = true;
-    }
-
-    private void OnElementsChanged(object? sender, NotifyCollectionChangedEventArgs e)
-        => HasElements = Elements.Count > 0;
-
-    // v0.2: 하드코딩 팩토리. v0.3+에서 리플렉션/플러그인화 예정.
-    private static (Control Visual, double Width, double Height) CreateVisual(ToolboxItem item)
-    {
-        return item.AvaloniaTypeName switch
+        if (_componentCatalog.TryGet(typeName, out var definition))
         {
-            "Avalonia.Controls.Button" => (new Button { Content = "Button" }, 100d, 32d),
-            "Avalonia.Controls.TextBox" => (new TextBox { Text = "TextBox", Watermark = "입력" }, 160d, 32d),
-            "Avalonia.Controls.TextBlock" => (new TextBlock { Text = "TextBlock", VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center }, 100d, 24d),
-            _ => (new TextBlock { Text = $"[알 수 없음: {item.DisplayName}]" }, 160d, 24d),
-        };
+            return (_renderer.CreateControl(definition), definition.DefaultWidth, definition.DefaultHeight);
+        }
+
+        return (
+            new TextBlock { Text = $"[Unsupported: {displayName}]" },
+            160,
+            24);
     }
+
+    private static void ApplyVisualProperties(Control visual, IReadOnlyDictionary<string, string>? properties)
+    {
+        if (properties is null)
+        {
+            return;
+        }
+
+        if (visual is Button button)
+        {
+            if (properties.TryGetValue("Content", out var content))
+            {
+                button.Content = content;
+            }
+
+            return;
+        }
+
+        if (visual is TextBox textBox)
+        {
+            if (properties.TryGetValue("Text", out var text))
+            {
+                textBox.Text = text;
+            }
+
+            if (properties.TryGetValue("Watermark", out var watermark))
+            {
+                textBox.Watermark = watermark;
+            }
+
+            return;
+        }
+
+        if (visual is StackPanel stackPanel)
+        {
+            if (properties.TryGetValue("Orientation", out var orientation)
+                && Enum.TryParse<Orientation>(orientation, ignoreCase: true, out var parsedOrientation))
+            {
+                stackPanel.Orientation = parsedOrientation;
+            }
+
+            if (properties.TryGetValue("Spacing", out var spacing)
+                && double.TryParse(spacing, NumberStyles.Float, CultureInfo.InvariantCulture, out var parsedSpacing))
+            {
+                stackPanel.Spacing = parsedSpacing;
+            }
+
+            if (properties.TryGetValue("__children", out var childrenJson))
+            {
+                RestoreStackPanelChildren(stackPanel, childrenJson);
+            }
+
+            return;
+        }
+
+        if (visual is Grid grid
+            && properties.TryGetValue("ShowGridLines", out var showGrid)
+            && bool.TryParse(showGrid, out var parsedShowGrid))
+        {
+            grid.ShowGridLines = parsedShowGrid;
+        }
+    }
+
+    private static void RestoreStackPanelChildren(StackPanel stackPanel, string json)
+    {
+        stackPanel.Children.Clear();
+
+        if (string.IsNullOrWhiteSpace(json))
+        {
+            return;
+        }
+
+        List<StackPanelChildSnapshot>? children;
+        try
+        {
+            children = JsonSerializer.Deserialize<List<StackPanelChildSnapshot>>(json);
+        }
+        catch
+        {
+            return;
+        }
+
+        if (children is null)
+        {
+            return;
+        }
+
+        foreach (var child in children)
+        {
+            var control = child.TypeName switch
+            {
+                "TextBlock" => new TextBlock
+                {
+                    Text = child.Text ?? string.Empty,
+                },
+                "Button" => new Button
+                {
+                    Content = child.Content ?? string.Empty,
+                },
+                "TextBox" => new TextBox
+                {
+                    Text = child.Text ?? string.Empty,
+                    Watermark = child.Watermark,
+                },
+                _ => null,
+            };
+
+            if (control is not null)
+            {
+                stackPanel.Children.Add(control);
+            }
+        }
+    }
+
+    private string BuildUniqueDisplayName(string displayPrefix)
+    {
+        var index = Elements.Count + 1;
+        return $"{displayPrefix}{index}";
+    }
+
+    private sealed record StackPanelChildSnapshot(
+        string TypeName,
+        string? Text = null,
+        string? Content = null,
+        string? Watermark = null);
 }

@@ -1,46 +1,51 @@
-<Window xmlns="https://github.com/avaloniaui"
+﻿<Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vm="using:AvaloniaUIDesigner.App.ViewModels"
         xmlns:pg="using:Avalonia.PropertyGrid.Controls"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-        mc:Ignorable="d" d:DesignWidth="1280" d:DesignHeight="800"
+        mc:Ignorable="d"
+        d:DesignWidth="1280"
+        d:DesignHeight="800"
         x:Class="AvaloniaUIDesigner.App.Views.MainWindow"
         x:DataType="vm:MainWindowViewModel"
         Icon="/Assets/avalonia-logo.ico"
         Title="Avalonia UI Designer"
-        Width="1280" Height="800">
+        Width="1280"
+        Height="800"
+        KeyDown="OnWindowKeyDown">
 
     <Design.DataContext>
         <vm:MainWindowViewModel/>
     </Design.DataContext>
 
     <DockPanel>
-        <!-- 상단 메뉴바 -->
         <Menu DockPanel.Dock="Top">
-            <MenuItem Header="파일(_F)">
-                <MenuItem Header="새 폼(_N)"/>
-                <MenuItem Header="열기(_O)..."/>
-                <MenuItem Header="저장(_S)"/>
+            <MenuItem Header="File">
+                <MenuItem Header="New" Click="OnNewMenuClicked"/>
+                <MenuItem Header="Open..." Click="OnOpenMenuClicked"/>
+                <MenuItem Header="Open Recent" x:Name="OpenRecentMenu"/>
                 <Separator/>
-                <MenuItem Header="종료(_X)"/>
+                <MenuItem Header="Save" Click="OnSaveMenuClicked"/>
+                <MenuItem Header="Save As..." Click="OnSaveAsMenuClicked"/>
+                <Separator/>
+                <MenuItem Header="Exit" Click="OnExitMenuClicked"/>
             </MenuItem>
-            <MenuItem Header="편집(_E)">
-                <MenuItem Header="실행 취소(_U)"/>
-                <MenuItem Header="다시 실행(_R)"/>
+            <MenuItem Header="Edit">
+                <MenuItem Header="Undo" Click="OnUndoMenuClicked" IsEnabled="{Binding CanUndo}"/>
+                <MenuItem Header="Redo" Click="OnRedoMenuClicked" IsEnabled="{Binding CanRedo}"/>
+                <Separator/>
+                <MenuItem Header="Delete" Click="OnDeleteMenuClicked"/>
             </MenuItem>
-            <MenuItem Header="보기(_V)"/>
-            <MenuItem Header="도움말(_H)"/>
+            <MenuItem Header="View"/>
+            <MenuItem Header="Help"/>
         </Menu>
 
-        <!-- 하단 상태바 -->
         <Border DockPanel.Dock="Bottom" Height="24" Background="#2D2D30" BorderBrush="#3F3F46" BorderThickness="0,1,0,0">
             <TextBlock Text="{Binding StatusText}" VerticalAlignment="Center" Margin="8,0" Foreground="#CCCCCC"/>
         </Border>
 
-        <!-- 4-Pane 영역 -->
         <Grid ColumnDefinitions="220,4,*,4,280">
-            <!-- 좌: 툴박스 -->
             <Border Grid.Column="0" Background="#252526" BorderBrush="#3F3F46" BorderThickness="0,0,1,0">
                 <DockPanel>
                     <Border DockPanel.Dock="Top" Background="#2D2D30" Padding="8,6">
@@ -48,7 +53,8 @@
                     </Border>
                     <ListBox ItemsSource="{Binding Toolbox.Items}"
                              SelectedItem="{Binding Toolbox.SelectedItem}"
-                             Background="Transparent" BorderThickness="0">
+                             Background="Transparent"
+                             BorderThickness="0">
                         <ListBox.ItemTemplate>
                             <DataTemplate>
                                 <TextBlock Text="{Binding DisplayName}" Padding="4,2"/>
@@ -60,18 +66,18 @@
 
             <GridSplitter Grid.Column="1" Background="#3F3F46" ResizeDirection="Columns"/>
 
-            <!-- 중: 캔버스 -->
             <Border Grid.Column="2" Background="#1E1E1E">
                 <DockPanel>
-                    <Border DockPanel.Dock="Top" Background="#2D2D30" Padding="8,6"
-                            BorderBrush="#3F3F46" BorderThickness="0,0,0,1">
+                    <Border DockPanel.Dock="Top" Background="#2D2D30" Padding="8,6" BorderBrush="#3F3F46" BorderThickness="0,0,0,1">
                         <TextBlock Text="Design Surface" FontWeight="SemiBold" Foreground="#CCCCCC"/>
                     </Border>
                     <Border Background="#252526" Margin="24" BorderBrush="#3F3F46" BorderThickness="1">
                         <Panel>
                             <TextBlock Text="{Binding Canvas.PlaceholderText}"
-                                       HorizontalAlignment="Center" VerticalAlignment="Center"
-                                       Foreground="#6D6D6D" FontStyle="Italic"
+                                       HorizontalAlignment="Center"
+                                       VerticalAlignment="Center"
+                                       Foreground="#6D6D6D"
+                                       FontStyle="Italic"
                                        IsHitTestVisible="False"
                                        IsVisible="{Binding !Canvas.HasElements}"/>
                             <ItemsControl Name="DesignHost"
@@ -103,17 +109,15 @@
                                     </DataTemplate>
                                 </ItemsControl.ItemTemplate>
                             </ItemsControl>
-                            <!-- 선택 기즈모: 8방향 리사이즈 핸들 (위치는 code-behind에서 갱신) -->
-                            <Canvas Name="SelectionOverlay"
-                                    IsVisible="{Binding Canvas.IsSelectionActive}">
+                            <Canvas Name="SelectionOverlay" IsVisible="{Binding Canvas.IsSelectionActive}">
                                 <Rectangle Name="HandleNW" Tag="NW" Width="10" Height="10" Fill="DodgerBlue" PointerPressed="OnHandlePressed"/>
-                                <Rectangle Name="HandleN"  Tag="N"  Width="10" Height="10" Fill="DodgerBlue" PointerPressed="OnHandlePressed"/>
+                                <Rectangle Name="HandleN" Tag="N" Width="10" Height="10" Fill="DodgerBlue" PointerPressed="OnHandlePressed"/>
                                 <Rectangle Name="HandleNE" Tag="NE" Width="10" Height="10" Fill="DodgerBlue" PointerPressed="OnHandlePressed"/>
-                                <Rectangle Name="HandleE"  Tag="E"  Width="10" Height="10" Fill="DodgerBlue" PointerPressed="OnHandlePressed"/>
+                                <Rectangle Name="HandleE" Tag="E" Width="10" Height="10" Fill="DodgerBlue" PointerPressed="OnHandlePressed"/>
                                 <Rectangle Name="HandleSE" Tag="SE" Width="10" Height="10" Fill="DodgerBlue" PointerPressed="OnHandlePressed"/>
-                                <Rectangle Name="HandleS"  Tag="S"  Width="10" Height="10" Fill="DodgerBlue" PointerPressed="OnHandlePressed"/>
+                                <Rectangle Name="HandleS" Tag="S" Width="10" Height="10" Fill="DodgerBlue" PointerPressed="OnHandlePressed"/>
                                 <Rectangle Name="HandleSW" Tag="SW" Width="10" Height="10" Fill="DodgerBlue" PointerPressed="OnHandlePressed"/>
-                                <Rectangle Name="HandleW"  Tag="W"  Width="10" Height="10" Fill="DodgerBlue" PointerPressed="OnHandlePressed"/>
+                                <Rectangle Name="HandleW" Tag="W" Width="10" Height="10" Fill="DodgerBlue" PointerPressed="OnHandlePressed"/>
                             </Canvas>
                         </Panel>
                     </Border>
@@ -122,7 +126,6 @@
 
             <GridSplitter Grid.Column="3" Background="#3F3F46" ResizeDirection="Columns"/>
 
-            <!-- 우: 오브젝트 트리 + 속성 검사기 -->
             <Grid Grid.Column="4" RowDefinitions="*,4,*">
                 <Border Grid.Row="0" Background="#252526" BorderBrush="#3F3F46" BorderThickness="1,0,0,0">
                     <DockPanel>
@@ -130,7 +133,9 @@
                             <TextBlock Text="Object Tree" FontWeight="SemiBold" Foreground="#CCCCCC"/>
                         </Border>
                         <TreeView ItemsSource="{Binding ObjectTree.Nodes}"
-                                  Background="Transparent" BorderThickness="0">
+                                  SelectedItem="{Binding ObjectTree.SelectedNode, Mode=TwoWay}"
+                                  Background="Transparent"
+                                  BorderThickness="0">
                             <TreeView.ItemTemplate>
                                 <TreeDataTemplate ItemsSource="{Binding Children}">
                                     <TextBlock Text="{Binding DisplayName}"/>
@@ -147,9 +152,7 @@
                         <Border DockPanel.Dock="Top" Background="#2D2D30" Padding="8,6">
                             <TextBlock Text="Properties" FontWeight="SemiBold" Foreground="#CCCCCC"/>
                         </Border>
-                        <pg:PropertyGrid Name="PropGrid"
-                                         IsQuickFilterVisible="False"
-                                         IsHeaderVisible="False"/>
+                        <pg:PropertyGrid Name="PropGrid" IsQuickFilterVisible="False" IsHeaderVisible="False"/>
                     </DockPanel>
                 </Border>
             </Grid>
