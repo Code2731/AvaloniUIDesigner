@@ -110,6 +110,14 @@ public sealed class PreviewWindow : Window
                 IsExpanded = true,
                 Content = new TextBlock { Text = "Expanded content", Margin = new Thickness(8) },
             },
+            "Avalonia.Controls.ScrollViewer" => new ScrollViewer
+            {
+                Content = new TextBlock
+                {
+                    Text = "Scrollable content\n\nUse Edit Content... to add more text.",
+                    Margin = new Thickness(8),
+                },
+            },
             "Avalonia.Controls.Border" => new Border
             {
                 Background = Brush.Parse("#F1F5F9"),
@@ -328,6 +336,9 @@ public sealed class PreviewWindow : Window
                 break;
             case Expander expander:
                 ApplyExpanderProperties(expander, properties);
+                break;
+            case ScrollViewer scrollViewer:
+                ApplyScrollViewerProperties(scrollViewer, properties);
                 break;
             case Border border:
                 ApplyBorderProperties(border, properties);
@@ -629,6 +640,14 @@ public sealed class PreviewWindow : Window
         if (properties.TryGetValue("__contentText", out var contentText))
         {
             expander.Content = new TextBlock { Text = contentText, Margin = new Thickness(8) };
+        }
+    }
+
+    private static void ApplyScrollViewerProperties(ScrollViewer scrollViewer, IReadOnlyDictionary<string, string> properties)
+    {
+        if (properties.TryGetValue("__contentText", out var contentText))
+        {
+            scrollViewer.Content = new TextBlock { Text = contentText, Margin = new Thickness(8) };
         }
     }
 

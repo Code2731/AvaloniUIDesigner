@@ -154,6 +154,19 @@ public sealed class BuiltInComponentCatalog : IComponentCatalog
                 Content = new TextBlock { Text = "Expanded content", Margin = new Thickness(8) },
             }),
         new(
+            DisplayName: "ScrollViewer",
+            AvaloniaTypeName: "Avalonia.Controls.ScrollViewer",
+            DefaultWidth: 260,
+            DefaultHeight: 160,
+            VisualFactory: static () => new ScrollViewer
+            {
+                Content = new TextBlock
+                {
+                    Text = "Scrollable content\n\nUse Edit Content... to add more text.",
+                    Margin = new Thickness(8),
+                },
+            }),
+        new(
             DisplayName: "Border",
             AvaloniaTypeName: "Avalonia.Controls.Border",
             DefaultWidth: 240,

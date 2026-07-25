@@ -827,6 +827,16 @@ public partial class CanvasViewModel : ViewModelBase
             return;
         }
 
+        if (visual is ScrollViewer scrollViewer)
+        {
+            if (properties.TryGetValue("__contentText", out var contentText))
+            {
+                SetScrollViewerContent(scrollViewer, contentText);
+            }
+
+            return;
+        }
+
         if (visual is Border border)
         {
             if (properties.TryGetValue("Background", out var background))
@@ -1031,6 +1041,9 @@ public partial class CanvasViewModel : ViewModelBase
 
     private static void SetExpanderContent(Expander expander, string contentText)
         => expander.Content = new TextBlock { Text = contentText, Margin = new Thickness(8) };
+
+    private static void SetScrollViewerContent(ScrollViewer scrollViewer, string contentText)
+        => scrollViewer.Content = new TextBlock { Text = contentText, Margin = new Thickness(8) };
 
     private static void TrySetBorderBackground(Border border, string value)
     {

@@ -305,7 +305,7 @@ public partial class MainWindow : Window
         var updatedContent = await ShowTextEditorDialogAsync(
             $"Edit Content - {controlName}",
             content,
-            "Enter the content shown when the Expander is open.");
+            "Enter the text shown inside the selected Expander or ScrollViewer.");
         if (updatedContent is not null)
         {
             Vm.SetSelectedExpanderContent(updatedContent);
