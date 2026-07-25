@@ -443,6 +443,14 @@ public partial class MainWindow : Window
             return;
         }
 
+        if (ctrl && e.Key == Key.F)
+        {
+            ObjectTreeSearch.Focus();
+            ObjectTreeSearch.SelectAll();
+            e.Handled = true;
+            return;
+        }
+
         if (ctrl && e.Key == Key.N)
         {
             await HandleNewCommandAsync();
