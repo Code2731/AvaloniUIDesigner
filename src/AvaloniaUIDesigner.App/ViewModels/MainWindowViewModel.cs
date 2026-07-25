@@ -333,10 +333,10 @@ public partial class MainWindowViewModel : ViewModelBase
 
     public void RemoveSelectedElement()
     {
-        var targets = Canvas.SelectedElements.ToList();
+        var targets = Canvas.SelectedElements.Where(element => !element.IsLocked).ToList();
         if (targets.Count == 0)
         {
-            StatusText = "No selected element to delete.";
+            StatusText = "No unlocked controls to delete.";
             return;
         }
 
