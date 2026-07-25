@@ -7,4 +7,5 @@ public interface IComponentCatalog
 {
     IReadOnlyList<DesignerComponentDefinition> GetAll();
     bool TryGet(string avaloniaTypeName, out DesignerComponentDefinition definition);
+    bool TryRegister(DesignerComponentDefinition definition, out string error);
 }

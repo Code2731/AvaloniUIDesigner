@@ -26,6 +26,7 @@ public partial class MainWindowViewModel : ViewModelBase
 
     private readonly IComponentCatalog _componentCatalog;
     private readonly IDesignerSerializer _serializer;
+    private readonly ComponentPackLoader _componentPackLoader = new();
     private readonly Stack<HistoryEntry> _undoStack = new();
     private readonly Stack<HistoryEntry> _redoStack = new();
 
@@ -122,6 +123,25 @@ public partial class MainWindowViewModel : ViewModelBase
         CommitCanvasMutation();
 
         StatusText = $"Placed {element.DisplayName} ({snappedX:0}, {snappedY:0})";
+    }
+
+    public bool TryLoadComponentPack(string json, out string result)
+    {
+        if (!_componentPackLoader.TryLoad(
+                json,
+                _componentCatalog,
+                displayName => Toolbox.FindItemByDisplayName(displayName) is null,
+                out var pack,
+                out var error))
+        {
+            result = error;
+            return false;
+        }
+
+        Toolbox.AddComponents(pack.Definitions);
+        result = $"Loaded {pack.Definitions.Count} component(s) from {pack.Name}.";
+        StatusText = result;
+        return true;
     }
 
     public void SetCanvasGridSize(double gridSize)

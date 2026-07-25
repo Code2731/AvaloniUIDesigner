@@ -1,0 +1,34 @@
+{
+  "name": "Form Controls",
+  "components": [
+    {
+      "displayName": "Primary Button",
+      "avaloniaTypeName": "Avalonia.Controls.Button",
+      "defaultWidth": 160,
+      "defaultHeight": 40,
+      "defaultProperties": {
+        "Content": "Continue"
+      }
+    },
+    {
+      "displayName": "Email Input",
+      "avaloniaTypeName": "Avalonia.Controls.TextBox",
+      "defaultWidth": 280,
+      "defaultHeight": 36,
+      "defaultProperties": {
+        "Watermark": "name@example.com"
+      }
+    },
+    {
+      "displayName": "Section Heading",
+      "avaloniaTypeName": "Avalonia.Controls.TextBlock",
+      "defaultWidth": 280,
+      "defaultHeight": 32,
+      "defaultProperties": {
+        "Text": "Section title",
+        "FontSize": "24",
+        "FontWeight": "Bold"
+      }
+    }
+  ]
+}

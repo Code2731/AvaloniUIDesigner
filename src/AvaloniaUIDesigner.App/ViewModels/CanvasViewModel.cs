@@ -123,7 +123,16 @@ public partial class CanvasViewModel : ViewModelBase
     public DesignElement PlaceElement(ToolboxItem item, double x, double y)
     {
         var (visual, width, height) = CreateVisualByType(item.AvaloniaTypeName, item.DisplayName);
-        return AddElement(item.DisplayName, item.AvaloniaTypeName, visual, x, y, width, height, select: true);
+        ApplyVisualProperties(visual, item.DefaultProperties);
+        return AddElement(
+            item.NamePrefix ?? item.DisplayName,
+            item.AvaloniaTypeName,
+            visual,
+            x,
+            y,
+            item.DefaultWidth ?? width,
+            item.DefaultHeight ?? height,
+            select: true);
     }
 
     public bool TrySetSelectedImageSource(string source)

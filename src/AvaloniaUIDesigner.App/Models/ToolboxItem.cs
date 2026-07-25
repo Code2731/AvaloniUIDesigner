@@ -6,7 +6,11 @@ namespace AvaloniaUIDesigner.App.Models;
 public sealed record ToolboxItem(
     string DisplayName,
     string AvaloniaTypeName,
-    IReadOnlyList<DesignerElementSnapshot>? PresetElements = null)
+    IReadOnlyList<DesignerElementSnapshot>? PresetElements = null,
+    double? DefaultWidth = null,
+    double? DefaultHeight = null,
+    IReadOnlyDictionary<string, string>? DefaultProperties = null,
+    string? NamePrefix = null)
 {
     public bool IsPreset => PresetElements is { Count: > 0 };
 }

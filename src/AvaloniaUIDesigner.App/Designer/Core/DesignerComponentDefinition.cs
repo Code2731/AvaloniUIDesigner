@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using Avalonia.Controls;
 
 namespace AvaloniaUIDesigner.App.Designer.Core;
@@ -8,4 +9,6 @@ public sealed record DesignerComponentDefinition(
     string AvaloniaTypeName,
     double DefaultWidth,
     double DefaultHeight,
-    Func<Control> VisualFactory);
+    Func<Control> VisualFactory,
+    IReadOnlyDictionary<string, string>? DefaultProperties = null,
+    string? NamePrefix = null);

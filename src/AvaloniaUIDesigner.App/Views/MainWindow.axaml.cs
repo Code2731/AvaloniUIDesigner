@@ -71,6 +71,37 @@ public partial class MainWindow : Window
         await HandleOpenCommandAsync();
     }
 
+    private async void OnLoadComponentPackMenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        if (Vm is null)
+        {
+            return;
+        }
+
+        var files = await StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
+        {
+            Title = "Load Component Pack",
+            AllowMultiple = false,
+            FileTypeFilter =
+            [
+                new FilePickerFileType("Component Pack JSON") { Patterns = ["*.json"] }
+            ]
+        });
+
+        if (files.Count == 0)
+        {
+            return;
+        }
+
+        await using var stream = await files[0].OpenReadAsync();
+        using var reader = new StreamReader(stream);
+        var json = await reader.ReadToEndAsync();
+        if (!Vm.TryLoadComponentPack(json, out var result))
+        {
+            Vm.StatusText = $"Could not load component pack: {result}";
+        }
+    }
+
     private async Task HandleOpenCommandAsync()
     {
         if (Vm is null)
@@ -1256,7 +1287,7 @@ public partial class MainWindow : Window
         _pendingToolboxDragItem = null;
         e.Pointer.Capture(null);
         var data = new DataObject();
-        data.Set(ToolboxDragDataFormat, item.AvaloniaTypeName);
+        data.Set(ToolboxDragDataFormat, item.DisplayName);
         await DragDrop.DoDragDrop(e, data, DragDropEffects.Copy);
         e.Handled = true;
     }
@@ -1293,8 +1324,8 @@ public partial class MainWindow : Window
     {
         ToolboxDropHint.IsVisible = false;
         if (Vm is null || sender is not Control host
-            || e.Data.Get(ToolboxDragDataFormat) is not string avaloniaTypeName
-            || Vm.Toolbox.FindItem(avaloniaTypeName) is not { } item)
+            || e.Data.Get(ToolboxDragDataFormat) is not string displayName
+            || Vm.Toolbox.FindItemByDisplayName(displayName) is not { } item)
         {
             e.DragEffects = DragDropEffects.None;
             return;

@@ -1,4 +1,6 @@
+using System;
 using System.Collections.Generic;
+using System.Linq;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Layout;
@@ -10,7 +12,7 @@ namespace AvaloniaUIDesigner.App.Designer.Services;
 
 public sealed class BuiltInComponentCatalog : IComponentCatalog
 {
-    private readonly IReadOnlyList<DesignerComponentDefinition> _definitions = new List<DesignerComponentDefinition>
+    private readonly List<DesignerComponentDefinition> _definitions = new()
     {
         new(
             DisplayName: "Button",
@@ -210,20 +212,47 @@ public sealed class BuiltInComponentCatalog : IComponentCatalog
             })
     };
 
+    private readonly Dictionary<string, DesignerComponentDefinition> _baseDefinitions;
+
+    public BuiltInComponentCatalog()
+    {
+        _baseDefinitions = _definitions.ToDictionary(
+            definition => definition.AvaloniaTypeName,
+            StringComparer.Ordinal);
+    }
+
     public IReadOnlyList<DesignerComponentDefinition> GetAll() => _definitions;
 
     public bool TryGet(string avaloniaTypeName, out DesignerComponentDefinition definition)
     {
-        foreach (var candidate in _definitions)
+        return _baseDefinitions.TryGetValue(avaloniaTypeName, out definition!);
+    }
+
+    public bool TryRegister(DesignerComponentDefinition definition, out string error)
+    {
+        if (string.IsNullOrWhiteSpace(definition.DisplayName))
         {
-            if (candidate.AvaloniaTypeName == avaloniaTypeName)
-            {
-                definition = candidate;
-                return true;
-            }
+            error = "Component display name is required.";
+            return false;
         }
 
-        definition = default!;
-        return false;
+        if (!_baseDefinitions.TryGetValue(definition.AvaloniaTypeName, out var baseDefinition))
+        {
+            error = $"Unsupported Avalonia type: {definition.AvaloniaTypeName}";
+            return false;
+        }
+
+        if (_definitions.Any(candidate => string.Equals(
+            candidate.DisplayName,
+            definition.DisplayName,
+            StringComparison.OrdinalIgnoreCase)))
+        {
+            error = $"A Toolbox item named '{definition.DisplayName}' already exists.";
+            return false;
+        }
+
+        _definitions.Add(definition with { VisualFactory = baseDefinition.VisualFactory });
+        error = string.Empty;
+        return true;
     }
 }

@@ -30,6 +30,7 @@
                     <MenuItem Header="Settings" Tag="Settings" Click="OnTemplateMenuClicked"/>
                     <MenuItem Header="Dashboard" Tag="Dashboard" Click="OnTemplateMenuClicked"/>
                 </MenuItem>
+                <MenuItem Header="Load Component Pack..." Click="OnLoadComponentPackMenuClicked"/>
                 <MenuItem Header="Open..." Click="OnOpenMenuClicked"/>
                 <MenuItem Header="Open Recent" x:Name="OpenRecentMenu"/>
                 <Separator/>

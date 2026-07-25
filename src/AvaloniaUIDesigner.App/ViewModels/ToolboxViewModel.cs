@@ -20,12 +20,12 @@ public partial class ToolboxViewModel : ViewModelBase
 
     public ToolboxViewModel(IComponentCatalog componentCatalog)
     {
-        Items = new ObservableCollection<ToolboxItem>(
-            componentCatalog
-                .GetAll()
-                .Select(def => new ToolboxItem(def.DisplayName, def.AvaloniaTypeName)));
+        _allItems = componentCatalog
+            .GetAll()
+            .Select(CreateToolboxItem)
+            .ToList();
 
-        Items.Add(new ToolboxItem(
+        _allItems.Add(new ToolboxItem(
             "Preset: Form Field",
             "Preset.FormField",
             [
@@ -35,7 +35,7 @@ public partial class ToolboxViewModel : ViewModelBase
                     new System.Collections.Generic.Dictionary<string, string> { ["Watermark"] = "Enter value" }),
             ]));
 
-        Items.Add(new ToolboxItem(
+        _allItems.Add(new ToolboxItem(
             "Preset: Volume Control",
             "Preset.VolumeControl",
             [
@@ -50,16 +50,22 @@ public partial class ToolboxViewModel : ViewModelBase
                     }),
             ]));
 
-        _allItems = Items.ToList();
+        Items = new ObservableCollection<ToolboxItem>(_allItems);
     }
 
     public ObservableCollection<ToolboxItem> Items { get; }
 
-    public ToolboxItem? FindItem(string avaloniaTypeName) =>
+    public ToolboxItem? FindItemByDisplayName(string displayName) =>
         _allItems.FirstOrDefault(item => string.Equals(
-            item.AvaloniaTypeName,
-            avaloniaTypeName,
-            System.StringComparison.Ordinal));
+            item.DisplayName,
+            displayName,
+            System.StringComparison.OrdinalIgnoreCase));
+
+    public void AddComponents(IEnumerable<DesignerComponentDefinition> definitions)
+    {
+        _allItems.AddRange(definitions.Select(CreateToolboxItem));
+        ApplyFilter();
+    }
 
     public string SearchResultText => string.IsNullOrWhiteSpace(SearchText)
         ? $"{Items.Count} controls"
@@ -73,8 +79,13 @@ public partial class ToolboxViewModel : ViewModelBase
 
     partial void OnSearchTextChanged(string value)
     {
+        ApplyFilter();
+    }
+
+    private void ApplyFilter()
+    {
         var selected = SelectedItem;
-        var query = value.Trim();
+        var query = SearchText.Trim();
         var matches = string.IsNullOrWhiteSpace(query)
             ? _allItems
             : _allItems.Where(item => item.DisplayName.Contains(query, System.StringComparison.OrdinalIgnoreCase)
@@ -94,4 +105,12 @@ public partial class ToolboxViewModel : ViewModelBase
 
         OnPropertyChanged(nameof(SearchResultText));
     }
+
+    private static ToolboxItem CreateToolboxItem(DesignerComponentDefinition definition) => new(
+        definition.DisplayName,
+        definition.AvaloniaTypeName,
+        DefaultWidth: definition.DefaultWidth,
+        DefaultHeight: definition.DefaultHeight,
+        DefaultProperties: definition.DefaultProperties,
+        NamePrefix: definition.NamePrefix);
 }
