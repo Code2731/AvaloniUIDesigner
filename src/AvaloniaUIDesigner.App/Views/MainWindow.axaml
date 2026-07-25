@@ -72,6 +72,9 @@
                 <MenuItem Header="Order" IsEnabled="{Binding Canvas.IsSelectionActive}">
                     <MenuItem Header="Bring to Front" Click="OnBringToFrontMenuClicked"/>
                     <MenuItem Header="Send to Back" Click="OnSendToBackMenuClicked"/>
+                    <Separator/>
+                    <MenuItem Header="Bring Forward" Click="OnBringForwardMenuClicked"/>
+                    <MenuItem Header="Send Backward" Click="OnSendBackwardMenuClicked"/>
                 </MenuItem>
                 <Separator/>
                 <MenuItem Header="Center on Artboard" IsEnabled="{Binding Canvas.IsSelectionActive}">

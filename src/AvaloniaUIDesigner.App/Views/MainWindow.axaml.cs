@@ -251,6 +251,12 @@ public partial class MainWindow : Window
     private void OnSendToBackMenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
         => MoveSelectedElementsInLayerOrder(MainWindowViewModel.LayerOrderAction.SendToBack);
 
+    private void OnBringForwardMenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+        => MoveSelectedElementsInLayerOrder(MainWindowViewModel.LayerOrderAction.BringForward);
+
+    private void OnSendBackwardMenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+        => MoveSelectedElementsInLayerOrder(MainWindowViewModel.LayerOrderAction.SendBackward);
+
     private void MoveSelectedElementsInLayerOrder(MainWindowViewModel.LayerOrderAction action)
     {
         FlushPendingPropertyHistory();

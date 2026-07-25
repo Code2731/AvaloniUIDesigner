@@ -419,15 +419,15 @@ public partial class MainWindowViewModel : ViewModelBase
         {
             LayerOrderAction.BringToFront => Canvas.MoveElementsToFront(targets),
             LayerOrderAction.SendToBack => Canvas.MoveElementsToBack(targets),
+            LayerOrderAction.BringForward => Canvas.MoveElementsForward(targets),
+            LayerOrderAction.SendBackward => Canvas.MoveElementsBackward(targets),
             _ => false,
         };
 
         if (!changed)
         {
             _pendingMutation = null;
-            StatusText = action == LayerOrderAction.BringToFront
-                ? "Selected controls are already at the front."
-                : "Selected controls are already at the back.";
+            StatusText = DescribeLayerLimit(action);
             return;
         }
 
@@ -443,9 +443,7 @@ public partial class MainWindowViewModel : ViewModelBase
         }
 
         CommitCanvasMutation();
-        StatusText = action == LayerOrderAction.BringToFront
-            ? $"Brought {targets.Count} control(s) to front."
-            : $"Sent {targets.Count} control(s) to back.";
+        StatusText = DescribeLayerAction(action, targets.Count);
     }
 
     public void RemoveSelectedElement()
@@ -1343,6 +1341,26 @@ public partial class MainWindowViewModel : ViewModelBase
         };
     }
 
+    private static string DescribeLayerAction(LayerOrderAction action, int count)
+        => action switch
+        {
+            LayerOrderAction.BringToFront => $"Brought {count} control(s) to front.",
+            LayerOrderAction.SendToBack => $"Sent {count} control(s) to back.",
+            LayerOrderAction.BringForward => $"Brought {count} control(s) forward.",
+            LayerOrderAction.SendBackward => $"Sent {count} control(s) backward.",
+            _ => "Changed control layer order.",
+        };
+
+    private static string DescribeLayerLimit(LayerOrderAction action)
+        => action switch
+        {
+            LayerOrderAction.BringToFront => "Selected controls are already at the front.",
+            LayerOrderAction.SendToBack => "Selected controls are already at the back.",
+            LayerOrderAction.BringForward => "Selected controls cannot move further forward.",
+            LayerOrderAction.SendBackward => "Selected controls cannot move further backward.",
+            _ => "Selected controls cannot change layer order.",
+        };
+
     private void RegisterRecentFile(string path)
     {
         if (string.IsNullOrWhiteSpace(path))
@@ -1737,6 +1755,8 @@ public partial class MainWindowViewModel : ViewModelBase
     {
         BringToFront,
         SendToBack,
+        BringForward,
+        SendBackward,
     }
 
     private sealed record PendingMutation(DesignerCanvasDocument Before, HistoryActionType ActionType, string Message);

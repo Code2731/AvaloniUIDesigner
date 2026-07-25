@@ -277,6 +277,50 @@ public partial class CanvasViewModel : ViewModelBase
         return true;
     }
 
+    public bool MoveElementsForward(IEnumerable<DesignElement> elements)
+    {
+        var moving = new HashSet<DesignElement>(elements);
+        var changed = false;
+
+        // Walk from front to back so a selected block keeps its internal order.
+        for (var index = Elements.Count - 2; index >= 0; index--)
+        {
+            if (!moving.Contains(Elements[index]) || moving.Contains(Elements[index + 1]))
+            {
+                continue;
+            }
+
+            var next = Elements[index + 1];
+            Elements[index + 1] = Elements[index];
+            Elements[index] = next;
+            changed = true;
+        }
+
+        return changed;
+    }
+
+    public bool MoveElementsBackward(IEnumerable<DesignElement> elements)
+    {
+        var moving = new HashSet<DesignElement>(elements);
+        var changed = false;
+
+        // Walk from back to front so a selected block keeps its internal order.
+        for (var index = 1; index < Elements.Count; index++)
+        {
+            if (!moving.Contains(Elements[index]) || moving.Contains(Elements[index - 1]))
+            {
+                continue;
+            }
+
+            var previous = Elements[index - 1];
+            Elements[index - 1] = Elements[index];
+            Elements[index] = previous;
+            changed = true;
+        }
+
+        return changed;
+    }
+
     private void ReplaceSelection(IEnumerable<DesignElement> elements)
     {
         var next = elements
