@@ -826,6 +826,11 @@ public partial class MainWindow : Window
             return propertyName is "Minimum" or "Maximum" or "Increment" or "Value";
         }
 
+        if (control is TabControl)
+        {
+            return propertyName == "SelectedIndex";
+        }
+
         if (control is Border)
         {
             return propertyName is "Background" or "BorderBrush" or "BorderThickness" or "CornerRadius";

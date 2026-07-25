@@ -308,10 +308,14 @@ public partial class MainWindowViewModel : ViewModelBase
                 controlName = target.DisplayName;
                 items = ReadItems(listBox);
                 return true;
+            case TabControl tabControl:
+                controlName = target.DisplayName;
+                items = ReadTabHeaders(tabControl);
+                return true;
             default:
                 controlName = string.Empty;
                 items = Array.Empty<string>();
-                StatusText = "Item editing is available for ComboBox and ListBox controls.";
+                StatusText = "Item editing is available for ComboBox, ListBox, and TabControl controls.";
                 return false;
         }
     }
@@ -321,7 +325,7 @@ public partial class MainWindowViewModel : ViewModelBase
         var target = Canvas.SelectedElement;
         if (target is null || target.IsLocked)
         {
-            StatusText = "Select an unlocked ComboBox or ListBox to edit its items.";
+            StatusText = "Select an unlocked ComboBox, ListBox, or TabControl to edit its items.";
             return;
         }
 
@@ -362,8 +366,23 @@ public partial class MainWindowViewModel : ViewModelBase
                 StatusText = $"Updated {updatedItems.Count} ListBox item(s).";
                 return;
 
+            case TabControl tabControl:
+                if (ReadTabHeaders(tabControl).SequenceEqual(updatedItems, StringComparer.Ordinal))
+                {
+                    StatusText = "TabControl tabs are unchanged.";
+                    return;
+                }
+
+                BeginCanvasMutation(HistoryActionType.EditProperty, "Updated TabControl tabs.");
+                var tabControlSelectedIndex = tabControl.SelectedIndex;
+                ReplaceTabHeaders(tabControl, updatedItems);
+                tabControl.SelectedIndex = Math.Clamp(tabControlSelectedIndex, -1, updatedItems.Count - 1);
+                CommitCanvasMutation();
+                StatusText = $"Updated {updatedItems.Count} TabControl tab(s).";
+                return;
+
             default:
-                StatusText = "Item editing is available for ComboBox and ListBox controls.";
+                StatusText = "Item editing is available for ComboBox, ListBox, and TabControl controls.";
                 return;
         }
     }
@@ -1262,6 +1281,16 @@ public partial class MainWindowViewModel : ViewModelBase
             };
         }
 
+        if (visual is TabControl tabControl)
+        {
+            return new Dictionary<string, string>
+            {
+                ["SelectedIndex"] = tabControl.SelectedIndex.ToString(CultureInfo.InvariantCulture),
+                ["__tabs"] = SerializeTabHeaders(tabControl),
+                ["Opacity"] = tabControl.Opacity.ToString("0.###", CultureInfo.InvariantCulture),
+            };
+        }
+
         if (visual is Border border)
         {
             var properties = new Dictionary<string, string>
@@ -1314,6 +1343,13 @@ public partial class MainWindowViewModel : ViewModelBase
                 : item?.ToString() ?? string.Empty)
             .ToList();
 
+    private static IReadOnlyList<string> ReadTabHeaders(TabControl tabControl)
+        => tabControl.Items
+            .Select(item => item is TabItem tabItem
+                ? tabItem.Header?.ToString() ?? string.Empty
+                : item?.ToString() ?? string.Empty)
+            .ToList();
+
     private static void ReplaceItems(ItemsControl itemsControl, IReadOnlyList<string> items)
     {
         itemsControl.Items.Clear();
@@ -1322,6 +1358,22 @@ public partial class MainWindowViewModel : ViewModelBase
             itemsControl.Items.Add(item);
         }
     }
+
+    private static void ReplaceTabHeaders(TabControl tabControl, IReadOnlyList<string> headers)
+    {
+        tabControl.Items.Clear();
+        foreach (var header in headers)
+        {
+            tabControl.Items.Add(CreateTabItem(header));
+        }
+    }
+
+    private static TabItem CreateTabItem(string header)
+        => new()
+        {
+            Header = header,
+            Content = new TextBlock { Text = $"{header} content", Margin = new Thickness(12) },
+        };
 
     private static bool AreSameDocument(DesignerCanvasDocument left, DesignerCanvasDocument right)
     {
@@ -1589,6 +1641,10 @@ public partial class MainWindowViewModel : ViewModelBase
         {
             map["__items"] = SerializeItems(element);
         }
+        else if (string.Equals(element.Name.LocalName, "TabControl", StringComparison.OrdinalIgnoreCase))
+        {
+            map["__tabs"] = SerializeTabHeaders(element);
+        }
 
         return map.Count == 0 ? null : map;
     }
@@ -1612,6 +1668,7 @@ public partial class MainWindowViewModel : ViewModelBase
             "DatePicker" => propertyName == "SelectedDate",
             "TimePicker" => propertyName == "SelectedTime",
             "NumericUpDown" => propertyName is "Minimum" or "Maximum" or "Increment" or "Value",
+            "TabControl" => propertyName == "SelectedIndex",
             "Border" => propertyName is "Background" or "BorderBrush" or "BorderThickness" or "CornerRadius",
             "Grid" => propertyName == "ShowGridLines",
             "StackPanel" => propertyName is "Orientation" or "Spacing",
@@ -1985,6 +2042,9 @@ public partial class MainWindowViewModel : ViewModelBase
         return JsonSerializer.Serialize(items);
     }
 
+    private static string SerializeTabHeaders(TabControl tabControl)
+        => JsonSerializer.Serialize(ReadTabHeaders(tabControl));
+
     private static string SerializeItems(XElement itemsControlElement)
     {
         var items = itemsControlElement.Elements()
@@ -1993,6 +2053,16 @@ public partial class MainWindowViewModel : ViewModelBase
             .ToList();
 
         return JsonSerializer.Serialize(items);
+    }
+
+    private static string SerializeTabHeaders(XElement tabControlElement)
+    {
+        var headers = tabControlElement.Elements()
+            .Where(element => string.Equals(element.Name.LocalName, "TabItem", StringComparison.OrdinalIgnoreCase))
+            .Select(element => element.Attribute("Header")?.Value ?? string.Empty)
+            .ToList();
+
+        return JsonSerializer.Serialize(headers);
     }
 
     private static void WriteTopLevelElementAxaml(StringBuilder sb, DesignElement element, string indent)
@@ -2160,6 +2230,30 @@ public partial class MainWindowViewModel : ViewModelBase
                 }
 
                 sb.AppendLine(" />");
+                break;
+
+            case TabControl tabControl:
+                sb.Append(indent);
+                sb.Append("<TabControl");
+                AppendCanvasLayoutAttributes(sb, element);
+                AppendAttribute(sb, "SelectedIndex", tabControl.SelectedIndex.ToString(CultureInfo.InvariantCulture));
+                sb.AppendLine(">");
+                foreach (var header in ReadTabHeaders(tabControl))
+                {
+                    sb.Append(indent);
+                    sb.Append("  <TabItem");
+                    AppendAttribute(sb, "Header", header);
+                    sb.AppendLine(">");
+                    sb.Append(indent);
+                    sb.Append("    <TextBlock");
+                    AppendAttribute(sb, "Text", $"{header} content");
+                    sb.AppendLine(" />");
+                    sb.Append(indent);
+                    sb.AppendLine("  </TabItem>");
+                }
+
+                sb.Append(indent);
+                sb.AppendLine("</TabControl>");
                 break;
 
             case Border border:

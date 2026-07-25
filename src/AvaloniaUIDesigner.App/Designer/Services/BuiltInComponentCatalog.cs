@@ -105,6 +105,20 @@ public sealed class BuiltInComponentCatalog : IComponentCatalog
                 Value = 50,
             }),
         new(
+            DisplayName: "TabControl",
+            AvaloniaTypeName: "Avalonia.Controls.TabControl",
+            DefaultWidth: 320,
+            DefaultHeight: 180,
+            VisualFactory: static () => new TabControl
+            {
+                SelectedIndex = 0,
+                Items =
+                {
+                    new TabItem { Header = "Overview", Content = new TextBlock { Text = "Overview content", Margin = new Thickness(12) } },
+                    new TabItem { Header = "Details", Content = new TextBlock { Text = "Details content", Margin = new Thickness(12) } },
+                },
+            }),
+        new(
             DisplayName: "Border",
             AvaloniaTypeName: "Avalonia.Controls.Border",
             DefaultWidth: 240,

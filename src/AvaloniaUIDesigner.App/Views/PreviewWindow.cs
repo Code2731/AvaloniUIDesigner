@@ -87,6 +87,7 @@ public sealed class PreviewWindow : Window
                 Increment = 1,
                 Value = 50,
             },
+            "Avalonia.Controls.TabControl" => CreateDefaultTabControl(),
             "Avalonia.Controls.Border" => new Border
             {
                 Background = Brush.Parse("#F1F5F9"),
@@ -225,6 +226,9 @@ public sealed class PreviewWindow : Window
                 break;
             case NumericUpDown numericUpDown:
                 ApplyNumericUpDownProperties(numericUpDown, properties);
+                break;
+            case TabControl tabControl:
+                ApplyTabControlProperties(tabControl, properties);
                 break;
             case Border border:
                 ApplyBorderProperties(border, properties);
@@ -401,6 +405,55 @@ public sealed class PreviewWindow : Window
             numericUpDown.Value = parsedValue;
         }
     }
+
+    private static TabControl CreateDefaultTabControl()
+        => new()
+        {
+            SelectedIndex = 0,
+            Items =
+            {
+                CreateTabItem("Overview"),
+                CreateTabItem("Details"),
+            },
+        };
+
+    private static void ApplyTabControlProperties(TabControl tabControl, IReadOnlyDictionary<string, string> properties)
+    {
+        if (properties.TryGetValue("__tabs", out var tabsJson))
+        {
+            List<string>? tabs;
+            try
+            {
+                tabs = JsonSerializer.Deserialize<List<string>>(tabsJson);
+            }
+            catch
+            {
+                tabs = null;
+            }
+
+            if (tabs is not null)
+            {
+                tabControl.Items.Clear();
+                foreach (var tab in tabs)
+                {
+                    tabControl.Items.Add(CreateTabItem(tab));
+                }
+            }
+        }
+
+        if (properties.TryGetValue("SelectedIndex", out var selectedIndex)
+            && int.TryParse(selectedIndex, NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsedSelectedIndex))
+        {
+            tabControl.SelectedIndex = Math.Clamp(parsedSelectedIndex, -1, tabControl.Items.Count - 1);
+        }
+    }
+
+    private static TabItem CreateTabItem(string header)
+        => new()
+        {
+            Header = header,
+            Content = new TextBlock { Text = $"{header} content", Margin = new Thickness(12) },
+        };
 
     private static void ApplyListBoxProperties(ListBox listBox, IReadOnlyDictionary<string, string> properties)
     {

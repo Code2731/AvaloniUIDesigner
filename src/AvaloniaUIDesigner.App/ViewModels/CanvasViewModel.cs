@@ -651,6 +651,22 @@ public partial class CanvasViewModel : ViewModelBase
             return;
         }
 
+        if (visual is TabControl tabControl)
+        {
+            if (properties.TryGetValue("__tabs", out var tabsJson))
+            {
+                RestoreTabControlTabs(tabControl, tabsJson);
+            }
+
+            if (properties.TryGetValue("SelectedIndex", out var selectedIndex)
+                && int.TryParse(selectedIndex, NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsedSelectedIndex))
+            {
+                tabControl.SelectedIndex = Math.Clamp(parsedSelectedIndex, -1, tabControl.Items.Count - 1);
+            }
+
+            return;
+        }
+
         if (visual is Border border)
         {
             if (properties.TryGetValue("Background", out var background))
@@ -767,6 +783,37 @@ public partial class CanvasViewModel : ViewModelBase
             listBox.Items.Add(item);
         }
     }
+
+    private static void RestoreTabControlTabs(TabControl tabControl, string json)
+    {
+        List<string>? tabs;
+        try
+        {
+            tabs = JsonSerializer.Deserialize<List<string>>(json);
+        }
+        catch
+        {
+            return;
+        }
+
+        if (tabs is null)
+        {
+            return;
+        }
+
+        tabControl.Items.Clear();
+        foreach (var tab in tabs)
+        {
+            tabControl.Items.Add(CreateTabItem(tab));
+        }
+    }
+
+    private static TabItem CreateTabItem(string header)
+        => new()
+        {
+            Header = header,
+            Content = new TextBlock { Text = $"{header} content", Margin = new Thickness(12) },
+        };
 
     private static void TrySetBorderBackground(Border border, string value)
     {
