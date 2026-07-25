@@ -1250,6 +1250,18 @@ public partial class MainWindowViewModel : ViewModelBase
             };
         }
 
+        if (visual is NumericUpDown numericUpDown)
+        {
+            return new Dictionary<string, string>
+            {
+                ["Minimum"] = numericUpDown.Minimum.ToString(CultureInfo.InvariantCulture),
+                ["Maximum"] = numericUpDown.Maximum.ToString(CultureInfo.InvariantCulture),
+                ["Increment"] = numericUpDown.Increment.ToString(CultureInfo.InvariantCulture),
+                ["Value"] = numericUpDown.Value?.ToString(CultureInfo.InvariantCulture) ?? string.Empty,
+                ["Opacity"] = numericUpDown.Opacity.ToString("0.###", CultureInfo.InvariantCulture),
+            };
+        }
+
         if (visual is Border border)
         {
             var properties = new Dictionary<string, string>
@@ -1599,6 +1611,7 @@ public partial class MainWindowViewModel : ViewModelBase
             "Slider" or "ProgressBar" => propertyName is "Minimum" or "Maximum" or "Value",
             "DatePicker" => propertyName == "SelectedDate",
             "TimePicker" => propertyName == "SelectedTime",
+            "NumericUpDown" => propertyName is "Minimum" or "Maximum" or "Increment" or "Value",
             "Border" => propertyName is "Background" or "BorderBrush" or "BorderThickness" or "CornerRadius",
             "Grid" => propertyName == "ShowGridLines",
             "StackPanel" => propertyName is "Orientation" or "Spacing",
@@ -2129,6 +2142,21 @@ public partial class MainWindowViewModel : ViewModelBase
                 if (timePicker.SelectedTime is { } selectedTime)
                 {
                     AppendAttribute(sb, "SelectedTime", selectedTime.ToString("hh\\:mm", CultureInfo.InvariantCulture));
+                }
+
+                sb.AppendLine(" />");
+                break;
+
+            case NumericUpDown numericUpDown:
+                sb.Append(indent);
+                sb.Append("<NumericUpDown");
+                AppendCanvasLayoutAttributes(sb, element);
+                AppendAttribute(sb, "Minimum", numericUpDown.Minimum.ToString(CultureInfo.InvariantCulture));
+                AppendAttribute(sb, "Maximum", numericUpDown.Maximum.ToString(CultureInfo.InvariantCulture));
+                AppendAttribute(sb, "Increment", numericUpDown.Increment.ToString(CultureInfo.InvariantCulture));
+                if (numericUpDown.Value is { } value)
+                {
+                    AppendAttribute(sb, "Value", value.ToString(CultureInfo.InvariantCulture));
                 }
 
                 sb.AppendLine(" />");

@@ -821,6 +821,11 @@ public partial class MainWindow : Window
             return propertyName == "SelectedTime";
         }
 
+        if (control is NumericUpDown)
+        {
+            return propertyName is "Minimum" or "Maximum" or "Increment" or "Value";
+        }
+
         if (control is Border)
         {
             return propertyName is "Background" or "BorderBrush" or "BorderThickness" or "CornerRadius";

@@ -80,6 +80,13 @@ public sealed class PreviewWindow : Window
             "Avalonia.Controls.ProgressBar" => new ProgressBar { Minimum = 0, Maximum = 100, Value = 50 },
             "Avalonia.Controls.DatePicker" => new DatePicker(),
             "Avalonia.Controls.TimePicker" => new TimePicker(),
+            "Avalonia.Controls.NumericUpDown" => new NumericUpDown
+            {
+                Minimum = 0,
+                Maximum = 100,
+                Increment = 1,
+                Value = 50,
+            },
             "Avalonia.Controls.Border" => new Border
             {
                 Background = Brush.Parse("#F1F5F9"),
@@ -215,6 +222,9 @@ public sealed class PreviewWindow : Window
                 break;
             case TimePicker timePicker:
                 ApplyTimePickerProperties(timePicker, properties);
+                break;
+            case NumericUpDown numericUpDown:
+                ApplyNumericUpDownProperties(numericUpDown, properties);
                 break;
             case Border border:
                 ApplyBorderProperties(border, properties);
@@ -362,6 +372,33 @@ public sealed class PreviewWindow : Window
                 out var parsedSelectedTime))
         {
             timePicker.SelectedTime = parsedSelectedTime;
+        }
+    }
+
+    private static void ApplyNumericUpDownProperties(NumericUpDown numericUpDown, IReadOnlyDictionary<string, string> properties)
+    {
+        if (properties.TryGetValue("Minimum", out var minimum)
+            && decimal.TryParse(minimum, NumberStyles.Number, CultureInfo.InvariantCulture, out var parsedMinimum))
+        {
+            numericUpDown.Minimum = parsedMinimum;
+        }
+
+        if (properties.TryGetValue("Maximum", out var maximum)
+            && decimal.TryParse(maximum, NumberStyles.Number, CultureInfo.InvariantCulture, out var parsedMaximum))
+        {
+            numericUpDown.Maximum = parsedMaximum;
+        }
+
+        if (properties.TryGetValue("Increment", out var increment)
+            && decimal.TryParse(increment, NumberStyles.Number, CultureInfo.InvariantCulture, out var parsedIncrement))
+        {
+            numericUpDown.Increment = parsedIncrement;
+        }
+
+        if (properties.TryGetValue("Value", out var value)
+            && decimal.TryParse(value, NumberStyles.Number, CultureInfo.InvariantCulture, out var parsedValue))
+        {
+            numericUpDown.Value = parsedValue;
         }
     }
 

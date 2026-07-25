@@ -93,6 +93,18 @@ public sealed class BuiltInComponentCatalog : IComponentCatalog
             DefaultHeight: 32,
             VisualFactory: static () => new TimePicker()),
         new(
+            DisplayName: "NumericUpDown",
+            AvaloniaTypeName: "Avalonia.Controls.NumericUpDown",
+            DefaultWidth: 180,
+            DefaultHeight: 32,
+            VisualFactory: static () => new NumericUpDown
+            {
+                Minimum = 0,
+                Maximum = 100,
+                Increment = 1,
+                Value = 50,
+            }),
+        new(
             DisplayName: "Border",
             AvaloniaTypeName: "Avalonia.Controls.Border",
             DefaultWidth: 240,

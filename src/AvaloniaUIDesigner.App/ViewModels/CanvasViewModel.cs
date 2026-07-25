@@ -622,6 +622,35 @@ public partial class CanvasViewModel : ViewModelBase
             return;
         }
 
+        if (visual is NumericUpDown numericUpDown)
+        {
+            if (properties.TryGetValue("Minimum", out var minimum)
+                && decimal.TryParse(minimum, NumberStyles.Number, CultureInfo.InvariantCulture, out var parsedMinimum))
+            {
+                numericUpDown.Minimum = parsedMinimum;
+            }
+
+            if (properties.TryGetValue("Maximum", out var maximum)
+                && decimal.TryParse(maximum, NumberStyles.Number, CultureInfo.InvariantCulture, out var parsedMaximum))
+            {
+                numericUpDown.Maximum = parsedMaximum;
+            }
+
+            if (properties.TryGetValue("Increment", out var increment)
+                && decimal.TryParse(increment, NumberStyles.Number, CultureInfo.InvariantCulture, out var parsedIncrement))
+            {
+                numericUpDown.Increment = parsedIncrement;
+            }
+
+            if (properties.TryGetValue("Value", out var value)
+                && decimal.TryParse(value, NumberStyles.Number, CultureInfo.InvariantCulture, out var parsedValue))
+            {
+                numericUpDown.Value = parsedValue;
+            }
+
+            return;
+        }
+
         if (visual is Border border)
         {
             if (properties.TryGetValue("Background", out var background))
