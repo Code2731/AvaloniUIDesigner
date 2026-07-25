@@ -120,6 +120,20 @@ public partial class MainWindow : Window
         await HandleNewCommandAsync();
     }
 
+    private async void OnTemplateMenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        if (sender is not MenuItem { Tag: string templateName })
+        {
+            return;
+        }
+
+        FlushPendingPropertyHistory();
+        if (await EnsureCanContinueWithUnsavedChangesAsync())
+        {
+            Vm?.CreateDocumentFromTemplate(templateName);
+        }
+    }
+
     private async Task HandleNewCommandAsync()
     {
         FlushPendingPropertyHistory();

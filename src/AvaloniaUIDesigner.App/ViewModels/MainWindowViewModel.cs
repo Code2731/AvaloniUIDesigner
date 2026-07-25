@@ -414,6 +414,26 @@ public partial class MainWindowViewModel : ViewModelBase
         StatusText = "Created a new document.";
     }
 
+    public void CreateDocumentFromTemplate(string templateName)
+    {
+        var document = templateName switch
+        {
+            "Login" => CreateLoginTemplate(),
+            "Settings" => CreateSettingsTemplate(),
+            "Dashboard" => CreateDashboardTemplate(),
+            _ => throw new ArgumentOutOfRangeException(nameof(templateName), templateName, "Unknown document template."),
+        };
+
+        ApplyDocument(document);
+        _currentDocumentPath = null;
+        _pendingMutation = null;
+        ClearHistory();
+        IsDirty = true;
+        OnPropertyChanged(nameof(CurrentDocumentPath));
+        OnPropertyChanged(nameof(WindowTitle));
+        StatusText = $"Created {templateName} template. Save it to choose a file name.";
+    }
+
     public void MarkDocumentLoaded(string path)
     {
         _currentDocumentPath = path;
@@ -677,6 +697,48 @@ public partial class MainWindowViewModel : ViewModelBase
 
     private DesignerCanvasSettings CaptureCanvasSettings()
         => new(Canvas.ArtboardWidth, Canvas.ArtboardHeight, Canvas.ArtboardBackground);
+
+    private static DesignerCanvasDocument CreateLoginTemplate() => new(
+        [
+            new("Title", "Avalonia.Controls.TextBlock", 80, 64, 300, 36, Props("Text", "Welcome back")),
+            new("Email", "Avalonia.Controls.TextBox", 80, 126, 300, 32, Props("Watermark", "Email address")),
+            new("Password", "Avalonia.Controls.TextBox", 80, 170, 300, 32, Props("Watermark", "Password")),
+            new("RememberMe", "Avalonia.Controls.CheckBox", 80, 214, 220, 32, Props("Content", "Remember me")),
+            new("SignIn", "Avalonia.Controls.Button", 80, 262, 300, 36, Props("Content", "Sign in")),
+        ],
+        new DesignerCanvasSettings(520, 380, "#F7F9FC"));
+
+    private static DesignerCanvasDocument CreateSettingsTemplate() => new(
+        [
+            new("Title", "Avalonia.Controls.TextBlock", 64, 52, 360, 36, Props("Text", "Application settings")),
+            new("VolumeLabel", "Avalonia.Controls.TextBlock", 64, 122, 220, 24, Props("Text", "Volume")),
+            new("Volume", "Avalonia.Controls.Slider", 64, 150, 300, 32, Props("Minimum", "0", "Maximum", "100", "Value", "65")),
+            new("Notifications", "Avalonia.Controls.CheckBox", 64, 208, 300, 32, Props("Content", "Enable notifications")),
+            new("SaveSettings", "Avalonia.Controls.Button", 64, 270, 160, 36, Props("Content", "Save changes")),
+        ],
+        new DesignerCanvasSettings(560, 400, "#FFFFFF"));
+
+    private static DesignerCanvasDocument CreateDashboardTemplate() => new(
+        [
+            new("Title", "Avalonia.Controls.TextBlock", 48, 40, 520, 36, Props("Text", "Project dashboard")),
+            new("Summary", "Avalonia.Controls.TextBlock", 48, 96, 520, 24, Props("Text", "A quick overview of this week's progress")),
+            new("ProgressLabel", "Avalonia.Controls.TextBlock", 48, 158, 240, 24, Props("Text", "Completion")),
+            new("Progress", "Avalonia.Controls.Slider", 48, 186, 360, 32, Props("Minimum", "0", "Maximum", "100", "Value", "72")),
+            new("Refresh", "Avalonia.Controls.Button", 48, 252, 140, 36, Props("Content", "Refresh")),
+            new("AutoRefresh", "Avalonia.Controls.CheckBox", 214, 254, 240, 32, Props("Content", "Refresh automatically")),
+        ],
+        new DesignerCanvasSettings(720, 440, "#F7F9FC"));
+
+    private static IReadOnlyDictionary<string, string> Props(params string[] values)
+    {
+        var properties = new Dictionary<string, string>();
+        for (var index = 0; index < values.Length; index += 2)
+        {
+            properties[values[index]] = values[index + 1];
+        }
+
+        return properties;
+    }
 
     private static DesignerElementSnapshot CreateSnapshot(
         DesignElement element,
