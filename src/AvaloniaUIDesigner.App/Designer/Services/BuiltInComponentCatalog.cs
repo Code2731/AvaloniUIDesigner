@@ -137,6 +137,17 @@ public sealed class BuiltInComponentCatalog : IComponentCatalog
                 },
             }),
         new(
+            DisplayName: "Expander",
+            AvaloniaTypeName: "Avalonia.Controls.Expander",
+            DefaultWidth: 260,
+            DefaultHeight: 100,
+            VisualFactory: static () => new Expander
+            {
+                Header = "Advanced options",
+                IsExpanded = true,
+                Content = new TextBlock { Text = "Expanded content", Margin = new Thickness(8) },
+            }),
+        new(
             DisplayName: "Border",
             AvaloniaTypeName: "Avalonia.Controls.Border",
             DefaultWidth: 240,

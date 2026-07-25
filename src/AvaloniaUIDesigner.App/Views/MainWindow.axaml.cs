@@ -294,6 +294,21 @@ public partial class MainWindow : Window
         Vm.TrySetSelectedImageSource(files[0].Path.AbsoluteUri);
     }
 
+    private async void OnEditExpanderContentMenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        FlushPendingPropertyHistory();
+        if (Vm is null || !Vm.TryGetSelectedExpanderContent(out var controlName, out var content))
+        {
+            return;
+        }
+
+        var updatedContent = await ShowTextEditorDialogAsync($"Edit Content - {controlName}", content);
+        if (updatedContent is not null)
+        {
+            Vm.SetSelectedExpanderContent(updatedContent);
+        }
+    }
+
     private void OnBringToFrontMenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
         => MoveSelectedElementsInLayerOrder(MainWindowViewModel.LayerOrderAction.BringToFront);
 
@@ -873,6 +888,11 @@ public partial class MainWindow : Window
         if (control is TabControl)
         {
             return propertyName == "SelectedIndex";
+        }
+
+        if (control is Expander)
+        {
+            return propertyName is "Header" or "IsExpanded";
         }
 
         if (control is Border)
@@ -1689,6 +1709,58 @@ public partial class MainWindow : Window
         dialog.Content = content;
 
         return await dialog.ShowDialog<IReadOnlyList<string>?>(this);
+    }
+
+    private async Task<string?> ShowTextEditorDialogAsync(string title, string content)
+    {
+        var editor = new TextBox
+        {
+            Text = content,
+            AcceptsReturn = true,
+            MinHeight = 160,
+        };
+
+        var dialog = new Window
+        {
+            Title = title,
+            Width = 460,
+            Height = 330,
+            MinWidth = 360,
+            MinHeight = 240,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner,
+        };
+
+        var applyButton = new Button { Content = "Apply", MinWidth = 84 };
+        applyButton.Click += (_, _) => dialog.Close<string?>(editor.Text ?? string.Empty);
+
+        var cancelButton = new Button { Content = "Cancel", MinWidth = 84 };
+        cancelButton.Click += (_, _) => dialog.Close<string?>(null);
+
+        var buttons = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            Spacing = 8,
+            HorizontalAlignment = HorizontalAlignment.Right,
+            Children = { cancelButton, applyButton },
+        };
+
+        var layout = new Grid
+        {
+            Margin = new Thickness(16),
+            RowDefinitions = new RowDefinitions("Auto,*,Auto"),
+            RowSpacing = 12,
+            Children =
+            {
+                new TextBlock { Text = "Enter the content shown when the Expander is open." },
+                editor,
+                buttons,
+            },
+        };
+        Grid.SetRow(editor, 1);
+        Grid.SetRow(buttons, 2);
+        dialog.Content = layout;
+
+        return await dialog.ShowDialog<string?>(this);
     }
 
     private void OnWindowClosing(object? sender, WindowClosingEventArgs e)

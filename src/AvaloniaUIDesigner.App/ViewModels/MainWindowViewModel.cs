@@ -409,6 +409,43 @@ public partial class MainWindowViewModel : ViewModelBase
         return true;
     }
 
+    public bool TryGetSelectedExpanderContent(out string controlName, out string content)
+    {
+        var target = Canvas.SelectedElement;
+        if (target is null || target.IsLocked || target.Visual is not Expander expander)
+        {
+            controlName = string.Empty;
+            content = string.Empty;
+            StatusText = "Select an unlocked Expander control to edit its content.";
+            return false;
+        }
+
+        controlName = target.DisplayName;
+        content = ReadExpanderContent(expander);
+        return true;
+    }
+
+    public void SetSelectedExpanderContent(string content)
+    {
+        var target = Canvas.SelectedElement;
+        if (target is null || target.IsLocked || target.Visual is not Expander expander)
+        {
+            StatusText = "Select an unlocked Expander control to edit its content.";
+            return;
+        }
+
+        if (string.Equals(ReadExpanderContent(expander), content, StringComparison.Ordinal))
+        {
+            StatusText = "Expander content is unchanged.";
+            return;
+        }
+
+        BeginCanvasMutation(HistoryActionType.EditProperty, "Updated Expander content.");
+        SetExpanderContent(expander, content);
+        CommitCanvasMutation();
+        StatusText = $"Updated content for {target.DisplayName}.";
+    }
+
     public bool TryRenameElement(DesignElement element, string proposedName)
     {
         if (element.IsLocked)
@@ -1343,6 +1380,17 @@ public partial class MainWindowViewModel : ViewModelBase
             };
         }
 
+        if (visual is Expander expander)
+        {
+            return new Dictionary<string, string>
+            {
+                ["Header"] = expander.Header?.ToString() ?? string.Empty,
+                ["IsExpanded"] = expander.IsExpanded.ToString(),
+                ["__contentText"] = ReadExpanderContent(expander),
+                ["Opacity"] = expander.Opacity.ToString("0.###", CultureInfo.InvariantCulture),
+            };
+        }
+
         if (visual is Border border)
         {
             var properties = new Dictionary<string, string>
@@ -1426,6 +1474,14 @@ public partial class MainWindowViewModel : ViewModelBase
             Header = header,
             Content = new TextBlock { Text = $"{header} content", Margin = new Thickness(12) },
         };
+
+    private static string ReadExpanderContent(Expander expander)
+        => expander.Content is TextBlock textBlock
+            ? textBlock.Text ?? string.Empty
+            : expander.Content?.ToString() ?? string.Empty;
+
+    private static void SetExpanderContent(Expander expander, string content)
+        => expander.Content = new TextBlock { Text = content, Margin = new Thickness(8) };
 
     private static bool AreSameDocument(DesignerCanvasDocument left, DesignerCanvasDocument right)
     {
@@ -1697,6 +1753,12 @@ public partial class MainWindowViewModel : ViewModelBase
         {
             map["__tabs"] = SerializeTabHeaders(element);
         }
+        else if (string.Equals(element.Name.LocalName, "Expander", StringComparison.OrdinalIgnoreCase))
+        {
+            map["__contentText"] = element.Elements()
+                .FirstOrDefault(child => string.Equals(child.Name.LocalName, "TextBlock", StringComparison.OrdinalIgnoreCase))?
+                .Attribute("Text")?.Value ?? string.Empty;
+        }
 
         return map.Count == 0 ? null : map;
     }
@@ -1724,6 +1786,7 @@ public partial class MainWindowViewModel : ViewModelBase
             "TimePicker" => propertyName == "SelectedTime",
             "NumericUpDown" => propertyName is "Minimum" or "Maximum" or "Increment" or "Value",
             "TabControl" => propertyName == "SelectedIndex",
+            "Expander" => propertyName is "Header" or "IsExpanded",
             "Border" => propertyName is "Background" or "BorderBrush" or "BorderThickness" or "CornerRadius",
             "Grid" => propertyName == "ShowGridLines",
             "StackPanel" => propertyName is "Orientation" or "Spacing",
@@ -2348,6 +2411,21 @@ public partial class MainWindowViewModel : ViewModelBase
 
                 sb.Append(indent);
                 sb.AppendLine("</TabControl>");
+                break;
+
+            case Expander expander:
+                sb.Append(indent);
+                sb.Append("<Expander");
+                AppendCanvasLayoutAttributes(sb, element);
+                AppendAttribute(sb, "Header", expander.Header?.ToString() ?? string.Empty);
+                AppendAttribute(sb, "IsExpanded", expander.IsExpanded.ToString());
+                sb.AppendLine(">");
+                sb.Append(indent);
+                sb.Append("  <TextBlock");
+                AppendAttribute(sb, "Text", ReadExpanderContent(expander));
+                sb.AppendLine(" />");
+                sb.Append(indent);
+                sb.AppendLine("</Expander>");
                 break;
 
             case Border border:

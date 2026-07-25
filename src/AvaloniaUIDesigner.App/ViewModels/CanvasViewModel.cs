@@ -731,6 +731,27 @@ public partial class CanvasViewModel : ViewModelBase
             return;
         }
 
+        if (visual is Expander expander)
+        {
+            if (properties.TryGetValue("Header", out var header))
+            {
+                expander.Header = header;
+            }
+
+            if (properties.TryGetValue("IsExpanded", out var isExpanded)
+                && bool.TryParse(isExpanded, out var parsedIsExpanded))
+            {
+                expander.IsExpanded = parsedIsExpanded;
+            }
+
+            if (properties.TryGetValue("__contentText", out var contentText))
+            {
+                SetExpanderContent(expander, contentText);
+            }
+
+            return;
+        }
+
         if (visual is Border border)
         {
             if (properties.TryGetValue("Background", out var background))
@@ -932,6 +953,9 @@ public partial class CanvasViewModel : ViewModelBase
             Header = header,
             Content = new TextBlock { Text = $"{header} content", Margin = new Thickness(12) },
         };
+
+    private static void SetExpanderContent(Expander expander, string contentText)
+        => expander.Content = new TextBlock { Text = contentText, Margin = new Thickness(8) };
 
     private static void TrySetBorderBackground(Border border, string value)
     {

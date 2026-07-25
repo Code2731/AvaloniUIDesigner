@@ -92,6 +92,12 @@ public sealed class PreviewWindow : Window
                 Value = 50,
             },
             "Avalonia.Controls.TabControl" => CreateDefaultTabControl(),
+            "Avalonia.Controls.Expander" => new Expander
+            {
+                Header = "Advanced options",
+                IsExpanded = true,
+                Content = new TextBlock { Text = "Expanded content", Margin = new Thickness(8) },
+            },
             "Avalonia.Controls.Border" => new Border
             {
                 Background = Brush.Parse("#F1F5F9"),
@@ -251,6 +257,9 @@ public sealed class PreviewWindow : Window
                 break;
             case TabControl tabControl:
                 ApplyTabControlProperties(tabControl, properties);
+                break;
+            case Expander expander:
+                ApplyExpanderProperties(expander, properties);
                 break;
             case Border border:
                 ApplyBorderProperties(border, properties);
@@ -535,6 +544,25 @@ public sealed class PreviewWindow : Window
             Header = header,
             Content = new TextBlock { Text = $"{header} content", Margin = new Thickness(12) },
         };
+
+    private static void ApplyExpanderProperties(Expander expander, IReadOnlyDictionary<string, string> properties)
+    {
+        if (properties.TryGetValue("Header", out var header))
+        {
+            expander.Header = header;
+        }
+
+        if (properties.TryGetValue("IsExpanded", out var isExpanded)
+            && bool.TryParse(isExpanded, out var parsedIsExpanded))
+        {
+            expander.IsExpanded = parsedIsExpanded;
+        }
+
+        if (properties.TryGetValue("__contentText", out var contentText))
+        {
+            expander.Content = new TextBlock { Text = contentText, Margin = new Thickness(8) };
+        }
+    }
 
     private static void ApplyListBoxProperties(ListBox listBox, IReadOnlyDictionary<string, string> properties)
     {
