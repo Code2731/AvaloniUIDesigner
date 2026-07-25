@@ -98,6 +98,16 @@ public partial class MainWindow : Window
         _ = await SaveDocumentAsync(forceSaveAs: true);
     }
 
+    private void OnValidateAxamlMenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        FlushPendingPropertyHistory();
+        if (Vm is not null)
+        {
+            Vm.TryValidateCurrentAxaml(out var result);
+            Vm.StatusText = result;
+        }
+    }
+
     private async void OnNewMenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
         await HandleNewCommandAsync();
@@ -406,14 +416,14 @@ public partial class MainWindow : Window
         }
 
         var content = await File.ReadAllTextAsync(path);
-        if (!Vm.TryImportDraftAxaml(content, out var error))
+        if (!Vm.TryImportDraftAxaml(content, out var error, out var warning))
         {
             Vm.StatusText = $"Open failed: {error}";
             return;
         }
 
         Vm.MarkDocumentLoaded(path);
-        Vm.StatusText = $"Opened {Path.GetFileName(path)}";
+        Vm.StatusText = BuildOpenStatus(Path.GetFileName(path), warning);
     }
 
     private void OnCanvasPropertyChanged(object? sender, PropertyChangedEventArgs e)
@@ -780,7 +790,7 @@ public partial class MainWindow : Window
         using var reader = new StreamReader(stream);
         var content = await reader.ReadToEndAsync();
 
-        if (!Vm.TryImportDraftAxaml(content, out var error))
+        if (!Vm.TryImportDraftAxaml(content, out var error, out var warning))
         {
             Vm.StatusText = $"Open failed: {error}";
             return;
@@ -790,14 +800,17 @@ public partial class MainWindow : Window
         if (!string.IsNullOrWhiteSpace(localPath))
         {
             Vm.MarkDocumentLoaded(localPath);
-            Vm.StatusText = $"Opened {Path.GetFileName(localPath)}";
+            Vm.StatusText = BuildOpenStatus(Path.GetFileName(localPath), warning);
         }
         else
         {
             Vm.MarkDocumentLoadedWithoutPath();
-            Vm.StatusText = $"Opened {file.Name}";
+            Vm.StatusText = BuildOpenStatus(file.Name, warning);
         }
     }
+
+    private static string BuildOpenStatus(string name, string warning)
+        => string.IsNullOrEmpty(warning) ? $"Opened {name}" : $"Opened {name}. {warning}";
 
     private async Task<bool> SaveDocumentAsync(bool forceSaveAs)
     {

@@ -29,6 +29,7 @@
                 <Separator/>
                 <MenuItem Header="Save" Click="OnSaveMenuClicked"/>
                 <MenuItem Header="Save As..." Click="OnSaveAsMenuClicked"/>
+                <MenuItem Header="Validate AXAML" Click="OnValidateAxamlMenuClicked"/>
                 <Separator/>
                 <MenuItem Header="Exit" Click="OnExitMenuClicked"/>
             </MenuItem>

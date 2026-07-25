@@ -1,4 +1,5 @@
 ﻿using System.Collections.Generic;
+using System;
 using System.Globalization;
 using System.Text;
 using AvaloniaUIDesigner.App.Designer.Contracts;
@@ -52,7 +53,7 @@ public sealed class AxamlDocumentSerializer : IDesignerSerializer
 
         foreach (var pair in properties)
         {
-            if (string.IsNullOrWhiteSpace(pair.Key))
+            if (string.IsNullOrWhiteSpace(pair.Key) || pair.Key.StartsWith("__", StringComparison.Ordinal))
             {
                 continue;
             }

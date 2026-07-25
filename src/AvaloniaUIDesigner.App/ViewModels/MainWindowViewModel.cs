@@ -384,14 +384,16 @@ public partial class MainWindowViewModel : ViewModelBase
         return sb.ToString();
     }
 
-    public bool TryImportDraftAxaml(string axaml, out string error)
+    public bool TryImportDraftAxaml(string axaml, out string error, out string warning)
     {
         error = string.Empty;
+        warning = string.Empty;
 
         DesignerCanvasDocument parsed;
+        var warnings = new List<string>();
         try
         {
-            parsed = ParseDraftDocument(axaml);
+            parsed = ParseDraftDocument(axaml, warnings);
         }
         catch (Exception ex)
         {
@@ -404,6 +406,32 @@ public partial class MainWindowViewModel : ViewModelBase
         ClearHistory();
         AcceptCurrentAsSaved();
         StatusText = "Loaded AXAML document.";
+        warning = FormatWarnings(warnings);
+        return true;
+    }
+
+    public bool TryValidateCurrentAxaml(out string result)
+    {
+        var warnings = new List<string>();
+        try
+        {
+            var parsed = ParseDraftDocument(ExportFullAxaml(), warnings);
+            if (parsed.Elements.Count != Canvas.Elements.Count)
+            {
+                result = "Validation failed: exported control count does not match the canvas.";
+                return false;
+            }
+        }
+        catch (Exception ex)
+        {
+            result = $"Validation failed: {ex.Message}";
+            return false;
+        }
+
+        var warning = FormatWarnings(warnings);
+        result = string.IsNullOrEmpty(warning)
+            ? $"AXAML structure is valid ({Canvas.Elements.Count} control(s))."
+            : $"AXAML structure is valid. {warning}";
         return true;
     }
 
@@ -643,11 +671,17 @@ public partial class MainWindowViewModel : ViewModelBase
         return true;
     }
 
-    private DesignerCanvasDocument ParseDraftDocument(string axaml)
+    private DesignerCanvasDocument ParseDraftDocument(string axaml, ICollection<string> warnings)
     {
         var doc = XDocument.Parse(axaml);
         var root = doc.Root ?? throw new InvalidOperationException("AXAML root element is missing.");
         var parseRoot = FindParseRoot(root);
+
+        if (!string.Equals(root.Name.LocalName, "Canvas", StringComparison.OrdinalIgnoreCase)
+            && !string.Equals(parseRoot.Name.LocalName, "Canvas", StringComparison.OrdinalIgnoreCase))
+        {
+            warnings.Add("No Canvas element was found; imported direct child controls from the root element.");
+        }
 
         var snapshots = new List<DesignerElementSnapshot>();
 
@@ -659,14 +693,18 @@ public partial class MainWindowViewModel : ViewModelBase
                 continue;
             }
 
-            var typeName = ResolveTypeName(tagName);
+            if (!TryResolveTypeName(tagName, out var typeName))
+            {
+                warnings.Add($"Unsupported control <{tagName}> was imported as a placeholder.");
+            }
+
             var displayName = BuildImportedDisplayName(tagName, snapshots.Count + 1);
 
             var x = ReadDouble(child, "Canvas.Left", 0);
             var y = ReadDouble(child, "Canvas.Top", 0);
             var width = ReadDouble(child, "Width", 120);
             var height = ReadDouble(child, "Height", 40);
-            var props = ReadVisualProperties(child);
+            var props = ReadVisualProperties(child, warnings);
 
             snapshots.Add(new DesignerElementSnapshot(displayName, typeName, x, y, width, height, props));
         }
@@ -674,18 +712,20 @@ public partial class MainWindowViewModel : ViewModelBase
         return new DesignerCanvasDocument(snapshots);
     }
 
-    private string ResolveTypeName(string tagName)
+    private bool TryResolveTypeName(string tagName, out string typeName)
     {
         foreach (var definition in _componentCatalog.GetAll())
         {
             var shortName = definition.AvaloniaTypeName[(definition.AvaloniaTypeName.LastIndexOf('.') + 1)..];
             if (string.Equals(shortName, tagName, StringComparison.OrdinalIgnoreCase))
             {
-                return definition.AvaloniaTypeName;
+                typeName = definition.AvaloniaTypeName;
+                return true;
             }
         }
 
-        return $"Avalonia.Controls.{tagName}";
+        typeName = $"Avalonia.Controls.{tagName}";
+        return false;
     }
 
     private static string BuildImportedDisplayName(string tagName, int sequence)
@@ -707,19 +747,27 @@ public partial class MainWindowViewModel : ViewModelBase
     private static bool IsIgnoredContainerTag(string tagName)
         => tagName is "Styles" or "Resources" || tagName.Contains('.', StringComparison.Ordinal);
 
-    private static IReadOnlyDictionary<string, string>? ReadVisualProperties(XElement element)
+    private static IReadOnlyDictionary<string, string>? ReadVisualProperties(XElement element, ICollection<string> warnings)
     {
         var map = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        var tagName = element.Name.LocalName;
 
         foreach (var attr in element.Attributes())
         {
             var name = attr.Name.LocalName;
-            if (name is "Canvas.Left" or "Canvas.Top" or "Width" or "Height")
+            if (attr.IsNamespaceDeclaration || name is "Canvas.Left" or "Canvas.Top" or "Width" or "Height")
             {
                 continue;
             }
 
-            map[name] = attr.Value;
+            if (IsSupportedVisualProperty(tagName, name))
+            {
+                map[name] = attr.Value;
+            }
+            else
+            {
+                warnings.Add($"Ignored unsupported property {tagName}.{name}.");
+            }
         }
 
         if (string.Equals(element.Name.LocalName, "StackPanel", StringComparison.OrdinalIgnoreCase))
@@ -728,6 +776,31 @@ public partial class MainWindowViewModel : ViewModelBase
         }
 
         return map.Count == 0 ? null : map;
+    }
+
+    private static bool IsSupportedVisualProperty(string tagName, string propertyName)
+    {
+        return tagName switch
+        {
+            "Button" => propertyName == "Content",
+            "TextBox" => propertyName is "Text" or "Watermark",
+            "Grid" => propertyName == "ShowGridLines",
+            "StackPanel" => propertyName is "Orientation" or "Spacing",
+            _ => false,
+        };
+    }
+
+    private static string FormatWarnings(IReadOnlyCollection<string> warnings)
+    {
+        if (warnings.Count == 0)
+        {
+            return string.Empty;
+        }
+
+        var preview = string.Join(" ", warnings.Take(3));
+        return warnings.Count > 3
+            ? $"Warnings ({warnings.Count}): {preview}"
+            : $"Warnings: {preview}";
     }
 
     private static bool DictionaryEquals(IReadOnlyDictionary<string, string>? left, IReadOnlyDictionary<string, string>? right)
