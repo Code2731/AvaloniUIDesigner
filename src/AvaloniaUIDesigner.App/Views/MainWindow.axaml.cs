@@ -354,6 +354,12 @@ public partial class MainWindow : Window
         Vm?.ToggleSelectedEnabledState();
     }
 
+    private void OnToggleVisibilityMenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        FlushPendingPropertyHistory();
+        Vm?.ToggleSelectedVisibility();
+    }
+
     private async void OnEditTabOrderMenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
         FlushPendingPropertyHistory();
@@ -892,7 +898,7 @@ public partial class MainWindow : Window
 
     private static bool IsUndoTrackedVisualProperty(Control control, string propertyName)
     {
-        if (propertyName is "Opacity" or "IsEnabled" or "TabIndex" or "IsTabStop")
+        if (propertyName is "Opacity" or "IsEnabled" or "IsVisible" or "TabIndex" or "IsTabStop")
         {
             return true;
         }

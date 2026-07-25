@@ -549,6 +549,28 @@ public partial class MainWindowViewModel : ViewModelBase
             : $"Disabled {targets.Count} control(s).";
     }
 
+    public void ToggleSelectedVisibility()
+    {
+        var targets = Canvas.SelectedElements.Where(element => !element.IsLocked).ToList();
+        if (targets.Count == 0)
+        {
+            StatusText = "Select at least one unlocked control to change its visibility.";
+            return;
+        }
+
+        var show = targets.All(element => !element.Visual.IsVisible);
+        BeginCanvasMutation(HistoryActionType.EditProperty, "Updated control visibility.");
+        foreach (var target in targets)
+        {
+            target.Visual.IsVisible = show;
+        }
+
+        CommitCanvasMutation();
+        StatusText = show
+            ? $"Showed {targets.Count} control(s)."
+            : $"Hid {targets.Count} control(s).";
+    }
+
     public bool TryGetSelectedTabIndex(out string controlName, out int tabIndex)
     {
         var target = Canvas.SelectedElement;
@@ -1365,10 +1387,6 @@ public partial class MainWindowViewModel : ViewModelBase
         var properties = CaptureVisualPropertiesCore(visual);
         var toolTip = ToolTip.GetTip(visual)?.ToString();
         var automationName = AutomationProperties.GetName(visual);
-        if (string.IsNullOrWhiteSpace(toolTip) && string.IsNullOrWhiteSpace(automationName) && visual.IsEnabled)
-        {
-            return properties;
-        }
 
         var result = properties is null
             ? new Dictionary<string, string>(StringComparer.Ordinal)
@@ -1386,6 +1404,11 @@ public partial class MainWindowViewModel : ViewModelBase
         if (!visual.IsEnabled)
         {
             result["__isEnabled"] = bool.FalseString;
+        }
+
+        if (!visual.IsVisible)
+        {
+            result["__isVisible"] = bool.FalseString;
         }
 
         // Defaults vary by control type, so preserve both keyboard navigation values explicitly.
@@ -1939,6 +1962,12 @@ public partial class MainWindowViewModel : ViewModelBase
             if (name == "IsEnabled")
             {
                 map["__isEnabled"] = attr.Value;
+                continue;
+            }
+
+            if (name == "IsVisible")
+            {
+                map["__isVisible"] = attr.Value;
                 continue;
             }
 
@@ -2812,6 +2841,11 @@ public partial class MainWindowViewModel : ViewModelBase
         if (!element.Visual.IsEnabled)
         {
             AppendAttribute(sb, "IsEnabled", bool.FalseString);
+        }
+
+        if (!element.Visual.IsVisible)
+        {
+            AppendAttribute(sb, "IsVisible", bool.FalseString);
         }
 
         AppendAttribute(sb, "TabIndex", element.Visual.TabIndex.ToString(CultureInfo.InvariantCulture));

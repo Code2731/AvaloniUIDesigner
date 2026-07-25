@@ -153,6 +153,12 @@ public sealed class PreviewWindow : Window
             control.IsEnabled = parsedIsEnabled;
         }
 
+        if (properties.TryGetValue("__isVisible", out var isVisible)
+            && bool.TryParse(isVisible, out var parsedIsVisible))
+        {
+            control.IsVisible = parsedIsVisible;
+        }
+
         if (properties.TryGetValue("__tabIndex", out var tabIndex)
             && int.TryParse(tabIndex, NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsedTabIndex))
         {
