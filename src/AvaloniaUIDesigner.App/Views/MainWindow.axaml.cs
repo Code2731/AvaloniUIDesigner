@@ -12,6 +12,7 @@ using Avalonia.Input;
 using Avalonia.Layout;
 using Avalonia.Platform.Storage;
 using Avalonia.Threading;
+using AvaloniaUIDesigner.App.Designer.Services;
 using AvaloniaUIDesigner.App.ViewModels;
 
 namespace AvaloniaUIDesigner.App.Views;
@@ -1415,6 +1416,7 @@ public partial class MainWindow : Window
 
         FlushPendingPropertyHistory();
 
+        var axaml = Vm.ExportFullAxaml();
         var targetPath = forceSaveAs ? null : Vm.CurrentDocumentPath;
         if (string.IsNullOrWhiteSpace(targetPath))
         {
@@ -1434,31 +1436,48 @@ public partial class MainWindow : Window
                 return false;
             }
 
-            await using var stream = await file.OpenWriteAsync();
-            stream.SetLength(0);
-            using var writer = new StreamWriter(stream);
-            await writer.WriteAsync(Vm.ExportFullAxaml());
-            await writer.FlushAsync();
-
             var pickedPath = file.TryGetLocalPath();
-            if (!string.IsNullOrWhiteSpace(pickedPath))
+            try
             {
-                Vm.MarkDocumentSaved(pickedPath);
-                Vm.StatusText = $"Saved {Path.GetFileName(pickedPath)}";
+                if (!string.IsNullOrWhiteSpace(pickedPath))
+                {
+                    await AtomicFileWriter.WriteAllTextAsync(pickedPath, axaml);
+                    Vm.MarkDocumentSaved(pickedPath);
+                    Vm.StatusText = $"Saved {Path.GetFileName(pickedPath)}";
+                }
+                else
+                {
+                    await using var stream = await file.OpenWriteAsync();
+                    stream.SetLength(0);
+                    using var writer = new StreamWriter(stream);
+                    await writer.WriteAsync(axaml);
+                    await writer.FlushAsync();
+
+                    Vm.MarkCurrentStateSaved();
+                    Vm.StatusText = $"Saved {file.Name}";
+                }
             }
-            else
+            catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
             {
-                Vm.MarkCurrentStateSaved();
-                Vm.StatusText = $"Saved {file.Name}";
+                Vm.StatusText = $"Could not save {file.Name}: {exception.Message}";
+                return false;
             }
 
             return true;
         }
 
-        await File.WriteAllTextAsync(targetPath, Vm.ExportFullAxaml());
-        Vm.MarkDocumentSaved(targetPath);
-        Vm.StatusText = $"Saved {Path.GetFileName(targetPath)}";
-        return true;
+        try
+        {
+            await AtomicFileWriter.WriteAllTextAsync(targetPath, axaml);
+            Vm.MarkDocumentSaved(targetPath);
+            Vm.StatusText = $"Saved {Path.GetFileName(targetPath)}";
+            return true;
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        {
+            Vm.StatusText = $"Could not save {Path.GetFileName(targetPath)}: {exception.Message}";
+            return false;
+        }
     }
 
     private async Task<bool> EnsureCanContinueWithUnsavedChangesAsync()
