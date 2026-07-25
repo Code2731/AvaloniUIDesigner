@@ -7,6 +7,7 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Layout;
 using Avalonia.Media;
+using Avalonia.Media.Imaging;
 using AvaloniaUIDesigner.App.Designer.Core;
 
 namespace AvaloniaUIDesigner.App.Views;
@@ -63,6 +64,7 @@ public sealed class PreviewWindow : Window
             "Avalonia.Controls.Button" => new Button { Content = "Button" },
             "Avalonia.Controls.TextBox" => new TextBox { Watermark = "Type here" },
             "Avalonia.Controls.TextBlock" => new TextBlock { Text = "Text" },
+            "Avalonia.Controls.Image" => new Image { Stretch = Stretch.Uniform },
             "Avalonia.Controls.CheckBox" => new CheckBox { Content = "CheckBox" },
             "Avalonia.Controls.RadioButton" => new RadioButton { Content = "Option", GroupName = "Options" },
             "Avalonia.Controls.ToggleSwitch" => new ToggleSwitch { Content = "Toggle" },
@@ -166,6 +168,9 @@ public sealed class PreviewWindow : Window
                 {
                     TrySetTextForeground(textBlock, foreground);
                 }
+                break;
+            case Image image:
+                ApplyImageProperties(image, properties);
                 break;
             case CheckBox checkBox:
                 if (properties.TryGetValue("Content", out var checkBoxContent))
@@ -293,6 +298,46 @@ public sealed class PreviewWindow : Window
             default:
                 fontWeight = FontWeight.Normal;
                 return false;
+        }
+    }
+
+    private static void ApplyImageProperties(Image image, IReadOnlyDictionary<string, string> properties)
+    {
+        if (properties.TryGetValue("Source", out var source))
+        {
+            TryLoadImageSource(image, source);
+        }
+
+        if (properties.TryGetValue("Stretch", out var stretch)
+            && Enum.TryParse<Stretch>(stretch, ignoreCase: true, out var parsedStretch))
+        {
+            image.Stretch = parsedStretch;
+        }
+    }
+
+    private static void TryLoadImageSource(Image image, string source)
+    {
+        try
+        {
+            var path = Uri.TryCreate(source, UriKind.Absolute, out var uri)
+                ? uri.IsFile ? uri.LocalPath : null
+                : System.IO.Path.GetFullPath(source);
+            if (string.IsNullOrWhiteSpace(path) || !System.IO.File.Exists(path))
+            {
+                return;
+            }
+
+            if (image.Source is IDisposable disposable)
+            {
+                disposable.Dispose();
+            }
+
+            image.Source = new Bitmap(path);
+            image.Tag = source;
+        }
+        catch
+        {
+            // Keep the preview usable when an imported image source is missing or invalid.
         }
     }
 

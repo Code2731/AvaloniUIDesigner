@@ -387,6 +387,28 @@ public partial class MainWindowViewModel : ViewModelBase
         }
     }
 
+    public bool TrySetSelectedImageSource(string source)
+    {
+        var target = Canvas.SelectedElement;
+        if (target is null || target.IsLocked || target.Visual is not Image)
+        {
+            StatusText = "Select an unlocked Image control before choosing an image file.";
+            return false;
+        }
+
+        BeginCanvasMutation(HistoryActionType.EditProperty, "Updated image source.");
+        if (!Canvas.TrySetSelectedImageSource(source))
+        {
+            _pendingMutation = null;
+            StatusText = "The selected file could not be loaded as an image.";
+            return false;
+        }
+
+        CommitCanvasMutation();
+        StatusText = $"Set image source for {target.DisplayName}.";
+        return true;
+    }
+
     public bool TryRenameElement(DesignElement element, string proposedName)
     {
         if (element.IsLocked)
@@ -1178,6 +1200,16 @@ public partial class MainWindowViewModel : ViewModelBase
             return properties;
         }
 
+        if (visual is Image image)
+        {
+            return new Dictionary<string, string>
+            {
+                ["Source"] = image.Tag?.ToString() ?? string.Empty,
+                ["Stretch"] = image.Stretch.ToString(),
+                ["Opacity"] = image.Opacity.ToString("0.###", CultureInfo.InvariantCulture),
+            };
+        }
+
         if (visual is CheckBox checkBox)
         {
             return new Dictionary<string, string>
@@ -1681,6 +1713,7 @@ public partial class MainWindowViewModel : ViewModelBase
             "Button" => propertyName == "Content",
             "TextBox" => propertyName is "Text" or "Watermark",
             "TextBlock" => propertyName is "Text" or "FontSize" or "FontWeight" or "Foreground",
+            "Image" => propertyName is "Source" or "Stretch",
             "CheckBox" or "ToggleSwitch" => propertyName is "Content" or "IsChecked",
             "ToggleButton" => propertyName is "Content" or "IsChecked",
             "RadioButton" => propertyName is "Content" or "IsChecked" or "GroupName",
@@ -2120,6 +2153,19 @@ public partial class MainWindowViewModel : ViewModelBase
                 AppendAttribute(sb, "FontSize", textBlock.FontSize.ToString("0.###", CultureInfo.InvariantCulture));
                 AppendAttribute(sb, "FontWeight", textBlock.FontWeight.ToString());
                 AppendTextForegroundAttribute(sb, textBlock);
+                sb.AppendLine(" />");
+                break;
+
+            case Image image:
+                sb.Append(indent);
+                sb.Append("<Image");
+                AppendCanvasLayoutAttributes(sb, element);
+                if (!string.IsNullOrWhiteSpace(image.Tag?.ToString()))
+                {
+                    AppendAttribute(sb, "Source", image.Tag?.ToString() ?? string.Empty);
+                }
+
+                AppendAttribute(sb, "Stretch", image.Stretch.ToString());
                 sb.AppendLine(" />");
                 break;
 

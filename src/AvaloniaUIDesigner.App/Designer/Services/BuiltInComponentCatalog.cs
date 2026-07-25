@@ -31,6 +31,12 @@ public sealed class BuiltInComponentCatalog : IComponentCatalog
             DefaultHeight: 24,
             VisualFactory: static () => new TextBlock { Text = "Text" }),
         new(
+            DisplayName: "Image",
+            AvaloniaTypeName: "Avalonia.Controls.Image",
+            DefaultWidth: 240,
+            DefaultHeight: 160,
+            VisualFactory: static () => new Image { Stretch = Stretch.Uniform }),
+        new(
             DisplayName: "CheckBox",
             AvaloniaTypeName: "Avalonia.Controls.CheckBox",
             DefaultWidth: 160,

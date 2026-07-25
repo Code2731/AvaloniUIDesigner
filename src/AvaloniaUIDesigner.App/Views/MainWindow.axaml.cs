@@ -265,6 +265,35 @@ public partial class MainWindow : Window
         }
     }
 
+    private async void OnChooseImageMenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        FlushPendingPropertyHistory();
+        if (Vm is null)
+        {
+            return;
+        }
+
+        var files = await StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
+        {
+            Title = "Choose image",
+            AllowMultiple = false,
+            FileTypeFilter =
+            [
+                new FilePickerFileType("Image files")
+                {
+                    Patterns = ["*.png", "*.jpg", "*.jpeg", "*.gif", "*.bmp", "*.webp"]
+                }
+            ]
+        });
+
+        if (files.Count == 0 || !files[0].Path.IsFile)
+        {
+            return;
+        }
+
+        Vm.TrySetSelectedImageSource(files[0].Path.AbsoluteUri);
+    }
+
     private void OnBringToFrontMenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
         => MoveSelectedElementsInLayerOrder(MainWindowViewModel.LayerOrderAction.BringToFront);
 
@@ -789,6 +818,11 @@ public partial class MainWindow : Window
         if (control is TextBlock)
         {
             return propertyName is "Text" or "FontSize" or "FontWeight" or "Foreground";
+        }
+
+        if (control is Image)
+        {
+            return propertyName == "Stretch";
         }
 
         if (control is CheckBox or ToggleSwitch)
