@@ -59,6 +59,8 @@
                 </MenuItem>
             </MenuItem>
             <MenuItem Header="View">
+                <MenuItem Header="Preview" Click="OnPreviewMenuClicked"/>
+                <Separator/>
                 <MenuItem Header="Snap to Grid (8px)"
                           IsCheckable="True"
                           IsChecked="{Binding Canvas.SnapToGrid, Mode=TwoWay}"/>

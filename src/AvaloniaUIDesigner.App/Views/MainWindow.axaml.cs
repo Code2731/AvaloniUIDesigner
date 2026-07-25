@@ -155,6 +155,19 @@ public partial class MainWindow : Window
         Vm?.DuplicateSelectedElement();
     }
 
+    private void OnPreviewMenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        if (Vm is null)
+        {
+            return;
+        }
+
+        FlushPendingPropertyHistory();
+        var preview = new PreviewWindow(Vm.CreatePreviewDocument());
+        preview.Show(this);
+        Vm.StatusText = "Opened runtime preview.";
+    }
+
     private void OnAlignLeftMenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
         => ArrangeSelectedElements(MainWindowViewModel.SelectionLayoutAction.AlignLeft);
 
@@ -267,6 +280,13 @@ public partial class MainWindow : Window
         {
             FlushPendingPropertyHistory();
             Vm.PasteElement();
+            e.Handled = true;
+            return;
+        }
+
+        if (ctrl && e.Key == Key.R)
+        {
+            OnPreviewMenuClicked(this, e);
             e.Handled = true;
             return;
         }

@@ -364,6 +364,8 @@ public partial class MainWindowViewModel : ViewModelBase
 
     public string ExportDraftAxaml() => _serializer.Serialize(CaptureDocument());
 
+    public DesignerCanvasDocument CreatePreviewDocument() => CaptureDocument();
+
     public string ExportFullAxaml()
     {
         var sb = new StringBuilder();
