@@ -74,6 +74,11 @@
                     <MenuItem Header="Send to Back" Click="OnSendToBackMenuClicked"/>
                 </MenuItem>
                 <Separator/>
+                <MenuItem Header="Center on Artboard" IsEnabled="{Binding Canvas.IsSelectionActive}">
+                    <MenuItem Header="Horizontally" Click="OnCenterHorizontallyOnArtboardMenuClicked"/>
+                    <MenuItem Header="Vertically" Click="OnCenterVerticallyOnArtboardMenuClicked"/>
+                    <MenuItem Header="Both" Click="OnCenterOnArtboardMenuClicked"/>
+                </MenuItem>
                 <MenuItem Header="Arrange" IsEnabled="{Binding Canvas.HasMultipleSelection}">
                     <MenuItem Header="Align Left" Click="OnAlignLeftMenuClicked"/>
                     <MenuItem Header="Align Center" Click="OnAlignCenterMenuClicked"/>

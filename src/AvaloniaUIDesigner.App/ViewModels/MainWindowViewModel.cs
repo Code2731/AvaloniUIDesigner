@@ -364,6 +364,47 @@ public partial class MainWindowViewModel : ViewModelBase
         StatusText = $"{DescribeLayoutAction(action)} {targets.Count} control(s)";
     }
 
+    public void CenterSelectedElementsOnArtboard(bool horizontally, bool vertically)
+    {
+        var targets = Canvas.SelectedElements.Where(element => !element.IsLocked).ToList();
+        if (targets.Count == 0)
+        {
+            StatusText = "Select an unlocked control to center on the artboard.";
+            return;
+        }
+
+        BeginCanvasMutation(HistoryActionType.TransformElement, "Centered controls on artboard.");
+
+        if (horizontally)
+        {
+            var left = targets.Min(element => element.X);
+            var right = targets.Max(element => element.X + element.Width);
+            var offset = (Canvas.ArtboardWidth - (right - left)) / 2 - left;
+            foreach (var element in targets)
+            {
+                element.X = Math.Max(0, element.X + offset);
+            }
+        }
+
+        if (vertically)
+        {
+            var top = targets.Min(element => element.Y);
+            var bottom = targets.Max(element => element.Y + element.Height);
+            var offset = (Canvas.ArtboardHeight - (bottom - top)) / 2 - top;
+            foreach (var element in targets)
+            {
+                element.Y = Math.Max(0, element.Y + offset);
+            }
+        }
+
+        CommitCanvasMutation();
+        StatusText = horizontally && vertically
+            ? $"Centered {targets.Count} control(s) on the artboard."
+            : horizontally
+                ? $"Horizontally centered {targets.Count} control(s) on the artboard."
+                : $"Vertically centered {targets.Count} control(s) on the artboard.";
+    }
+
     public void MoveSelectedElementsInLayerOrder(LayerOrderAction action)
     {
         var targets = Canvas.SelectedElements.Where(element => !element.IsLocked).ToList();

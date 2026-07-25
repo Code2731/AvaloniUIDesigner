@@ -399,10 +399,25 @@ public partial class MainWindow : Window
     private void OnMakeSameSizeMenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
         => ArrangeSelectedElements(MainWindowViewModel.SelectionLayoutAction.MakeSameSize);
 
+    private void OnCenterHorizontallyOnArtboardMenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+        => CenterSelectedElementsOnArtboard(horizontally: true, vertically: false);
+
+    private void OnCenterVerticallyOnArtboardMenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+        => CenterSelectedElementsOnArtboard(horizontally: false, vertically: true);
+
+    private void OnCenterOnArtboardMenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+        => CenterSelectedElementsOnArtboard(horizontally: true, vertically: true);
+
     private void ArrangeSelectedElements(MainWindowViewModel.SelectionLayoutAction action)
     {
         FlushPendingPropertyHistory();
         Vm?.ArrangeSelectedElements(action);
+    }
+
+    private void CenterSelectedElementsOnArtboard(bool horizontally, bool vertically)
+    {
+        FlushPendingPropertyHistory();
+        Vm?.CenterSelectedElementsOnArtboard(horizontally, vertically);
     }
 
     private async void OnWindowKeyDown(object? sender, KeyEventArgs e)
