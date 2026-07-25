@@ -40,6 +40,23 @@
                 <MenuItem Header="Paste" Click="OnPasteMenuClicked" IsEnabled="{Binding CanPaste}"/>
                 <MenuItem Header="Duplicate" Click="OnDuplicateMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
                 <MenuItem Header="Delete" Click="OnDeleteMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
+                <Separator/>
+                <MenuItem Header="Arrange" IsEnabled="{Binding Canvas.HasMultipleSelection}">
+                    <MenuItem Header="Align Left" Click="OnAlignLeftMenuClicked"/>
+                    <MenuItem Header="Align Center" Click="OnAlignCenterMenuClicked"/>
+                    <MenuItem Header="Align Right" Click="OnAlignRightMenuClicked"/>
+                    <Separator/>
+                    <MenuItem Header="Align Top" Click="OnAlignTopMenuClicked"/>
+                    <MenuItem Header="Align Middle" Click="OnAlignMiddleMenuClicked"/>
+                    <MenuItem Header="Align Bottom" Click="OnAlignBottomMenuClicked"/>
+                    <Separator/>
+                    <MenuItem Header="Distribute Horizontally" Click="OnDistributeHorizontallyMenuClicked"/>
+                    <MenuItem Header="Distribute Vertically" Click="OnDistributeVerticallyMenuClicked"/>
+                    <Separator/>
+                    <MenuItem Header="Make Same Width" Click="OnMakeSameWidthMenuClicked"/>
+                    <MenuItem Header="Make Same Height" Click="OnMakeSameHeightMenuClicked"/>
+                    <MenuItem Header="Make Same Size" Click="OnMakeSameSizeMenuClicked"/>
+                </MenuItem>
             </MenuItem>
             <MenuItem Header="View">
                 <MenuItem Header="Snap to Grid (8px)"

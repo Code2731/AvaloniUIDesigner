@@ -155,6 +155,45 @@ public partial class MainWindow : Window
         Vm?.DuplicateSelectedElement();
     }
 
+    private void OnAlignLeftMenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+        => ArrangeSelectedElements(MainWindowViewModel.SelectionLayoutAction.AlignLeft);
+
+    private void OnAlignCenterMenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+        => ArrangeSelectedElements(MainWindowViewModel.SelectionLayoutAction.AlignCenter);
+
+    private void OnAlignRightMenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+        => ArrangeSelectedElements(MainWindowViewModel.SelectionLayoutAction.AlignRight);
+
+    private void OnAlignTopMenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+        => ArrangeSelectedElements(MainWindowViewModel.SelectionLayoutAction.AlignTop);
+
+    private void OnAlignMiddleMenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+        => ArrangeSelectedElements(MainWindowViewModel.SelectionLayoutAction.AlignMiddle);
+
+    private void OnAlignBottomMenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+        => ArrangeSelectedElements(MainWindowViewModel.SelectionLayoutAction.AlignBottom);
+
+    private void OnDistributeHorizontallyMenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+        => ArrangeSelectedElements(MainWindowViewModel.SelectionLayoutAction.DistributeHorizontally);
+
+    private void OnDistributeVerticallyMenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+        => ArrangeSelectedElements(MainWindowViewModel.SelectionLayoutAction.DistributeVertically);
+
+    private void OnMakeSameWidthMenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+        => ArrangeSelectedElements(MainWindowViewModel.SelectionLayoutAction.MakeSameWidth);
+
+    private void OnMakeSameHeightMenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+        => ArrangeSelectedElements(MainWindowViewModel.SelectionLayoutAction.MakeSameHeight);
+
+    private void OnMakeSameSizeMenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+        => ArrangeSelectedElements(MainWindowViewModel.SelectionLayoutAction.MakeSameSize);
+
+    private void ArrangeSelectedElements(MainWindowViewModel.SelectionLayoutAction action)
+    {
+        FlushPendingPropertyHistory();
+        Vm?.ArrangeSelectedElements(action);
+    }
+
     private async void OnWindowKeyDown(object? sender, KeyEventArgs e)
     {
         if (Vm is null)

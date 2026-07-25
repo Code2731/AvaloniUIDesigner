@@ -130,6 +130,91 @@ public partial class MainWindowViewModel : ViewModelBase
         StatusText = $"Moved {targets.Count} control(s)";
     }
 
+    public void ArrangeSelectedElements(SelectionLayoutAction action)
+    {
+        var targets = Canvas.SelectedElements.ToList();
+        if (targets.Count < 2)
+        {
+            StatusText = "Select at least two controls to arrange.";
+            return;
+        }
+
+        if ((action is SelectionLayoutAction.DistributeHorizontally or SelectionLayoutAction.DistributeVertically)
+            && targets.Count < 3)
+        {
+            StatusText = "Select at least three controls to distribute.";
+            return;
+        }
+
+        var primary = Canvas.SelectedElement ?? targets[^1];
+        BeginCanvasMutation(HistoryActionType.TransformElement, "Arranged selected controls.");
+
+        switch (action)
+        {
+            case SelectionLayoutAction.AlignLeft:
+            {
+                var left = targets.Min(element => element.X);
+                foreach (var element in targets) element.X = left;
+                break;
+            }
+            case SelectionLayoutAction.AlignCenter:
+            {
+                var center = (targets.Min(element => element.X) + targets.Max(element => element.X + element.Width)) / 2;
+                foreach (var element in targets) element.X = center - element.Width / 2;
+                break;
+            }
+            case SelectionLayoutAction.AlignRight:
+            {
+                var right = targets.Max(element => element.X + element.Width);
+                foreach (var element in targets) element.X = right - element.Width;
+                break;
+            }
+            case SelectionLayoutAction.AlignTop:
+            {
+                var top = targets.Min(element => element.Y);
+                foreach (var element in targets) element.Y = top;
+                break;
+            }
+            case SelectionLayoutAction.AlignMiddle:
+            {
+                var middle = (targets.Min(element => element.Y) + targets.Max(element => element.Y + element.Height)) / 2;
+                foreach (var element in targets) element.Y = middle - element.Height / 2;
+                break;
+            }
+            case SelectionLayoutAction.AlignBottom:
+            {
+                var bottom = targets.Max(element => element.Y + element.Height);
+                foreach (var element in targets) element.Y = bottom - element.Height;
+                break;
+            }
+            case SelectionLayoutAction.DistributeHorizontally:
+                DistributeHorizontally(targets);
+                break;
+            case SelectionLayoutAction.DistributeVertically:
+                DistributeVertically(targets);
+                break;
+            case SelectionLayoutAction.MakeSameWidth:
+                foreach (var element in targets) element.Width = primary.Width;
+                break;
+            case SelectionLayoutAction.MakeSameHeight:
+                foreach (var element in targets) element.Height = primary.Height;
+                break;
+            case SelectionLayoutAction.MakeSameSize:
+                foreach (var element in targets)
+                {
+                    element.Width = primary.Width;
+                    element.Height = primary.Height;
+                }
+                break;
+            default:
+                _pendingMutation = null;
+                return;
+        }
+
+        CommitCanvasMutation();
+        StatusText = $"{DescribeLayoutAction(action)} {targets.Count} control(s)";
+    }
+
     public void RemoveSelectedElement()
     {
         var targets = Canvas.SelectedElements.ToList();
@@ -395,6 +480,46 @@ public partial class MainWindowViewModel : ViewModelBase
         var element = ObjectTree.SelectedNode?.Element;
         Canvas.Select(element);
         StatusText = element is null ? "Ready" : $"Selected {element.DisplayName} from Object Tree";
+    }
+
+    private static void DistributeHorizontally(IReadOnlyList<DesignElement> elements)
+    {
+        if (elements.Count < 3)
+        {
+            return;
+        }
+
+        var ordered = elements.OrderBy(element => element.X).ToList();
+        var left = ordered[0].X;
+        var right = ordered[^1].X + ordered[^1].Width;
+        var gap = (right - left - ordered.Sum(element => element.Width)) / (ordered.Count - 1);
+        var x = left;
+
+        foreach (var element in ordered)
+        {
+            element.X = x;
+            x += element.Width + gap;
+        }
+    }
+
+    private static void DistributeVertically(IReadOnlyList<DesignElement> elements)
+    {
+        if (elements.Count < 3)
+        {
+            return;
+        }
+
+        var ordered = elements.OrderBy(element => element.Y).ToList();
+        var top = ordered[0].Y;
+        var bottom = ordered[^1].Y + ordered[^1].Height;
+        var gap = (bottom - top - ordered.Sum(element => element.Height)) / (ordered.Count - 1);
+        var y = top;
+
+        foreach (var element in ordered)
+        {
+            element.Y = y;
+            y += element.Height + gap;
+        }
     }
 
     private void ApplyDocument(DesignerCanvasDocument document)
@@ -676,6 +801,25 @@ public partial class MainWindowViewModel : ViewModelBase
             HistoryActionType.LoadDocument => "load document",
             HistoryActionType.NewDocument => "new document",
             _ => "change",
+        };
+    }
+
+    private static string DescribeLayoutAction(SelectionLayoutAction action)
+    {
+        return action switch
+        {
+            SelectionLayoutAction.AlignLeft => "Aligned left",
+            SelectionLayoutAction.AlignCenter => "Aligned center",
+            SelectionLayoutAction.AlignRight => "Aligned right",
+            SelectionLayoutAction.AlignTop => "Aligned top",
+            SelectionLayoutAction.AlignMiddle => "Aligned middle",
+            SelectionLayoutAction.AlignBottom => "Aligned bottom",
+            SelectionLayoutAction.DistributeHorizontally => "Distributed horizontally",
+            SelectionLayoutAction.DistributeVertically => "Distributed vertically",
+            SelectionLayoutAction.MakeSameWidth => "Matched width for",
+            SelectionLayoutAction.MakeSameHeight => "Matched height for",
+            SelectionLayoutAction.MakeSameSize => "Matched size for",
+            _ => "Arranged",
         };
     }
 
@@ -1003,6 +1147,21 @@ public partial class MainWindowViewModel : ViewModelBase
         EditProperty,
         LoadDocument,
         NewDocument,
+    }
+
+    public enum SelectionLayoutAction
+    {
+        AlignLeft,
+        AlignCenter,
+        AlignRight,
+        AlignTop,
+        AlignMiddle,
+        AlignBottom,
+        DistributeHorizontally,
+        DistributeVertically,
+        MakeSameWidth,
+        MakeSameHeight,
+        MakeSameSize,
     }
 
     private sealed record PendingMutation(DesignerCanvasDocument Before, HistoryActionType ActionType, string Message);
