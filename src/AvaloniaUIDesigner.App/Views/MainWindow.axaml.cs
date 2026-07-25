@@ -224,6 +224,12 @@ public partial class MainWindow : Window
         Vm?.CopySelectedElement();
     }
 
+    private void OnCutMenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        FlushPendingPropertyHistory();
+        Vm?.CutSelectedElement();
+    }
+
     private void OnPasteMenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
         FlushPendingPropertyHistory();
@@ -479,6 +485,14 @@ public partial class MainWindow : Window
         {
             FlushPendingPropertyHistory();
             Vm.CopySelectedElement();
+            e.Handled = true;
+            return;
+        }
+
+        if (ctrl && e.Key == Key.X)
+        {
+            FlushPendingPropertyHistory();
+            Vm.CutSelectedElement();
             e.Handled = true;
             return;
         }

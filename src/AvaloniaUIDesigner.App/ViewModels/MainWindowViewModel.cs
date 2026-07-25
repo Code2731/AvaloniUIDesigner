@@ -417,6 +417,28 @@ public partial class MainWindowViewModel : ViewModelBase
         StatusText = $"Copied {targets.Count} control(s)";
     }
 
+    public void CutSelectedElement()
+    {
+        var targets = Canvas.SelectedElements.Where(element => !element.IsLocked).ToList();
+        if (targets.Count == 0)
+        {
+            StatusText = "No unlocked controls to cut.";
+            return;
+        }
+
+        _clipboardSnapshots = targets.Select(element => CreateSnapshot(element, element.DisplayName, element.X, element.Y)).ToList();
+        OnPropertyChanged(nameof(CanPaste));
+        BeginCanvasMutation(HistoryActionType.RemoveElement, "Cut control.");
+        foreach (var target in targets)
+        {
+            Canvas.RemoveElement(target);
+        }
+
+        ObjectTree.RebuildFrom(Canvas.Elements);
+        CommitCanvasMutation();
+        StatusText = $"Cut {targets.Count} control(s)";
+    }
+
     public void PasteElement()
     {
         if (_clipboardSnapshots is not { Count: > 0 })
