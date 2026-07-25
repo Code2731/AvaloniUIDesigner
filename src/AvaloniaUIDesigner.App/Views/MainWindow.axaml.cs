@@ -753,6 +753,12 @@ public partial class MainWindow : Window
 
     private void OnLayoutEditorGotFocus(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
+        if (_boundElement?.IsLocked == true)
+        {
+            Vm?.StatusText = "Selected control is locked.";
+            return;
+        }
+
         if (_boundElement is null || _hasPendingLayoutEdit)
         {
             return;
@@ -765,6 +771,13 @@ public partial class MainWindow : Window
 
     private void OnLayoutEditorLostFocus(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
+        if (_boundElement?.IsLocked == true)
+        {
+            UpdateLayoutEditors();
+            FlushPendingLayoutHistory();
+            return;
+        }
+
         if (sender is not TextBox editor || _boundElement is null)
         {
             FlushPendingLayoutHistory();
