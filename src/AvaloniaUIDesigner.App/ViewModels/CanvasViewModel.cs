@@ -436,6 +436,18 @@ public partial class CanvasViewModel : ViewModelBase
             visual.IsEnabled = parsedIsEnabled;
         }
 
+        if (properties.TryGetValue("__tabIndex", out var tabIndex)
+            && int.TryParse(tabIndex, NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsedTabIndex))
+        {
+            visual.TabIndex = parsedTabIndex;
+        }
+
+        if (properties.TryGetValue("__isTabStop", out var isTabStop)
+            && bool.TryParse(isTabStop, out var parsedIsTabStop))
+        {
+            visual.IsTabStop = parsedIsTabStop;
+        }
+
         if (visual is Button button)
         {
             if (properties.TryGetValue("Content", out var content))

@@ -354,6 +354,38 @@ public partial class MainWindow : Window
         Vm?.ToggleSelectedEnabledState();
     }
 
+    private async void OnEditTabOrderMenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        FlushPendingPropertyHistory();
+        if (Vm is null || !Vm.TryGetSelectedTabIndex(out var controlName, out var tabIndex))
+        {
+            return;
+        }
+
+        var updatedTabIndex = await ShowTextEditorDialogAsync(
+            $"Edit Tab Order - {controlName}",
+            tabIndex.ToString(CultureInfo.InvariantCulture),
+            "Enter an integer. Lower values receive keyboard focus first.");
+        if (updatedTabIndex is null)
+        {
+            return;
+        }
+
+        if (!int.TryParse(updatedTabIndex.Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsedTabIndex))
+        {
+            Vm.StatusText = "Tab order must be a whole number.";
+            return;
+        }
+
+        Vm.SetSelectedTabIndex(parsedTabIndex);
+    }
+
+    private void OnToggleTabStopMenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        FlushPendingPropertyHistory();
+        Vm?.ToggleSelectedTabStop();
+    }
+
     private void OnBringToFrontMenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
         => MoveSelectedElementsInLayerOrder(MainWindowViewModel.LayerOrderAction.BringToFront);
 
@@ -860,7 +892,7 @@ public partial class MainWindow : Window
 
     private static bool IsUndoTrackedVisualProperty(Control control, string propertyName)
     {
-        if (propertyName is "Opacity" or "IsEnabled")
+        if (propertyName is "Opacity" or "IsEnabled" or "TabIndex" or "IsTabStop")
         {
             return true;
         }

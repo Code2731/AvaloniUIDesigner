@@ -549,6 +549,65 @@ public partial class MainWindowViewModel : ViewModelBase
             : $"Disabled {targets.Count} control(s).";
     }
 
+    public bool TryGetSelectedTabIndex(out string controlName, out int tabIndex)
+    {
+        var target = Canvas.SelectedElement;
+        if (target is null || target.IsLocked)
+        {
+            controlName = string.Empty;
+            tabIndex = 0;
+            StatusText = "Select an unlocked control to edit its tab order.";
+            return false;
+        }
+
+        controlName = target.DisplayName;
+        tabIndex = target.Visual.TabIndex;
+        return true;
+    }
+
+    public void SetSelectedTabIndex(int tabIndex)
+    {
+        var target = Canvas.SelectedElement;
+        if (target is null || target.IsLocked)
+        {
+            StatusText = "Select an unlocked control to edit its tab order.";
+            return;
+        }
+
+        if (target.Visual.TabIndex == tabIndex)
+        {
+            StatusText = "Tab order is unchanged.";
+            return;
+        }
+
+        BeginCanvasMutation(HistoryActionType.EditProperty, "Updated control tab order.");
+        target.Visual.TabIndex = tabIndex;
+        CommitCanvasMutation();
+        StatusText = $"Set tab order to {tabIndex} for {target.DisplayName}.";
+    }
+
+    public void ToggleSelectedTabStop()
+    {
+        var targets = Canvas.SelectedElements.Where(element => !element.IsLocked).ToList();
+        if (targets.Count == 0)
+        {
+            StatusText = "Select at least one unlocked control to change tab navigation.";
+            return;
+        }
+
+        var includeInTabNavigation = targets.All(element => !element.Visual.IsTabStop);
+        BeginCanvasMutation(HistoryActionType.EditProperty, "Updated control tab navigation.");
+        foreach (var target in targets)
+        {
+            target.Visual.IsTabStop = includeInTabNavigation;
+        }
+
+        CommitCanvasMutation();
+        StatusText = includeInTabNavigation
+            ? $"Included {targets.Count} control(s) in tab navigation."
+            : $"Excluded {targets.Count} control(s) from tab navigation.";
+    }
+
     public bool TryRenameElement(DesignElement element, string proposedName)
     {
         if (element.IsLocked)
@@ -1329,6 +1388,10 @@ public partial class MainWindowViewModel : ViewModelBase
             result["__isEnabled"] = bool.FalseString;
         }
 
+        // Defaults vary by control type, so preserve both keyboard navigation values explicitly.
+        result["__tabIndex"] = visual.TabIndex.ToString(CultureInfo.InvariantCulture);
+        result["__isTabStop"] = visual.IsTabStop.ToString();
+
         return result;
     }
 
@@ -1876,6 +1939,18 @@ public partial class MainWindowViewModel : ViewModelBase
             if (name == "IsEnabled")
             {
                 map["__isEnabled"] = attr.Value;
+                continue;
+            }
+
+            if (name == "TabIndex")
+            {
+                map["__tabIndex"] = attr.Value;
+                continue;
+            }
+
+            if (name == "IsTabStop")
+            {
+                map["__isTabStop"] = attr.Value;
                 continue;
             }
 
@@ -2738,6 +2813,9 @@ public partial class MainWindowViewModel : ViewModelBase
         {
             AppendAttribute(sb, "IsEnabled", bool.FalseString);
         }
+
+        AppendAttribute(sb, "TabIndex", element.Visual.TabIndex.ToString(CultureInfo.InvariantCulture));
+        AppendAttribute(sb, "IsTabStop", element.Visual.IsTabStop.ToString());
     }
 
     private static void AppendTextForegroundAttribute(StringBuilder sb, TextBlock textBlock)

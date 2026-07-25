@@ -153,6 +153,18 @@ public sealed class PreviewWindow : Window
             control.IsEnabled = parsedIsEnabled;
         }
 
+        if (properties.TryGetValue("__tabIndex", out var tabIndex)
+            && int.TryParse(tabIndex, NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsedTabIndex))
+        {
+            control.TabIndex = parsedTabIndex;
+        }
+
+        if (properties.TryGetValue("__isTabStop", out var isTabStop)
+            && bool.TryParse(isTabStop, out var parsedIsTabStop))
+        {
+            control.IsTabStop = parsedIsTabStop;
+        }
+
         switch (control)
         {
             case Button button when properties.TryGetValue("Content", out var content):
