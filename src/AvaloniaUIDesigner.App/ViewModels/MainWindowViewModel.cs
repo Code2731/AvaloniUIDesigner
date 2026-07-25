@@ -527,6 +527,28 @@ public partial class MainWindowViewModel : ViewModelBase
             : $"Updated accessible name for {target.DisplayName}.";
     }
 
+    public void ToggleSelectedEnabledState()
+    {
+        var targets = Canvas.SelectedElements.Where(element => !element.IsLocked).ToList();
+        if (targets.Count == 0)
+        {
+            StatusText = "Select at least one unlocked control to change its enabled state.";
+            return;
+        }
+
+        var enable = targets.All(element => !element.Visual.IsEnabled);
+        BeginCanvasMutation(HistoryActionType.EditProperty, "Updated control enabled state.");
+        foreach (var target in targets)
+        {
+            target.Visual.IsEnabled = enable;
+        }
+
+        CommitCanvasMutation();
+        StatusText = enable
+            ? $"Enabled {targets.Count} control(s)."
+            : $"Disabled {targets.Count} control(s).";
+    }
+
     public bool TryRenameElement(DesignElement element, string proposedName)
     {
         if (element.IsLocked)
@@ -1284,7 +1306,7 @@ public partial class MainWindowViewModel : ViewModelBase
         var properties = CaptureVisualPropertiesCore(visual);
         var toolTip = ToolTip.GetTip(visual)?.ToString();
         var automationName = AutomationProperties.GetName(visual);
-        if (string.IsNullOrWhiteSpace(toolTip) && string.IsNullOrWhiteSpace(automationName))
+        if (string.IsNullOrWhiteSpace(toolTip) && string.IsNullOrWhiteSpace(automationName) && visual.IsEnabled)
         {
             return properties;
         }
@@ -1300,6 +1322,11 @@ public partial class MainWindowViewModel : ViewModelBase
         if (!string.IsNullOrWhiteSpace(automationName))
         {
             result["__automationName"] = automationName;
+        }
+
+        if (!visual.IsEnabled)
+        {
+            result["__isEnabled"] = bool.FalseString;
         }
 
         return result;
@@ -1843,6 +1870,12 @@ public partial class MainWindowViewModel : ViewModelBase
             if (name == "AutomationProperties.Name")
             {
                 map["__automationName"] = attr.Value;
+                continue;
+            }
+
+            if (name == "IsEnabled")
+            {
+                map["__isEnabled"] = attr.Value;
                 continue;
             }
 
@@ -2699,6 +2732,11 @@ public partial class MainWindowViewModel : ViewModelBase
         if (!string.IsNullOrWhiteSpace(automationName))
         {
             AppendAttribute(sb, "AutomationProperties.Name", automationName);
+        }
+
+        if (!element.Visual.IsEnabled)
+        {
+            AppendAttribute(sb, "IsEnabled", bool.FalseString);
         }
     }
 

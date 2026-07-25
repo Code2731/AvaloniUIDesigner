@@ -430,6 +430,12 @@ public partial class CanvasViewModel : ViewModelBase
             AutomationProperties.SetName(visual, automationName);
         }
 
+        if (properties.TryGetValue("__isEnabled", out var isEnabled)
+            && bool.TryParse(isEnabled, out var parsedIsEnabled))
+        {
+            visual.IsEnabled = parsedIsEnabled;
+        }
+
         if (visual is Button button)
         {
             if (properties.TryGetValue("Content", out var content))

@@ -348,6 +348,12 @@ public partial class MainWindow : Window
         }
     }
 
+    private void OnToggleEnabledMenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        FlushPendingPropertyHistory();
+        Vm?.ToggleSelectedEnabledState();
+    }
+
     private void OnBringToFrontMenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
         => MoveSelectedElementsInLayerOrder(MainWindowViewModel.LayerOrderAction.BringToFront);
 
@@ -854,7 +860,7 @@ public partial class MainWindow : Window
 
     private static bool IsUndoTrackedVisualProperty(Control control, string propertyName)
     {
-        if (propertyName == "Opacity")
+        if (propertyName is "Opacity" or "IsEnabled")
         {
             return true;
         }

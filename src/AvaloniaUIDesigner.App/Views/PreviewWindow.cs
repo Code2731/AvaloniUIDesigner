@@ -147,6 +147,12 @@ public sealed class PreviewWindow : Window
             AutomationProperties.SetName(control, automationName);
         }
 
+        if (properties.TryGetValue("__isEnabled", out var isEnabled)
+            && bool.TryParse(isEnabled, out var parsedIsEnabled))
+        {
+            control.IsEnabled = parsedIsEnabled;
+        }
+
         switch (control)
         {
             case Button button when properties.TryGetValue("Content", out var content):
