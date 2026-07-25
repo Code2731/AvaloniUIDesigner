@@ -24,6 +24,7 @@ public partial class MainWindow : Window
     private const double HandleHalf = 5;
     private const double MinSize = 10;
     private const double MarqueeThreshold = 3;
+    private const double SmartSnapThreshold = 6;
 
     private DragMode _dragMode = DragMode.None;
     private Point _dragStart;
@@ -948,10 +949,16 @@ public partial class MainWindow : Window
         switch (_dragMode)
         {
             case DragMode.Move:
-                foreach (var (element, origin) in _dragOrigins)
+                var origin = _dragOrigins.TryGetValue(_dragTarget, out var dragOrigin)
+                    ? dragOrigin
+                    : new Point(_origX, _origY);
+                var position = GetSmartSnappedPosition(
+                    Math.Max(0, SnapPosition(origin.X + dx)),
+                    Math.Max(0, SnapPosition(origin.Y + dy)));
+                foreach (var (element, elementOrigin) in _dragOrigins)
                 {
-                    element.X = Math.Max(0, SnapPosition(origin.X + dx));
-                    element.Y = Math.Max(0, SnapPosition(origin.Y + dy));
+                    element.X = Math.Max(0, position.X + (elementOrigin.X - dragOrigin.X));
+                    element.Y = Math.Max(0, position.Y + (elementOrigin.Y - dragOrigin.Y));
                 }
                 break;
             case DragMode.E:
@@ -1027,6 +1034,81 @@ public partial class MainWindow : Window
 
     private double SnapPosition(double value) => Vm?.Canvas.SnapPosition(value) ?? value;
 
+    private Point GetSmartSnappedPosition(double x, double y)
+    {
+        if (_dragTarget is null || Vm is null)
+        {
+            HideSmartSnapGuides();
+            return new Point(x, y);
+        }
+
+        double? guideX = null;
+        double? guideY = null;
+        var bestX = SmartSnapThreshold + 1;
+        var bestY = SmartSnapThreshold + 1;
+        var snappedX = x;
+        var snappedY = y;
+        var movingX = new[] { x, x + _dragTarget.Width / 2, x + _dragTarget.Width };
+        var movingY = new[] { y, y + _dragTarget.Height / 2, y + _dragTarget.Height };
+
+        foreach (var element in Vm.Canvas.Elements.Where(element => !_dragOrigins.ContainsKey(element)))
+        {
+            foreach (var candidate in new[] { element.X, element.X + element.Width / 2, element.X + element.Width })
+            {
+                foreach (var moving in movingX)
+                {
+                    var distance = Math.Abs(candidate - moving);
+                    if (distance < bestX)
+                    {
+                        bestX = distance;
+                        snappedX = x + candidate - moving;
+                        guideX = candidate;
+                    }
+                }
+            }
+
+            foreach (var candidate in new[] { element.Y, element.Y + element.Height / 2, element.Y + element.Height })
+            {
+                foreach (var moving in movingY)
+                {
+                    var distance = Math.Abs(candidate - moving);
+                    if (distance < bestY)
+                    {
+                        bestY = distance;
+                        snappedY = y + candidate - moving;
+                        guideY = candidate;
+                    }
+                }
+            }
+        }
+
+        UpdateSmartSnapGuides(guideX, guideY);
+        return new Point(snappedX, snappedY);
+    }
+
+    private void UpdateSmartSnapGuides(double? x, double? y)
+    {
+        SmartSnapVertical.IsVisible = x.HasValue;
+        SmartSnapHorizontal.IsVisible = y.HasValue;
+        if (x.HasValue)
+        {
+            Canvas.SetLeft(SmartSnapVertical, x.Value);
+            SmartSnapVertical.Height = Vm?.Canvas.ArtboardHeight ?? 0;
+        }
+
+        if (y.HasValue)
+        {
+            Canvas.SetTop(SmartSnapHorizontal, y.Value);
+            SmartSnapHorizontal.Width = Vm?.Canvas.ArtboardWidth ?? 0;
+        }
+    }
+
+    private void HideSmartSnapGuides()
+    {
+        SmartSnapVertical.IsVisible = false;
+        SmartSnapHorizontal.IsVisible = false;
+    }
+
     private double SnapSize(double value) => Vm?.Canvas.SnapSize(value, MinSize) ?? Math.Max(MinSize, value);
 
     private void OnDragPointerReleased(object? sender, PointerReleasedEventArgs e)
@@ -1050,6 +1132,7 @@ public partial class MainWindow : Window
         _dragMode = DragMode.None;
         _dragTarget = null;
         _dragOrigins.Clear();
+        HideSmartSnapGuides();
         e.Pointer.Capture(null);
         e.Handled = true;
 

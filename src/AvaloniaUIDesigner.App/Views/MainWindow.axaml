@@ -202,6 +202,10 @@
                                 <Rectangle Name="HandleW" Tag="W" Width="10" Height="10" Fill="DodgerBlue" PointerPressed="OnHandlePressed"/>
                             </Canvas>
                             <Canvas IsHitTestVisible="False">
+                                <Rectangle Name="SmartSnapVertical" Width="1" Fill="#22D3EE" IsVisible="False"/>
+                                <Rectangle Name="SmartSnapHorizontal" Height="1" Fill="#22D3EE" IsVisible="False"/>
+                            </Canvas>
+                            <Canvas IsHitTestVisible="False">
                                 <Rectangle Name="MarqueeRectangle"
                                            Fill="#3078D7FF"
                                            Stroke="DodgerBlue"
