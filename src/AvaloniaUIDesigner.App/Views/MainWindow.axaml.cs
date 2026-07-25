@@ -495,6 +495,23 @@ public partial class MainWindow : Window
     private void OnMobileArtboardMenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
         => SetArtboard(390, 844);
 
+    private void OnRotateArtboardMenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        if (Vm is null)
+        {
+            return;
+        }
+
+        if (Math.Abs(Vm.Canvas.ArtboardWidth - Vm.Canvas.ArtboardHeight) < double.Epsilon)
+        {
+            Vm.StatusText = "The square artboard orientation is unchanged.";
+            return;
+        }
+
+        SetArtboard(Vm.Canvas.ArtboardHeight, Vm.Canvas.ArtboardWidth);
+        Vm.StatusText = $"Rotated artboard: {Vm.Canvas.ArtboardWidth:0} x {Vm.Canvas.ArtboardHeight:0}";
+    }
+
     private void OnWhiteArtboardBackgroundMenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
         => SetArtboardBackground("#FFFFFF");
 
