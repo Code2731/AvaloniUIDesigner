@@ -1,6 +1,8 @@
 using System.Collections.Generic;
+using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Layout;
+using Avalonia.Media;
 using AvaloniaUIDesigner.App.Designer.Contracts;
 using AvaloniaUIDesigner.App.Designer.Core;
 
@@ -62,6 +64,18 @@ public sealed class BuiltInComponentCatalog : IComponentCatalog
             DefaultWidth: 180,
             DefaultHeight: 20,
             VisualFactory: static () => new ProgressBar { Minimum = 0, Maximum = 100, Value = 50 }),
+        new(
+            DisplayName: "Border",
+            AvaloniaTypeName: "Avalonia.Controls.Border",
+            DefaultWidth: 240,
+            DefaultHeight: 120,
+            VisualFactory: static () => new Border
+            {
+                Background = Brush.Parse("#F1F5F9"),
+                BorderBrush = Brush.Parse("#94A3B8"),
+                BorderThickness = new Thickness(1),
+                CornerRadius = new CornerRadius(8),
+            }),
         new(
             DisplayName: "Grid",
             AvaloniaTypeName: "Avalonia.Controls.Grid",

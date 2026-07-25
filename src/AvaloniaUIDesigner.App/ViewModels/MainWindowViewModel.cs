@@ -8,6 +8,7 @@ using System.Linq;
 using System.Text;
 using System.Text.Json;
 using System.Xml.Linq;
+using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Layout;
 using Avalonia.Media;
@@ -1121,6 +1122,28 @@ public partial class MainWindowViewModel : ViewModelBase
             };
         }
 
+        if (visual is Border border)
+        {
+            var properties = new Dictionary<string, string>
+            {
+                ["BorderThickness"] = border.BorderThickness.ToString(),
+                ["CornerRadius"] = border.CornerRadius.ToString(),
+                ["Opacity"] = border.Opacity.ToString("0.###", CultureInfo.InvariantCulture),
+            };
+
+            if (border.Background is SolidColorBrush background)
+            {
+                properties["Background"] = background.Color.ToString();
+            }
+
+            if (border.BorderBrush is SolidColorBrush borderBrush)
+            {
+                properties["BorderBrush"] = borderBrush.Color.ToString();
+            }
+
+            return properties;
+        }
+
         if (visual is StackPanel stackPanel)
         {
             return new Dictionary<string, string>
@@ -1428,6 +1451,7 @@ public partial class MainWindowViewModel : ViewModelBase
             "CheckBox" or "ToggleSwitch" => propertyName is "Content" or "IsChecked",
             "ComboBox" => propertyName == "SelectedIndex",
             "Slider" or "ProgressBar" => propertyName is "Minimum" or "Maximum" or "Value",
+            "Border" => propertyName is "Background" or "BorderBrush" or "BorderThickness" or "CornerRadius",
             "Grid" => propertyName == "ShowGridLines",
             "StackPanel" => propertyName is "Orientation" or "Spacing",
             _ => false,
@@ -1890,6 +1914,25 @@ public partial class MainWindowViewModel : ViewModelBase
                 AppendAttribute(sb, "Minimum", progressBar.Minimum.ToString("0.###", CultureInfo.InvariantCulture));
                 AppendAttribute(sb, "Maximum", progressBar.Maximum.ToString("0.###", CultureInfo.InvariantCulture));
                 AppendAttribute(sb, "Value", progressBar.Value.ToString("0.###", CultureInfo.InvariantCulture));
+                sb.AppendLine(" />");
+                break;
+
+            case Border border:
+                sb.Append(indent);
+                sb.Append("<Border");
+                AppendCanvasLayoutAttributes(sb, element);
+                if (border.Background is SolidColorBrush background)
+                {
+                    AppendAttribute(sb, "Background", background.Color.ToString());
+                }
+
+                if (border.BorderBrush is SolidColorBrush borderBrush)
+                {
+                    AppendAttribute(sb, "BorderBrush", borderBrush.Color.ToString());
+                }
+
+                AppendAttribute(sb, "BorderThickness", border.BorderThickness.ToString());
+                AppendAttribute(sb, "CornerRadius", border.CornerRadius.ToString());
                 sb.AppendLine(" />");
                 break;
 

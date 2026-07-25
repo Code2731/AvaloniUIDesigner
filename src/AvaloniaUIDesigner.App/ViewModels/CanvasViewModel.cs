@@ -5,6 +5,7 @@ using System.Collections.Specialized;
 using System.Globalization;
 using System.Linq;
 using System.Text.Json;
+using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Layout;
 using Avalonia.Media;
@@ -553,6 +554,33 @@ public partial class CanvasViewModel : ViewModelBase
             return;
         }
 
+        if (visual is Border border)
+        {
+            if (properties.TryGetValue("Background", out var background))
+            {
+                TrySetBorderBackground(border, background);
+            }
+
+            if (properties.TryGetValue("BorderBrush", out var borderBrush))
+            {
+                TrySetBorderBrush(border, borderBrush);
+            }
+
+            if (properties.TryGetValue("BorderThickness", out var borderThickness)
+                && TryParseThickness(borderThickness, out var parsedBorderThickness))
+            {
+                border.BorderThickness = parsedBorderThickness;
+            }
+
+            if (properties.TryGetValue("CornerRadius", out var cornerRadius)
+                && TryParseCornerRadius(cornerRadius, out var parsedCornerRadius))
+            {
+                border.CornerRadius = parsedCornerRadius;
+            }
+
+            return;
+        }
+
         if (visual is StackPanel stackPanel)
         {
             if (properties.TryGetValue("Orientation", out var orientation)
@@ -616,6 +644,58 @@ public partial class CanvasViewModel : ViewModelBase
         foreach (var item in items)
         {
             comboBox.Items.Add(item);
+        }
+    }
+
+    private static void TrySetBorderBackground(Border border, string value)
+    {
+        try
+        {
+            border.Background = Brush.Parse(value);
+        }
+        catch (FormatException)
+        {
+            // Ignore malformed imported brushes while keeping the control usable.
+        }
+    }
+
+    private static void TrySetBorderBrush(Border border, string value)
+    {
+        try
+        {
+            border.BorderBrush = Brush.Parse(value);
+        }
+        catch (FormatException)
+        {
+            // Ignore malformed imported brushes while keeping the control usable.
+        }
+    }
+
+    private static bool TryParseThickness(string value, out Thickness thickness)
+    {
+        try
+        {
+            thickness = Thickness.Parse(value);
+            return true;
+        }
+        catch (FormatException)
+        {
+            thickness = default;
+            return false;
+        }
+    }
+
+    private static bool TryParseCornerRadius(string value, out CornerRadius cornerRadius)
+    {
+        try
+        {
+            cornerRadius = CornerRadius.Parse(value);
+            return true;
+        }
+        catch (FormatException)
+        {
+            cornerRadius = default;
+            return false;
         }
     }
 

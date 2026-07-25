@@ -72,6 +72,13 @@ public sealed class PreviewWindow : Window
             },
             "Avalonia.Controls.Slider" => new Slider { Minimum = 0, Maximum = 100, Value = 50 },
             "Avalonia.Controls.ProgressBar" => new ProgressBar { Minimum = 0, Maximum = 100, Value = 50 },
+            "Avalonia.Controls.Border" => new Border
+            {
+                Background = Brush.Parse("#F1F5F9"),
+                BorderBrush = Brush.Parse("#94A3B8"),
+                BorderThickness = new Thickness(1),
+                CornerRadius = new CornerRadius(8),
+            },
             "Avalonia.Controls.Grid" => new Grid { ShowGridLines = true },
             "Avalonia.Controls.StackPanel" => new StackPanel
             {
@@ -174,6 +181,9 @@ public sealed class PreviewWindow : Window
                 break;
             case ProgressBar progressBar:
                 ApplyProgressBarProperties(progressBar, properties);
+                break;
+            case Border border:
+                ApplyBorderProperties(border, properties);
                 break;
             case Grid grid when properties.TryGetValue("ShowGridLines", out var showGrid)
                 && bool.TryParse(showGrid, out var parsedShowGrid):
@@ -291,6 +301,55 @@ public sealed class PreviewWindow : Window
             && double.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out var parsedValue))
         {
             progressBar.Value = parsedValue;
+        }
+    }
+
+    private static void ApplyBorderProperties(Border border, IReadOnlyDictionary<string, string> properties)
+    {
+        if (properties.TryGetValue("Background", out var background))
+        {
+            TrySetBorderBrush(value => border.Background = value, background);
+        }
+
+        if (properties.TryGetValue("BorderBrush", out var borderBrush))
+        {
+            TrySetBorderBrush(value => border.BorderBrush = value, borderBrush);
+        }
+
+        if (properties.TryGetValue("BorderThickness", out var borderThickness))
+        {
+            try
+            {
+                border.BorderThickness = Thickness.Parse(borderThickness);
+            }
+            catch (FormatException)
+            {
+                // Ignore malformed imported thickness values.
+            }
+        }
+
+        if (properties.TryGetValue("CornerRadius", out var cornerRadius))
+        {
+            try
+            {
+                border.CornerRadius = CornerRadius.Parse(cornerRadius);
+            }
+            catch (FormatException)
+            {
+                // Ignore malformed imported corner-radius values.
+            }
+        }
+    }
+
+    private static void TrySetBorderBrush(Action<IBrush?> applyBrush, string value)
+    {
+        try
+        {
+            applyBrush(Brush.Parse(value));
+        }
+        catch (FormatException)
+        {
+            // Ignore malformed imported brushes while keeping the preview available.
         }
     }
 
