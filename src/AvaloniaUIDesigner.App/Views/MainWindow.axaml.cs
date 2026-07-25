@@ -451,6 +451,14 @@ public partial class MainWindow : Window
             return;
         }
 
+        if (ctrl && e.Key == Key.D0)
+        {
+            Vm.Canvas.ResetZoom();
+            UpdateZoomStatus();
+            e.Handled = true;
+            return;
+        }
+
         if (ctrl && e.Key == Key.N)
         {
             await HandleNewCommandAsync();
