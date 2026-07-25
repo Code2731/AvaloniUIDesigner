@@ -17,6 +17,19 @@ public partial class ObjectTreeViewModel : ViewModelBase
     [ObservableProperty]
     private ObjectNodeViewModel? _selectedNode;
 
+    [ObservableProperty]
+    private string _searchText = string.Empty;
+
+    partial void OnSearchTextChanged(string value)
+    {
+        var match = System.Linq.Enumerable.FirstOrDefault(Root.Children, node => node.DisplayName.Contains(value, System.StringComparison.OrdinalIgnoreCase)
+            || node.Element?.TypeName.Contains(value, System.StringComparison.OrdinalIgnoreCase) == true);
+        if (!string.IsNullOrWhiteSpace(value) && match is not null)
+        {
+            SelectedNode = match;
+        }
+    }
+
     public ObjectNodeViewModel Add(DesignElement element)
     {
         var node = new ObjectNodeViewModel(element.DisplayName) { Element = element };
