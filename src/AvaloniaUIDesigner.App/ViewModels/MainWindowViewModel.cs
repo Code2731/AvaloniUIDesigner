@@ -1376,6 +1376,7 @@ public partial class MainWindowViewModel : ViewModelBase
                 sb.Append("<TextBlock");
                 AppendCanvasLayoutAttributes(sb, element);
                 AppendAttribute(sb, "Text", textBlock.Text ?? string.Empty);
+                AppendAttribute(sb, "FontSize", textBlock.FontSize.ToString("0.###", CultureInfo.InvariantCulture));
                 sb.AppendLine(" />");
                 break;
 
