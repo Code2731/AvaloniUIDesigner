@@ -9,7 +9,10 @@ public sealed record DesignerCanvasDocument(
 public sealed record DesignerCanvasSettings(
     double Width = 1280,
     double Height = 800,
-    string Background = "#FFFFFF");
+    string Background = "#FFFFFF",
+    double GridSize = 8,
+    bool IsGridVisible = true,
+    bool SnapToGrid = true);
 
 public sealed record DesignerElementSnapshot(
     string DisplayName,

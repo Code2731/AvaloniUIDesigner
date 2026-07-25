@@ -20,6 +20,8 @@ namespace AvaloniaUIDesigner.App.ViewModels;
 
 public partial class MainWindowViewModel : ViewModelBase
 {
+    private const string DesignerMetadataPrefix = "AvaloniaUIDesigner:";
+
     private readonly IComponentCatalog _componentCatalog;
     private readonly IDesignerSerializer _serializer;
     private readonly Stack<HistoryEntry> _undoStack = new();
@@ -672,9 +674,15 @@ public partial class MainWindowViewModel : ViewModelBase
         sb.AppendLine("        xmlns:x=\"http://schemas.microsoft.com/winfx/2006/xaml\"");
         sb.AppendLine($"        Width=\"{settings.Width:0.###}\" Height=\"{settings.Height:0.###}\">");
         sb.AppendLine($"  <Canvas Width=\"{settings.Width:0.###}\" Height=\"{settings.Height:0.###}\" Background=\"{EscapeXmlAttribute(settings.Background)}\">");
+        sb.AppendLine($"    <!-- {DesignerMetadataPrefix} GridSize={settings.GridSize.ToString(\"0.###\", CultureInfo.InvariantCulture)}; IsGridVisible={settings.IsGridVisible}; SnapToGrid={settings.SnapToGrid} -->");
 
         foreach (var element in Canvas.Elements)
         {
+            if (element.IsLocked)
+            {
+                sb.AppendLine($"    <!-- {DesignerMetadataPrefix} IsLocked=true -->");
+            }
+
             WriteTopLevelElementAxaml(sb, element, "    ");
         }
 
@@ -725,6 +733,22 @@ public partial class MainWindowViewModel : ViewModelBase
                 .SequenceEqual(Canvas.Elements.Select(element => element.DisplayName), StringComparer.Ordinal))
             {
                 result = "Validation failed: exported control names do not match the canvas.";
+                return false;
+            }
+
+            var settings = parsed.Settings ?? new DesignerCanvasSettings();
+            if (settings.GridSize != Canvas.GridSize
+                || settings.IsGridVisible != Canvas.IsGridVisible
+                || settings.SnapToGrid != Canvas.SnapToGrid)
+            {
+                result = "Validation failed: exported designer canvas settings do not match.";
+                return false;
+            }
+
+            if (!parsed.Elements.Select(element => element.IsLocked)
+                .SequenceEqual(Canvas.Elements.Select(element => element.IsLocked)))
+            {
+                result = "Validation failed: exported control lock states do not match.";
                 return false;
             }
         }
@@ -865,6 +889,9 @@ public partial class MainWindowViewModel : ViewModelBase
         {
             var settings = document.Settings ?? new DesignerCanvasSettings();
             Canvas.SetArtboard(settings.Width, settings.Height, settings.Background);
+            Canvas.SetGridSize(settings.GridSize);
+            Canvas.IsGridVisible = settings.IsGridVisible;
+            Canvas.SnapToGrid = settings.SnapToGrid;
             Canvas.Clear();
             foreach (var snapshot in document.Elements)
             {
@@ -898,7 +925,13 @@ public partial class MainWindowViewModel : ViewModelBase
     }
 
     private DesignerCanvasSettings CaptureCanvasSettings()
-        => new(Canvas.ArtboardWidth, Canvas.ArtboardHeight, Canvas.ArtboardBackground);
+        => new(
+            Canvas.ArtboardWidth,
+            Canvas.ArtboardHeight,
+            Canvas.ArtboardBackground,
+            Canvas.GridSize,
+            Canvas.IsGridVisible,
+            Canvas.SnapToGrid);
 
     private static DesignerCanvasDocument CreateLoginTemplate() => new(
         [
@@ -1064,6 +1097,7 @@ public partial class MainWindowViewModel : ViewModelBase
                 || a.Y != b.Y
                 || a.Width != b.Width
                 || a.Height != b.Height
+                || a.IsLocked != b.IsLocked
                 || !DictionaryEquals(a.VisualProperties, b.VisualProperties))
             {
                 return false;
@@ -1086,9 +1120,27 @@ public partial class MainWindowViewModel : ViewModelBase
         }
 
         var snapshots = new List<DesignerElementSnapshot>();
+        var nextIsLocked = false;
 
-        foreach (var child in parseRoot.Elements())
+        foreach (var node in parseRoot.Nodes())
         {
+            if (node is XComment comment)
+            {
+                var metadata = ReadDesignerMetadata(comment);
+                if (metadata.TryGetValue("IsLocked", out var isLocked)
+                    && bool.TryParse(isLocked, out var parsedIsLocked))
+                {
+                    nextIsLocked = parsedIsLocked;
+                }
+
+                continue;
+            }
+
+            if (node is not XElement child)
+            {
+                continue;
+            }
+
             var tagName = child.Name.LocalName;
             if (IsIgnoredContainerTag(tagName))
             {
@@ -1108,7 +1160,8 @@ public partial class MainWindowViewModel : ViewModelBase
             var height = ReadDouble(child, "Height", 40);
             var props = ReadVisualProperties(child, warnings);
 
-            snapshots.Add(new DesignerElementSnapshot(displayName, typeName, x, y, width, height, props));
+            snapshots.Add(new DesignerElementSnapshot(displayName, typeName, x, y, width, height, props, nextIsLocked));
+            nextIsLocked = false;
         }
 
         return new DesignerCanvasDocument(snapshots, ReadCanvasSettings(parseRoot, warnings));
@@ -1125,8 +1178,58 @@ public partial class MainWindowViewModel : ViewModelBase
             background = "#FFFFFF";
         }
 
-        return new DesignerCanvasSettings(width, height, background);
+        var metadata = canvas.Nodes()
+            .OfType<XComment>()
+            .Select(ReadDesignerMetadata)
+            .FirstOrDefault(values => values.ContainsKey("GridSize")
+                || values.ContainsKey("IsGridVisible")
+                || values.ContainsKey("SnapToGrid"));
+
+        return new DesignerCanvasSettings(
+            width,
+            height,
+            background,
+            ReadDesignerDouble(metadata, "GridSize", 8),
+            ReadDesignerBoolean(metadata, "IsGridVisible", true),
+            ReadDesignerBoolean(metadata, "SnapToGrid", true));
     }
+
+    private static IReadOnlyDictionary<string, string> ReadDesignerMetadata(XComment comment)
+    {
+        var text = comment.Value.Trim();
+        if (!text.StartsWith(DesignerMetadataPrefix, StringComparison.Ordinal))
+        {
+            return new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        }
+
+        var metadata = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var segment in text[DesignerMetadataPrefix.Length..].Split(';', StringSplitOptions.RemoveEmptyEntries))
+        {
+            var separator = segment.IndexOf('=');
+            if (separator <= 0)
+            {
+                continue;
+            }
+
+            metadata[segment[..separator].Trim()] = segment[(separator + 1)..].Trim();
+        }
+
+        return metadata;
+    }
+
+    private static double ReadDesignerDouble(IReadOnlyDictionary<string, string>? metadata, string name, double fallback)
+        => metadata is not null
+            && metadata.TryGetValue(name, out var value)
+            && double.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out var parsed)
+                ? parsed
+                : fallback;
+
+    private static bool ReadDesignerBoolean(IReadOnlyDictionary<string, string>? metadata, string name, bool fallback)
+        => metadata is not null
+            && metadata.TryGetValue(name, out var value)
+            && bool.TryParse(value, out var parsed)
+                ? parsed
+                : fallback;
 
     private bool TryResolveTypeName(string tagName, out string typeName)
     {
