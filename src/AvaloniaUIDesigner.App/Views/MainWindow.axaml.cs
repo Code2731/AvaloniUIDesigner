@@ -304,13 +304,19 @@ public partial class MainWindow : Window
     }
 
     private void OnGridSize4MenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
-        => SetGridSize(4);
+        => Vm?.SetCanvasGridSize(4);
 
     private void OnGridSize8MenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
-        => SetGridSize(8);
+        => Vm?.SetCanvasGridSize(8);
 
     private void OnGridSize16MenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
-        => SetGridSize(16);
+        => Vm?.SetCanvasGridSize(16);
+
+    private void OnShowGridMenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+        => Vm?.SetCanvasGridVisibility(!Vm.Canvas.IsGridVisible);
+
+    private void OnSnapToGridMenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+        => Vm?.SetCanvasSnapToGrid(!Vm.Canvas.SnapToGrid);
 
     private void OnDesktopArtboardMenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
         => SetArtboard(1280, 800);
@@ -329,17 +335,6 @@ public partial class MainWindow : Window
 
     private void OnInkArtboardBackgroundMenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
         => SetArtboardBackground("#1E293B");
-
-    private void SetGridSize(double size)
-    {
-        if (Vm is null)
-        {
-            return;
-        }
-
-        Vm.Canvas.SetGridSize(size);
-        Vm.StatusText = $"Grid size: {Vm.Canvas.GridSize:0}px";
-    }
 
     private void SetArtboard(double width, double height)
     {

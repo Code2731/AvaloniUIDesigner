@@ -117,6 +117,45 @@ public partial class MainWindowViewModel : ViewModelBase
         StatusText = $"Placed {element.DisplayName} ({snappedX:0}, {snappedY:0})";
     }
 
+    public void SetCanvasGridSize(double gridSize)
+    {
+        if (Canvas.GridSize == Math.Clamp(gridSize, 4, 32))
+        {
+            return;
+        }
+
+        BeginCanvasMutation(HistoryActionType.TransformElement, "Updated grid size.");
+        Canvas.SetGridSize(gridSize);
+        CommitCanvasMutation();
+        StatusText = $"Grid size: {Canvas.GridSize:0}px";
+    }
+
+    public void SetCanvasGridVisibility(bool isVisible)
+    {
+        if (Canvas.IsGridVisible == isVisible)
+        {
+            return;
+        }
+
+        BeginCanvasMutation(HistoryActionType.TransformElement, "Updated grid visibility.");
+        Canvas.IsGridVisible = isVisible;
+        CommitCanvasMutation();
+        StatusText = isVisible ? "Grid shown." : "Grid hidden.";
+    }
+
+    public void SetCanvasSnapToGrid(bool snapToGrid)
+    {
+        if (Canvas.SnapToGrid == snapToGrid)
+        {
+            return;
+        }
+
+        BeginCanvasMutation(HistoryActionType.TransformElement, "Updated snap to grid.");
+        Canvas.SnapToGrid = snapToGrid;
+        CommitCanvasMutation();
+        StatusText = snapToGrid ? "Snap to grid enabled." : "Snap to grid disabled.";
+    }
+
     public void SelectElement(DesignElement? element, bool toggle = false)
     {
         _isSyncingSelection = true;
