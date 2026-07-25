@@ -1270,6 +1270,16 @@ public partial class MainWindowViewModel : ViewModelBase
             };
         }
 
+        if (visual is CalendarDatePicker calendarDatePicker)
+        {
+            return new Dictionary<string, string>
+            {
+                ["SelectedDate"] = calendarDatePicker.SelectedDate?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) ?? string.Empty,
+                ["Watermark"] = calendarDatePicker.Watermark ?? string.Empty,
+                ["Opacity"] = calendarDatePicker.Opacity.ToString("0.###", CultureInfo.InvariantCulture),
+            };
+        }
+
         if (visual is TimePicker timePicker)
         {
             return new Dictionary<string, string>
@@ -1677,6 +1687,7 @@ public partial class MainWindowViewModel : ViewModelBase
             "ComboBox" or "ListBox" => propertyName == "SelectedIndex",
             "Slider" or "ProgressBar" => propertyName is "Minimum" or "Maximum" or "Value",
             "DatePicker" => propertyName == "SelectedDate",
+            "CalendarDatePicker" => propertyName is "SelectedDate" or "Watermark",
             "TimePicker" => propertyName == "SelectedTime",
             "NumericUpDown" => propertyName is "Minimum" or "Maximum" or "Increment" or "Value",
             "TabControl" => propertyName == "SelectedIndex",
@@ -2220,6 +2231,23 @@ public partial class MainWindowViewModel : ViewModelBase
                 if (datePicker.SelectedDate is { } selectedDate)
                 {
                     AppendAttribute(sb, "SelectedDate", selectedDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture));
+                }
+
+                sb.AppendLine(" />");
+                break;
+
+            case CalendarDatePicker calendarDatePicker:
+                sb.Append(indent);
+                sb.Append("<CalendarDatePicker");
+                AppendCanvasLayoutAttributes(sb, element);
+                if (calendarDatePicker.SelectedDate is { } selectedDate)
+                {
+                    AppendAttribute(sb, "SelectedDate", selectedDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture));
+                }
+
+                if (!string.IsNullOrWhiteSpace(calendarDatePicker.Watermark))
+                {
+                    AppendAttribute(sb, "Watermark", calendarDatePicker.Watermark);
                 }
 
                 sb.AppendLine(" />");

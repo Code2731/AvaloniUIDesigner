@@ -623,6 +623,27 @@ public partial class CanvasViewModel : ViewModelBase
             return;
         }
 
+        if (visual is CalendarDatePicker calendarDatePicker)
+        {
+            if (properties.TryGetValue("SelectedDate", out var selectedDate)
+                && DateTime.TryParseExact(
+                    selectedDate,
+                    "yyyy-MM-dd",
+                    CultureInfo.InvariantCulture,
+                    DateTimeStyles.None,
+                    out var parsedSelectedDate))
+            {
+                calendarDatePicker.SelectedDate = parsedSelectedDate;
+            }
+
+            if (properties.TryGetValue("Watermark", out var watermark))
+            {
+                calendarDatePicker.Watermark = watermark;
+            }
+
+            return;
+        }
+
         if (visual is TimePicker timePicker)
         {
             if (properties.TryGetValue("SelectedTime", out var selectedTime)

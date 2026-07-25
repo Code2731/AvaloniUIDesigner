@@ -80,6 +80,7 @@ public sealed class PreviewWindow : Window
             "Avalonia.Controls.Slider" => new Slider { Minimum = 0, Maximum = 100, Value = 50 },
             "Avalonia.Controls.ProgressBar" => new ProgressBar { Minimum = 0, Maximum = 100, Value = 50 },
             "Avalonia.Controls.DatePicker" => new DatePicker(),
+            "Avalonia.Controls.CalendarDatePicker" => new CalendarDatePicker { Watermark = "Select date" },
             "Avalonia.Controls.TimePicker" => new TimePicker(),
             "Avalonia.Controls.NumericUpDown" => new NumericUpDown
             {
@@ -234,6 +235,9 @@ public sealed class PreviewWindow : Window
             case DatePicker datePicker:
                 ApplyDatePickerProperties(datePicker, properties);
                 break;
+            case CalendarDatePicker calendarDatePicker:
+                ApplyCalendarDatePickerProperties(calendarDatePicker, properties);
+                break;
             case TimePicker timePicker:
                 ApplyTimePickerProperties(timePicker, properties);
                 break;
@@ -376,6 +380,25 @@ public sealed class PreviewWindow : Window
                 out var parsedSelectedDate))
         {
             datePicker.SelectedDate = parsedSelectedDate;
+        }
+    }
+
+    private static void ApplyCalendarDatePickerProperties(CalendarDatePicker calendarDatePicker, IReadOnlyDictionary<string, string> properties)
+    {
+        if (properties.TryGetValue("SelectedDate", out var selectedDate)
+            && DateTime.TryParseExact(
+                selectedDate,
+                "yyyy-MM-dd",
+                CultureInfo.InvariantCulture,
+                DateTimeStyles.None,
+                out var parsedSelectedDate))
+        {
+            calendarDatePicker.SelectedDate = parsedSelectedDate;
+        }
+
+        if (properties.TryGetValue("Watermark", out var watermark))
+        {
+            calendarDatePicker.Watermark = watermark;
         }
     }
 

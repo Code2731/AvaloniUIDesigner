@@ -821,6 +821,11 @@ public partial class MainWindow : Window
             return propertyName == "SelectedDate";
         }
 
+        if (control is CalendarDatePicker)
+        {
+            return propertyName is "SelectedDate" or "Watermark";
+        }
+
         if (control is TimePicker)
         {
             return propertyName == "SelectedTime";
