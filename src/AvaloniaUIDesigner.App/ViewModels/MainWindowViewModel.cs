@@ -1484,6 +1484,7 @@ public partial class MainWindowViewModel : ViewModelBase
         AppendAttribute(sb, "Canvas.Top", element.Y.ToString("0.###", CultureInfo.InvariantCulture));
         AppendAttribute(sb, "Width", element.Width.ToString("0.###", CultureInfo.InvariantCulture));
         AppendAttribute(sb, "Height", element.Height.ToString("0.###", CultureInfo.InvariantCulture));
+        AppendAttribute(sb, "Opacity", element.Visual.Opacity.ToString("0.###", CultureInfo.InvariantCulture));
     }
 
     private static void AppendAttribute(StringBuilder sb, string name, string value)
