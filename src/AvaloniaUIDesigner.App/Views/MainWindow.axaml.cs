@@ -208,6 +208,9 @@ public partial class MainWindow : Window
     private void OnTextColorInkMenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e) => Vm?.SetSelectedTextColor("#111827");
     private void OnTextColorBlueMenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e) => Vm?.SetSelectedTextColor("#2563EB");
     private void OnTextColorRedMenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e) => Vm?.SetSelectedTextColor("#DC2626");
+    private void OnTextWeightRegularMenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e) => Vm?.SetSelectedTextWeight("Regular");
+    private void OnTextWeightSemiboldMenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e) => Vm?.SetSelectedTextWeight("Semibold");
+    private void OnTextWeightBoldMenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e) => Vm?.SetSelectedTextWeight("Bold");
 
     private void SetSelectionOpacity(double opacity)
     {
@@ -773,7 +776,7 @@ public partial class MainWindow : Window
 
         if (control is TextBlock)
         {
-            return propertyName is "Text" or "FontSize" or "Foreground";
+            return propertyName is "Text" or "FontSize" or "FontWeight" or "Foreground";
         }
 
         if (control is CheckBox)

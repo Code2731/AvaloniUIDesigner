@@ -68,6 +68,11 @@
                         <MenuItem Header="Blue" Click="OnTextColorBlueMenuClicked"/>
                         <MenuItem Header="Red" Click="OnTextColorRedMenuClicked"/>
                     </MenuItem>
+                    <MenuItem Header="Text Weight">
+                        <MenuItem Header="Regular" Click="OnTextWeightRegularMenuClicked"/>
+                        <MenuItem Header="Semibold" Click="OnTextWeightSemiboldMenuClicked"/>
+                        <MenuItem Header="Bold" Click="OnTextWeightBoldMenuClicked"/>
+                    </MenuItem>
                 </MenuItem>
                 <MenuItem Header="Order" IsEnabled="{Binding Canvas.IsSelectionActive}">
                     <MenuItem Header="Bring to Front" Click="OnBringToFrontMenuClicked"/>

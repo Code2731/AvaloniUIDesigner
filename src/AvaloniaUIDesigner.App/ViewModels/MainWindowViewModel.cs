@@ -212,6 +212,31 @@ public partial class MainWindowViewModel : ViewModelBase
         StatusText = $"Set text color for {targets.Count} control(s)";
     }
 
+    public void SetSelectedTextWeight(string weightName)
+    {
+        var targets = Canvas.SelectedElements.Where(element => !element.IsLocked && element.Visual is TextBlock).ToList();
+        if (targets.Count == 0)
+        {
+            StatusText = "Select an unlocked TextBlock to change its weight.";
+            return;
+        }
+
+        if (!TryParseTextWeight(weightName, out var fontWeight))
+        {
+            StatusText = "Unsupported text weight.";
+            return;
+        }
+
+        BeginCanvasMutation(HistoryActionType.EditProperty, "Updated text weight.");
+        foreach (var target in targets)
+        {
+            ((TextBlock)target.Visual).FontWeight = fontWeight;
+        }
+
+        CommitCanvasMutation();
+        StatusText = $"Set text weight to {weightName} for {targets.Count} control(s)";
+    }
+
     public bool TryRenameElement(DesignElement element, string proposedName)
     {
         if (element.IsLocked)
@@ -960,6 +985,7 @@ public partial class MainWindowViewModel : ViewModelBase
             {
                 ["Text"] = textBlock.Text ?? string.Empty,
                 ["FontSize"] = textBlock.FontSize.ToString("0.###", CultureInfo.InvariantCulture),
+                ["FontWeight"] = textBlock.FontWeight.ToString(),
                 ["Opacity"] = textBlock.Opacity.ToString("0.###", CultureInfo.InvariantCulture),
             };
 
@@ -1221,7 +1247,7 @@ public partial class MainWindowViewModel : ViewModelBase
         {
             "Button" => propertyName == "Content",
             "TextBox" => propertyName is "Text" or "Watermark",
-            "TextBlock" => propertyName is "Text" or "FontSize" or "Foreground",
+            "TextBlock" => propertyName is "Text" or "FontSize" or "FontWeight" or "Foreground",
             "CheckBox" => propertyName is "Content" or "IsChecked",
             "Slider" => propertyName is "Minimum" or "Maximum" or "Value",
             "Grid" => propertyName == "ShowGridLines",
@@ -1476,6 +1502,30 @@ public partial class MainWindowViewModel : ViewModelBase
         return name.All(character => char.IsLetterOrDigit(character) || character == '_');
     }
 
+    private static bool TryParseTextWeight(string value, out FontWeight fontWeight)
+    {
+        switch (value.Trim().ToLowerInvariant())
+        {
+            case "normal":
+            case "regular":
+            case "400":
+                fontWeight = FontWeight.Normal;
+                return true;
+            case "semibold":
+            case "semi-bold":
+            case "600":
+                fontWeight = FontWeight.SemiBold;
+                return true;
+            case "bold":
+            case "700":
+                fontWeight = FontWeight.Bold;
+                return true;
+            default:
+                fontWeight = FontWeight.Normal;
+                return false;
+        }
+    }
+
     private static IReadOnlyDictionary<string, string>? CloneProperties(IReadOnlyDictionary<string, string>? source)
     {
         if (source is null)
@@ -1581,6 +1631,7 @@ public partial class MainWindowViewModel : ViewModelBase
                 AppendCanvasLayoutAttributes(sb, element);
                 AppendAttribute(sb, "Text", textBlock.Text ?? string.Empty);
                 AppendAttribute(sb, "FontSize", textBlock.FontSize.ToString("0.###", CultureInfo.InvariantCulture));
+                AppendAttribute(sb, "FontWeight", textBlock.FontWeight.ToString());
                 AppendTextForegroundAttribute(sb, textBlock);
                 sb.AppendLine(" />");
                 break;

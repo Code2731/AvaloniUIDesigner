@@ -124,6 +124,12 @@ public sealed class PreviewWindow : Window
                     textBlock.FontSize = Math.Clamp(parsedFontSize, 8, 96);
                 }
 
+                if (properties.TryGetValue("FontWeight", out var fontWeight)
+                    && TryParseTextWeight(fontWeight, out var parsedFontWeight))
+                {
+                    textBlock.FontWeight = parsedFontWeight;
+                }
+
                 if (properties.TryGetValue("Foreground", out var foreground))
                 {
                     TrySetTextForeground(textBlock, foreground);
@@ -163,6 +169,30 @@ public sealed class PreviewWindow : Window
         catch (FormatException)
         {
             // Ignore malformed imported colors while keeping the preview available.
+        }
+    }
+
+    private static bool TryParseTextWeight(string value, out FontWeight fontWeight)
+    {
+        switch (value.Trim().ToLowerInvariant())
+        {
+            case "normal":
+            case "regular":
+            case "400":
+                fontWeight = FontWeight.Normal;
+                return true;
+            case "semibold":
+            case "semi-bold":
+            case "600":
+                fontWeight = FontWeight.SemiBold;
+                return true;
+            case "bold":
+            case "700":
+                fontWeight = FontWeight.Bold;
+                return true;
+            default:
+                fontWeight = FontWeight.Normal;
+                return false;
         }
     }
 
