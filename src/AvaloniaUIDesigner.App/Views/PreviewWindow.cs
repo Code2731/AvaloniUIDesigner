@@ -78,6 +78,7 @@ public sealed class PreviewWindow : Window
             },
             "Avalonia.Controls.Slider" => new Slider { Minimum = 0, Maximum = 100, Value = 50 },
             "Avalonia.Controls.ProgressBar" => new ProgressBar { Minimum = 0, Maximum = 100, Value = 50 },
+            "Avalonia.Controls.DatePicker" => new DatePicker(),
             "Avalonia.Controls.Border" => new Border
             {
                 Background = Brush.Parse("#F1F5F9"),
@@ -208,6 +209,9 @@ public sealed class PreviewWindow : Window
             case ProgressBar progressBar:
                 ApplyProgressBarProperties(progressBar, properties);
                 break;
+            case DatePicker datePicker:
+                ApplyDatePickerProperties(datePicker, properties);
+                break;
             case Border border:
                 ApplyBorderProperties(border, properties);
                 break;
@@ -327,6 +331,20 @@ public sealed class PreviewWindow : Window
             && double.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out var parsedValue))
         {
             progressBar.Value = parsedValue;
+        }
+    }
+
+    private static void ApplyDatePickerProperties(DatePicker datePicker, IReadOnlyDictionary<string, string> properties)
+    {
+        if (properties.TryGetValue("SelectedDate", out var selectedDate)
+            && DateTimeOffset.TryParseExact(
+                selectedDate,
+                "yyyy-MM-dd",
+                CultureInfo.InvariantCulture,
+                DateTimeStyles.AssumeLocal,
+                out var parsedSelectedDate))
+        {
+            datePicker.SelectedDate = parsedSelectedDate;
         }
     }
 

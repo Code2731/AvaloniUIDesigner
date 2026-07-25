@@ -591,6 +591,22 @@ public partial class CanvasViewModel : ViewModelBase
             return;
         }
 
+        if (visual is DatePicker datePicker)
+        {
+            if (properties.TryGetValue("SelectedDate", out var selectedDate)
+                && DateTimeOffset.TryParseExact(
+                    selectedDate,
+                    "yyyy-MM-dd",
+                    CultureInfo.InvariantCulture,
+                    DateTimeStyles.AssumeLocal,
+                    out var parsedSelectedDate))
+            {
+                datePicker.SelectedDate = parsedSelectedDate;
+            }
+
+            return;
+        }
+
         if (visual is Border border)
         {
             if (properties.TryGetValue("Background", out var background))

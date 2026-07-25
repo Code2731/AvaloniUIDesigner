@@ -811,6 +811,11 @@ public partial class MainWindow : Window
             return propertyName is "Minimum" or "Maximum" or "Value";
         }
 
+        if (control is DatePicker)
+        {
+            return propertyName == "SelectedDate";
+        }
+
         if (control is Border)
         {
             return propertyName is "Background" or "BorderBrush" or "BorderThickness" or "CornerRadius";

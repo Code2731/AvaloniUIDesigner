@@ -1232,6 +1232,15 @@ public partial class MainWindowViewModel : ViewModelBase
             };
         }
 
+        if (visual is DatePicker datePicker)
+        {
+            return new Dictionary<string, string>
+            {
+                ["SelectedDate"] = datePicker.SelectedDate?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) ?? string.Empty,
+                ["Opacity"] = datePicker.Opacity.ToString("0.###", CultureInfo.InvariantCulture),
+            };
+        }
+
         if (visual is Border border)
         {
             var properties = new Dictionary<string, string>
@@ -1579,6 +1588,7 @@ public partial class MainWindowViewModel : ViewModelBase
             "RadioButton" => propertyName is "Content" or "IsChecked" or "GroupName",
             "ComboBox" or "ListBox" => propertyName == "SelectedIndex",
             "Slider" or "ProgressBar" => propertyName is "Minimum" or "Maximum" or "Value",
+            "DatePicker" => propertyName == "SelectedDate",
             "Border" => propertyName is "Background" or "BorderBrush" or "BorderThickness" or "CornerRadius",
             "Grid" => propertyName == "ShowGridLines",
             "StackPanel" => propertyName is "Orientation" or "Spacing",
@@ -2087,6 +2097,18 @@ public partial class MainWindowViewModel : ViewModelBase
                 AppendAttribute(sb, "Minimum", progressBar.Minimum.ToString("0.###", CultureInfo.InvariantCulture));
                 AppendAttribute(sb, "Maximum", progressBar.Maximum.ToString("0.###", CultureInfo.InvariantCulture));
                 AppendAttribute(sb, "Value", progressBar.Value.ToString("0.###", CultureInfo.InvariantCulture));
+                sb.AppendLine(" />");
+                break;
+
+            case DatePicker datePicker:
+                sb.Append(indent);
+                sb.Append("<DatePicker");
+                AppendCanvasLayoutAttributes(sb, element);
+                if (datePicker.SelectedDate is { } selectedDate)
+                {
+                    AppendAttribute(sb, "SelectedDate", selectedDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture));
+                }
+
                 sb.AppendLine(" />");
                 break;
 

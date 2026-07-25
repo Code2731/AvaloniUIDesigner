@@ -81,6 +81,12 @@ public sealed class BuiltInComponentCatalog : IComponentCatalog
             DefaultHeight: 20,
             VisualFactory: static () => new ProgressBar { Minimum = 0, Maximum = 100, Value = 50 }),
         new(
+            DisplayName: "DatePicker",
+            AvaloniaTypeName: "Avalonia.Controls.DatePicker",
+            DefaultWidth: 180,
+            DefaultHeight: 32,
+            VisualFactory: static () => new DatePicker()),
+        new(
             DisplayName: "Border",
             AvaloniaTypeName: "Avalonia.Controls.Border",
             DefaultWidth: 240,
