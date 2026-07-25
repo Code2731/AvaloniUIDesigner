@@ -539,6 +539,34 @@ public partial class MainWindowViewModel : ViewModelBase
         return true;
     }
 
+    public bool TryGetSelectedElementName(out string controlName, out string elementName)
+    {
+        var target = Canvas.SelectedElement;
+        if (target is null || target.IsLocked)
+        {
+            controlName = string.Empty;
+            elementName = string.Empty;
+            StatusText = "Select an unlocked control to rename it.";
+            return false;
+        }
+
+        controlName = target.DisplayName;
+        elementName = target.DisplayName;
+        return true;
+    }
+
+    public bool RenameSelectedElement(string proposedName)
+    {
+        var target = Canvas.SelectedElement;
+        if (target is null)
+        {
+            StatusText = "Select a control to rename it.";
+            return false;
+        }
+
+        return TryRenameElement(target, proposedName);
+    }
+
     public bool TryGetSelectedButtonClickHandler(out string buttonName, out string handlerName)
     {
         if (Canvas.SelectedElement is not { IsLocked: false, Visual: Button button } target)

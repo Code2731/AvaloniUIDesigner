@@ -54,6 +54,7 @@
                 <MenuItem Header="Cut" Click="OnCutMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
                 <MenuItem Header="Paste" Click="OnPasteMenuClicked" IsEnabled="{Binding CanPaste}"/>
                 <MenuItem Header="Duplicate" Click="OnDuplicateMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
+                <MenuItem Header="Rename Selected Control..." Click="OnRenameSelectedControlMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
                 <MenuItem Header="Delete" Click="OnDeleteMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
                 <MenuItem Header="Edit Items..." Click="OnEditItemsMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
                 <MenuItem Header="Edit Content..." Click="OnEditExpanderContentMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
@@ -266,6 +267,7 @@
                                                     <MenuItem Header="Copy" Click="OnCopyMenuClicked"/>
                                                     <MenuItem Header="Cut" Click="OnCutMenuClicked"/>
                                                     <MenuItem Header="Duplicate" Click="OnDuplicateMenuClicked"/>
+                                                    <MenuItem Header="Rename..." Click="OnRenameSelectedControlMenuClicked"/>
                                                     <MenuItem Header="Delete" Click="OnDeleteMenuClicked"/>
                                                     <Separator/>
                                                     <MenuItem Header="Lock / Unlock Selection" Click="OnToggleLockMenuClicked"/>

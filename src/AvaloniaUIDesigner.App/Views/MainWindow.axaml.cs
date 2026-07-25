@@ -357,6 +357,25 @@ public partial class MainWindow : Window
         Vm?.DuplicateSelectedElement();
     }
 
+    private async void OnRenameSelectedControlMenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        FlushPendingPropertyHistory();
+        if (Vm is null || !Vm.TryGetSelectedElementName(out var controlName, out var elementName))
+        {
+            return;
+        }
+
+        var updatedName = await ShowTextEditorDialogAsync(
+            $"Rename Control - {controlName}",
+            elementName,
+            "Enter a unique x:Name. Names must start with a letter or underscore and contain only letters, numbers, or underscores.",
+            multiline: false);
+        if (updatedName is not null)
+        {
+            Vm.RenameSelectedElement(updatedName);
+        }
+    }
+
     private async void OnEditItemsMenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
         FlushPendingPropertyHistory();
@@ -2061,22 +2080,22 @@ public partial class MainWindow : Window
         return await dialog.ShowDialog<IReadOnlyList<string>?>(this);
     }
 
-    private async Task<string?> ShowTextEditorDialogAsync(string title, string content, string helpText)
+    private async Task<string?> ShowTextEditorDialogAsync(string title, string content, string helpText, bool multiline = true)
     {
         var editor = new TextBox
         {
             Text = content,
-            AcceptsReturn = true,
-            MinHeight = 160,
+            AcceptsReturn = multiline,
+            MinHeight = multiline ? 160 : 32,
         };
 
         var dialog = new Window
         {
             Title = title,
             Width = 460,
-            Height = 330,
+            Height = multiline ? 330 : 190,
             MinWidth = 360,
-            MinHeight = 240,
+            MinHeight = multiline ? 240 : 170,
             WindowStartupLocation = WindowStartupLocation.CenterOwner,
         };
 
