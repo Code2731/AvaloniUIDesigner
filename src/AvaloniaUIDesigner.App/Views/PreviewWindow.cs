@@ -65,6 +65,11 @@ public sealed class PreviewWindow : Window
             "Avalonia.Controls.TextBlock" => new TextBlock { Text = "Text" },
             "Avalonia.Controls.CheckBox" => new CheckBox { Content = "CheckBox" },
             "Avalonia.Controls.ToggleSwitch" => new ToggleSwitch { Content = "Toggle" },
+            "Avalonia.Controls.ComboBox" => new ComboBox
+            {
+                SelectedIndex = 0,
+                Items = { "Option 1", "Option 2", "Option 3" },
+            },
             "Avalonia.Controls.Slider" => new Slider { Minimum = 0, Maximum = 100, Value = 50 },
             "Avalonia.Controls.ProgressBar" => new ProgressBar { Minimum = 0, Maximum = 100, Value = 50 },
             "Avalonia.Controls.Grid" => new Grid { ShowGridLines = true },
@@ -161,6 +166,9 @@ public sealed class PreviewWindow : Window
                     toggleSwitch.IsChecked = parsedToggleSwitchIsChecked;
                 }
                 break;
+            case ComboBox comboBox:
+                ApplyComboBoxProperties(comboBox, properties);
+                break;
             case Slider slider:
                 ApplySliderProperties(slider, properties);
                 break;
@@ -231,6 +239,37 @@ public sealed class PreviewWindow : Window
             && double.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out var parsedValue))
         {
             slider.Value = parsedValue;
+        }
+    }
+
+    private static void ApplyComboBoxProperties(ComboBox comboBox, IReadOnlyDictionary<string, string> properties)
+    {
+        if (properties.TryGetValue("__items", out var itemsJson))
+        {
+            List<string>? items;
+            try
+            {
+                items = JsonSerializer.Deserialize<List<string>>(itemsJson);
+            }
+            catch
+            {
+                items = null;
+            }
+
+            if (items is not null)
+            {
+                comboBox.Items.Clear();
+                foreach (var item in items)
+                {
+                    comboBox.Items.Add(item);
+                }
+            }
+        }
+
+        if (properties.TryGetValue("SelectedIndex", out var selectedIndex)
+            && int.TryParse(selectedIndex, NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsedSelectedIndex))
+        {
+            comboBox.SelectedIndex = Math.Clamp(parsedSelectedIndex, -1, comboBox.Items.Count - 1);
         }
     }
 

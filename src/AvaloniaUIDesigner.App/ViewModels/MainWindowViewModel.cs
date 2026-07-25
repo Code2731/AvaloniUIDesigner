@@ -1089,6 +1089,16 @@ public partial class MainWindowViewModel : ViewModelBase
             };
         }
 
+        if (visual is ComboBox comboBox)
+        {
+            return new Dictionary<string, string>
+            {
+                ["SelectedIndex"] = comboBox.SelectedIndex.ToString(CultureInfo.InvariantCulture),
+                ["__items"] = SerializeComboBoxItems(comboBox),
+                ["Opacity"] = comboBox.Opacity.ToString("0.###", CultureInfo.InvariantCulture),
+            };
+        }
+
         if (visual is Slider slider)
         {
             return new Dictionary<string, string>
@@ -1395,6 +1405,10 @@ public partial class MainWindowViewModel : ViewModelBase
         {
             map["__children"] = SerializeStackPanelChildren(element);
         }
+        else if (string.Equals(element.Name.LocalName, "ComboBox", StringComparison.OrdinalIgnoreCase))
+        {
+            map["__items"] = SerializeComboBoxItems(element);
+        }
 
         return map.Count == 0 ? null : map;
     }
@@ -1412,6 +1426,7 @@ public partial class MainWindowViewModel : ViewModelBase
             "TextBox" => propertyName is "Text" or "Watermark",
             "TextBlock" => propertyName is "Text" or "FontSize" or "FontWeight" or "Foreground",
             "CheckBox" or "ToggleSwitch" => propertyName is "Content" or "IsChecked",
+            "ComboBox" => propertyName == "SelectedIndex",
             "Slider" or "ProgressBar" => propertyName is "Minimum" or "Maximum" or "Value",
             "Grid" => propertyName == "ShowGridLines",
             "StackPanel" => propertyName is "Orientation" or "Spacing",
@@ -1733,6 +1748,17 @@ public partial class MainWindowViewModel : ViewModelBase
         return JsonSerializer.Serialize(children);
     }
 
+    private static string SerializeComboBoxItems(ComboBox comboBox)
+    {
+        var items = comboBox.Items
+            .Select(item => item is ComboBoxItem comboBoxItem
+                ? comboBoxItem.Content?.ToString() ?? string.Empty
+                : item?.ToString() ?? string.Empty)
+            .ToList();
+
+        return JsonSerializer.Serialize(items);
+    }
+
     private static string SerializeStackPanelChildren(XElement stackPanelElement)
     {
         var children = new List<StackPanelChildSnapshot>();
@@ -1761,6 +1787,16 @@ public partial class MainWindowViewModel : ViewModelBase
         }
 
         return JsonSerializer.Serialize(children);
+    }
+
+    private static string SerializeComboBoxItems(XElement comboBoxElement)
+    {
+        var items = comboBoxElement.Elements()
+            .Where(element => !element.Name.LocalName.Contains('.', StringComparison.Ordinal))
+            .Select(element => element.Attribute("Content")?.Value ?? element.Value)
+            .ToList();
+
+        return JsonSerializer.Serialize(items);
     }
 
     private static void WriteTopLevelElementAxaml(StringBuilder sb, DesignElement element, string indent)
@@ -1815,6 +1851,26 @@ public partial class MainWindowViewModel : ViewModelBase
                 AppendAttribute(sb, "Content", toggleSwitch.Content?.ToString() ?? string.Empty);
                 AppendAttribute(sb, "IsChecked", (toggleSwitch.IsChecked ?? false).ToString());
                 sb.AppendLine(" />");
+                break;
+
+            case ComboBox comboBox:
+                sb.Append(indent);
+                sb.Append("<ComboBox");
+                AppendCanvasLayoutAttributes(sb, element);
+                AppendAttribute(sb, "SelectedIndex", comboBox.SelectedIndex.ToString(CultureInfo.InvariantCulture));
+                sb.AppendLine(">");
+                foreach (var item in comboBox.Items)
+                {
+                    sb.Append(indent);
+                    sb.Append("  <ComboBoxItem");
+                    AppendAttribute(sb, "Content", item is ComboBoxItem comboBoxItem
+                        ? comboBoxItem.Content?.ToString() ?? string.Empty
+                        : item?.ToString() ?? string.Empty);
+                    sb.AppendLine(" />");
+                }
+
+                sb.Append(indent);
+                sb.AppendLine("</ComboBox>");
                 break;
 
             case Slider slider:

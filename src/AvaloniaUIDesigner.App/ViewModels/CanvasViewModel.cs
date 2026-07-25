@@ -491,6 +491,22 @@ public partial class CanvasViewModel : ViewModelBase
             return;
         }
 
+        if (visual is ComboBox comboBox)
+        {
+            if (properties.TryGetValue("__items", out var itemsJson))
+            {
+                RestoreComboBoxItems(comboBox, itemsJson);
+            }
+
+            if (properties.TryGetValue("SelectedIndex", out var selectedIndex)
+                && int.TryParse(selectedIndex, NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsedSelectedIndex))
+            {
+                comboBox.SelectedIndex = Math.Clamp(parsedSelectedIndex, -1, comboBox.Items.Count - 1);
+            }
+
+            return;
+        }
+
         if (visual is Slider slider)
         {
             if (properties.TryGetValue("Minimum", out var minimum)
@@ -576,6 +592,30 @@ public partial class CanvasViewModel : ViewModelBase
         catch (FormatException)
         {
             // Ignore malformed imported colors while keeping the control usable.
+        }
+    }
+
+    private static void RestoreComboBoxItems(ComboBox comboBox, string json)
+    {
+        List<string>? items;
+        try
+        {
+            items = JsonSerializer.Deserialize<List<string>>(json);
+        }
+        catch
+        {
+            return;
+        }
+
+        if (items is null)
+        {
+            return;
+        }
+
+        comboBox.Items.Clear();
+        foreach (var item in items)
+        {
+            comboBox.Items.Add(item);
         }
     }
 

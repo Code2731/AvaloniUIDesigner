@@ -779,6 +779,11 @@ public partial class MainWindow : Window
             return propertyName is "Content" or "IsChecked";
         }
 
+        if (control is ComboBox)
+        {
+            return propertyName == "SelectedIndex";
+        }
+
         if (control is Slider or ProgressBar)
         {
             return propertyName is "Minimum" or "Maximum" or "Value";
