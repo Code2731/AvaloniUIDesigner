@@ -57,6 +57,7 @@
                 <MenuItem Header="Delete" Click="OnDeleteMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
                 <MenuItem Header="Edit Items..." Click="OnEditItemsMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
                 <MenuItem Header="Edit Content..." Click="OnEditExpanderContentMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
+                <MenuItem Header="Edit Click Handler..." Click="OnEditButtonClickHandlerMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
                 <MenuItem Header="Edit Tooltip..." Click="OnEditToolTipMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
                 <MenuItem Header="Edit Accessible Name..." Click="OnEditAccessibleNameMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
                 <MenuItem Header="Enable / Disable Selected" Click="OnToggleEnabledMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>

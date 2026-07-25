@@ -16,6 +16,7 @@ using Avalonia.Media;
 using AvaloniaUIDesigner.App.Designer.Contracts;
 using AvaloniaUIDesigner.App.Designer.Core;
 using AvaloniaUIDesigner.App.Designer.Services;
+using AvaloniaUIDesigner.App.Models;
 using CommunityToolkit.Mvvm.ComponentModel;
 
 namespace AvaloniaUIDesigner.App.ViewModels;
@@ -535,6 +536,53 @@ public partial class MainWindowViewModel : ViewModelBase
 
         controlName = target.DisplayName;
         toolTip = ToolTip.GetTip(target.Visual)?.ToString() ?? string.Empty;
+        return true;
+    }
+
+    public bool TryGetSelectedButtonClickHandler(out string buttonName, out string handlerName)
+    {
+        if (Canvas.SelectedElement is not { IsLocked: false, Visual: Button button } target)
+        {
+            buttonName = string.Empty;
+            handlerName = string.Empty;
+            StatusText = "Select an unlocked Button to edit its Click handler.";
+            return false;
+        }
+
+        buttonName = target.DisplayName;
+        handlerName = (button.Tag as ButtonClickHandlerMetadata)?.HandlerName ?? string.Empty;
+        return true;
+    }
+
+    public bool SetSelectedButtonClickHandler(string handlerName)
+    {
+        if (Canvas.SelectedElement is not { IsLocked: false, Visual: Button button } target)
+        {
+            StatusText = "Select an unlocked Button to edit its Click handler.";
+            return false;
+        }
+
+        var normalizedHandler = handlerName.Trim();
+        if (!string.IsNullOrEmpty(normalizedHandler) && !IsValidControlName(normalizedHandler))
+        {
+            StatusText = "Click handler names must start with a letter or underscore and contain only letters, numbers, or underscores.";
+            return false;
+        }
+
+        var currentHandler = (button.Tag as ButtonClickHandlerMetadata)?.HandlerName ?? string.Empty;
+        if (string.Equals(currentHandler, normalizedHandler, StringComparison.Ordinal))
+        {
+            return true;
+        }
+
+        BeginCanvasMutation(HistoryActionType.EditProperty, "Updated Button Click handler.");
+        button.Tag = string.IsNullOrEmpty(normalizedHandler)
+            ? null
+            : new ButtonClickHandlerMetadata(normalizedHandler);
+        CommitCanvasMutation();
+        StatusText = string.IsNullOrEmpty(normalizedHandler)
+            ? $"Cleared Click handler for {target.DisplayName}."
+            : $"Set Click handler for {target.DisplayName}: {normalizedHandler}.";
         return true;
     }
 
@@ -1604,6 +1652,11 @@ public partial class MainWindowViewModel : ViewModelBase
         // Defaults vary by control type, so preserve both keyboard navigation values explicitly.
         result["__tabIndex"] = visual.TabIndex.ToString(CultureInfo.InvariantCulture);
         result["__isTabStop"] = visual.IsTabStop.ToString();
+        if (visual is Button { Tag: ButtonClickHandlerMetadata clickHandler }
+            && !string.IsNullOrWhiteSpace(clickHandler.HandlerName))
+        {
+            result["__clickHandler"] = clickHandler.HandlerName;
+        }
 
         return result;
     }
@@ -2190,6 +2243,12 @@ public partial class MainWindowViewModel : ViewModelBase
                 continue;
             }
 
+            if (tagName == "Button" && name == "Click")
+            {
+                map["__clickHandler"] = attr.Value;
+                continue;
+            }
+
             if (name == "AutomationProperties.Name")
             {
                 map["__automationName"] = attr.Value;
@@ -2712,6 +2771,11 @@ public partial class MainWindowViewModel : ViewModelBase
                 sb.Append("<Button");
                 AppendCanvasLayoutAttributes(sb, element);
                 AppendAttribute(sb, "Content", button.Content?.ToString() ?? string.Empty);
+                if (button.Tag is ButtonClickHandlerMetadata clickHandler
+                    && !string.IsNullOrWhiteSpace(clickHandler.HandlerName))
+                {
+                    AppendAttribute(sb, "Click", clickHandler.HandlerName);
+                }
                 sb.AppendLine(" />");
                 break;
 

@@ -485,6 +485,12 @@ public partial class CanvasViewModel : ViewModelBase
                 button.Content = content;
             }
 
+            if (properties.TryGetValue("__clickHandler", out var clickHandler)
+                && !string.IsNullOrWhiteSpace(clickHandler))
+            {
+                button.Tag = new ButtonClickHandlerMetadata(clickHandler);
+            }
+
             return;
         }
 

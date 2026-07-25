@@ -437,6 +437,24 @@ public partial class MainWindow : Window
         }
     }
 
+    private async void OnEditButtonClickHandlerMenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        FlushPendingPropertyHistory();
+        if (Vm is null || !Vm.TryGetSelectedButtonClickHandler(out var buttonName, out var handlerName))
+        {
+            return;
+        }
+
+        var updatedHandler = await ShowTextEditorDialogAsync(
+            $"Edit Click Handler - {buttonName}",
+            handlerName,
+            "Enter a handler method name, for example SaveButton_Click. Leave blank to remove the handler.");
+        if (updatedHandler is not null)
+        {
+            Vm.SetSelectedButtonClickHandler(updatedHandler);
+        }
+    }
+
     private async void OnEditAccessibleNameMenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
         FlushPendingPropertyHistory();
