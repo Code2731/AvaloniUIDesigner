@@ -431,7 +431,18 @@ public partial class CanvasViewModel : ViewModelBase
 
         if (visual is TextBox textBox)
         {
-            if (properties.TryGetValue("Text", out var text))
+            if (properties.TryGetValue("PasswordChar", out var passwordChar))
+            {
+                textBox.PasswordChar = string.IsNullOrEmpty(passwordChar) ? '\0' : passwordChar[0];
+            }
+
+            if (properties.TryGetValue("RevealPassword", out var revealPassword)
+                && bool.TryParse(revealPassword, out var parsedRevealPassword))
+            {
+                textBox.RevealPassword = parsedRevealPassword;
+            }
+
+            if (textBox.PasswordChar == '\0' && properties.TryGetValue("Text", out var text))
             {
                 textBox.Text = text;
             }
@@ -1071,8 +1082,10 @@ public partial class CanvasViewModel : ViewModelBase
                 },
                 "TextBox" => new TextBox
                 {
-                    Text = child.Text ?? string.Empty,
+                    Text = string.IsNullOrEmpty(child.PasswordChar) ? child.Text ?? string.Empty : string.Empty,
                     Watermark = child.Watermark,
+                    PasswordChar = string.IsNullOrEmpty(child.PasswordChar) ? '\0' : child.PasswordChar[0],
+                    RevealPassword = child.RevealPassword ?? false,
                 },
                 _ => null,
             };
@@ -1101,5 +1114,7 @@ public partial class CanvasViewModel : ViewModelBase
         string TypeName,
         string? Text = null,
         string? Content = null,
-        string? Watermark = null);
+        string? Watermark = null,
+        string? PasswordChar = null,
+        bool? RevealPassword = null);
 }

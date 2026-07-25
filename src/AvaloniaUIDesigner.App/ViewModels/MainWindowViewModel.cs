@@ -1213,8 +1213,10 @@ public partial class MainWindowViewModel : ViewModelBase
         {
             return new Dictionary<string, string>
             {
-                ["Text"] = textBox.Text ?? string.Empty,
+                ["Text"] = textBox.PasswordChar == '\0' ? textBox.Text ?? string.Empty : string.Empty,
                 ["Watermark"] = textBox.Watermark?.ToString() ?? string.Empty,
+                ["PasswordChar"] = textBox.PasswordChar == '\0' ? string.Empty : textBox.PasswordChar.ToString(),
+                ["RevealPassword"] = textBox.RevealPassword.ToString(),
                 ["Opacity"] = textBox.Opacity.ToString("0.###", CultureInfo.InvariantCulture),
             };
         }
@@ -1773,7 +1775,7 @@ public partial class MainWindowViewModel : ViewModelBase
         return tagName switch
         {
             "Button" => propertyName == "Content",
-            "TextBox" => propertyName is "Text" or "Watermark",
+            "TextBox" => propertyName is "Text" or "Watermark" or "PasswordChar" or "RevealPassword",
             "TextBlock" => propertyName is "Text" or "FontSize" or "FontWeight" or "Foreground",
             "Image" => propertyName is "Source" or "Stretch",
             "CheckBox" or "ToggleSwitch" => propertyName is "Content" or "IsChecked",
@@ -2097,8 +2099,10 @@ public partial class MainWindowViewModel : ViewModelBase
                     Content: button.Content?.ToString() ?? string.Empty),
                 TextBox textBox => new StackPanelChildSnapshot(
                     TypeName: "TextBox",
-                    Text: textBox.Text ?? string.Empty,
-                    Watermark: textBox.Watermark?.ToString()),
+                    Text: textBox.PasswordChar == '\0' ? textBox.Text ?? string.Empty : string.Empty,
+                    Watermark: textBox.Watermark?.ToString(),
+                    PasswordChar: textBox.PasswordChar == '\0' ? null : textBox.PasswordChar.ToString(),
+                    RevealPassword: textBox.RevealPassword),
                 _ => null,
             })
             .Where(snapshot => snapshot is not null)
@@ -2138,10 +2142,15 @@ public partial class MainWindowViewModel : ViewModelBase
                         Content: child.Attribute("Content")?.Value ?? string.Empty));
                     break;
                 case "TextBox":
+                    var passwordChar = child.Attribute("PasswordChar")?.Value;
                     children.Add(new StackPanelChildSnapshot(
                         TypeName: "TextBox",
-                        Text: child.Attribute("Text")?.Value ?? string.Empty,
-                        Watermark: child.Attribute("Watermark")?.Value));
+                        Text: string.IsNullOrEmpty(passwordChar) ? child.Attribute("Text")?.Value ?? string.Empty : string.Empty,
+                        Watermark: child.Attribute("Watermark")?.Value,
+                        PasswordChar: passwordChar,
+                        RevealPassword: bool.TryParse(child.Attribute("RevealPassword")?.Value, out var revealPassword)
+                            ? revealPassword
+                            : null));
                     break;
             }
         }
@@ -2199,10 +2208,24 @@ public partial class MainWindowViewModel : ViewModelBase
                 sb.Append(indent);
                 sb.Append("<TextBox");
                 AppendCanvasLayoutAttributes(sb, element);
-                AppendAttribute(sb, "Text", textBox.Text ?? string.Empty);
+                if (textBox.PasswordChar == '\0')
+                {
+                    AppendAttribute(sb, "Text", textBox.Text ?? string.Empty);
+                }
+
                 if (!string.IsNullOrWhiteSpace(textBox.Watermark?.ToString()))
                 {
                     AppendAttribute(sb, "Watermark", textBox.Watermark?.ToString() ?? string.Empty);
+                }
+
+                if (textBox.PasswordChar != '\0')
+                {
+                    AppendAttribute(sb, "PasswordChar", textBox.PasswordChar.ToString());
+                }
+
+                if (textBox.RevealPassword)
+                {
+                    AppendAttribute(sb, "RevealPassword", bool.TrueString);
                 }
 
                 sb.AppendLine(" />");
@@ -2509,10 +2532,24 @@ public partial class MainWindowViewModel : ViewModelBase
             case TextBox textBox:
                 sb.Append(indent);
                 sb.Append("<TextBox");
-                AppendAttribute(sb, "Text", textBox.Text ?? string.Empty);
+                if (textBox.PasswordChar == '\0')
+                {
+                    AppendAttribute(sb, "Text", textBox.Text ?? string.Empty);
+                }
+
                 if (!string.IsNullOrWhiteSpace(textBox.Watermark?.ToString()))
                 {
                     AppendAttribute(sb, "Watermark", textBox.Watermark?.ToString() ?? string.Empty);
+                }
+
+                if (textBox.PasswordChar != '\0')
+                {
+                    AppendAttribute(sb, "PasswordChar", textBox.PasswordChar.ToString());
+                }
+
+                if (textBox.RevealPassword)
+                {
+                    AppendAttribute(sb, "RevealPassword", bool.TrueString);
                 }
 
                 sb.AppendLine(" />");
@@ -2614,5 +2651,7 @@ public partial class MainWindowViewModel : ViewModelBase
         string TypeName,
         string? Text = null,
         string? Content = null,
-        string? Watermark = null);
+        string? Watermark = null,
+        string? PasswordChar = null,
+        bool? RevealPassword = null);
 }

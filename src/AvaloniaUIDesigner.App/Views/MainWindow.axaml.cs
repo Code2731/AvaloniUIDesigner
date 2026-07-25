@@ -827,7 +827,7 @@ public partial class MainWindow : Window
 
         if (control is TextBox)
         {
-            return propertyName is "Text" or "Watermark";
+            return propertyName is "Text" or "Watermark" or "PasswordChar" or "RevealPassword";
         }
 
         if (control is TextBlock)
