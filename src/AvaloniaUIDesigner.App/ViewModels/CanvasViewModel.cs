@@ -120,6 +120,33 @@ public partial class CanvasViewModel : ViewModelBase
             preserveDisplayName: true);
     }
 
+    public IReadOnlyList<DesignElement> PlacePreset(ToolboxItem preset, double x, double y)
+    {
+        if (!preset.IsPreset || preset.PresetElements is null)
+        {
+            return Array.Empty<DesignElement>();
+        }
+
+        var placed = new List<DesignElement>();
+        foreach (var snapshot in preset.PresetElements)
+        {
+            var (visual, defaultWidth, defaultHeight) = CreateVisualByType(snapshot.TypeName, snapshot.DisplayName);
+            ApplyVisualProperties(visual, snapshot.VisualProperties);
+            placed.Add(AddElement(
+                snapshot.DisplayName,
+                snapshot.TypeName,
+                visual,
+                SnapPosition(x + snapshot.X),
+                SnapPosition(y + snapshot.Y),
+                snapshot.Width > 0 ? snapshot.Width : defaultWidth,
+                snapshot.Height > 0 ? snapshot.Height : defaultHeight,
+                select: false));
+        }
+
+        SelectMany(placed);
+        return placed;
+    }
+
     public void Clear()
     {
         ClearSelection();

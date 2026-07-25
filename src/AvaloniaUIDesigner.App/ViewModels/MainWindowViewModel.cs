@@ -85,6 +85,20 @@ public partial class MainWindowViewModel : ViewModelBase
         var snappedY = Canvas.SnapPosition(y);
 
         BeginCanvasMutation(HistoryActionType.AddElement, "Added control to canvas.");
+        if (item.IsPreset)
+        {
+            var elements = Canvas.PlacePreset(item, snappedX, snappedY);
+            foreach (var element in elements)
+            {
+                ObjectTree.Add(element);
+            }
+
+            ObjectTree.SelectByElement(Canvas.SelectedElement);
+            CommitCanvasMutation();
+            StatusText = $"Placed {item.DisplayName} ({elements.Count} control(s))";
+            return;
+        }
+
         var element = Canvas.PlaceElement(item, snappedX, snappedY);
         ObjectTree.Add(element);
         ObjectTree.SelectByElement(element);
