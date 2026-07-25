@@ -1,6 +1,7 @@
 ﻿<Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vm="using:AvaloniaUIDesigner.App.ViewModels"
+        xmlns:views="using:AvaloniaUIDesigner.App.Views"
         xmlns:pg="using:Avalonia.PropertyGrid.Controls"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
@@ -72,7 +73,15 @@
                 <MenuItem Header="Actual Size (100%)" Click="OnResetZoomMenuClicked"/>
                 <MenuItem Header="Fit to View" Click="OnFitToViewMenuClicked"/>
                 <Separator/>
-                <MenuItem Header="Snap to Grid (8px)"
+                <MenuItem Header="Show Grid"
+                          IsCheckable="True"
+                          IsChecked="{Binding Canvas.IsGridVisible, Mode=TwoWay}"/>
+                <MenuItem Header="Grid Size">
+                    <MenuItem Header="4px" Click="OnGridSize4MenuClicked"/>
+                    <MenuItem Header="8px" Click="OnGridSize8MenuClicked"/>
+                    <MenuItem Header="16px" Click="OnGridSize16MenuClicked"/>
+                </MenuItem>
+                <MenuItem Header="Snap to Grid"
                           IsCheckable="True"
                           IsChecked="{Binding Canvas.SnapToGrid, Mode=TwoWay}"/>
             </MenuItem>
@@ -117,6 +126,9 @@
                             <Panel.RenderTransform>
                                 <ScaleTransform ScaleX="{Binding Canvas.ZoomScale}" ScaleY="{Binding Canvas.ZoomScale}"/>
                             </Panel.RenderTransform>
+                            <views:DesignerGridOverlay GridSize="{Binding Canvas.GridSize}"
+                                                      IsGridVisible="{Binding Canvas.IsGridVisible}"
+                                                      IsHitTestVisible="False"/>
                             <TextBlock Text="{Binding Canvas.PlaceholderText}"
                                        HorizontalAlignment="Center"
                                        VerticalAlignment="Center"

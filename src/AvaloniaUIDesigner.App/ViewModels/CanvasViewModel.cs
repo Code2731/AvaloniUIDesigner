@@ -49,6 +49,9 @@ public partial class CanvasViewModel : ViewModelBase
     private double _gridSize = 8;
 
     [ObservableProperty]
+    private bool _isGridVisible = true;
+
+    [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(ZoomPercentage))]
     private double _zoomScale = 1;
 
@@ -66,6 +69,8 @@ public partial class CanvasViewModel : ViewModelBase
 
     public double SnapSize(double value, double minimum)
         => Math.Max(minimum, SnapPosition(value));
+
+    public void SetGridSize(double gridSize) => GridSize = Math.Clamp(gridSize, 4, 32);
 
     public void ZoomIn() => SetZoom(ZoomScale + 0.1);
 
