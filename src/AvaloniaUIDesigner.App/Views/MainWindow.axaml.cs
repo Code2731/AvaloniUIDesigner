@@ -106,6 +106,25 @@ public partial class MainWindow : Window
         _ = await SaveDocumentAsync(forceSaveAs: true);
     }
 
+    private async void OnCopyAxamlMenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        if (Vm is null)
+        {
+            return;
+        }
+
+        FlushPendingPropertyHistory();
+        var clipboard = TopLevel.GetTopLevel(this)?.Clipboard;
+        if (clipboard is null)
+        {
+            Vm.StatusText = "Clipboard is unavailable.";
+            return;
+        }
+
+        await clipboard.SetTextAsync(Vm.ExportFullAxaml());
+        Vm.StatusText = "Copied generated AXAML to clipboard.";
+    }
+
     private void OnValidateAxamlMenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
         FlushPendingPropertyHistory();
