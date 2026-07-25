@@ -6,6 +6,7 @@ using System.Globalization;
 using System.Linq;
 using System.Text.Json;
 using Avalonia;
+using Avalonia.Automation;
 using Avalonia.Controls;
 using Avalonia.Layout;
 using Avalonia.Media;
@@ -422,6 +423,11 @@ public partial class CanvasViewModel : ViewModelBase
         if (properties.TryGetValue("__toolTip", out var toolTip))
         {
             ToolTip.SetTip(visual, string.IsNullOrWhiteSpace(toolTip) ? null : toolTip);
+        }
+
+        if (properties.TryGetValue("__automationName", out var automationName))
+        {
+            AutomationProperties.SetName(visual, automationName);
         }
 
         if (visual is Button button)

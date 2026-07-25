@@ -330,6 +330,24 @@ public partial class MainWindow : Window
         }
     }
 
+    private async void OnEditAccessibleNameMenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        FlushPendingPropertyHistory();
+        if (Vm is null || !Vm.TryGetSelectedAutomationName(out var controlName, out var automationName))
+        {
+            return;
+        }
+
+        var updatedName = await ShowTextEditorDialogAsync(
+            $"Edit Accessible Name - {controlName}",
+            automationName,
+            "Enter the label announced by screen readers and used by UI automation.");
+        if (updatedName is not null)
+        {
+            Vm.SetSelectedAutomationName(updatedName);
+        }
+    }
+
     private void OnBringToFrontMenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
         => MoveSelectedElementsInLayerOrder(MainWindowViewModel.LayerOrderAction.BringToFront);
 

@@ -9,6 +9,7 @@ using System.Text;
 using System.Text.Json;
 using System.Xml.Linq;
 using Avalonia;
+using Avalonia.Automation;
 using Avalonia.Controls;
 using Avalonia.Layout;
 using Avalonia.Media;
@@ -484,6 +485,46 @@ public partial class MainWindowViewModel : ViewModelBase
         StatusText = string.IsNullOrEmpty(normalizedToolTip)
             ? $"Cleared tooltip for {target.DisplayName}."
             : $"Updated tooltip for {target.DisplayName}.";
+    }
+
+    public bool TryGetSelectedAutomationName(out string controlName, out string automationName)
+    {
+        var target = Canvas.SelectedElement;
+        if (target is null || target.IsLocked)
+        {
+            controlName = string.Empty;
+            automationName = string.Empty;
+            StatusText = "Select an unlocked control to edit its accessible name.";
+            return false;
+        }
+
+        controlName = target.DisplayName;
+        automationName = AutomationProperties.GetName(target.Visual) ?? string.Empty;
+        return true;
+    }
+
+    public void SetSelectedAutomationName(string automationName)
+    {
+        var target = Canvas.SelectedElement;
+        if (target is null || target.IsLocked)
+        {
+            StatusText = "Select an unlocked control to edit its accessible name.";
+            return;
+        }
+
+        var normalizedName = automationName.Trim();
+        if (string.Equals(AutomationProperties.GetName(target.Visual) ?? string.Empty, normalizedName, StringComparison.Ordinal))
+        {
+            StatusText = "Accessible name is unchanged.";
+            return;
+        }
+
+        BeginCanvasMutation(HistoryActionType.EditProperty, "Updated accessible name.");
+        AutomationProperties.SetName(target.Visual, normalizedName);
+        CommitCanvasMutation();
+        StatusText = string.IsNullOrEmpty(normalizedName)
+            ? $"Cleared accessible name for {target.DisplayName}."
+            : $"Updated accessible name for {target.DisplayName}.";
     }
 
     public bool TryRenameElement(DesignElement element, string proposedName)
@@ -1242,7 +1283,8 @@ public partial class MainWindowViewModel : ViewModelBase
     {
         var properties = CaptureVisualPropertiesCore(visual);
         var toolTip = ToolTip.GetTip(visual)?.ToString();
-        if (string.IsNullOrWhiteSpace(toolTip))
+        var automationName = AutomationProperties.GetName(visual);
+        if (string.IsNullOrWhiteSpace(toolTip) && string.IsNullOrWhiteSpace(automationName))
         {
             return properties;
         }
@@ -1250,7 +1292,16 @@ public partial class MainWindowViewModel : ViewModelBase
         var result = properties is null
             ? new Dictionary<string, string>(StringComparer.Ordinal)
             : new Dictionary<string, string>(properties, StringComparer.Ordinal);
-        result["__toolTip"] = toolTip;
+        if (!string.IsNullOrWhiteSpace(toolTip))
+        {
+            result["__toolTip"] = toolTip;
+        }
+
+        if (!string.IsNullOrWhiteSpace(automationName))
+        {
+            result["__automationName"] = automationName;
+        }
+
         return result;
     }
 
@@ -1786,6 +1837,12 @@ public partial class MainWindowViewModel : ViewModelBase
             if (name == "ToolTip.Tip")
             {
                 map["__toolTip"] = attr.Value;
+                continue;
+            }
+
+            if (name == "AutomationProperties.Name")
+            {
+                map["__automationName"] = attr.Value;
                 continue;
             }
 
@@ -2636,6 +2693,12 @@ public partial class MainWindowViewModel : ViewModelBase
         if (ToolTip.GetTip(element.Visual) is { } toolTip && !string.IsNullOrWhiteSpace(toolTip.ToString()))
         {
             AppendAttribute(sb, "ToolTip.Tip", toolTip.ToString() ?? string.Empty);
+        }
+
+        var automationName = AutomationProperties.GetName(element.Visual);
+        if (!string.IsNullOrWhiteSpace(automationName))
+        {
+            AppendAttribute(sb, "AutomationProperties.Name", automationName);
         }
     }
 

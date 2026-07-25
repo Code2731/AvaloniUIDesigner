@@ -4,6 +4,7 @@ using System.Globalization;
 using System.Linq;
 using System.Text.Json;
 using Avalonia;
+using Avalonia.Automation;
 using Avalonia.Controls;
 using Avalonia.Layout;
 using Avalonia.Media;
@@ -139,6 +140,11 @@ public sealed class PreviewWindow : Window
         if (properties.TryGetValue("__toolTip", out var toolTip))
         {
             ToolTip.SetTip(control, string.IsNullOrWhiteSpace(toolTip) ? null : toolTip);
+        }
+
+        if (properties.TryGetValue("__automationName", out var automationName))
+        {
+            AutomationProperties.SetName(control, automationName);
         }
 
         switch (control)
