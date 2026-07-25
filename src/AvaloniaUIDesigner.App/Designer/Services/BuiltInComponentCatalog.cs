@@ -41,6 +41,12 @@ public sealed class BuiltInComponentCatalog : IComponentCatalog
             DefaultHeight: 32,
             VisualFactory: static () => new Slider { Minimum = 0, Maximum = 100, Value = 50 }),
         new(
+            DisplayName: "ProgressBar",
+            AvaloniaTypeName: "Avalonia.Controls.ProgressBar",
+            DefaultWidth: 180,
+            DefaultHeight: 20,
+            VisualFactory: static () => new ProgressBar { Minimum = 0, Maximum = 100, Value = 50 }),
+        new(
             DisplayName: "Grid",
             AvaloniaTypeName: "Avalonia.Controls.Grid",
             DefaultWidth: 240,

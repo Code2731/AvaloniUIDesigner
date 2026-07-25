@@ -779,7 +779,7 @@ public partial class MainWindow : Window
             return propertyName is "Content" or "IsChecked";
         }
 
-        if (control is Slider)
+        if (control is Slider or ProgressBar)
         {
             return propertyName is "Minimum" or "Maximum" or "Value";
         }

@@ -1090,6 +1090,17 @@ public partial class MainWindowViewModel : ViewModelBase
             };
         }
 
+        if (visual is ProgressBar progressBar)
+        {
+            return new Dictionary<string, string>
+            {
+                ["Minimum"] = progressBar.Minimum.ToString("0.###", CultureInfo.InvariantCulture),
+                ["Maximum"] = progressBar.Maximum.ToString("0.###", CultureInfo.InvariantCulture),
+                ["Value"] = progressBar.Value.ToString("0.###", CultureInfo.InvariantCulture),
+                ["Opacity"] = progressBar.Opacity.ToString("0.###", CultureInfo.InvariantCulture),
+            };
+        }
+
         if (visual is StackPanel stackPanel)
         {
             return new Dictionary<string, string>
@@ -1391,7 +1402,7 @@ public partial class MainWindowViewModel : ViewModelBase
             "TextBox" => propertyName is "Text" or "Watermark",
             "TextBlock" => propertyName is "Text" or "FontSize" or "FontWeight" or "Foreground",
             "CheckBox" => propertyName is "Content" or "IsChecked",
-            "Slider" => propertyName is "Minimum" or "Maximum" or "Value",
+            "Slider" or "ProgressBar" => propertyName is "Minimum" or "Maximum" or "Value",
             "Grid" => propertyName == "ShowGridLines",
             "StackPanel" => propertyName is "Orientation" or "Spacing",
             _ => false,
@@ -1794,6 +1805,16 @@ public partial class MainWindowViewModel : ViewModelBase
                 AppendAttribute(sb, "Minimum", slider.Minimum.ToString("0.###", CultureInfo.InvariantCulture));
                 AppendAttribute(sb, "Maximum", slider.Maximum.ToString("0.###", CultureInfo.InvariantCulture));
                 AppendAttribute(sb, "Value", slider.Value.ToString("0.###", CultureInfo.InvariantCulture));
+                sb.AppendLine(" />");
+                break;
+
+            case ProgressBar progressBar:
+                sb.Append(indent);
+                sb.Append("<ProgressBar");
+                AppendCanvasLayoutAttributes(sb, element);
+                AppendAttribute(sb, "Minimum", progressBar.Minimum.ToString("0.###", CultureInfo.InvariantCulture));
+                AppendAttribute(sb, "Maximum", progressBar.Maximum.ToString("0.###", CultureInfo.InvariantCulture));
+                AppendAttribute(sb, "Value", progressBar.Value.ToString("0.###", CultureInfo.InvariantCulture));
                 sb.AppendLine(" />");
                 break;
 

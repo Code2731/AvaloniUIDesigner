@@ -65,6 +65,7 @@ public sealed class PreviewWindow : Window
             "Avalonia.Controls.TextBlock" => new TextBlock { Text = "Text" },
             "Avalonia.Controls.CheckBox" => new CheckBox { Content = "CheckBox" },
             "Avalonia.Controls.Slider" => new Slider { Minimum = 0, Maximum = 100, Value = 50 },
+            "Avalonia.Controls.ProgressBar" => new ProgressBar { Minimum = 0, Maximum = 100, Value = 50 },
             "Avalonia.Controls.Grid" => new Grid { ShowGridLines = true },
             "Avalonia.Controls.StackPanel" => new StackPanel
             {
@@ -150,6 +151,9 @@ public sealed class PreviewWindow : Window
             case Slider slider:
                 ApplySliderProperties(slider, properties);
                 break;
+            case ProgressBar progressBar:
+                ApplyProgressBarProperties(progressBar, properties);
+                break;
             case Grid grid when properties.TryGetValue("ShowGridLines", out var showGrid)
                 && bool.TryParse(showGrid, out var parsedShowGrid):
                 grid.ShowGridLines = parsedShowGrid;
@@ -214,6 +218,27 @@ public sealed class PreviewWindow : Window
             && double.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out var parsedValue))
         {
             slider.Value = parsedValue;
+        }
+    }
+
+    private static void ApplyProgressBarProperties(ProgressBar progressBar, IReadOnlyDictionary<string, string> properties)
+    {
+        if (properties.TryGetValue("Minimum", out var minimum)
+            && double.TryParse(minimum, NumberStyles.Float, CultureInfo.InvariantCulture, out var parsedMinimum))
+        {
+            progressBar.Minimum = parsedMinimum;
+        }
+
+        if (properties.TryGetValue("Maximum", out var maximum)
+            && double.TryParse(maximum, NumberStyles.Float, CultureInfo.InvariantCulture, out var parsedMaximum))
+        {
+            progressBar.Maximum = parsedMaximum;
+        }
+
+        if (properties.TryGetValue("Value", out var value)
+            && double.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out var parsedValue))
+        {
+            progressBar.Value = parsedValue;
         }
     }
 

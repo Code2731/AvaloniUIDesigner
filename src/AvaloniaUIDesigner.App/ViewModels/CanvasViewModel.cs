@@ -498,6 +498,29 @@ public partial class CanvasViewModel : ViewModelBase
             return;
         }
 
+        if (visual is ProgressBar progressBar)
+        {
+            if (properties.TryGetValue("Minimum", out var minimum)
+                && double.TryParse(minimum, NumberStyles.Float, CultureInfo.InvariantCulture, out var parsedMinimum))
+            {
+                progressBar.Minimum = parsedMinimum;
+            }
+
+            if (properties.TryGetValue("Maximum", out var maximum)
+                && double.TryParse(maximum, NumberStyles.Float, CultureInfo.InvariantCulture, out var parsedMaximum))
+            {
+                progressBar.Maximum = parsedMaximum;
+            }
+
+            if (properties.TryGetValue("Value", out var value)
+                && double.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out var parsedValue))
+            {
+                progressBar.Value = parsedValue;
+            }
+
+            return;
+        }
+
         if (visual is StackPanel stackPanel)
         {
             if (properties.TryGetValue("Orientation", out var orientation)
