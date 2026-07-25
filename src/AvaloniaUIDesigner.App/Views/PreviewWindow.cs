@@ -136,6 +136,11 @@ public sealed class PreviewWindow : Window
             control.Opacity = Math.Clamp(parsedOpacity, 0, 1);
         }
 
+        if (properties.TryGetValue("__toolTip", out var toolTip))
+        {
+            ToolTip.SetTip(control, string.IsNullOrWhiteSpace(toolTip) ? null : toolTip);
+        }
+
         switch (control)
         {
             case Button button when properties.TryGetValue("Content", out var content):

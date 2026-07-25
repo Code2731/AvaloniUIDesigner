@@ -302,10 +302,31 @@ public partial class MainWindow : Window
             return;
         }
 
-        var updatedContent = await ShowTextEditorDialogAsync($"Edit Content - {controlName}", content);
+        var updatedContent = await ShowTextEditorDialogAsync(
+            $"Edit Content - {controlName}",
+            content,
+            "Enter the content shown when the Expander is open.");
         if (updatedContent is not null)
         {
             Vm.SetSelectedExpanderContent(updatedContent);
+        }
+    }
+
+    private async void OnEditToolTipMenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        FlushPendingPropertyHistory();
+        if (Vm is null || !Vm.TryGetSelectedToolTip(out var controlName, out var toolTip))
+        {
+            return;
+        }
+
+        var updatedToolTip = await ShowTextEditorDialogAsync(
+            $"Edit Tooltip - {controlName}",
+            toolTip,
+            "Enter a short hint shown when the pointer rests over this control.");
+        if (updatedToolTip is not null)
+        {
+            Vm.SetSelectedToolTip(updatedToolTip);
         }
     }
 
@@ -1711,7 +1732,7 @@ public partial class MainWindow : Window
         return await dialog.ShowDialog<IReadOnlyList<string>?>(this);
     }
 
-    private async Task<string?> ShowTextEditorDialogAsync(string title, string content)
+    private async Task<string?> ShowTextEditorDialogAsync(string title, string content, string helpText)
     {
         var editor = new TextBox
         {
@@ -1751,7 +1772,7 @@ public partial class MainWindow : Window
             RowSpacing = 12,
             Children =
             {
-                new TextBlock { Text = "Enter the content shown when the Expander is open." },
+                new TextBlock { Text = helpText },
                 editor,
                 buttons,
             },

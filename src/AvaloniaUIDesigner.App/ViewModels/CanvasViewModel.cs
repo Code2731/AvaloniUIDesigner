@@ -419,6 +419,11 @@ public partial class CanvasViewModel : ViewModelBase
             visual.Opacity = Math.Clamp(parsedOpacity, 0, 1);
         }
 
+        if (properties.TryGetValue("__toolTip", out var toolTip))
+        {
+            ToolTip.SetTip(visual, string.IsNullOrWhiteSpace(toolTip) ? null : toolTip);
+        }
+
         if (visual is Button button)
         {
             if (properties.TryGetValue("Content", out var content))

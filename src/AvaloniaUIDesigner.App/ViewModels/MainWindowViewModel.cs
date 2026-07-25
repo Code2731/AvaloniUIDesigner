@@ -446,6 +446,46 @@ public partial class MainWindowViewModel : ViewModelBase
         StatusText = $"Updated content for {target.DisplayName}.";
     }
 
+    public bool TryGetSelectedToolTip(out string controlName, out string toolTip)
+    {
+        var target = Canvas.SelectedElement;
+        if (target is null || target.IsLocked)
+        {
+            controlName = string.Empty;
+            toolTip = string.Empty;
+            StatusText = "Select an unlocked control to edit its tooltip.";
+            return false;
+        }
+
+        controlName = target.DisplayName;
+        toolTip = ToolTip.GetTip(target.Visual)?.ToString() ?? string.Empty;
+        return true;
+    }
+
+    public void SetSelectedToolTip(string toolTip)
+    {
+        var target = Canvas.SelectedElement;
+        if (target is null || target.IsLocked)
+        {
+            StatusText = "Select an unlocked control to edit its tooltip.";
+            return;
+        }
+
+        var normalizedToolTip = toolTip.Trim();
+        if (string.Equals(ToolTip.GetTip(target.Visual)?.ToString() ?? string.Empty, normalizedToolTip, StringComparison.Ordinal))
+        {
+            StatusText = "Tooltip is unchanged.";
+            return;
+        }
+
+        BeginCanvasMutation(HistoryActionType.EditProperty, "Updated control tooltip.");
+        ToolTip.SetTip(target.Visual, string.IsNullOrEmpty(normalizedToolTip) ? null : normalizedToolTip);
+        CommitCanvasMutation();
+        StatusText = string.IsNullOrEmpty(normalizedToolTip)
+            ? $"Cleared tooltip for {target.DisplayName}."
+            : $"Updated tooltip for {target.DisplayName}.";
+    }
+
     public bool TryRenameElement(DesignElement element, string proposedName)
     {
         if (element.IsLocked)
@@ -1200,6 +1240,22 @@ public partial class MainWindowViewModel : ViewModelBase
 
     private static IReadOnlyDictionary<string, string>? CaptureVisualProperties(Control visual)
     {
+        var properties = CaptureVisualPropertiesCore(visual);
+        var toolTip = ToolTip.GetTip(visual)?.ToString();
+        if (string.IsNullOrWhiteSpace(toolTip))
+        {
+            return properties;
+        }
+
+        var result = properties is null
+            ? new Dictionary<string, string>(StringComparer.Ordinal)
+            : new Dictionary<string, string>(properties, StringComparer.Ordinal);
+        result["__toolTip"] = toolTip;
+        return result;
+    }
+
+    private static IReadOnlyDictionary<string, string>? CaptureVisualPropertiesCore(Control visual)
+    {
         if (visual is Button button)
         {
             return new Dictionary<string, string>
@@ -1727,6 +1783,12 @@ public partial class MainWindowViewModel : ViewModelBase
         foreach (var attr in element.Attributes())
         {
             var name = attr.Name.LocalName;
+            if (name == "ToolTip.Tip")
+            {
+                map["__toolTip"] = attr.Value;
+                continue;
+            }
+
             if (attr.IsNamespaceDeclaration || name is "Canvas.Left" or "Canvas.Top" or "Width" or "Height" or "Name")
             {
                 continue;
@@ -2571,6 +2633,10 @@ public partial class MainWindowViewModel : ViewModelBase
         AppendAttribute(sb, "Width", element.Width.ToString("0.###", CultureInfo.InvariantCulture));
         AppendAttribute(sb, "Height", element.Height.ToString("0.###", CultureInfo.InvariantCulture));
         AppendAttribute(sb, "Opacity", element.Visual.Opacity.ToString("0.###", CultureInfo.InvariantCulture));
+        if (ToolTip.GetTip(element.Visual) is { } toolTip && !string.IsNullOrWhiteSpace(toolTip.ToString()))
+        {
+            AppendAttribute(sb, "ToolTip.Tip", toolTip.ToString() ?? string.Empty);
+        }
     }
 
     private static void AppendTextForegroundAttribute(StringBuilder sb, TextBlock textBlock)
