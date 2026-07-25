@@ -1,4 +1,5 @@
-﻿using System.Collections.ObjectModel;
+using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using System.Linq;
 using AvaloniaUIDesigner.App.Designer.Contracts;
 using AvaloniaUIDesigner.App.Designer.Core;
@@ -10,6 +11,8 @@ namespace AvaloniaUIDesigner.App.ViewModels;
 
 public partial class ToolboxViewModel : ViewModelBase
 {
+    private readonly List<ToolboxItem> _allItems;
+
     public ToolboxViewModel()
         : this(new BuiltInComponentCatalog())
     {
@@ -46,10 +49,43 @@ public partial class ToolboxViewModel : ViewModelBase
                         ["Value"] = "50",
                     }),
             ]));
+
+        _allItems = Items.ToList();
     }
 
     public ObservableCollection<ToolboxItem> Items { get; }
 
+    public string SearchResultText => string.IsNullOrWhiteSpace(SearchText)
+        ? $"{Items.Count} controls"
+        : $"{Items.Count} of {_allItems.Count} controls";
+
     [ObservableProperty]
     private ToolboxItem? _selectedItem;
+
+    [ObservableProperty]
+    private string _searchText = string.Empty;
+
+    partial void OnSearchTextChanged(string value)
+    {
+        var selected = SelectedItem;
+        var query = value.Trim();
+        var matches = string.IsNullOrWhiteSpace(query)
+            ? _allItems
+            : _allItems.Where(item => item.DisplayName.Contains(query, System.StringComparison.OrdinalIgnoreCase)
+                || item.AvaloniaTypeName.Contains(query, System.StringComparison.OrdinalIgnoreCase));
+
+        Items.Clear();
+        foreach (var item in matches)
+        {
+            Items.Add(item);
+        }
+
+        SelectedItem = null;
+        if (selected is not null && Items.Contains(selected))
+        {
+            SelectedItem = selected;
+        }
+
+        OnPropertyChanged(nameof(SearchResultText));
+    }
 }

@@ -155,6 +155,8 @@
                     <Border DockPanel.Dock="Top" Background="#2D2D30" Padding="8,6">
                         <TextBlock Text="Toolbox" FontWeight="SemiBold" Foreground="#CCCCCC"/>
                     </Border>
+                    <TextBox Name="ToolboxSearch" DockPanel.Dock="Top" Margin="6" Watermark="Find control..." Text="{Binding Toolbox.SearchText, Mode=TwoWay}"/>
+                    <TextBlock DockPanel.Dock="Top" Margin="8,0,8,4" Text="{Binding Toolbox.SearchResultText}" FontSize="11" Foreground="#9CDCFE"/>
                     <ListBox ItemsSource="{Binding Toolbox.Items}"
                              SelectedItem="{Binding Toolbox.SelectedItem}"
                              Background="Transparent"
