@@ -212,6 +212,42 @@ public partial class MainWindowViewModel : ViewModelBase
         StatusText = $"Set text color for {targets.Count} control(s)";
     }
 
+    public bool TryRenameElement(DesignElement element, string proposedName)
+    {
+        if (element.IsLocked)
+        {
+            StatusText = "Selected control is locked.";
+            return false;
+        }
+
+        var name = proposedName.Trim();
+        if (!IsValidControlName(name))
+        {
+            StatusText = "Names must start with a letter or underscore and contain only letters, numbers, or underscores.";
+            return false;
+        }
+
+        if (Canvas.Elements.Any(candidate => !ReferenceEquals(candidate, element)
+            && string.Equals(candidate.DisplayName, name, StringComparison.OrdinalIgnoreCase)))
+        {
+            StatusText = $"A control named '{name}' already exists.";
+            return false;
+        }
+
+        if (string.Equals(element.DisplayName, name, StringComparison.Ordinal))
+        {
+            return true;
+        }
+
+        BeginCanvasMutation(HistoryActionType.EditProperty, "Renamed control.");
+        element.DisplayName = name;
+        ObjectTree.RebuildFrom(Canvas.Elements);
+        ObjectTree.SelectByElement(element);
+        CommitCanvasMutation();
+        StatusText = $"Renamed control to {name}.";
+        return true;
+    }
+
     public void ToggleSelectedLock()
     {
         var targets = Canvas.SelectedElements.ToList();
@@ -620,6 +656,13 @@ public partial class MainWindowViewModel : ViewModelBase
                 result = "Validation failed: exported control count does not match the canvas.";
                 return false;
             }
+
+            if (!parsed.Elements.Select(element => element.DisplayName)
+                .SequenceEqual(Canvas.Elements.Select(element => element.DisplayName), StringComparer.Ordinal))
+            {
+                result = "Validation failed: exported control names do not match the canvas.";
+                return false;
+            }
         }
         catch (Exception ex)
         {
@@ -992,7 +1035,7 @@ public partial class MainWindowViewModel : ViewModelBase
                 warnings.Add($"Unsupported control <{tagName}> was imported as a placeholder.");
             }
 
-            var displayName = BuildImportedDisplayName(tagName, snapshots.Count + 1);
+            var displayName = ReadImportedDisplayName(child, tagName, snapshots.Count + 1, snapshots, warnings);
 
             var x = ReadDouble(child, "Canvas.Left", 0);
             var y = ReadDouble(child, "Canvas.Top", 0);
@@ -1039,6 +1082,48 @@ public partial class MainWindowViewModel : ViewModelBase
     private static string BuildImportedDisplayName(string tagName, int sequence)
         => $"{tagName}{sequence}";
 
+    private static string ReadImportedDisplayName(
+        XElement element,
+        string tagName,
+        int sequence,
+        IReadOnlyCollection<DesignerElementSnapshot> existing,
+        ICollection<string> warnings)
+    {
+        var importedName = element.Attributes()
+            .FirstOrDefault(attribute => string.Equals(attribute.Name.LocalName, "Name", StringComparison.OrdinalIgnoreCase))
+            ?.Value
+            .Trim();
+
+        if (!string.IsNullOrWhiteSpace(importedName) && IsValidControlName(importedName)
+            && !existing.Any(snapshot => string.Equals(snapshot.DisplayName, importedName, StringComparison.OrdinalIgnoreCase)))
+        {
+            return importedName;
+        }
+
+        if (!string.IsNullOrWhiteSpace(importedName))
+        {
+            warnings.Add($"Ignored invalid or duplicate control name '{importedName}'.");
+        }
+
+        return BuildUniqueImportedDisplayName(tagName, sequence, existing);
+    }
+
+    private static string BuildUniqueImportedDisplayName(
+        string tagName,
+        int sequence,
+        IReadOnlyCollection<DesignerElementSnapshot> existing)
+    {
+        var candidate = BuildImportedDisplayName(tagName, sequence);
+        var suffix = 2;
+        while (existing.Any(snapshot => string.Equals(snapshot.DisplayName, candidate, StringComparison.OrdinalIgnoreCase)))
+        {
+            candidate = $"{tagName}{sequence}_{suffix}";
+            suffix++;
+        }
+
+        return candidate;
+    }
+
     private static XElement FindParseRoot(XElement root)
     {
         if (string.Equals(root.Name.LocalName, "Canvas", StringComparison.OrdinalIgnoreCase))
@@ -1063,7 +1148,7 @@ public partial class MainWindowViewModel : ViewModelBase
         foreach (var attr in element.Attributes())
         {
             var name = attr.Name.LocalName;
-            if (attr.IsNamespaceDeclaration || name is "Canvas.Left" or "Canvas.Top" or "Width" or "Height")
+            if (attr.IsNamespaceDeclaration || name is "Canvas.Left" or "Canvas.Top" or "Width" or "Height" or "Name")
             {
                 continue;
             }
@@ -1322,6 +1407,16 @@ public partial class MainWindowViewModel : ViewModelBase
         return candidate;
     }
 
+    private static bool IsValidControlName(string name)
+    {
+        if (string.IsNullOrWhiteSpace(name) || !(char.IsLetter(name[0]) || name[0] == '_'))
+        {
+            return false;
+        }
+
+        return name.All(character => char.IsLetterOrDigit(character) || character == '_');
+    }
+
     private static IReadOnlyDictionary<string, string>? CloneProperties(IReadOnlyDictionary<string, string>? source)
     {
         if (source is null)
@@ -1531,6 +1626,7 @@ public partial class MainWindowViewModel : ViewModelBase
 
     private static void AppendCanvasLayoutAttributes(StringBuilder sb, DesignElement element)
     {
+        AppendAttribute(sb, "x:Name", element.DisplayName);
         AppendAttribute(sb, "Canvas.Left", element.X.ToString("0.###", CultureInfo.InvariantCulture));
         AppendAttribute(sb, "Canvas.Top", element.Y.ToString("0.###", CultureInfo.InvariantCulture));
         AppendAttribute(sb, "Width", element.Width.ToString("0.###", CultureInfo.InvariantCulture));

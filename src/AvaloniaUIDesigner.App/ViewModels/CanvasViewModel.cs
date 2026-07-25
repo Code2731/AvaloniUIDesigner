@@ -543,8 +543,15 @@ public partial class CanvasViewModel : ViewModelBase
 
     private string BuildUniqueDisplayName(string displayPrefix)
     {
-        var index = Elements.Count + 1;
-        return $"{displayPrefix}{index}";
+        var index = 1;
+        var candidate = $"{displayPrefix}{index}";
+        while (Elements.Any(element => string.Equals(element.DisplayName, candidate, StringComparison.OrdinalIgnoreCase)))
+        {
+            index++;
+            candidate = $"{displayPrefix}{index}";
+        }
+
+        return candidate;
     }
 
     private sealed record StackPanelChildSnapshot(

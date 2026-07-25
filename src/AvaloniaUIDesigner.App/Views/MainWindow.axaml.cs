@@ -818,19 +818,10 @@ public partial class MainWindow : Window
         _hasPendingLayoutEdit = true;
     }
 
-    private void OnElementNameEditorGotFocus(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
-    {
-        if (_boundElement?.IsLocked != true)
-        {
-            Vm?.BeginCanvasMutation(MainWindowViewModel.HistoryActionType.EditProperty, "Renamed control.");
-        }
-    }
-
     private void OnElementNameEditorLostFocus(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
         if (_boundElement is null || _boundElement.IsLocked || sender is not TextBox editor)
         {
-            Vm?.CommitCanvasMutation();
             UpdateElementNameEditor();
             return;
         }
@@ -838,12 +829,9 @@ public partial class MainWindow : Window
         var name = editor.Text?.Trim();
         if (!string.IsNullOrWhiteSpace(name))
         {
-            _boundElement.DisplayName = name;
-            Vm?.ObjectTree.RebuildFrom(Vm.Canvas.Elements);
-            Vm?.ObjectTree.SelectByElement(_boundElement);
+            Vm?.TryRenameElement(_boundElement, name);
         }
 
-        Vm?.CommitCanvasMutation();
         UpdateElementNameEditor();
     }
 
