@@ -49,6 +49,12 @@ public sealed class BuiltInComponentCatalog : IComponentCatalog
             DefaultHeight: 32,
             VisualFactory: static () => new ToggleSwitch { Content = "Toggle" }),
         new(
+            DisplayName: "ToggleButton",
+            AvaloniaTypeName: "Avalonia.Controls.Primitives.ToggleButton",
+            DefaultWidth: 120,
+            DefaultHeight: 32,
+            VisualFactory: static () => new Avalonia.Controls.Primitives.ToggleButton { Content = "Toggle" }),
+        new(
             DisplayName: "ComboBox",
             AvaloniaTypeName: "Avalonia.Controls.ComboBox",
             DefaultWidth: 180,

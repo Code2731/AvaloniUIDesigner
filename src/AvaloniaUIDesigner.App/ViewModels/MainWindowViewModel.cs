@@ -1209,6 +1209,16 @@ public partial class MainWindowViewModel : ViewModelBase
             };
         }
 
+        if (visual is Avalonia.Controls.Primitives.ToggleButton toggleButton)
+        {
+            return new Dictionary<string, string>
+            {
+                ["Content"] = toggleButton.Content?.ToString() ?? string.Empty,
+                ["IsChecked"] = (toggleButton.IsChecked ?? false).ToString(),
+                ["Opacity"] = toggleButton.Opacity.ToString("0.###", CultureInfo.InvariantCulture),
+            };
+        }
+
         if (visual is ComboBox comboBox)
         {
             return new Dictionary<string, string>
@@ -1662,6 +1672,7 @@ public partial class MainWindowViewModel : ViewModelBase
             "TextBox" => propertyName is "Text" or "Watermark",
             "TextBlock" => propertyName is "Text" or "FontSize" or "FontWeight" or "Foreground",
             "CheckBox" or "ToggleSwitch" => propertyName is "Content" or "IsChecked",
+            "ToggleButton" => propertyName is "Content" or "IsChecked",
             "RadioButton" => propertyName is "Content" or "IsChecked" or "GroupName",
             "ComboBox" or "ListBox" => propertyName == "SelectedIndex",
             "Slider" or "ProgressBar" => propertyName is "Minimum" or "Maximum" or "Value",
@@ -2130,6 +2141,15 @@ public partial class MainWindowViewModel : ViewModelBase
                 AppendCanvasLayoutAttributes(sb, element);
                 AppendAttribute(sb, "Content", toggleSwitch.Content?.ToString() ?? string.Empty);
                 AppendAttribute(sb, "IsChecked", (toggleSwitch.IsChecked ?? false).ToString());
+                sb.AppendLine(" />");
+                break;
+
+            case Avalonia.Controls.Primitives.ToggleButton toggleButton:
+                sb.Append(indent);
+                sb.Append("<ToggleButton");
+                AppendCanvasLayoutAttributes(sb, element);
+                AppendAttribute(sb, "Content", toggleButton.Content?.ToString() ?? string.Empty);
+                AppendAttribute(sb, "IsChecked", (toggleButton.IsChecked ?? false).ToString());
                 sb.AppendLine(" />");
                 break;
 

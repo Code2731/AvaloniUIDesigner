@@ -66,6 +66,7 @@ public sealed class PreviewWindow : Window
             "Avalonia.Controls.CheckBox" => new CheckBox { Content = "CheckBox" },
             "Avalonia.Controls.RadioButton" => new RadioButton { Content = "Option", GroupName = "Options" },
             "Avalonia.Controls.ToggleSwitch" => new ToggleSwitch { Content = "Toggle" },
+            "Avalonia.Controls.Primitives.ToggleButton" => new Avalonia.Controls.Primitives.ToggleButton { Content = "Toggle" },
             "Avalonia.Controls.ComboBox" => new ComboBox
             {
                 SelectedIndex = 0,
@@ -204,6 +205,18 @@ public sealed class PreviewWindow : Window
                     && bool.TryParse(toggleSwitchIsChecked, out var parsedToggleSwitchIsChecked))
                 {
                     toggleSwitch.IsChecked = parsedToggleSwitchIsChecked;
+                }
+                break;
+            case Avalonia.Controls.Primitives.ToggleButton toggleButton:
+                if (properties.TryGetValue("Content", out var toggleButtonContent))
+                {
+                    toggleButton.Content = toggleButtonContent;
+                }
+
+                if (properties.TryGetValue("IsChecked", out var toggleButtonIsChecked)
+                    && bool.TryParse(toggleButtonIsChecked, out var parsedToggleButtonIsChecked))
+                {
+                    toggleButton.IsChecked = parsedToggleButtonIsChecked;
                 }
                 break;
             case ComboBox comboBox:

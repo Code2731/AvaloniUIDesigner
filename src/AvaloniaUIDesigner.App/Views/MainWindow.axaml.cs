@@ -796,6 +796,11 @@ public partial class MainWindow : Window
             return propertyName is "Content" or "IsChecked";
         }
 
+        if (control is Avalonia.Controls.Primitives.ToggleButton)
+        {
+            return propertyName is "Content" or "IsChecked";
+        }
+
         if (control is RadioButton)
         {
             return propertyName is "Content" or "IsChecked" or "GroupName";

@@ -513,6 +513,22 @@ public partial class CanvasViewModel : ViewModelBase
             return;
         }
 
+        if (visual is Avalonia.Controls.Primitives.ToggleButton toggleButton)
+        {
+            if (properties.TryGetValue("Content", out var content))
+            {
+                toggleButton.Content = content;
+            }
+
+            if (properties.TryGetValue("IsChecked", out var isChecked)
+                && bool.TryParse(isChecked, out var parsedIsChecked))
+            {
+                toggleButton.IsChecked = parsedIsChecked;
+            }
+
+            return;
+        }
+
         if (visual is ComboBox comboBox)
         {
             if (properties.TryGetValue("__items", out var itemsJson))
