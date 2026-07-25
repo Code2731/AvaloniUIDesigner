@@ -690,6 +690,7 @@ public partial class MainWindow : Window
         }
 
         PropGrid.Content = _boundElement?.Visual;
+        UpdateSelectionEditability();
         UpdateLayoutEditors();
         UpdateElementNameEditor();
         UpdateHandlePositions();
@@ -781,6 +782,11 @@ public partial class MainWindow : Window
             UpdateElementNameEditor();
         }
 
+        if (e.PropertyName == nameof(DesignElement.IsLocked))
+        {
+            UpdateSelectionEditability();
+        }
+
         if (e.PropertyName is nameof(DesignElement.X)
             or nameof(DesignElement.Y)
             or nameof(DesignElement.Width)
@@ -841,6 +847,27 @@ public partial class MainWindow : Window
     private void UpdateElementNameEditor()
     {
         ElementNameEditor.Text = _boundElement?.DisplayName ?? string.Empty;
+    }
+
+    private void UpdateSelectionEditability()
+    {
+        var canEdit = _boundElement is { IsLocked: false };
+
+        PropGrid.IsEnabled = canEdit;
+        ElementNameEditor.IsEnabled = canEdit;
+        LayoutXEditor.IsEnabled = canEdit;
+        LayoutYEditor.IsEnabled = canEdit;
+        LayoutWidthEditor.IsEnabled = canEdit;
+        LayoutHeightEditor.IsEnabled = canEdit;
+
+        HandleNW.IsVisible = canEdit;
+        HandleN.IsVisible = canEdit;
+        HandleNE.IsVisible = canEdit;
+        HandleE.IsVisible = canEdit;
+        HandleSE.IsVisible = canEdit;
+        HandleS.IsVisible = canEdit;
+        HandleSW.IsVisible = canEdit;
+        HandleW.IsVisible = canEdit;
     }
 
     private void OnLayoutEditorLostFocus(object? sender, Avalonia.Interactivity.RoutedEventArgs e)

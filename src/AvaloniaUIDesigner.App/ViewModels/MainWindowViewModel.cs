@@ -154,10 +154,10 @@ public partial class MainWindowViewModel : ViewModelBase
 
     public void SetSelectedOpacity(double opacity)
     {
-        var targets = Canvas.SelectedElements.ToList();
+        var targets = Canvas.SelectedElements.Where(element => !element.IsLocked).ToList();
         if (targets.Count == 0)
         {
-            StatusText = "No selected controls to style.";
+            StatusText = "Select an unlocked control to change opacity.";
             return;
         }
 
@@ -309,10 +309,10 @@ public partial class MainWindowViewModel : ViewModelBase
 
     public void MoveSelectedElementsInLayerOrder(LayerOrderAction action)
     {
-        var targets = Canvas.SelectedElements.ToList();
+        var targets = Canvas.SelectedElements.Where(element => !element.IsLocked).ToList();
         if (targets.Count == 0)
         {
-            StatusText = "No selected controls to reorder.";
+            StatusText = "No unlocked controls to reorder.";
             return;
         }
 
