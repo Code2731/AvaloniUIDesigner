@@ -207,6 +207,15 @@
                                    DragDrop.DragLeave="OnDesignSurfaceDragLeave"
                                    DragDrop.DragOver="OnDesignSurfaceDragOver"
                                    DragDrop.Drop="OnDesignSurfaceDrop">
+                            <Panel.ContextMenu>
+                                <ContextMenu>
+                                    <MenuItem Header="Paste" Click="OnPasteMenuClicked"/>
+                                    <MenuItem Header="Select All" Click="OnSelectAllMenuClicked"/>
+                                    <Separator/>
+                                    <MenuItem Header="Preview" Click="OnPreviewMenuClicked"/>
+                                    <MenuItem Header="Fit to View" Click="OnFitToViewMenuClicked"/>
+                                </ContextMenu>
+                            </Panel.ContextMenu>
                             <views:DesignerGridOverlay GridSize="{Binding Canvas.GridSize}"
                                                       IsGridVisible="{Binding Canvas.IsGridVisible}"
                                                       IsHitTestVisible="False"/>
@@ -248,6 +257,37 @@
                                                 Width="{Binding Width}"
                                                 Height="{Binding Height}"
                                                 PointerPressed="OnElementPointerPressed">
+                                            <Border.ContextMenu>
+                                                <ContextMenu>
+                                                    <MenuItem Header="Copy" Click="OnCopyMenuClicked"/>
+                                                    <MenuItem Header="Cut" Click="OnCutMenuClicked"/>
+                                                    <MenuItem Header="Duplicate" Click="OnDuplicateMenuClicked"/>
+                                                    <MenuItem Header="Delete" Click="OnDeleteMenuClicked"/>
+                                                    <Separator/>
+                                                    <MenuItem Header="Lock / Unlock Selection" Click="OnToggleLockMenuClicked"/>
+                                                    <MenuItem Header="Order">
+                                                        <MenuItem Header="Bring to Front" Click="OnBringToFrontMenuClicked"/>
+                                                        <MenuItem Header="Send to Back" Click="OnSendToBackMenuClicked"/>
+                                                        <MenuItem Header="Bring Forward" Click="OnBringForwardMenuClicked"/>
+                                                        <MenuItem Header="Send Backward" Click="OnSendBackwardMenuClicked"/>
+                                                    </MenuItem>
+                                                    <MenuItem Header="Arrange">
+                                                        <MenuItem Header="Align Left" Click="OnAlignLeftMenuClicked"/>
+                                                        <MenuItem Header="Align Center" Click="OnAlignCenterMenuClicked"/>
+                                                        <MenuItem Header="Align Right" Click="OnAlignRightMenuClicked"/>
+                                                        <MenuItem Header="Align Top" Click="OnAlignTopMenuClicked"/>
+                                                        <MenuItem Header="Align Middle" Click="OnAlignMiddleMenuClicked"/>
+                                                        <MenuItem Header="Align Bottom" Click="OnAlignBottomMenuClicked"/>
+                                                        <Separator/>
+                                                        <MenuItem Header="Distribute Horizontally" Click="OnDistributeHorizontallyMenuClicked"/>
+                                                        <MenuItem Header="Distribute Vertically" Click="OnDistributeVerticallyMenuClicked"/>
+                                                        <Separator/>
+                                                        <MenuItem Header="Make Same Width" Click="OnMakeSameWidthMenuClicked"/>
+                                                        <MenuItem Header="Make Same Height" Click="OnMakeSameHeightMenuClicked"/>
+                                                        <MenuItem Header="Make Same Size" Click="OnMakeSameSizeMenuClicked"/>
+                                                    </MenuItem>
+                                                </ContextMenu>
+                                            </Border.ContextMenu>
                                             <Grid>
                                                 <ContentPresenter Content="{Binding Visual}"/>
                                                 <Border Background="#B45309" CornerRadius="3" Padding="3,1"

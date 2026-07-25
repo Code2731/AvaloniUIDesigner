@@ -1313,6 +1313,11 @@ public partial class MainWindow : Window
             return;
         }
 
+        if (e.GetCurrentPoint(host).Properties.IsRightButtonPressed)
+        {
+            return;
+        }
+
         var point = e.GetPosition(host);
         if (Vm.Toolbox.SelectedItem is not null)
         {
@@ -1333,6 +1338,17 @@ public partial class MainWindow : Window
     {
         if (Vm is null || sender is not Control { DataContext: DesignElement element })
         {
+            return;
+        }
+
+        if (e.GetCurrentPoint((Control)sender).Properties.IsRightButtonPressed)
+        {
+            if (!Vm.Canvas.SelectedElements.Contains(element))
+            {
+                Vm.SelectElement(element);
+            }
+
+            Vm.StatusText = $"Selected {element.DisplayName}.";
             return;
         }
 
