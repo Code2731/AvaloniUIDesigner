@@ -279,6 +279,95 @@ public partial class MainWindowViewModel : ViewModelBase
         StatusText = $"Set text weight to {weightName} for {targets.Count} control(s)";
     }
 
+    public bool TryGetSelectedItems(out string controlName, out IReadOnlyList<string> items)
+    {
+        var target = Canvas.SelectedElement;
+        if (target is null)
+        {
+            controlName = string.Empty;
+            items = Array.Empty<string>();
+            StatusText = "Select a ComboBox or ListBox to edit its items.";
+            return false;
+        }
+
+        if (target.IsLocked)
+        {
+            controlName = string.Empty;
+            items = Array.Empty<string>();
+            StatusText = "Unlock the selected control before editing its items.";
+            return false;
+        }
+
+        switch (target.Visual)
+        {
+            case ComboBox comboBox:
+                controlName = target.DisplayName;
+                items = ReadItems(comboBox);
+                return true;
+            case ListBox listBox:
+                controlName = target.DisplayName;
+                items = ReadItems(listBox);
+                return true;
+            default:
+                controlName = string.Empty;
+                items = Array.Empty<string>();
+                StatusText = "Item editing is available for ComboBox and ListBox controls.";
+                return false;
+        }
+    }
+
+    public void SetSelectedItems(IEnumerable<string> items)
+    {
+        var target = Canvas.SelectedElement;
+        if (target is null || target.IsLocked)
+        {
+            StatusText = "Select an unlocked ComboBox or ListBox to edit its items.";
+            return;
+        }
+
+        var updatedItems = items
+            .Select(item => item.Trim())
+            .Where(item => item.Length > 0)
+            .ToList();
+
+        switch (target.Visual)
+        {
+            case ComboBox comboBox:
+                if (ReadItems(comboBox).SequenceEqual(updatedItems, StringComparer.Ordinal))
+                {
+                    StatusText = "ComboBox items are unchanged.";
+                    return;
+                }
+
+                BeginCanvasMutation(HistoryActionType.EditProperty, "Updated ComboBox items.");
+                var comboBoxSelectedIndex = comboBox.SelectedIndex;
+                ReplaceItems(comboBox, updatedItems);
+                comboBox.SelectedIndex = Math.Clamp(comboBoxSelectedIndex, -1, updatedItems.Count - 1);
+                CommitCanvasMutation();
+                StatusText = $"Updated {updatedItems.Count} ComboBox item(s).";
+                return;
+
+            case ListBox listBox:
+                if (ReadItems(listBox).SequenceEqual(updatedItems, StringComparer.Ordinal))
+                {
+                    StatusText = "ListBox items are unchanged.";
+                    return;
+                }
+
+                BeginCanvasMutation(HistoryActionType.EditProperty, "Updated ListBox items.");
+                var listBoxSelectedIndex = listBox.SelectedIndex;
+                ReplaceItems(listBox, updatedItems);
+                listBox.SelectedIndex = Math.Clamp(listBoxSelectedIndex, -1, updatedItems.Count - 1);
+                CommitCanvasMutation();
+                StatusText = $"Updated {updatedItems.Count} ListBox item(s).";
+                return;
+
+            default:
+                StatusText = "Item editing is available for ComboBox and ListBox controls.";
+                return;
+        }
+    }
+
     public bool TryRenameElement(DesignElement element, string proposedName)
     {
         if (element.IsLocked)
@@ -1175,6 +1264,22 @@ public partial class MainWindowViewModel : ViewModelBase
         }
 
         return null;
+    }
+
+    private static IReadOnlyList<string> ReadItems(ItemsControl itemsControl)
+        => itemsControl.Items
+            .Select(item => item is ContentControl contentControl
+                ? contentControl.Content?.ToString() ?? string.Empty
+                : item?.ToString() ?? string.Empty)
+            .ToList();
+
+    private static void ReplaceItems(ItemsControl itemsControl, IReadOnlyList<string> items)
+    {
+        itemsControl.Items.Clear();
+        foreach (var item in items)
+        {
+            itemsControl.Items.Add(item);
+        }
     }
 
     private static bool AreSameDocument(DesignerCanvasDocument left, DesignerCanvasDocument right)

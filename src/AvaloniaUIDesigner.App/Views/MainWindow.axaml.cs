@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Collections.Specialized;
 using System.ComponentModel;
 using System.Globalization;
@@ -247,6 +248,21 @@ public partial class MainWindow : Window
     {
         FlushPendingPropertyHistory();
         Vm?.DuplicateSelectedElement();
+    }
+
+    private async void OnEditItemsMenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        FlushPendingPropertyHistory();
+        if (Vm is null || !Vm.TryGetSelectedItems(out var controlName, out var items))
+        {
+            return;
+        }
+
+        var updatedItems = await ShowItemsEditorDialogAsync(controlName, items);
+        if (updatedItems is not null)
+        {
+            Vm.SetSelectedItems(updatedItems);
+        }
     }
 
     private void OnBringToFrontMenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
@@ -1545,6 +1561,65 @@ public partial class MainWindow : Window
         };
 
         return await dialog.ShowDialog<UnsavedChoice>(this);
+    }
+
+    private async Task<IReadOnlyList<string>?> ShowItemsEditorDialogAsync(string controlName, IReadOnlyList<string> items)
+    {
+        var editor = new TextBox
+        {
+            Text = string.Join(Environment.NewLine, items),
+            AcceptsReturn = true,
+            MinHeight = 200,
+        };
+
+        var dialog = new Window
+        {
+            Title = $"Edit Items - {controlName}",
+            Width = 460,
+            Height = 380,
+            MinWidth = 360,
+            MinHeight = 260,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner,
+        };
+
+        var applyButton = new Button { Content = "Apply", MinWidth = 84 };
+        applyButton.Click += (_, _) =>
+        {
+            var updatedItems = (editor.Text ?? string.Empty)
+                .Replace("\r\n", "\n", StringComparison.Ordinal)
+                .Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                .ToList();
+            dialog.Close<IReadOnlyList<string>?>(updatedItems);
+        };
+
+        var cancelButton = new Button { Content = "Cancel", MinWidth = 84 };
+        cancelButton.Click += (_, _) => dialog.Close<IReadOnlyList<string>?>(null);
+
+        var buttons = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            Spacing = 8,
+            HorizontalAlignment = HorizontalAlignment.Right,
+            Children = { cancelButton, applyButton },
+        };
+
+        var content = new Grid
+        {
+            Margin = new Thickness(16),
+            RowDefinitions = new RowDefinitions("Auto,*,Auto"),
+            RowSpacing = 12,
+            Children =
+            {
+                new TextBlock { Text = "Enter one item per line. Empty lines are ignored." },
+                editor,
+                buttons,
+            },
+        };
+        Grid.SetRow(editor, 1);
+        Grid.SetRow(buttons, 2);
+        dialog.Content = content;
+
+        return await dialog.ShowDialog<IReadOnlyList<string>?>(this);
     }
 
     private void OnWindowClosing(object? sender, WindowClosingEventArgs e)
