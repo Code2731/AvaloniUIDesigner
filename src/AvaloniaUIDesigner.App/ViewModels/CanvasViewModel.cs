@@ -508,6 +508,22 @@ public partial class CanvasViewModel : ViewModelBase
             return;
         }
 
+        if (visual is ListBox listBox)
+        {
+            if (properties.TryGetValue("__items", out var itemsJson))
+            {
+                RestoreListBoxItems(listBox, itemsJson);
+            }
+
+            if (properties.TryGetValue("SelectedIndex", out var selectedIndex)
+                && int.TryParse(selectedIndex, NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsedSelectedIndex))
+            {
+                listBox.SelectedIndex = Math.Clamp(parsedSelectedIndex, -1, listBox.Items.Count - 1);
+            }
+
+            return;
+        }
+
         if (visual is Slider slider)
         {
             if (properties.TryGetValue("Minimum", out var minimum)
@@ -644,6 +660,30 @@ public partial class CanvasViewModel : ViewModelBase
         foreach (var item in items)
         {
             comboBox.Items.Add(item);
+        }
+    }
+
+    private static void RestoreListBoxItems(ListBox listBox, string json)
+    {
+        List<string>? items;
+        try
+        {
+            items = JsonSerializer.Deserialize<List<string>>(json);
+        }
+        catch
+        {
+            return;
+        }
+
+        if (items is null)
+        {
+            return;
+        }
+
+        listBox.Items.Clear();
+        foreach (var item in items)
+        {
+            listBox.Items.Add(item);
         }
     }
 

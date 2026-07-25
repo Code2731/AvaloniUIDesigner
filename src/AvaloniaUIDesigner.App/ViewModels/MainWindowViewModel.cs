@@ -1100,6 +1100,16 @@ public partial class MainWindowViewModel : ViewModelBase
             };
         }
 
+        if (visual is ListBox listBox)
+        {
+            return new Dictionary<string, string>
+            {
+                ["SelectedIndex"] = listBox.SelectedIndex.ToString(CultureInfo.InvariantCulture),
+                ["__items"] = SerializeListBoxItems(listBox),
+                ["Opacity"] = listBox.Opacity.ToString("0.###", CultureInfo.InvariantCulture),
+            };
+        }
+
         if (visual is Slider slider)
         {
             return new Dictionary<string, string>
@@ -1428,9 +1438,10 @@ public partial class MainWindowViewModel : ViewModelBase
         {
             map["__children"] = SerializeStackPanelChildren(element);
         }
-        else if (string.Equals(element.Name.LocalName, "ComboBox", StringComparison.OrdinalIgnoreCase))
+        else if (string.Equals(element.Name.LocalName, "ComboBox", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(element.Name.LocalName, "ListBox", StringComparison.OrdinalIgnoreCase))
         {
-            map["__items"] = SerializeComboBoxItems(element);
+            map["__items"] = SerializeItems(element);
         }
 
         return map.Count == 0 ? null : map;
@@ -1449,7 +1460,7 @@ public partial class MainWindowViewModel : ViewModelBase
             "TextBox" => propertyName is "Text" or "Watermark",
             "TextBlock" => propertyName is "Text" or "FontSize" or "FontWeight" or "Foreground",
             "CheckBox" or "ToggleSwitch" => propertyName is "Content" or "IsChecked",
-            "ComboBox" => propertyName == "SelectedIndex",
+            "ComboBox" or "ListBox" => propertyName == "SelectedIndex",
             "Slider" or "ProgressBar" => propertyName is "Minimum" or "Maximum" or "Value",
             "Border" => propertyName is "Background" or "BorderBrush" or "BorderThickness" or "CornerRadius",
             "Grid" => propertyName == "ShowGridLines",
@@ -1813,9 +1824,20 @@ public partial class MainWindowViewModel : ViewModelBase
         return JsonSerializer.Serialize(children);
     }
 
-    private static string SerializeComboBoxItems(XElement comboBoxElement)
+    private static string SerializeListBoxItems(ListBox listBox)
     {
-        var items = comboBoxElement.Elements()
+        var items = listBox.Items
+            .Select(item => item is ListBoxItem listBoxItem
+                ? listBoxItem.Content?.ToString() ?? string.Empty
+                : item?.ToString() ?? string.Empty)
+            .ToList();
+
+        return JsonSerializer.Serialize(items);
+    }
+
+    private static string SerializeItems(XElement itemsControlElement)
+    {
+        var items = itemsControlElement.Elements()
             .Where(element => !element.Name.LocalName.Contains('.', StringComparison.Ordinal))
             .Select(element => element.Attribute("Content")?.Value ?? element.Value)
             .ToList();
@@ -1895,6 +1917,26 @@ public partial class MainWindowViewModel : ViewModelBase
 
                 sb.Append(indent);
                 sb.AppendLine("</ComboBox>");
+                break;
+
+            case ListBox listBox:
+                sb.Append(indent);
+                sb.Append("<ListBox");
+                AppendCanvasLayoutAttributes(sb, element);
+                AppendAttribute(sb, "SelectedIndex", listBox.SelectedIndex.ToString(CultureInfo.InvariantCulture));
+                sb.AppendLine(">");
+                foreach (var item in listBox.Items)
+                {
+                    sb.Append(indent);
+                    sb.Append("  <ListBoxItem");
+                    AppendAttribute(sb, "Content", item is ListBoxItem listBoxItem
+                        ? listBoxItem.Content?.ToString() ?? string.Empty
+                        : item?.ToString() ?? string.Empty);
+                    sb.AppendLine(" />");
+                }
+
+                sb.Append(indent);
+                sb.AppendLine("</ListBox>");
                 break;
 
             case Slider slider:

@@ -70,6 +70,11 @@ public sealed class PreviewWindow : Window
                 SelectedIndex = 0,
                 Items = { "Option 1", "Option 2", "Option 3" },
             },
+            "Avalonia.Controls.ListBox" => new ListBox
+            {
+                SelectedIndex = 0,
+                Items = { "Item 1", "Item 2", "Item 3" },
+            },
             "Avalonia.Controls.Slider" => new Slider { Minimum = 0, Maximum = 100, Value = 50 },
             "Avalonia.Controls.ProgressBar" => new ProgressBar { Minimum = 0, Maximum = 100, Value = 50 },
             "Avalonia.Controls.Border" => new Border
@@ -175,6 +180,9 @@ public sealed class PreviewWindow : Window
                 break;
             case ComboBox comboBox:
                 ApplyComboBoxProperties(comboBox, properties);
+                break;
+            case ListBox listBox:
+                ApplyListBoxProperties(listBox, properties);
                 break;
             case Slider slider:
                 ApplySliderProperties(slider, properties);
@@ -301,6 +309,37 @@ public sealed class PreviewWindow : Window
             && double.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out var parsedValue))
         {
             progressBar.Value = parsedValue;
+        }
+    }
+
+    private static void ApplyListBoxProperties(ListBox listBox, IReadOnlyDictionary<string, string> properties)
+    {
+        if (properties.TryGetValue("__items", out var itemsJson))
+        {
+            List<string>? items;
+            try
+            {
+                items = JsonSerializer.Deserialize<List<string>>(itemsJson);
+            }
+            catch
+            {
+                items = null;
+            }
+
+            if (items is not null)
+            {
+                listBox.Items.Clear();
+                foreach (var item in items)
+                {
+                    listBox.Items.Add(item);
+                }
+            }
+        }
+
+        if (properties.TryGetValue("SelectedIndex", out var selectedIndex)
+            && int.TryParse(selectedIndex, NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsedSelectedIndex))
+        {
+            listBox.SelectedIndex = Math.Clamp(parsedSelectedIndex, -1, listBox.Items.Count - 1);
         }
     }
 

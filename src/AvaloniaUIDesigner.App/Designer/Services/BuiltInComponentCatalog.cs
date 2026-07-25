@@ -53,6 +53,16 @@ public sealed class BuiltInComponentCatalog : IComponentCatalog
                 Items = { "Option 1", "Option 2", "Option 3" },
             }),
         new(
+            DisplayName: "ListBox",
+            AvaloniaTypeName: "Avalonia.Controls.ListBox",
+            DefaultWidth: 180,
+            DefaultHeight: 120,
+            VisualFactory: static () => new ListBox
+            {
+                SelectedIndex = 0,
+                Items = { "Item 1", "Item 2", "Item 3" },
+            }),
+        new(
             DisplayName: "Slider",
             AvaloniaTypeName: "Avalonia.Controls.Slider",
             DefaultWidth: 180,

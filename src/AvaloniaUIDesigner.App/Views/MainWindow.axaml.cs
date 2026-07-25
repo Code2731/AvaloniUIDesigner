@@ -780,7 +780,7 @@ public partial class MainWindow : Window
             return propertyName is "Content" or "IsChecked";
         }
 
-        if (control is ComboBox)
+        if (control is ComboBox or ListBox)
         {
             return propertyName == "SelectedIndex";
         }
