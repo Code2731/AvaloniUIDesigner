@@ -182,6 +182,14 @@ public partial class MainWindow : Window
         Vm?.Redo();
     }
 
+    private void OnSelectAllMenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        if (Vm is not null)
+        {
+            Vm.SelectElements(Vm.Canvas.Elements);
+        }
+    }
+
     private void OnOpacity100MenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
         => SetSelectionOpacity(1);
 
@@ -441,6 +449,13 @@ public partial class MainWindow : Window
         {
             FlushPendingPropertyHistory();
             Vm.Redo();
+            e.Handled = true;
+            return;
+        }
+
+        if (ctrl && e.Key == Key.A)
+        {
+            Vm.SelectElements(Vm.Canvas.Elements);
             e.Handled = true;
             return;
         }
