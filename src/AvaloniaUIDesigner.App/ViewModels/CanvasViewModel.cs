@@ -401,6 +401,11 @@ public partial class CanvasViewModel : ViewModelBase
                 textBlock.FontSize = Math.Clamp(parsedFontSize, 8, 96);
             }
 
+            if (properties.TryGetValue("Foreground", out var foreground))
+            {
+                TrySetTextForeground(textBlock, foreground);
+            }
+
             return;
         }
 
@@ -470,6 +475,18 @@ public partial class CanvasViewModel : ViewModelBase
             && bool.TryParse(showGrid, out var parsedShowGrid))
         {
             grid.ShowGridLines = parsedShowGrid;
+        }
+    }
+
+    private static void TrySetTextForeground(TextBlock textBlock, string foreground)
+    {
+        try
+        {
+            textBlock.Foreground = Brush.Parse(foreground);
+        }
+        catch (FormatException)
+        {
+            // Ignore malformed imported colors while keeping the control usable.
         }
     }
 

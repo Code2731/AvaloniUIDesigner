@@ -10,6 +10,7 @@ using System.Text.Json;
 using System.Xml.Linq;
 using Avalonia.Controls;
 using Avalonia.Layout;
+using Avalonia.Media;
 using AvaloniaUIDesigner.App.Designer.Contracts;
 using AvaloniaUIDesigner.App.Designer.Core;
 using AvaloniaUIDesigner.App.Designer.Services;
@@ -189,6 +190,26 @@ public partial class MainWindowViewModel : ViewModelBase
 
         CommitCanvasMutation();
         StatusText = $"Set text size to {fontSize:0}px for {targets.Count} control(s)";
+    }
+
+    public void SetSelectedTextColor(string color)
+    {
+        var targets = Canvas.SelectedElements.Where(element => !element.IsLocked && element.Visual is TextBlock).ToList();
+        if (targets.Count == 0)
+        {
+            StatusText = "Select an unlocked TextBlock to change its color.";
+            return;
+        }
+
+        BeginCanvasMutation(HistoryActionType.EditProperty, "Updated text color.");
+        var brush = new SolidColorBrush(Color.Parse(color));
+        foreach (var target in targets)
+        {
+            ((TextBlock)target.Visual).Foreground = brush;
+        }
+
+        CommitCanvasMutation();
+        StatusText = $"Set text color for {targets.Count} control(s)";
     }
 
     public void ToggleSelectedLock()
@@ -853,12 +874,19 @@ public partial class MainWindowViewModel : ViewModelBase
 
         if (visual is TextBlock textBlock)
         {
-            return new Dictionary<string, string>
+            var properties = new Dictionary<string, string>
             {
                 ["Text"] = textBlock.Text ?? string.Empty,
                 ["FontSize"] = textBlock.FontSize.ToString("0.###", CultureInfo.InvariantCulture),
                 ["Opacity"] = textBlock.Opacity.ToString("0.###", CultureInfo.InvariantCulture),
             };
+
+            if (textBlock.Foreground is SolidColorBrush foreground)
+            {
+                properties["Foreground"] = foreground.Color.ToString();
+            }
+
+            return properties;
         }
 
         if (visual is CheckBox checkBox)
@@ -1069,7 +1097,7 @@ public partial class MainWindowViewModel : ViewModelBase
         {
             "Button" => propertyName == "Content",
             "TextBox" => propertyName is "Text" or "Watermark",
-            "TextBlock" => propertyName is "Text" or "FontSize",
+            "TextBlock" => propertyName is "Text" or "FontSize" or "Foreground",
             "CheckBox" => propertyName is "Content" or "IsChecked",
             "Slider" => propertyName is "Minimum" or "Maximum" or "Value",
             "Grid" => propertyName == "ShowGridLines",
@@ -1399,6 +1427,7 @@ public partial class MainWindowViewModel : ViewModelBase
                 AppendCanvasLayoutAttributes(sb, element);
                 AppendAttribute(sb, "Text", textBlock.Text ?? string.Empty);
                 AppendAttribute(sb, "FontSize", textBlock.FontSize.ToString("0.###", CultureInfo.InvariantCulture));
+                AppendTextForegroundAttribute(sb, textBlock);
                 sb.AppendLine(" />");
                 break;
 
@@ -1507,6 +1536,14 @@ public partial class MainWindowViewModel : ViewModelBase
         AppendAttribute(sb, "Width", element.Width.ToString("0.###", CultureInfo.InvariantCulture));
         AppendAttribute(sb, "Height", element.Height.ToString("0.###", CultureInfo.InvariantCulture));
         AppendAttribute(sb, "Opacity", element.Visual.Opacity.ToString("0.###", CultureInfo.InvariantCulture));
+    }
+
+    private static void AppendTextForegroundAttribute(StringBuilder sb, TextBlock textBlock)
+    {
+        if (textBlock.Foreground is SolidColorBrush foreground)
+        {
+            AppendAttribute(sb, "Foreground", foreground.Color.ToString());
+        }
     }
 
     private static void AppendAttribute(StringBuilder sb, string name, string value)

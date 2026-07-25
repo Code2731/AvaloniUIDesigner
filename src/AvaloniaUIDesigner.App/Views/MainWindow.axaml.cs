@@ -205,6 +205,9 @@ public partial class MainWindow : Window
     private void OnTextSize14MenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e) => Vm?.SetSelectedTextSize(14);
     private void OnTextSize18MenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e) => Vm?.SetSelectedTextSize(18);
     private void OnTextSize24MenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e) => Vm?.SetSelectedTextSize(24);
+    private void OnTextColorInkMenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e) => Vm?.SetSelectedTextColor("#111827");
+    private void OnTextColorBlueMenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e) => Vm?.SetSelectedTextColor("#2563EB");
+    private void OnTextColorRedMenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e) => Vm?.SetSelectedTextColor("#DC2626");
 
     private void SetSelectionOpacity(double opacity)
     {
@@ -749,7 +752,7 @@ public partial class MainWindow : Window
 
         if (control is TextBlock)
         {
-            return propertyName is "Text" or "FontSize";
+            return propertyName is "Text" or "FontSize" or "Foreground";
         }
 
         if (control is CheckBox)

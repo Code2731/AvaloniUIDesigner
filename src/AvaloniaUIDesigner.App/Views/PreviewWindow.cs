@@ -90,6 +90,12 @@ public sealed class PreviewWindow : Window
             return;
         }
 
+        if (properties.TryGetValue("Opacity", out var opacity)
+            && double.TryParse(opacity, NumberStyles.Float, CultureInfo.InvariantCulture, out var parsedOpacity))
+        {
+            control.Opacity = Math.Clamp(parsedOpacity, 0, 1);
+        }
+
         switch (control)
         {
             case Button button when properties.TryGetValue("Content", out var content):
@@ -106,8 +112,22 @@ public sealed class PreviewWindow : Window
                     textBox.Watermark = watermark;
                 }
                 break;
-            case TextBlock textBlock when properties.TryGetValue("Text", out var textBlockText):
-                textBlock.Text = textBlockText;
+            case TextBlock textBlock:
+                if (properties.TryGetValue("Text", out var textBlockText))
+                {
+                    textBlock.Text = textBlockText;
+                }
+
+                if (properties.TryGetValue("FontSize", out var fontSize)
+                    && double.TryParse(fontSize, NumberStyles.Float, CultureInfo.InvariantCulture, out var parsedFontSize))
+                {
+                    textBlock.FontSize = Math.Clamp(parsedFontSize, 8, 96);
+                }
+
+                if (properties.TryGetValue("Foreground", out var foreground))
+                {
+                    TrySetTextForeground(textBlock, foreground);
+                }
                 break;
             case CheckBox checkBox:
                 if (properties.TryGetValue("Content", out var checkBoxContent))
@@ -131,6 +151,18 @@ public sealed class PreviewWindow : Window
             case StackPanel stackPanel:
                 ApplyStackPanelProperties(stackPanel, properties);
                 break;
+        }
+    }
+
+    private static void TrySetTextForeground(TextBlock textBlock, string foreground)
+    {
+        try
+        {
+            textBlock.Foreground = Brush.Parse(foreground);
+        }
+        catch (FormatException)
+        {
+            // Ignore malformed imported colors while keeping the preview available.
         }
     }
 
