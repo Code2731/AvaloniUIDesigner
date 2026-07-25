@@ -58,6 +58,9 @@ public sealed class PreviewWindow : Window
         {
             "Avalonia.Controls.Button" => new Button { Content = "Button" },
             "Avalonia.Controls.TextBox" => new TextBox { Watermark = "Type here" },
+            "Avalonia.Controls.TextBlock" => new TextBlock { Text = "Text" },
+            "Avalonia.Controls.CheckBox" => new CheckBox { Content = "CheckBox" },
+            "Avalonia.Controls.Slider" => new Slider { Minimum = 0, Maximum = 100, Value = 50 },
             "Avalonia.Controls.Grid" => new Grid { ShowGridLines = true },
             "Avalonia.Controls.StackPanel" => new StackPanel
             {
@@ -99,6 +102,24 @@ public sealed class PreviewWindow : Window
                     textBox.Watermark = watermark;
                 }
                 break;
+            case TextBlock textBlock when properties.TryGetValue("Text", out var textBlockText):
+                textBlock.Text = textBlockText;
+                break;
+            case CheckBox checkBox:
+                if (properties.TryGetValue("Content", out var checkBoxContent))
+                {
+                    checkBox.Content = checkBoxContent;
+                }
+
+                if (properties.TryGetValue("IsChecked", out var isChecked)
+                    && bool.TryParse(isChecked, out var parsedIsChecked))
+                {
+                    checkBox.IsChecked = parsedIsChecked;
+                }
+                break;
+            case Slider slider:
+                ApplySliderProperties(slider, properties);
+                break;
             case Grid grid when properties.TryGetValue("ShowGridLines", out var showGrid)
                 && bool.TryParse(showGrid, out var parsedShowGrid):
                 grid.ShowGridLines = parsedShowGrid;
@@ -106,6 +127,27 @@ public sealed class PreviewWindow : Window
             case StackPanel stackPanel:
                 ApplyStackPanelProperties(stackPanel, properties);
                 break;
+        }
+    }
+
+    private static void ApplySliderProperties(Slider slider, IReadOnlyDictionary<string, string> properties)
+    {
+        if (properties.TryGetValue("Minimum", out var minimum)
+            && double.TryParse(minimum, NumberStyles.Float, CultureInfo.InvariantCulture, out var parsedMinimum))
+        {
+            slider.Minimum = parsedMinimum;
+        }
+
+        if (properties.TryGetValue("Maximum", out var maximum)
+            && double.TryParse(maximum, NumberStyles.Float, CultureInfo.InvariantCulture, out var parsedMaximum))
+        {
+            slider.Maximum = parsedMaximum;
+        }
+
+        if (properties.TryGetValue("Value", out var value)
+            && double.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out var parsedValue))
+        {
+            slider.Value = parsedValue;
         }
     }
 

@@ -666,6 +666,33 @@ public partial class MainWindowViewModel : ViewModelBase
             };
         }
 
+        if (visual is TextBlock textBlock)
+        {
+            return new Dictionary<string, string>
+            {
+                ["Text"] = textBlock.Text ?? string.Empty,
+            };
+        }
+
+        if (visual is CheckBox checkBox)
+        {
+            return new Dictionary<string, string>
+            {
+                ["Content"] = checkBox.Content?.ToString() ?? string.Empty,
+                ["IsChecked"] = (checkBox.IsChecked ?? false).ToString(),
+            };
+        }
+
+        if (visual is Slider slider)
+        {
+            return new Dictionary<string, string>
+            {
+                ["Minimum"] = slider.Minimum.ToString("0.###", CultureInfo.InvariantCulture),
+                ["Maximum"] = slider.Maximum.ToString("0.###", CultureInfo.InvariantCulture),
+                ["Value"] = slider.Value.ToString("0.###", CultureInfo.InvariantCulture),
+            };
+        }
+
         if (visual is StackPanel stackPanel)
         {
             return new Dictionary<string, string>
@@ -827,6 +854,9 @@ public partial class MainWindowViewModel : ViewModelBase
         {
             "Button" => propertyName == "Content",
             "TextBox" => propertyName is "Text" or "Watermark",
+            "TextBlock" => propertyName == "Text",
+            "CheckBox" => propertyName is "Content" or "IsChecked",
+            "Slider" => propertyName is "Minimum" or "Maximum" or "Value",
             "Grid" => propertyName == "ShowGridLines",
             "StackPanel" => propertyName is "Orientation" or "Spacing",
             _ => false,
@@ -1142,6 +1172,33 @@ public partial class MainWindowViewModel : ViewModelBase
                     AppendAttribute(sb, "Watermark", textBox.Watermark?.ToString() ?? string.Empty);
                 }
 
+                sb.AppendLine(" />");
+                break;
+
+            case TextBlock textBlock:
+                sb.Append(indent);
+                sb.Append("<TextBlock");
+                AppendCanvasLayoutAttributes(sb, element);
+                AppendAttribute(sb, "Text", textBlock.Text ?? string.Empty);
+                sb.AppendLine(" />");
+                break;
+
+            case CheckBox checkBox:
+                sb.Append(indent);
+                sb.Append("<CheckBox");
+                AppendCanvasLayoutAttributes(sb, element);
+                AppendAttribute(sb, "Content", checkBox.Content?.ToString() ?? string.Empty);
+                AppendAttribute(sb, "IsChecked", (checkBox.IsChecked ?? false).ToString());
+                sb.AppendLine(" />");
+                break;
+
+            case Slider slider:
+                sb.Append(indent);
+                sb.Append("<Slider");
+                AppendCanvasLayoutAttributes(sb, element);
+                AppendAttribute(sb, "Minimum", slider.Minimum.ToString("0.###", CultureInfo.InvariantCulture));
+                AppendAttribute(sb, "Maximum", slider.Maximum.ToString("0.###", CultureInfo.InvariantCulture));
+                AppendAttribute(sb, "Value", slider.Value.ToString("0.###", CultureInfo.InvariantCulture));
                 sb.AppendLine(" />");
                 break;
 

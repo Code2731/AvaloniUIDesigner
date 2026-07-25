@@ -523,6 +523,21 @@ public partial class MainWindow : Window
             return propertyName is "Text" or "Watermark";
         }
 
+        if (control is TextBlock)
+        {
+            return propertyName == "Text";
+        }
+
+        if (control is CheckBox)
+        {
+            return propertyName is "Content" or "IsChecked";
+        }
+
+        if (control is Slider)
+        {
+            return propertyName is "Minimum" or "Maximum" or "Value";
+        }
+
         if (control is StackPanel)
         {
             return propertyName is "Orientation" or "Spacing";

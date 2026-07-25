@@ -297,6 +297,55 @@ public partial class CanvasViewModel : ViewModelBase
             return;
         }
 
+        if (visual is TextBlock textBlock)
+        {
+            if (properties.TryGetValue("Text", out var text))
+            {
+                textBlock.Text = text;
+            }
+
+            return;
+        }
+
+        if (visual is CheckBox checkBox)
+        {
+            if (properties.TryGetValue("Content", out var content))
+            {
+                checkBox.Content = content;
+            }
+
+            if (properties.TryGetValue("IsChecked", out var isChecked)
+                && bool.TryParse(isChecked, out var parsedIsChecked))
+            {
+                checkBox.IsChecked = parsedIsChecked;
+            }
+
+            return;
+        }
+
+        if (visual is Slider slider)
+        {
+            if (properties.TryGetValue("Minimum", out var minimum)
+                && double.TryParse(minimum, NumberStyles.Float, CultureInfo.InvariantCulture, out var parsedMinimum))
+            {
+                slider.Minimum = parsedMinimum;
+            }
+
+            if (properties.TryGetValue("Maximum", out var maximum)
+                && double.TryParse(maximum, NumberStyles.Float, CultureInfo.InvariantCulture, out var parsedMaximum))
+            {
+                slider.Maximum = parsedMaximum;
+            }
+
+            if (properties.TryGetValue("Value", out var value)
+                && double.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out var parsedValue))
+            {
+                slider.Value = parsedValue;
+            }
+
+            return;
+        }
+
         if (visual is StackPanel stackPanel)
         {
             if (properties.TryGetValue("Orientation", out var orientation)

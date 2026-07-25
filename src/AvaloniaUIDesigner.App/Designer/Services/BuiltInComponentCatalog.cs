@@ -23,6 +23,24 @@ public sealed class BuiltInComponentCatalog : IComponentCatalog
             DefaultHeight: 32,
             VisualFactory: static () => new TextBox { Watermark = "Type here" }),
         new(
+            DisplayName: "TextBlock",
+            AvaloniaTypeName: "Avalonia.Controls.TextBlock",
+            DefaultWidth: 160,
+            DefaultHeight: 24,
+            VisualFactory: static () => new TextBlock { Text = "Text" }),
+        new(
+            DisplayName: "CheckBox",
+            AvaloniaTypeName: "Avalonia.Controls.CheckBox",
+            DefaultWidth: 160,
+            DefaultHeight: 32,
+            VisualFactory: static () => new CheckBox { Content = "CheckBox" }),
+        new(
+            DisplayName: "Slider",
+            AvaloniaTypeName: "Avalonia.Controls.Slider",
+            DefaultWidth: 180,
+            DefaultHeight: 32,
+            VisualFactory: static () => new Slider { Minimum = 0, Maximum = 100, Value = 50 }),
+        new(
             DisplayName: "Grid",
             AvaloniaTypeName: "Avalonia.Controls.Grid",
             DefaultWidth: 240,
