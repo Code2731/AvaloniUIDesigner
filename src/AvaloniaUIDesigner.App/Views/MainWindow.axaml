@@ -152,6 +152,13 @@
                                 <Rectangle Name="HandleSW" Tag="SW" Width="10" Height="10" Fill="DodgerBlue" PointerPressed="OnHandlePressed"/>
                                 <Rectangle Name="HandleW" Tag="W" Width="10" Height="10" Fill="DodgerBlue" PointerPressed="OnHandlePressed"/>
                             </Canvas>
+                            <Canvas IsHitTestVisible="False">
+                                <Rectangle Name="MarqueeRectangle"
+                                           Fill="#3078D7FF"
+                                           Stroke="DodgerBlue"
+                                           StrokeThickness="1"
+                                           IsVisible="False"/>
+                            </Canvas>
                         </Panel>
                     </Border>
                 </DockPanel>

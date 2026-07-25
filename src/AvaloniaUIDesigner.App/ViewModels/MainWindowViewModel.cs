@@ -111,6 +111,26 @@ public partial class MainWindowViewModel : ViewModelBase
             : $"Selected {Canvas.SelectedElements.Count} control(s)";
     }
 
+    public void SelectElements(IEnumerable<DesignElement> elements, bool append = false)
+    {
+        var selection = append
+            ? Canvas.SelectedElements.Concat(elements).Distinct().ToList()
+            : elements.Distinct().ToList();
+
+        _isSyncingSelection = true;
+        try
+        {
+            Canvas.SelectMany(selection);
+            ObjectTree.SelectByElement(Canvas.SelectedElement);
+        }
+        finally
+        {
+            _isSyncingSelection = false;
+        }
+
+        StatusText = selection.Count == 0 ? "Ready" : $"Selected {selection.Count} control(s)";
+    }
+
     public void MoveSelectedElement(double deltaX, double deltaY)
     {
         var targets = Canvas.SelectedElements.ToList();

@@ -2,6 +2,7 @@
 using System.Collections.Specialized;
 using System.ComponentModel;
 using System.IO;
+using System.Linq;
 using System.Threading.Tasks;
 using Avalonia;
 using Avalonia.Controls;
@@ -21,12 +22,16 @@ public partial class MainWindow : Window
 
     private const double HandleHalf = 5;
     private const double MinSize = 10;
+    private const double MarqueeThreshold = 3;
 
     private DragMode _dragMode = DragMode.None;
     private Point _dragStart;
     private double _origX, _origY, _origW, _origH;
     private DesignElement? _dragTarget;
     private readonly System.Collections.Generic.Dictionary<DesignElement, Point> _dragOrigins = new();
+    private bool _isMarqueeSelecting;
+    private bool _marqueeAdditive;
+    private Point _marqueeStart;
 
     private CanvasViewModel? _boundCanvas;
     private DesignElement? _boundElement;
@@ -244,6 +249,17 @@ public partial class MainWindow : Window
 
         var ctrl = e.KeyModifiers.HasFlag(KeyModifiers.Control);
         var shift = e.KeyModifiers.HasFlag(KeyModifiers.Shift);
+
+        if (e.Key == Key.Escape)
+        {
+            _isMarqueeSelecting = false;
+            MarqueeRectangle.IsVisible = false;
+            Vm.Toolbox.SelectedItem = null;
+            Vm.SelectElements(Array.Empty<DesignElement>());
+            Vm.StatusText = "Selection tool active.";
+            e.Handled = true;
+            return;
+        }
 
         if (ctrl && e.Key == Key.S)
         {
@@ -601,7 +617,18 @@ public partial class MainWindow : Window
         }
 
         var point = e.GetPosition(host);
-        Vm.PlaceFromToolbox(point.X, point.Y);
+        if (Vm.Toolbox.SelectedItem is not null)
+        {
+            Vm.PlaceFromToolbox(point.X, point.Y);
+            e.Handled = true;
+            return;
+        }
+
+        _isMarqueeSelecting = true;
+        _marqueeAdditive = e.KeyModifiers.HasFlag(KeyModifiers.Control);
+        _marqueeStart = point;
+        UpdateMarquee(point);
+        e.Pointer.Capture(DesignHost);
         e.Handled = true;
     }
 
@@ -687,6 +714,12 @@ public partial class MainWindow : Window
 
     private void OnDragPointerMoved(object? sender, PointerEventArgs e)
     {
+        if (_isMarqueeSelecting)
+        {
+            UpdateMarquee(e.GetPosition(DesignHost));
+            return;
+        }
+
         if (_dragMode == DragMode.None || _dragTarget is null)
         {
             return;
@@ -792,8 +825,19 @@ public partial class MainWindow : Window
 
     private void OnDragPointerReleased(object? sender, PointerReleasedEventArgs e)
     {
+        if (_isMarqueeSelecting)
+        {
+            CompleteMarquee(e.GetPosition(DesignHost));
+            _isMarqueeSelecting = false;
+            MarqueeRectangle.IsVisible = false;
+            e.Pointer.Capture(null);
+            e.Handled = true;
+            return;
+        }
+
         if (_dragMode == DragMode.None)
         {
+            e.Pointer.Capture(null);
             return;
         }
 
@@ -804,6 +848,49 @@ public partial class MainWindow : Window
         e.Handled = true;
 
         Vm?.CommitCanvasMutation();
+    }
+
+    private void UpdateMarquee(Point current)
+    {
+        var area = GetMarqueeArea(current);
+        Canvas.SetLeft(MarqueeRectangle, area.X);
+        Canvas.SetTop(MarqueeRectangle, area.Y);
+        MarqueeRectangle.Width = area.Width;
+        MarqueeRectangle.Height = area.Height;
+        MarqueeRectangle.IsVisible = area.Width >= MarqueeThreshold || area.Height >= MarqueeThreshold;
+    }
+
+    private void CompleteMarquee(Point current)
+    {
+        if (Vm is null)
+        {
+            return;
+        }
+
+        var area = GetMarqueeArea(current);
+        if (area.Width < MarqueeThreshold && area.Height < MarqueeThreshold)
+        {
+            if (!_marqueeAdditive)
+            {
+                Vm.SelectElements(Array.Empty<DesignElement>());
+            }
+
+            return;
+        }
+
+        var selected = Vm.Canvas.Elements
+            .Where(element => area.Intersects(new Rect(element.X, element.Y, element.Width, element.Height)))
+            .ToList();
+        Vm.SelectElements(selected, _marqueeAdditive);
+    }
+
+    private Rect GetMarqueeArea(Point current)
+    {
+        var x = Math.Min(_marqueeStart.X, current.X);
+        var y = Math.Min(_marqueeStart.Y, current.Y);
+        var width = Math.Abs(current.X - _marqueeStart.X);
+        var height = Math.Abs(current.Y - _marqueeStart.Y);
+        return new Rect(x, y, width, height);
     }
 
     private async Task OpenStorageFileAsync(IStorageFile file)
