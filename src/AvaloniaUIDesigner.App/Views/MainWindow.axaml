@@ -73,6 +73,17 @@
                 <MenuItem Header="Actual Size (100%)" Click="OnResetZoomMenuClicked"/>
                 <MenuItem Header="Fit to View" Click="OnFitToViewMenuClicked"/>
                 <Separator/>
+                <MenuItem Header="Artboard Size">
+                    <MenuItem Header="Desktop (1280 x 800)" Click="OnDesktopArtboardMenuClicked"/>
+                    <MenuItem Header="Tablet (1024 x 768)" Click="OnTabletArtboardMenuClicked"/>
+                    <MenuItem Header="Mobile (390 x 844)" Click="OnMobileArtboardMenuClicked"/>
+                </MenuItem>
+                <MenuItem Header="Artboard Background">
+                    <MenuItem Header="White" Click="OnWhiteArtboardBackgroundMenuClicked"/>
+                    <MenuItem Header="Soft Gray" Click="OnGrayArtboardBackgroundMenuClicked"/>
+                    <MenuItem Header="Ink" Click="OnInkArtboardBackgroundMenuClicked"/>
+                </MenuItem>
+                <Separator/>
                 <MenuItem Header="Show Grid"
                           IsCheckable="True"
                           IsChecked="{Binding Canvas.IsGridVisible, Mode=TwoWay}"/>
@@ -122,10 +133,14 @@
                         <TextBlock Text="Design Surface" FontWeight="SemiBold" Foreground="#CCCCCC"/>
                     </Border>
                     <Border Name="DesignViewport" Background="#252526" Margin="24" BorderBrush="#3F3F46" BorderThickness="1" ClipToBounds="True">
-                        <Panel RenderTransformOrigin="0,0">
-                            <Panel.RenderTransform>
+                        <Border Width="{Binding Canvas.ArtboardWidth}"
+                                Height="{Binding Canvas.ArtboardHeight}"
+                                Background="{Binding Canvas.ArtboardBrush}"
+                                RenderTransformOrigin="0,0">
+                            <Border.RenderTransform>
                                 <ScaleTransform ScaleX="{Binding Canvas.ZoomScale}" ScaleY="{Binding Canvas.ZoomScale}"/>
-                            </Panel.RenderTransform>
+                            </Border.RenderTransform>
+                            <Panel>
                             <views:DesignerGridOverlay GridSize="{Binding Canvas.GridSize}"
                                                       IsGridVisible="{Binding Canvas.IsGridVisible}"
                                                       IsHitTestVisible="False"/>
@@ -182,7 +197,8 @@
                                            StrokeThickness="1"
                                            IsVisible="False"/>
                             </Canvas>
-                        </Panel>
+                            </Panel>
+                        </Border>
                     </Border>
                 </DockPanel>
             </Border>

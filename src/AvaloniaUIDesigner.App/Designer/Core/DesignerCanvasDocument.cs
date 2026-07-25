@@ -2,7 +2,14 @@
 
 namespace AvaloniaUIDesigner.App.Designer.Core;
 
-public sealed record DesignerCanvasDocument(IReadOnlyList<DesignerElementSnapshot> Elements);
+public sealed record DesignerCanvasDocument(
+    IReadOnlyList<DesignerElementSnapshot> Elements,
+    DesignerCanvasSettings? Settings = null);
+
+public sealed record DesignerCanvasSettings(
+    double Width = 1280,
+    double Height = 800,
+    string Background = "#FFFFFF");
 
 public sealed record DesignerElementSnapshot(
     string DisplayName,

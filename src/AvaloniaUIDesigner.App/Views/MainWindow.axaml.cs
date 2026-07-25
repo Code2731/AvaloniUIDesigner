@@ -228,6 +228,24 @@ public partial class MainWindow : Window
     private void OnGridSize16MenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
         => SetGridSize(16);
 
+    private void OnDesktopArtboardMenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+        => SetArtboard(1280, 800);
+
+    private void OnTabletArtboardMenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+        => SetArtboard(1024, 768);
+
+    private void OnMobileArtboardMenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+        => SetArtboard(390, 844);
+
+    private void OnWhiteArtboardBackgroundMenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+        => SetArtboardBackground("#FFFFFF");
+
+    private void OnGrayArtboardBackgroundMenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+        => SetArtboardBackground("#F1F5F9");
+
+    private void OnInkArtboardBackgroundMenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+        => SetArtboardBackground("#1E293B");
+
     private void SetGridSize(double size)
     {
         if (Vm is null)
@@ -237,6 +255,32 @@ public partial class MainWindow : Window
 
         Vm.Canvas.SetGridSize(size);
         Vm.StatusText = $"Grid size: {Vm.Canvas.GridSize:0}px";
+    }
+
+    private void SetArtboard(double width, double height)
+    {
+        if (Vm is null)
+        {
+            return;
+        }
+
+        Vm.BeginCanvasMutation(MainWindowViewModel.HistoryActionType.TransformElement, "Updated artboard size.");
+        Vm.Canvas.SetArtboard(width, height);
+        Vm.CommitCanvasMutation();
+        Vm.StatusText = $"Artboard: {Vm.Canvas.ArtboardWidth:0} x {Vm.Canvas.ArtboardHeight:0}";
+    }
+
+    private void SetArtboardBackground(string background)
+    {
+        if (Vm is null)
+        {
+            return;
+        }
+
+        Vm.BeginCanvasMutation(MainWindowViewModel.HistoryActionType.TransformElement, "Updated artboard background.");
+        Vm.Canvas.SetArtboard(Vm.Canvas.ArtboardWidth, Vm.Canvas.ArtboardHeight, background);
+        Vm.CommitCanvasMutation();
+        Vm.StatusText = "Updated artboard background.";
     }
 
     private void UpdateZoomStatus()

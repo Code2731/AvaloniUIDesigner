@@ -445,11 +445,12 @@ public partial class MainWindowViewModel : ViewModelBase
 
     public string ExportFullAxaml()
     {
+        var settings = CaptureCanvasSettings();
         var sb = new StringBuilder();
         sb.AppendLine("<Window xmlns=\"https://github.com/avaloniaui\"");
         sb.AppendLine("        xmlns:x=\"http://schemas.microsoft.com/winfx/2006/xaml\"");
-        sb.AppendLine("        Width=\"1280\" Height=\"800\">");
-        sb.AppendLine("  <Canvas>");
+        sb.AppendLine($"        Width=\"{settings.Width:0.###}\" Height=\"{settings.Height:0.###}\">");
+        sb.AppendLine($"  <Canvas Width=\"{settings.Width:0.###}\" Height=\"{settings.Height:0.###}\" Background=\"{EscapeXmlAttribute(settings.Background)}\">");
 
         foreach (var element in Canvas.Elements)
         {
@@ -634,6 +635,8 @@ public partial class MainWindowViewModel : ViewModelBase
         _isSyncingSelection = true;
         try
         {
+            var settings = document.Settings ?? new DesignerCanvasSettings();
+            Canvas.SetArtboard(settings.Width, settings.Height, settings.Background);
             Canvas.Clear();
             foreach (var snapshot in document.Elements)
             {
@@ -662,8 +665,11 @@ public partial class MainWindowViewModel : ViewModelBase
                 CaptureVisualProperties(e.Visual)))
             .ToList();
 
-        return new DesignerCanvasDocument(snapshots);
+        return new DesignerCanvasDocument(snapshots, CaptureCanvasSettings());
     }
+
+    private DesignerCanvasSettings CaptureCanvasSettings()
+        => new(Canvas.ArtboardWidth, Canvas.ArtboardHeight, Canvas.ArtboardBackground);
 
     private static DesignerElementSnapshot CreateSnapshot(
         DesignElement element,
@@ -750,6 +756,11 @@ public partial class MainWindowViewModel : ViewModelBase
 
     private static bool AreSameDocument(DesignerCanvasDocument left, DesignerCanvasDocument right)
     {
+        if (left.Settings != right.Settings)
+        {
+            return false;
+        }
+
         if (left.Elements.Count != right.Elements.Count)
         {
             return false;
@@ -813,7 +824,21 @@ public partial class MainWindowViewModel : ViewModelBase
             snapshots.Add(new DesignerElementSnapshot(displayName, typeName, x, y, width, height, props));
         }
 
-        return new DesignerCanvasDocument(snapshots);
+        return new DesignerCanvasDocument(snapshots, ReadCanvasSettings(parseRoot, warnings));
+    }
+
+    private static DesignerCanvasSettings ReadCanvasSettings(XElement canvas, ICollection<string> warnings)
+    {
+        var width = ReadDouble(canvas, "Width", 1280);
+        var height = ReadDouble(canvas, "Height", 800);
+        var background = canvas.Attribute("Background")?.Value ?? "#FFFFFF";
+        if (!background.StartsWith("#", StringComparison.Ordinal))
+        {
+            warnings.Add("Unsupported canvas background was replaced with white.");
+            background = "#FFFFFF";
+        }
+
+        return new DesignerCanvasSettings(width, height, background);
     }
 
     private bool TryResolveTypeName(string tagName, out string typeName)

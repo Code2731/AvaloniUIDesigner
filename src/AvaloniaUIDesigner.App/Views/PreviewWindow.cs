@@ -22,11 +22,15 @@ public sealed class PreviewWindow : Window
         MinHeight = 320;
         WindowStartupLocation = WindowStartupLocation.CenterOwner;
 
+        var settings = document.Settings ?? new DesignerCanvasSettings();
+        Width = Math.Clamp(settings.Width + 32, MinWidth, 1280);
+        Height = Math.Clamp(settings.Height + 72, MinHeight, 960);
+
         var canvas = new Canvas
         {
-            Background = Brushes.White,
-            Width = Math.Max(640, document.Elements.Count == 0 ? 0 : document.Elements.Max(element => element.X + element.Width + 32)),
-            Height = Math.Max(480, document.Elements.Count == 0 ? 0 : document.Elements.Max(element => element.Y + element.Height + 32)),
+            Background = Brush.Parse(settings.Background),
+            Width = Math.Max(settings.Width, document.Elements.Count == 0 ? 0 : document.Elements.Max(element => element.X + element.Width + 32)),
+            Height = Math.Max(settings.Height, document.Elements.Count == 0 ? 0 : document.Elements.Max(element => element.Y + element.Height + 32)),
         };
 
         foreach (var element in document.Elements)
@@ -41,7 +45,7 @@ public sealed class PreviewWindow : Window
 
         Content = new Border
         {
-            Background = Brushes.White,
+            Background = Brush.Parse(settings.Background),
             Padding = new Thickness(16),
             Child = new ScrollViewer
             {

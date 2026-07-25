@@ -12,7 +12,14 @@ public sealed class AxamlDocumentSerializer : IDesignerSerializer
     public string Serialize(DesignerCanvasDocument document)
     {
         var sb = new StringBuilder();
-        sb.AppendLine("<Canvas xmlns=\"https://github.com/avaloniaui\">");
+        var settings = document.Settings ?? new DesignerCanvasSettings();
+        sb.Append("<Canvas xmlns=\"https://github.com/avaloniaui\" Width=\"");
+        sb.Append(ToInvariantString(settings.Width));
+        sb.Append("\" Height=\"");
+        sb.Append(ToInvariantString(settings.Height));
+        sb.Append("\" Background=\"");
+        sb.Append(EscapeXmlAttribute(settings.Background));
+        sb.AppendLine("\">");
 
         foreach (var element in document.Elements)
         {

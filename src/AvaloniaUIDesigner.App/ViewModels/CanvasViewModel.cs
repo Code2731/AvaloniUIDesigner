@@ -7,6 +7,7 @@ using System.Linq;
 using System.Text.Json;
 using Avalonia.Controls;
 using Avalonia.Layout;
+using Avalonia.Media;
 using AvaloniaUIDesigner.App.Designer.Contracts;
 using AvaloniaUIDesigner.App.Designer.Core;
 using AvaloniaUIDesigner.App.Designer.Services;
@@ -52,6 +53,16 @@ public partial class CanvasViewModel : ViewModelBase
     private bool _isGridVisible = true;
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ArtboardBrush))]
+    private string _artboardBackground = "#FFFFFF";
+
+    [ObservableProperty]
+    private double _artboardWidth = 1280;
+
+    [ObservableProperty]
+    private double _artboardHeight = 800;
+
+    [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(ZoomPercentage))]
     private double _zoomScale = 1;
 
@@ -64,6 +75,8 @@ public partial class CanvasViewModel : ViewModelBase
 
     public string ZoomPercentage => $"{ZoomScale * 100:0}%";
 
+    public IBrush ArtboardBrush => Brush.Parse(ArtboardBackground);
+
     public double SnapPosition(double value)
         => SnapToGrid && GridSize > 0 ? Math.Round(value / GridSize) * GridSize : value;
 
@@ -71,6 +84,16 @@ public partial class CanvasViewModel : ViewModelBase
         => Math.Max(minimum, SnapPosition(value));
 
     public void SetGridSize(double gridSize) => GridSize = Math.Clamp(gridSize, 4, 32);
+
+    public void SetArtboard(double width, double height, string? background = null)
+    {
+        ArtboardWidth = Math.Clamp(width, 320, 3840);
+        ArtboardHeight = Math.Clamp(height, 240, 2160);
+        if (!string.IsNullOrWhiteSpace(background))
+        {
+            ArtboardBackground = background;
+        }
+    }
 
     public void ZoomIn() => SetZoom(ZoomScale + 0.1);
 
