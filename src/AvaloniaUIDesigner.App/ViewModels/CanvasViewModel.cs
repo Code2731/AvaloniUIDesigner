@@ -492,6 +492,18 @@ public partial class CanvasViewModel : ViewModelBase
                 textBox.RevealPassword = parsedRevealPassword;
             }
 
+            if (properties.TryGetValue("AcceptsReturn", out var acceptsReturn)
+                && bool.TryParse(acceptsReturn, out var parsedAcceptsReturn))
+            {
+                textBox.AcceptsReturn = parsedAcceptsReturn;
+            }
+
+            if (properties.TryGetValue("TextWrapping", out var textWrapping)
+                && Enum.TryParse<TextWrapping>(textWrapping, ignoreCase: true, out var parsedTextWrapping))
+            {
+                textBox.TextWrapping = parsedTextWrapping;
+            }
+
             if (textBox.PasswordChar == '\0' && properties.TryGetValue("Text", out var text))
             {
                 textBox.Text = text;
@@ -1163,6 +1175,10 @@ public partial class CanvasViewModel : ViewModelBase
                     Watermark = child.Watermark,
                     PasswordChar = string.IsNullOrEmpty(child.PasswordChar) ? '\0' : child.PasswordChar[0],
                     RevealPassword = child.RevealPassword ?? false,
+                    AcceptsReturn = child.AcceptsReturn ?? false,
+                    TextWrapping = Enum.TryParse<TextWrapping>(child.TextWrapping, ignoreCase: true, out var textWrapping)
+                        ? textWrapping
+                        : TextWrapping.NoWrap,
                 },
                 _ => null,
             };
@@ -1193,5 +1209,7 @@ public partial class CanvasViewModel : ViewModelBase
         string? Content = null,
         string? Watermark = null,
         string? PasswordChar = null,
-        bool? RevealPassword = null);
+        bool? RevealPassword = null,
+        bool? AcceptsReturn = null,
+        string? TextWrapping = null);
 }

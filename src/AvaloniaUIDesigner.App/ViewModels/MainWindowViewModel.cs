@@ -280,6 +280,32 @@ public partial class MainWindowViewModel : ViewModelBase
         StatusText = $"Set text weight to {weightName} for {targets.Count} control(s)";
     }
 
+    public void ToggleSelectedTextBoxMultiline()
+    {
+        var targets = Canvas.SelectedElements
+            .Where(element => !element.IsLocked && element.Visual is TextBox)
+            .ToList();
+        if (targets.Count == 0)
+        {
+            StatusText = "Select an unlocked TextBox to change its input mode.";
+            return;
+        }
+
+        var enableMultiline = targets.All(element => !((TextBox)element.Visual).AcceptsReturn);
+        BeginCanvasMutation(HistoryActionType.EditProperty, "Updated TextBox input mode.");
+        foreach (var target in targets)
+        {
+            var textBox = (TextBox)target.Visual;
+            textBox.AcceptsReturn = enableMultiline;
+            textBox.TextWrapping = enableMultiline ? TextWrapping.Wrap : TextWrapping.NoWrap;
+        }
+
+        CommitCanvasMutation();
+        StatusText = enableMultiline
+            ? $"Enabled multiline input for {targets.Count} TextBox control(s)."
+            : $"Enabled single-line input for {targets.Count} TextBox control(s).";
+    }
+
     public bool TryGetSelectedItems(out string controlName, out IReadOnlyList<string> items)
     {
         var target = Canvas.SelectedElement;
@@ -1532,6 +1558,8 @@ public partial class MainWindowViewModel : ViewModelBase
                 ["Watermark"] = textBox.Watermark?.ToString() ?? string.Empty,
                 ["PasswordChar"] = textBox.PasswordChar == '\0' ? string.Empty : textBox.PasswordChar.ToString(),
                 ["RevealPassword"] = textBox.RevealPassword.ToString(),
+                ["AcceptsReturn"] = textBox.AcceptsReturn.ToString(),
+                ["TextWrapping"] = textBox.TextWrapping.ToString(),
                 ["Opacity"] = textBox.Opacity.ToString("0.###", CultureInfo.InvariantCulture),
             };
         }
@@ -2154,7 +2182,7 @@ public partial class MainWindowViewModel : ViewModelBase
         return tagName switch
         {
             "Button" => propertyName == "Content",
-            "TextBox" => propertyName is "Text" or "Watermark" or "PasswordChar" or "RevealPassword",
+            "TextBox" => propertyName is "Text" or "Watermark" or "PasswordChar" or "RevealPassword" or "AcceptsReturn" or "TextWrapping",
             "TextBlock" => propertyName is "Text" or "FontSize" or "FontWeight" or "Foreground",
             "Label" => propertyName is "Content" or "Target",
             "Image" => propertyName is "Source" or "Stretch",
@@ -2483,7 +2511,9 @@ public partial class MainWindowViewModel : ViewModelBase
                     Text: textBox.PasswordChar == '\0' ? textBox.Text ?? string.Empty : string.Empty,
                     Watermark: textBox.Watermark?.ToString(),
                     PasswordChar: textBox.PasswordChar == '\0' ? null : textBox.PasswordChar.ToString(),
-                    RevealPassword: textBox.RevealPassword),
+                    RevealPassword: textBox.RevealPassword,
+                    AcceptsReturn: textBox.AcceptsReturn,
+                    TextWrapping: textBox.TextWrapping.ToString()),
                 _ => null,
             })
             .Where(snapshot => snapshot is not null)
@@ -2531,7 +2561,11 @@ public partial class MainWindowViewModel : ViewModelBase
                         PasswordChar: passwordChar,
                         RevealPassword: bool.TryParse(child.Attribute("RevealPassword")?.Value, out var revealPassword)
                             ? revealPassword
-                            : null));
+                            : null,
+                        AcceptsReturn: bool.TryParse(child.Attribute("AcceptsReturn")?.Value, out var acceptsReturn)
+                            ? acceptsReturn
+                            : null,
+                        TextWrapping: child.Attribute("TextWrapping")?.Value));
                     break;
             }
         }
@@ -2608,6 +2642,9 @@ public partial class MainWindowViewModel : ViewModelBase
                 {
                     AppendAttribute(sb, "RevealPassword", bool.TrueString);
                 }
+
+                AppendAttribute(sb, "AcceptsReturn", textBox.AcceptsReturn.ToString());
+                AppendAttribute(sb, "TextWrapping", textBox.TextWrapping.ToString());
 
                 sb.AppendLine(" />");
                 break;
@@ -2959,6 +2996,9 @@ public partial class MainWindowViewModel : ViewModelBase
                     AppendAttribute(sb, "RevealPassword", bool.TrueString);
                 }
 
+                AppendAttribute(sb, "AcceptsReturn", textBox.AcceptsReturn.ToString());
+                AppendAttribute(sb, "TextWrapping", textBox.TextWrapping.ToString());
+
                 sb.AppendLine(" />");
                 break;
 
@@ -3083,5 +3123,7 @@ public partial class MainWindowViewModel : ViewModelBase
         string? Content = null,
         string? Watermark = null,
         string? PasswordChar = null,
-        bool? RevealPassword = null);
+        bool? RevealPassword = null,
+        bool? AcceptsReturn = null,
+        string? TextWrapping = null);
 }

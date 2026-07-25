@@ -360,6 +360,12 @@ public partial class MainWindow : Window
         Vm?.ToggleSelectedVisibility();
     }
 
+    private void OnToggleTextBoxMultilineMenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        FlushPendingPropertyHistory();
+        Vm?.ToggleSelectedTextBoxMultiline();
+    }
+
     private async void OnEditLabelTargetMenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
         FlushPendingPropertyHistory();
@@ -928,7 +934,7 @@ public partial class MainWindow : Window
 
         if (control is TextBox)
         {
-            return propertyName is "Text" or "Watermark" or "PasswordChar" or "RevealPassword";
+            return propertyName is "Text" or "Watermark" or "PasswordChar" or "RevealPassword" or "AcceptsReturn" or "TextWrapping";
         }
 
         if (control is TextBlock)
