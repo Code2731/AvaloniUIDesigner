@@ -215,6 +215,49 @@ public partial class MainWindowViewModel : ViewModelBase
         StatusText = $"{DescribeLayoutAction(action)} {targets.Count} control(s)";
     }
 
+    public void MoveSelectedElementsInLayerOrder(LayerOrderAction action)
+    {
+        var targets = Canvas.SelectedElements.ToList();
+        if (targets.Count == 0)
+        {
+            StatusText = "No selected controls to reorder.";
+            return;
+        }
+
+        BeginCanvasMutation(HistoryActionType.TransformElement, "Changed control layer order.");
+        var changed = action switch
+        {
+            LayerOrderAction.BringToFront => Canvas.MoveElementsToFront(targets),
+            LayerOrderAction.SendToBack => Canvas.MoveElementsToBack(targets),
+            _ => false,
+        };
+
+        if (!changed)
+        {
+            _pendingMutation = null;
+            StatusText = action == LayerOrderAction.BringToFront
+                ? "Selected controls are already at the front."
+                : "Selected controls are already at the back.";
+            return;
+        }
+
+        _isSyncingSelection = true;
+        try
+        {
+            ObjectTree.RebuildFrom(Canvas.Elements);
+            ObjectTree.SelectByElement(Canvas.SelectedElement);
+        }
+        finally
+        {
+            _isSyncingSelection = false;
+        }
+
+        CommitCanvasMutation();
+        StatusText = action == LayerOrderAction.BringToFront
+            ? $"Brought {targets.Count} control(s) to front."
+            : $"Sent {targets.Count} control(s) to back.";
+    }
+
     public void RemoveSelectedElement()
     {
         var targets = Canvas.SelectedElements.ToList();
@@ -1237,6 +1280,12 @@ public partial class MainWindowViewModel : ViewModelBase
         MakeSameWidth,
         MakeSameHeight,
         MakeSameSize,
+    }
+
+    public enum LayerOrderAction
+    {
+        BringToFront,
+        SendToBack,
     }
 
     private sealed record PendingMutation(DesignerCanvasDocument Before, HistoryActionType ActionType, string Message);

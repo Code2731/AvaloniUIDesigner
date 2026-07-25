@@ -165,6 +165,18 @@ public partial class MainWindow : Window
         Vm?.DuplicateSelectedElement();
     }
 
+    private void OnBringToFrontMenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+        => MoveSelectedElementsInLayerOrder(MainWindowViewModel.LayerOrderAction.BringToFront);
+
+    private void OnSendToBackMenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+        => MoveSelectedElementsInLayerOrder(MainWindowViewModel.LayerOrderAction.SendToBack);
+
+    private void MoveSelectedElementsInLayerOrder(MainWindowViewModel.LayerOrderAction action)
+    {
+        FlushPendingPropertyHistory();
+        Vm?.MoveSelectedElementsInLayerOrder(action);
+    }
+
     private void OnPreviewMenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
         if (Vm is null)

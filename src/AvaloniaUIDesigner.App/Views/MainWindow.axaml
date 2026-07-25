@@ -42,6 +42,11 @@
                 <MenuItem Header="Duplicate" Click="OnDuplicateMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
                 <MenuItem Header="Delete" Click="OnDeleteMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
                 <Separator/>
+                <MenuItem Header="Order" IsEnabled="{Binding Canvas.IsSelectionActive}">
+                    <MenuItem Header="Bring to Front" Click="OnBringToFrontMenuClicked"/>
+                    <MenuItem Header="Send to Back" Click="OnSendToBackMenuClicked"/>
+                </MenuItem>
+                <Separator/>
                 <MenuItem Header="Arrange" IsEnabled="{Binding Canvas.HasMultipleSelection}">
                     <MenuItem Header="Align Left" Click="OnAlignLeftMenuClicked"/>
                     <MenuItem Header="Align Center" Click="OnAlignCenterMenuClicked"/>

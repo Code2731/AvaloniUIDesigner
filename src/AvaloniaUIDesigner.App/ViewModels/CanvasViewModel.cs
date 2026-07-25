@@ -150,6 +150,48 @@ public partial class CanvasViewModel : ViewModelBase
         return true;
     }
 
+    public bool MoveElementsToFront(IEnumerable<DesignElement> elements)
+    {
+        var moving = Elements.Where(elements.Contains).ToList();
+        if (moving.Count == 0 || Elements.Skip(Elements.Count - moving.Count).SequenceEqual(moving))
+        {
+            return false;
+        }
+
+        foreach (var element in moving)
+        {
+            Elements.Remove(element);
+        }
+
+        foreach (var element in moving)
+        {
+            Elements.Add(element);
+        }
+
+        return true;
+    }
+
+    public bool MoveElementsToBack(IEnumerable<DesignElement> elements)
+    {
+        var moving = Elements.Where(elements.Contains).ToList();
+        if (moving.Count == 0 || Elements.Take(moving.Count).SequenceEqual(moving))
+        {
+            return false;
+        }
+
+        foreach (var element in moving)
+        {
+            Elements.Remove(element);
+        }
+
+        for (var index = moving.Count - 1; index >= 0; index--)
+        {
+            Elements.Insert(0, moving[index]);
+        }
+
+        return true;
+    }
+
     private void ReplaceSelection(IEnumerable<DesignElement> elements)
     {
         var next = elements
