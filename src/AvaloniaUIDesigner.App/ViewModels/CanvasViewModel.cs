@@ -355,6 +355,12 @@ public partial class CanvasViewModel : ViewModelBase
             return;
         }
 
+        if (properties.TryGetValue("Opacity", out var opacity)
+            && double.TryParse(opacity, NumberStyles.Float, CultureInfo.InvariantCulture, out var parsedOpacity))
+        {
+            visual.Opacity = Math.Clamp(parsedOpacity, 0, 1);
+        }
+
         if (visual is Button button)
         {
             if (properties.TryGetValue("Content", out var content))

@@ -152,6 +152,26 @@ public partial class MainWindowViewModel : ViewModelBase
         StatusText = selection.Count == 0 ? "Ready" : $"Selected {selection.Count} control(s)";
     }
 
+    public void SetSelectedOpacity(double opacity)
+    {
+        var targets = Canvas.SelectedElements.ToList();
+        if (targets.Count == 0)
+        {
+            StatusText = "No selected controls to style.";
+            return;
+        }
+
+        var normalizedOpacity = Math.Clamp(opacity, 0, 1);
+        BeginCanvasMutation(HistoryActionType.EditProperty, "Updated control opacity.");
+        foreach (var element in targets)
+        {
+            element.Visual.Opacity = normalizedOpacity;
+        }
+
+        CommitCanvasMutation();
+        StatusText = $"Set opacity to {normalizedOpacity * 100:0}% for {targets.Count} control(s)";
+    }
+
     public void MoveSelectedElement(double deltaX, double deltaY)
     {
         var targets = Canvas.SelectedElements.ToList();
@@ -763,6 +783,7 @@ public partial class MainWindowViewModel : ViewModelBase
             return new Dictionary<string, string>
             {
                 ["Content"] = button.Content?.ToString() ?? string.Empty,
+                ["Opacity"] = button.Opacity.ToString("0.###", CultureInfo.InvariantCulture),
             };
         }
 
@@ -772,6 +793,7 @@ public partial class MainWindowViewModel : ViewModelBase
             {
                 ["Text"] = textBox.Text ?? string.Empty,
                 ["Watermark"] = textBox.Watermark?.ToString() ?? string.Empty,
+                ["Opacity"] = textBox.Opacity.ToString("0.###", CultureInfo.InvariantCulture),
             };
         }
 
@@ -780,6 +802,7 @@ public partial class MainWindowViewModel : ViewModelBase
             return new Dictionary<string, string>
             {
                 ["Text"] = textBlock.Text ?? string.Empty,
+                ["Opacity"] = textBlock.Opacity.ToString("0.###", CultureInfo.InvariantCulture),
             };
         }
 
@@ -789,6 +812,7 @@ public partial class MainWindowViewModel : ViewModelBase
             {
                 ["Content"] = checkBox.Content?.ToString() ?? string.Empty,
                 ["IsChecked"] = (checkBox.IsChecked ?? false).ToString(),
+                ["Opacity"] = checkBox.Opacity.ToString("0.###", CultureInfo.InvariantCulture),
             };
         }
 
@@ -799,6 +823,7 @@ public partial class MainWindowViewModel : ViewModelBase
                 ["Minimum"] = slider.Minimum.ToString("0.###", CultureInfo.InvariantCulture),
                 ["Maximum"] = slider.Maximum.ToString("0.###", CultureInfo.InvariantCulture),
                 ["Value"] = slider.Value.ToString("0.###", CultureInfo.InvariantCulture),
+                ["Opacity"] = slider.Opacity.ToString("0.###", CultureInfo.InvariantCulture),
             };
         }
 
@@ -809,6 +834,7 @@ public partial class MainWindowViewModel : ViewModelBase
                 ["Orientation"] = stackPanel.Orientation.ToString(),
                 ["Spacing"] = stackPanel.Spacing.ToString("0.###", CultureInfo.InvariantCulture),
                 ["__children"] = SerializeStackPanelChildren(stackPanel),
+                ["Opacity"] = stackPanel.Opacity.ToString("0.###", CultureInfo.InvariantCulture),
             };
         }
 
@@ -817,6 +843,7 @@ public partial class MainWindowViewModel : ViewModelBase
             return new Dictionary<string, string>
             {
                 ["ShowGridLines"] = grid.ShowGridLines.ToString(),
+                ["Opacity"] = grid.Opacity.ToString("0.###", CultureInfo.InvariantCulture),
             };
         }
 
@@ -978,6 +1005,11 @@ public partial class MainWindowViewModel : ViewModelBase
 
     private static bool IsSupportedVisualProperty(string tagName, string propertyName)
     {
+        if (propertyName == "Opacity")
+        {
+            return true;
+        }
+
         return tagName switch
         {
             "Button" => propertyName == "Content",

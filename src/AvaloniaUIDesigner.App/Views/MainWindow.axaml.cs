@@ -162,6 +162,21 @@ public partial class MainWindow : Window
         Vm?.Redo();
     }
 
+    private void OnOpacity100MenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+        => SetSelectionOpacity(1);
+
+    private void OnOpacity75MenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+        => SetSelectionOpacity(0.75);
+
+    private void OnOpacity50MenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+        => SetSelectionOpacity(0.5);
+
+    private void SetSelectionOpacity(double opacity)
+    {
+        FlushPendingPropertyHistory();
+        Vm?.SetSelectedOpacity(opacity);
+    }
+
     private void OnDeleteMenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
         FlushPendingPropertyHistory();
@@ -643,6 +658,11 @@ public partial class MainWindow : Window
 
     private static bool IsUndoTrackedVisualProperty(Control control, string propertyName)
     {
+        if (propertyName == "Opacity")
+        {
+            return true;
+        }
+
         if (control is Button)
         {
             return propertyName == "Content";

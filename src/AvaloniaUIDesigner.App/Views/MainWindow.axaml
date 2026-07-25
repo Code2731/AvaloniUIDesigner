@@ -48,6 +48,11 @@
                 <MenuItem Header="Duplicate" Click="OnDuplicateMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
                 <MenuItem Header="Delete" Click="OnDeleteMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
                 <Separator/>
+                <MenuItem Header="Style" IsEnabled="{Binding Canvas.IsSelectionActive}">
+                    <MenuItem Header="Opacity 100%" Click="OnOpacity100MenuClicked"/>
+                    <MenuItem Header="Opacity 75%" Click="OnOpacity75MenuClicked"/>
+                    <MenuItem Header="Opacity 50%" Click="OnOpacity50MenuClicked"/>
+                </MenuItem>
                 <MenuItem Header="Order" IsEnabled="{Binding Canvas.IsSelectionActive}">
                     <MenuItem Header="Bring to Front" Click="OnBringToFrontMenuClicked"/>
                     <MenuItem Header="Send to Back" Click="OnSendToBackMenuClicked"/>
