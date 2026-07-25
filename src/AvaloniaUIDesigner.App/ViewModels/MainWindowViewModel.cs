@@ -93,6 +93,11 @@ public partial class MainWindowViewModel : ViewModelBase
             return;
         }
 
+        PlaceToolboxItem(item, x, y);
+    }
+
+    public void PlaceToolboxItem(ToolboxItem item, double x, double y)
+    {
         var snappedX = Canvas.SnapPosition(x);
         var snappedY = Canvas.SnapPosition(y);
 

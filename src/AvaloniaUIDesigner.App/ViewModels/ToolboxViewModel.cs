@@ -55,6 +55,12 @@ public partial class ToolboxViewModel : ViewModelBase
 
     public ObservableCollection<ToolboxItem> Items { get; }
 
+    public ToolboxItem? FindItem(string avaloniaTypeName) =>
+        _allItems.FirstOrDefault(item => string.Equals(
+            item.AvaloniaTypeName,
+            avaloniaTypeName,
+            System.StringComparison.Ordinal));
+
     public string SearchResultText => string.IsNullOrWhiteSpace(SearchText)
         ? $"{Items.Count} controls"
         : $"{Items.Count} of {_allItems.Count} controls";

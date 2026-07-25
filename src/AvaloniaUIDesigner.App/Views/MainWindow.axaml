@@ -175,7 +175,11 @@
                              BorderThickness="0">
                         <ListBox.ItemTemplate>
                             <DataTemplate>
-                                <TextBlock Text="{Binding DisplayName}" Padding="4,2"/>
+                                <TextBlock Text="{Binding DisplayName}"
+                                           Padding="4,2"
+                                           PointerPressed="OnToolboxItemPointerPressed"
+                                           PointerMoved="OnToolboxItemPointerMoved"
+                                           PointerReleased="OnToolboxItemPointerReleased"/>
                             </DataTemplate>
                         </ListBox.ItemTemplate>
                     </ListBox>
@@ -197,10 +201,22 @@
                             <Border.RenderTransform>
                                 <ScaleTransform ScaleX="{Binding Canvas.ZoomScale}" ScaleY="{Binding Canvas.ZoomScale}"/>
                             </Border.RenderTransform>
-                            <Panel>
+                            <Panel Name="DesignSurface"
+                                   DragDrop.AllowDrop="True"
+                                   DragDrop.DragEnter="OnDesignSurfaceDragEnter"
+                                   DragDrop.DragLeave="OnDesignSurfaceDragLeave"
+                                   DragDrop.DragOver="OnDesignSurfaceDragOver"
+                                   DragDrop.Drop="OnDesignSurfaceDrop">
                             <views:DesignerGridOverlay GridSize="{Binding Canvas.GridSize}"
                                                       IsGridVisible="{Binding Canvas.IsGridVisible}"
                                                       IsHitTestVisible="False"/>
+                            <Border Name="ToolboxDropHint"
+                                    Background="#243078D7"
+                                    BorderBrush="DodgerBlue"
+                                    BorderThickness="2"
+                                    Panel.ZIndex="50"
+                                    IsHitTestVisible="False"
+                                    IsVisible="False"/>
                             <TextBlock Text="{Binding Canvas.PlaceholderText}"
                                        HorizontalAlignment="Center"
                                        VerticalAlignment="Center"

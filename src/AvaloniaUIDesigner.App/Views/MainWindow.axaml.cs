@@ -14,6 +14,7 @@ using Avalonia.Layout;
 using Avalonia.Platform.Storage;
 using Avalonia.Threading;
 using AvaloniaUIDesigner.App.Designer.Services;
+using AvaloniaUIDesigner.App.Models;
 using AvaloniaUIDesigner.App.ViewModels;
 
 namespace AvaloniaUIDesigner.App.Views;
@@ -27,6 +28,7 @@ public partial class MainWindow : Window
     private const double MinSize = 10;
     private const double MarqueeThreshold = 3;
     private const double SmartSnapThreshold = 6;
+    private const string ToolboxDragDataFormat = "AvaloniaUIDesigner.ToolboxItem";
 
     private DragMode _dragMode = DragMode.None;
     private Point _dragStart;
@@ -36,6 +38,8 @@ public partial class MainWindow : Window
     private bool _isMarqueeSelecting;
     private bool _marqueeAdditive;
     private Point _marqueeStart;
+    private ToolboxItem? _pendingToolboxDragItem;
+    private Point _toolboxDragStart;
 
     private CanvasViewModel? _boundCanvas;
     private DesignElement? _boundElement;
@@ -1220,6 +1224,86 @@ public partial class MainWindow : Window
     {
         Canvas.SetLeft(rectangle, cx - HandleHalf);
         Canvas.SetTop(rectangle, cy - HandleHalf);
+    }
+
+    private void OnToolboxItemPointerPressed(object? sender, PointerPressedEventArgs e)
+    {
+        if (sender is not Control { DataContext: ToolboxItem item } control
+            || !e.GetCurrentPoint(this).Properties.IsLeftButtonPressed)
+        {
+            return;
+        }
+
+        _pendingToolboxDragItem = item;
+        _toolboxDragStart = e.GetPosition(this);
+        e.Pointer.Capture(control);
+    }
+
+    private async void OnToolboxItemPointerMoved(object? sender, PointerEventArgs e)
+    {
+        if (_pendingToolboxDragItem is not { } item)
+        {
+            return;
+        }
+
+        var point = e.GetPosition(this);
+        if (Math.Abs(point.X - _toolboxDragStart.X) < MarqueeThreshold
+            && Math.Abs(point.Y - _toolboxDragStart.Y) < MarqueeThreshold)
+        {
+            return;
+        }
+
+        _pendingToolboxDragItem = null;
+        e.Pointer.Capture(null);
+        var data = new DataObject();
+        data.Set(ToolboxDragDataFormat, item.AvaloniaTypeName);
+        await DragDrop.DoDragDrop(e, data, DragDropEffects.Copy);
+        e.Handled = true;
+    }
+
+    private void OnToolboxItemPointerReleased(object? sender, PointerReleasedEventArgs e)
+    {
+        _pendingToolboxDragItem = null;
+        e.Pointer.Capture(null);
+    }
+
+    private void OnDesignSurfaceDragEnter(object? sender, DragEventArgs e)
+    {
+        if (e.Data.Contains(ToolboxDragDataFormat))
+        {
+            ToolboxDropHint.IsVisible = true;
+            Vm?.StatusText = "Drop the Toolbox item onto the artboard.";
+        }
+    }
+
+    private void OnDesignSurfaceDragLeave(object? sender, DragEventArgs e)
+    {
+        ToolboxDropHint.IsVisible = false;
+    }
+
+    private void OnDesignSurfaceDragOver(object? sender, DragEventArgs e)
+    {
+        e.DragEffects = e.Data.Contains(ToolboxDragDataFormat)
+            ? DragDropEffects.Copy
+            : DragDropEffects.None;
+        e.Handled = true;
+    }
+
+    private void OnDesignSurfaceDrop(object? sender, DragEventArgs e)
+    {
+        ToolboxDropHint.IsVisible = false;
+        if (Vm is null || sender is not Control host
+            || e.Data.Get(ToolboxDragDataFormat) is not string avaloniaTypeName
+            || Vm.Toolbox.FindItem(avaloniaTypeName) is not { } item)
+        {
+            e.DragEffects = DragDropEffects.None;
+            return;
+        }
+
+        var point = e.GetPosition(host);
+        Vm.PlaceToolboxItem(item, point.X, point.Y);
+        e.DragEffects = DragDropEffects.Copy;
+        e.Handled = true;
     }
 
     private void OnDesignHostPointerPressed(object? sender, PointerPressedEventArgs e)
