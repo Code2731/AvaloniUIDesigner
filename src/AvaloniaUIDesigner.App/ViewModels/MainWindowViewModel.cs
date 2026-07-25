@@ -27,6 +27,9 @@ public partial class MainWindowViewModel : ViewModelBase
     private PendingMutation? _pendingMutation;
     private bool _isSyncingSelection;
     private string? _currentDocumentPath;
+    private DesignerCanvasDocument _lastSavedSnapshot = new(Array.Empty<DesignerElementSnapshot>());
+    private DesignerElementSnapshot? _clipboardSnapshot;
+    private string? _clipboardSourceName;
 
     public MainWindowViewModel()
         : this(new BuiltInComponentCatalog(), new DefaultControlRenderer(), new AxamlDocumentSerializer())
@@ -59,10 +62,16 @@ public partial class MainWindowViewModel : ViewModelBase
 
     public bool CanUndo => _undoStack.Count > 0;
     public bool CanRedo => _redoStack.Count > 0;
+    public bool CanPaste => _clipboardSnapshot is not null;
     public string? CurrentDocumentPath => _currentDocumentPath;
+    public string WindowTitle => $"Avalonia UI Designer - {GetDisplayDocumentName()}{(IsDirty ? "*" : string.Empty)}";
 
     [ObservableProperty]
     private string _statusText = "Ready";
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(WindowTitle))]
+    private bool _isDirty;
 
     public void PlaceFromToolbox(double x, double y)
     {
@@ -73,13 +82,16 @@ public partial class MainWindowViewModel : ViewModelBase
             return;
         }
 
+        var snappedX = Canvas.SnapPosition(x);
+        var snappedY = Canvas.SnapPosition(y);
+
         BeginCanvasMutation(HistoryActionType.AddElement, "Added control to canvas.");
-        var element = Canvas.PlaceElement(item, x, y);
+        var element = Canvas.PlaceElement(item, snappedX, snappedY);
         ObjectTree.Add(element);
         ObjectTree.SelectByElement(element);
         CommitCanvasMutation();
 
-        StatusText = $"Placed {element.DisplayName} ({x:0}, {y:0})";
+        StatusText = $"Placed {element.DisplayName} ({snappedX:0}, {snappedY:0})";
     }
 
     public void SelectElement(DesignElement? element)
@@ -96,6 +108,21 @@ public partial class MainWindowViewModel : ViewModelBase
         }
 
         StatusText = element is null ? "Ready" : $"Selected {element.DisplayName}";
+    }
+
+    public void MoveSelectedElement(double deltaX, double deltaY)
+    {
+        var target = Canvas.SelectedElement;
+        if (target is null)
+        {
+            return;
+        }
+
+        BeginCanvasMutation(HistoryActionType.TransformElement, "Moved control with keyboard.");
+        target.X = Math.Max(0, target.X + deltaX);
+        target.Y = Math.Max(0, target.Y + deltaY);
+        CommitCanvasMutation();
+        StatusText = $"Moved {target.DisplayName}";
     }
 
     public void RemoveSelectedElement()
@@ -120,13 +147,86 @@ public partial class MainWindowViewModel : ViewModelBase
         StatusText = $"Deleted {target.DisplayName}";
     }
 
+    public void DuplicateSelectedElement()
+    {
+        var target = Canvas.SelectedElement;
+        if (target is null)
+        {
+            StatusText = "No selected element to duplicate.";
+            return;
+        }
+
+        BeginCanvasMutation(HistoryActionType.DuplicateElement, "Duplicated control.");
+
+        var duplicatedSnapshot = new DesignerElementSnapshot(
+            DisplayName: BuildDuplicateDisplayName(target.DisplayName),
+            TypeName: target.TypeName,
+            X: target.X + 16,
+            Y: target.Y + 16,
+            Width: target.Width,
+            Height: target.Height,
+            VisualProperties: CloneProperties(CaptureVisualProperties(target.Visual)));
+
+        var duplicated = Canvas.AddElementFromSnapshot(duplicatedSnapshot, select: true);
+        ObjectTree.Add(duplicated);
+        ObjectTree.SelectByElement(duplicated);
+        CommitCanvasMutation();
+
+        StatusText = $"Duplicated {target.DisplayName}";
+    }
+
+    public void CopySelectedElement()
+    {
+        var target = Canvas.SelectedElement;
+        if (target is null)
+        {
+            StatusText = "No selected element to copy.";
+            return;
+        }
+
+        _clipboardSnapshot = CreateSnapshot(target, target.DisplayName, target.X, target.Y);
+        _clipboardSourceName = target.DisplayName;
+        OnPropertyChanged(nameof(CanPaste));
+        StatusText = $"Copied {target.DisplayName}";
+    }
+
+    public void PasteElement()
+    {
+        if (_clipboardSnapshot is null)
+        {
+            StatusText = "Clipboard is empty.";
+            return;
+        }
+
+        BeginCanvasMutation(HistoryActionType.PasteElement, "Pasted control.");
+
+        var pastedSnapshot = _clipboardSnapshot with
+        {
+            DisplayName = BuildDuplicateDisplayName(_clipboardSourceName ?? _clipboardSnapshot.DisplayName),
+            X = _clipboardSnapshot.X + 16,
+            Y = _clipboardSnapshot.Y + 16,
+            VisualProperties = CloneProperties(_clipboardSnapshot.VisualProperties),
+        };
+
+        var pasted = Canvas.AddElementFromSnapshot(pastedSnapshot, select: true);
+        ObjectTree.Add(pasted);
+        ObjectTree.SelectByElement(pasted);
+        CommitCanvasMutation();
+
+        // Cascade subsequent pastes so they remain visible instead of stacking.
+        _clipboardSnapshot = pastedSnapshot;
+        StatusText = $"Pasted {pasted.DisplayName}";
+    }
+
     public void NewDocument()
     {
-        BeginCanvasMutation(HistoryActionType.NewDocument, "Created a new document.");
         ApplyDocument(new DesignerCanvasDocument(Array.Empty<DesignerElementSnapshot>()));
         _currentDocumentPath = null;
-        CommitCanvasMutation();
+        _pendingMutation = null;
+        ClearHistory();
+        AcceptCurrentAsSaved();
         OnPropertyChanged(nameof(CurrentDocumentPath));
+        OnPropertyChanged(nameof(WindowTitle));
         StatusText = "Created a new document.";
     }
 
@@ -134,14 +234,32 @@ public partial class MainWindowViewModel : ViewModelBase
     {
         _currentDocumentPath = path;
         RegisterRecentFile(path);
+        AcceptCurrentAsSaved();
         OnPropertyChanged(nameof(CurrentDocumentPath));
+        OnPropertyChanged(nameof(WindowTitle));
     }
 
     public void MarkDocumentSaved(string path)
     {
         _currentDocumentPath = path;
         RegisterRecentFile(path);
+        AcceptCurrentAsSaved();
         OnPropertyChanged(nameof(CurrentDocumentPath));
+        OnPropertyChanged(nameof(WindowTitle));
+    }
+
+    public void MarkCurrentStateSaved()
+    {
+        AcceptCurrentAsSaved();
+        OnPropertyChanged(nameof(WindowTitle));
+    }
+
+    public void MarkDocumentLoadedWithoutPath()
+    {
+        _currentDocumentPath = null;
+        AcceptCurrentAsSaved();
+        OnPropertyChanged(nameof(CurrentDocumentPath));
+        OnPropertyChanged(nameof(WindowTitle));
     }
 
     public string ExportDraftAxaml() => _serializer.Serialize(CaptureDocument());
@@ -179,9 +297,10 @@ public partial class MainWindowViewModel : ViewModelBase
             return false;
         }
 
-        BeginCanvasMutation(HistoryActionType.LoadDocument, "Loaded AXAML document.");
         ApplyDocument(parsed);
-        CommitCanvasMutation();
+        _pendingMutation = null;
+        ClearHistory();
+        AcceptCurrentAsSaved();
         StatusText = "Loaded AXAML document.";
         return true;
     }
@@ -211,6 +330,7 @@ public partial class MainWindowViewModel : ViewModelBase
         _undoStack.Push(entry);
         _redoStack.Clear();
         RaiseHistoryChanged();
+        RefreshDirtyState();
     }
 
     public void Undo()
@@ -225,6 +345,7 @@ public partial class MainWindowViewModel : ViewModelBase
         _redoStack.Push(entry);
         ApplyDocument(entry.Before);
         RaiseHistoryChanged();
+        RefreshDirtyState();
         StatusText = $"Undo: {DescribeAction(entry.ActionType)}";
     }
 
@@ -240,6 +361,7 @@ public partial class MainWindowViewModel : ViewModelBase
         _undoStack.Push(entry);
         ApplyDocument(entry.After);
         RaiseHistoryChanged();
+        RefreshDirtyState();
         StatusText = $"Redo: {DescribeAction(entry.ActionType)}";
     }
 
@@ -294,6 +416,22 @@ public partial class MainWindowViewModel : ViewModelBase
             .ToList();
 
         return new DesignerCanvasDocument(snapshots);
+    }
+
+    private static DesignerElementSnapshot CreateSnapshot(
+        DesignElement element,
+        string displayName,
+        double x,
+        double y)
+    {
+        return new DesignerElementSnapshot(
+            displayName,
+            element.TypeName,
+            x,
+            y,
+            element.Width,
+            element.Height,
+            CloneProperties(CaptureVisualProperties(element.Visual)));
     }
 
     private static IReadOnlyDictionary<string, string>? CaptureVisualProperties(Control visual)
@@ -492,11 +630,31 @@ public partial class MainWindowViewModel : ViewModelBase
         OnPropertyChanged(nameof(CanRedo));
     }
 
+    private void ClearHistory()
+    {
+        _undoStack.Clear();
+        _redoStack.Clear();
+        RaiseHistoryChanged();
+    }
+
+    private void AcceptCurrentAsSaved()
+    {
+        _lastSavedSnapshot = CaptureDocument();
+        IsDirty = false;
+    }
+
+    private void RefreshDirtyState()
+    {
+        IsDirty = !AreSameDocument(_lastSavedSnapshot, CaptureDocument());
+    }
+
     private static string DescribeAction(HistoryActionType action)
     {
         return action switch
         {
             HistoryActionType.AddElement => "add element",
+            HistoryActionType.DuplicateElement => "duplicate element",
+            HistoryActionType.PasteElement => "paste element",
             HistoryActionType.RemoveElement => "remove element",
             HistoryActionType.TransformElement => "move/resize element",
             HistoryActionType.EditProperty => "edit properties",
@@ -595,6 +753,40 @@ public partial class MainWindowViewModel : ViewModelBase
     {
         var baseDir = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
         return Path.Combine(baseDir, "AvaloniaUIDesigner", "recent-files.json");
+    }
+
+    private string BuildDuplicateDisplayName(string sourceName)
+    {
+        var candidate = $"{sourceName}_copy";
+        var suffix = 2;
+
+        while (Canvas.Elements.Any(e => string.Equals(e.DisplayName, candidate, StringComparison.OrdinalIgnoreCase)))
+        {
+            candidate = $"{sourceName}_copy{suffix}";
+            suffix++;
+        }
+
+        return candidate;
+    }
+
+    private static IReadOnlyDictionary<string, string>? CloneProperties(IReadOnlyDictionary<string, string>? source)
+    {
+        if (source is null)
+        {
+            return null;
+        }
+
+        return source.ToDictionary(pair => pair.Key, pair => pair.Value, StringComparer.Ordinal);
+    }
+
+    private string GetDisplayDocumentName()
+    {
+        if (string.IsNullOrWhiteSpace(_currentDocumentPath))
+        {
+            return "Untitled";
+        }
+
+        return Path.GetFileName(_currentDocumentPath);
     }
 
     private static string SerializeStackPanelChildren(StackPanel stackPanel)
@@ -789,6 +981,8 @@ public partial class MainWindowViewModel : ViewModelBase
     public enum HistoryActionType
     {
         AddElement,
+        DuplicateElement,
+        PasteElement,
         RemoveElement,
         TransformElement,
         EditProperty,

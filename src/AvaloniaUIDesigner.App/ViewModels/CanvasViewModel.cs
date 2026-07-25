@@ -39,10 +39,22 @@ public partial class CanvasViewModel : ViewModelBase
     private bool _hasElements;
 
     [ObservableProperty]
+    private bool _snapToGrid = true;
+
+    [ObservableProperty]
+    private double _gridSize = 8;
+
+    [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsSelectionActive))]
     private DesignElement? _selectedElement;
 
     public bool IsSelectionActive => SelectedElement is not null;
+
+    public double SnapPosition(double value)
+        => SnapToGrid && GridSize > 0 ? Math.Round(value / GridSize) * GridSize : value;
+
+    public double SnapSize(double value, double minimum)
+        => Math.Max(minimum, SnapPosition(value));
 
     public DesignElement PlaceElement(ToolboxItem item, double x, double y)
     {

@@ -10,9 +10,10 @@
         x:Class="AvaloniaUIDesigner.App.Views.MainWindow"
         x:DataType="vm:MainWindowViewModel"
         Icon="/Assets/avalonia-logo.ico"
-        Title="Avalonia UI Designer"
+        Title="{Binding WindowTitle}"
         Width="1280"
         Height="800"
+        Closing="OnWindowClosing"
         KeyDown="OnWindowKeyDown">
 
     <Design.DataContext>
@@ -35,9 +36,16 @@
                 <MenuItem Header="Undo" Click="OnUndoMenuClicked" IsEnabled="{Binding CanUndo}"/>
                 <MenuItem Header="Redo" Click="OnRedoMenuClicked" IsEnabled="{Binding CanRedo}"/>
                 <Separator/>
-                <MenuItem Header="Delete" Click="OnDeleteMenuClicked"/>
+                <MenuItem Header="Copy" Click="OnCopyMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
+                <MenuItem Header="Paste" Click="OnPasteMenuClicked" IsEnabled="{Binding CanPaste}"/>
+                <MenuItem Header="Duplicate" Click="OnDuplicateMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
+                <MenuItem Header="Delete" Click="OnDeleteMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
             </MenuItem>
-            <MenuItem Header="View"/>
+            <MenuItem Header="View">
+                <MenuItem Header="Snap to Grid (8px)"
+                          IsCheckable="True"
+                          IsChecked="{Binding Canvas.SnapToGrid, Mode=TwoWay}"/>
+            </MenuItem>
             <MenuItem Header="Help"/>
         </Menu>
 
