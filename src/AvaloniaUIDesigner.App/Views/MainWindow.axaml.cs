@@ -26,6 +26,7 @@ public partial class MainWindow : Window
     private Point _dragStart;
     private double _origX, _origY, _origW, _origH;
     private DesignElement? _dragTarget;
+    private readonly System.Collections.Generic.Dictionary<DesignElement, Point> _dragOrigins = new();
 
     private CanvasViewModel? _boundCanvas;
     private DesignElement? _boundElement;
@@ -515,7 +516,18 @@ public partial class MainWindow : Window
             return;
         }
 
-        Vm.SelectElement(element);
+        var toggleSelection = e.KeyModifiers.HasFlag(KeyModifiers.Control);
+        if (toggleSelection || !Vm.Canvas.SelectedElements.Contains(element))
+        {
+            Vm.SelectElement(element, toggleSelection);
+        }
+
+        if (toggleSelection)
+        {
+            e.Handled = true;
+            return;
+        }
+
         BeginDrag(DragMode.Move, element, e);
         e.Handled = true;
     }
@@ -564,6 +576,14 @@ public partial class MainWindow : Window
         _origY = target.Y;
         _origW = target.Width;
         _origH = target.Height;
+        _dragOrigins.Clear();
+        if (mode == DragMode.Move && Vm is not null)
+        {
+            foreach (var selected in Vm.Canvas.SelectedElements)
+            {
+                _dragOrigins[selected] = new Point(selected.X, selected.Y);
+            }
+        }
 
         Vm?.BeginCanvasMutation(MainWindowViewModel.HistoryActionType.TransformElement, "Updated element position/size.");
         e.Pointer.Capture(DesignHost);
@@ -593,8 +613,11 @@ public partial class MainWindow : Window
         switch (_dragMode)
         {
             case DragMode.Move:
-                _dragTarget.X = Math.Max(0, SnapPosition(_origX + dx));
-                _dragTarget.Y = Math.Max(0, SnapPosition(_origY + dy));
+                foreach (var (element, origin) in _dragOrigins)
+                {
+                    element.X = Math.Max(0, SnapPosition(origin.X + dx));
+                    element.Y = Math.Max(0, SnapPosition(origin.Y + dy));
+                }
                 break;
             case DragMode.E:
                 _dragTarget.Width = SnapSize(_origW + dx);
@@ -680,6 +703,7 @@ public partial class MainWindow : Window
 
         _dragMode = DragMode.None;
         _dragTarget = null;
+        _dragOrigins.Clear();
         e.Pointer.Capture(null);
         e.Handled = true;
 

@@ -28,8 +28,7 @@ public partial class MainWindowViewModel : ViewModelBase
     private bool _isSyncingSelection;
     private string? _currentDocumentPath;
     private DesignerCanvasDocument _lastSavedSnapshot = new(Array.Empty<DesignerElementSnapshot>());
-    private DesignerElementSnapshot? _clipboardSnapshot;
-    private string? _clipboardSourceName;
+    private List<DesignerElementSnapshot>? _clipboardSnapshots;
 
     public MainWindowViewModel()
         : this(new BuiltInComponentCatalog(), new DefaultControlRenderer(), new AxamlDocumentSerializer())
@@ -62,7 +61,7 @@ public partial class MainWindowViewModel : ViewModelBase
 
     public bool CanUndo => _undoStack.Count > 0;
     public bool CanRedo => _redoStack.Count > 0;
-    public bool CanPaste => _clipboardSnapshot is not null;
+    public bool CanPaste => _clipboardSnapshots is { Count: > 0 };
     public string? CurrentDocumentPath => _currentDocumentPath;
     public string WindowTitle => $"Avalonia UI Designer - {GetDisplayDocumentName()}{(IsDirty ? "*" : string.Empty)}";
 
@@ -94,63 +93,67 @@ public partial class MainWindowViewModel : ViewModelBase
         StatusText = $"Placed {element.DisplayName} ({snappedX:0}, {snappedY:0})";
     }
 
-    public void SelectElement(DesignElement? element)
+    public void SelectElement(DesignElement? element, bool toggle = false)
     {
         _isSyncingSelection = true;
         try
         {
-            Canvas.Select(element);
-            ObjectTree.SelectByElement(element);
+            Canvas.Select(element, toggle);
+            ObjectTree.SelectByElement(Canvas.SelectedElement);
         }
         finally
         {
             _isSyncingSelection = false;
         }
 
-        StatusText = element is null ? "Ready" : $"Selected {element.DisplayName}";
+        StatusText = Canvas.SelectedElement is null
+            ? "Ready"
+            : $"Selected {Canvas.SelectedElements.Count} control(s)";
     }
 
     public void MoveSelectedElement(double deltaX, double deltaY)
     {
-        var target = Canvas.SelectedElement;
-        if (target is null)
+        var targets = Canvas.SelectedElements.ToList();
+        if (targets.Count == 0)
         {
             return;
         }
 
         BeginCanvasMutation(HistoryActionType.TransformElement, "Moved control with keyboard.");
-        target.X = Math.Max(0, target.X + deltaX);
-        target.Y = Math.Max(0, target.Y + deltaY);
+        foreach (var target in targets)
+        {
+            target.X = Math.Max(0, target.X + deltaX);
+            target.Y = Math.Max(0, target.Y + deltaY);
+        }
+
         CommitCanvasMutation();
-        StatusText = $"Moved {target.DisplayName}";
+        StatusText = $"Moved {targets.Count} control(s)";
     }
 
     public void RemoveSelectedElement()
     {
-        var target = Canvas.SelectedElement;
-        if (target is null)
+        var targets = Canvas.SelectedElements.ToList();
+        if (targets.Count == 0)
         {
             StatusText = "No selected element to delete.";
             return;
         }
 
         BeginCanvasMutation(HistoryActionType.RemoveElement, "Removed control from canvas.");
-        if (!Canvas.RemoveElement(target))
+        foreach (var target in targets)
         {
-            _pendingMutation = null;
-            StatusText = "Delete failed.";
-            return;
+            Canvas.RemoveElement(target);
         }
 
         ObjectTree.RebuildFrom(Canvas.Elements);
         CommitCanvasMutation();
-        StatusText = $"Deleted {target.DisplayName}";
+        StatusText = $"Deleted {targets.Count} control(s)";
     }
 
     public void DuplicateSelectedElement()
     {
-        var target = Canvas.SelectedElement;
-        if (target is null)
+        var targets = Canvas.SelectedElements.ToList();
+        if (targets.Count == 0)
         {
             StatusText = "No selected element to duplicate.";
             return;
@@ -158,41 +161,45 @@ public partial class MainWindowViewModel : ViewModelBase
 
         BeginCanvasMutation(HistoryActionType.DuplicateElement, "Duplicated control.");
 
-        var duplicatedSnapshot = new DesignerElementSnapshot(
-            DisplayName: BuildDuplicateDisplayName(target.DisplayName),
-            TypeName: target.TypeName,
-            X: target.X + 16,
-            Y: target.Y + 16,
-            Width: target.Width,
-            Height: target.Height,
-            VisualProperties: CloneProperties(CaptureVisualProperties(target.Visual)));
+        var duplicates = new List<DesignElement>();
+        foreach (var target in targets)
+        {
+            var duplicatedSnapshot = CreateSnapshot(
+                target,
+                BuildDuplicateDisplayName(target.DisplayName),
+                target.X + 16,
+                target.Y + 16);
+            var duplicated = Canvas.AddElementFromSnapshot(duplicatedSnapshot, select: false);
+            duplicates.Add(duplicated);
+            ObjectTree.Add(duplicated);
+        }
 
-        var duplicated = Canvas.AddElementFromSnapshot(duplicatedSnapshot, select: true);
-        ObjectTree.Add(duplicated);
-        ObjectTree.SelectByElement(duplicated);
+        Canvas.SelectMany(duplicates);
+        ObjectTree.SelectByElement(Canvas.SelectedElement);
         CommitCanvasMutation();
 
-        StatusText = $"Duplicated {target.DisplayName}";
+        StatusText = $"Duplicated {targets.Count} control(s)";
     }
 
     public void CopySelectedElement()
     {
-        var target = Canvas.SelectedElement;
-        if (target is null)
+        var targets = Canvas.SelectedElements.ToList();
+        if (targets.Count == 0)
         {
             StatusText = "No selected element to copy.";
             return;
         }
 
-        _clipboardSnapshot = CreateSnapshot(target, target.DisplayName, target.X, target.Y);
-        _clipboardSourceName = target.DisplayName;
+        _clipboardSnapshots = targets
+            .Select(target => CreateSnapshot(target, target.DisplayName, target.X, target.Y))
+            .ToList();
         OnPropertyChanged(nameof(CanPaste));
-        StatusText = $"Copied {target.DisplayName}";
+        StatusText = $"Copied {targets.Count} control(s)";
     }
 
     public void PasteElement()
     {
-        if (_clipboardSnapshot is null)
+        if (_clipboardSnapshots is not { Count: > 0 })
         {
             StatusText = "Clipboard is empty.";
             return;
@@ -200,22 +207,30 @@ public partial class MainWindowViewModel : ViewModelBase
 
         BeginCanvasMutation(HistoryActionType.PasteElement, "Pasted control.");
 
-        var pastedSnapshot = _clipboardSnapshot with
+        var pastedSnapshots = new List<DesignerElementSnapshot>();
+        var pastedElements = new List<DesignElement>();
+        foreach (var snapshot in _clipboardSnapshots)
         {
-            DisplayName = BuildDuplicateDisplayName(_clipboardSourceName ?? _clipboardSnapshot.DisplayName),
-            X = _clipboardSnapshot.X + 16,
-            Y = _clipboardSnapshot.Y + 16,
-            VisualProperties = CloneProperties(_clipboardSnapshot.VisualProperties),
-        };
+            var pastedSnapshot = snapshot with
+            {
+                DisplayName = BuildDuplicateDisplayName(snapshot.DisplayName),
+                X = snapshot.X + 16,
+                Y = snapshot.Y + 16,
+                VisualProperties = CloneProperties(snapshot.VisualProperties),
+            };
+            var pasted = Canvas.AddElementFromSnapshot(pastedSnapshot, select: false);
+            pastedSnapshots.Add(pastedSnapshot);
+            pastedElements.Add(pasted);
+            ObjectTree.Add(pasted);
+        }
 
-        var pasted = Canvas.AddElementFromSnapshot(pastedSnapshot, select: true);
-        ObjectTree.Add(pasted);
-        ObjectTree.SelectByElement(pasted);
+        Canvas.SelectMany(pastedElements);
+        ObjectTree.SelectByElement(Canvas.SelectedElement);
         CommitCanvasMutation();
 
         // Cascade subsequent pastes so they remain visible instead of stacking.
-        _clipboardSnapshot = pastedSnapshot;
-        StatusText = $"Pasted {pasted.DisplayName}";
+        _clipboardSnapshots = pastedSnapshots;
+        StatusText = $"Pasted {pastedElements.Count} control(s)";
     }
 
     public void NewDocument()

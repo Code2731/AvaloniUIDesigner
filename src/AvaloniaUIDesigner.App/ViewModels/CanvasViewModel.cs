@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Collections.Specialized;
 using System.Globalization;
+using System.Linq;
 using System.Text.Json;
 using Avalonia.Controls;
 using Avalonia.Layout;
@@ -29,9 +30,12 @@ public partial class CanvasViewModel : ViewModelBase
         _componentCatalog = componentCatalog;
         _renderer = renderer;
         Elements.CollectionChanged += OnElementsChanged;
+        SelectedElements.CollectionChanged += OnSelectedElementsChanged;
     }
 
     public ObservableCollection<DesignElement> Elements { get; } = new();
+
+    public ObservableCollection<DesignElement> SelectedElements { get; } = new();
 
     public string PlaceholderText { get; } = "Select a control in Toolbox, then click the canvas.";
 
@@ -45,10 +49,11 @@ public partial class CanvasViewModel : ViewModelBase
     private double _gridSize = 8;
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(IsSelectionActive))]
     private DesignElement? _selectedElement;
 
-    public bool IsSelectionActive => SelectedElement is not null;
+    public bool IsSelectionActive => SelectedElements.Count > 0;
+
+    public bool HasMultipleSelection => SelectedElements.Count > 1;
 
     public double SnapPosition(double value)
         => SnapToGrid && GridSize > 0 ? Math.Round(value / GridSize) * GridSize : value;
@@ -84,11 +89,49 @@ public partial class CanvasViewModel : ViewModelBase
 
     public void Clear()
     {
+        ClearSelection();
         Elements.Clear();
-        SelectedElement = null;
     }
 
-    public void Select(DesignElement? element) => SelectedElement = element;
+    public void Select(DesignElement? element, bool toggle = false)
+    {
+        if (element is null)
+        {
+            ClearSelection();
+            return;
+        }
+
+        if (toggle)
+        {
+            if (SelectedElements.Remove(element))
+            {
+                element.IsSelected = false;
+                SelectedElement = SelectedElements.LastOrDefault();
+                return;
+            }
+
+            SelectedElements.Add(element);
+            element.IsSelected = true;
+            SelectedElement = element;
+            return;
+        }
+
+        ReplaceSelection(new[] { element });
+    }
+
+    public void SelectMany(IEnumerable<DesignElement> elements)
+        => ReplaceSelection(elements);
+
+    public void ClearSelection()
+    {
+        foreach (var element in SelectedElements)
+        {
+            element.IsSelected = false;
+        }
+
+        SelectedElements.Clear();
+        SelectedElement = null;
+    }
 
     public bool RemoveElement(DesignElement element)
     {
@@ -98,29 +141,45 @@ public partial class CanvasViewModel : ViewModelBase
             return false;
         }
 
-        if (ReferenceEquals(SelectedElement, element))
+        if (SelectedElements.Remove(element))
         {
-            SelectedElement = null;
+            element.IsSelected = false;
+            SelectedElement = SelectedElements.LastOrDefault();
         }
 
         return true;
     }
 
-    partial void OnSelectedElementChanged(DesignElement? oldValue, DesignElement? newValue)
+    private void ReplaceSelection(IEnumerable<DesignElement> elements)
     {
-        if (oldValue is not null)
+        var next = elements
+            .Where(Elements.Contains)
+            .Distinct()
+            .ToList();
+
+        foreach (var element in SelectedElements)
         {
-            oldValue.IsSelected = false;
+            element.IsSelected = false;
         }
 
-        if (newValue is not null)
+        SelectedElements.Clear();
+        foreach (var element in next)
         {
-            newValue.IsSelected = true;
+            element.IsSelected = true;
+            SelectedElements.Add(element);
         }
+
+        SelectedElement = next.LastOrDefault();
     }
 
     private void OnElementsChanged(object? sender, NotifyCollectionChangedEventArgs e)
         => HasElements = Elements.Count > 0;
+
+    private void OnSelectedElementsChanged(object? sender, NotifyCollectionChangedEventArgs e)
+    {
+        OnPropertyChanged(nameof(IsSelectionActive));
+        OnPropertyChanged(nameof(HasMultipleSelection));
+    }
 
     private DesignElement AddElement(
         string displayPrefix,
@@ -145,7 +204,7 @@ public partial class CanvasViewModel : ViewModelBase
         Elements.Add(element);
         if (select)
         {
-            SelectedElement = element;
+            Select(element);
         }
 
         return element;
