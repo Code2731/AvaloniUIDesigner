@@ -195,6 +195,38 @@ public partial class MainWindow : Window
         Vm.StatusText = "Opened runtime preview.";
     }
 
+    private void OnZoomInMenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        Vm?.Canvas.ZoomIn();
+        UpdateZoomStatus();
+    }
+
+    private void OnZoomOutMenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        Vm?.Canvas.ZoomOut();
+        UpdateZoomStatus();
+    }
+
+    private void OnResetZoomMenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        Vm?.Canvas.ResetZoom();
+        UpdateZoomStatus();
+    }
+
+    private void OnFitToViewMenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        Vm?.Canvas.FitToViewport(DesignViewport.Bounds.Width, DesignViewport.Bounds.Height);
+        UpdateZoomStatus();
+    }
+
+    private void UpdateZoomStatus()
+    {
+        if (Vm is not null)
+        {
+            Vm.StatusText = $"Zoom: {Vm.Canvas.ZoomPercentage}";
+        }
+    }
+
     private void OnAlignLeftMenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
         => ArrangeSelectedElements(MainWindowViewModel.SelectionLayoutAction.AlignLeft);
 

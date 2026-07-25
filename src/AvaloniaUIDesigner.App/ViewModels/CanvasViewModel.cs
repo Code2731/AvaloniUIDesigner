@@ -49,17 +49,45 @@ public partial class CanvasViewModel : ViewModelBase
     private double _gridSize = 8;
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ZoomPercentage))]
+    private double _zoomScale = 1;
+
+    [ObservableProperty]
     private DesignElement? _selectedElement;
 
     public bool IsSelectionActive => SelectedElements.Count > 0;
 
     public bool HasMultipleSelection => SelectedElements.Count > 1;
 
+    public string ZoomPercentage => $"{ZoomScale * 100:0}%";
+
     public double SnapPosition(double value)
         => SnapToGrid && GridSize > 0 ? Math.Round(value / GridSize) * GridSize : value;
 
     public double SnapSize(double value, double minimum)
         => Math.Max(minimum, SnapPosition(value));
+
+    public void ZoomIn() => SetZoom(ZoomScale + 0.1);
+
+    public void ZoomOut() => SetZoom(ZoomScale - 0.1);
+
+    public void ResetZoom() => SetZoom(1);
+
+    public void FitToViewport(double viewportWidth, double viewportHeight)
+    {
+        if (viewportWidth <= 0 || viewportHeight <= 0 || Elements.Count == 0)
+        {
+            ResetZoom();
+            return;
+        }
+
+        const double padding = 32;
+        var contentWidth = Elements.Max(element => element.X + element.Width) + padding;
+        var contentHeight = Elements.Max(element => element.Y + element.Height) + padding;
+        SetZoom(Math.Min(viewportWidth / contentWidth, viewportHeight / contentHeight));
+    }
+
+    private void SetZoom(double zoom) => ZoomScale = Math.Clamp(zoom, 0.25, 2);
 
     public DesignElement PlaceElement(ToolboxItem item, double x, double y)
     {

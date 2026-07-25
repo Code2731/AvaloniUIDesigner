@@ -67,6 +67,11 @@
             <MenuItem Header="View">
                 <MenuItem Header="Preview" Click="OnPreviewMenuClicked"/>
                 <Separator/>
+                <MenuItem Header="Zoom In" Click="OnZoomInMenuClicked"/>
+                <MenuItem Header="Zoom Out" Click="OnZoomOutMenuClicked"/>
+                <MenuItem Header="Actual Size (100%)" Click="OnResetZoomMenuClicked"/>
+                <MenuItem Header="Fit to View" Click="OnFitToViewMenuClicked"/>
+                <Separator/>
                 <MenuItem Header="Snap to Grid (8px)"
                           IsCheckable="True"
                           IsChecked="{Binding Canvas.SnapToGrid, Mode=TwoWay}"/>
@@ -75,7 +80,10 @@
         </Menu>
 
         <Border DockPanel.Dock="Bottom" Height="24" Background="#2D2D30" BorderBrush="#3F3F46" BorderThickness="0,1,0,0">
-            <TextBlock Text="{Binding StatusText}" VerticalAlignment="Center" Margin="8,0" Foreground="#CCCCCC"/>
+            <DockPanel>
+                <TextBlock Text="{Binding Canvas.ZoomPercentage}" DockPanel.Dock="Right" VerticalAlignment="Center" Margin="8,0" Foreground="#CCCCCC"/>
+                <TextBlock Text="{Binding StatusText}" VerticalAlignment="Center" Margin="8,0" Foreground="#CCCCCC"/>
+            </DockPanel>
         </Border>
 
         <Grid ColumnDefinitions="220,4,*,4,280">
@@ -104,8 +112,11 @@
                     <Border DockPanel.Dock="Top" Background="#2D2D30" Padding="8,6" BorderBrush="#3F3F46" BorderThickness="0,0,0,1">
                         <TextBlock Text="Design Surface" FontWeight="SemiBold" Foreground="#CCCCCC"/>
                     </Border>
-                    <Border Background="#252526" Margin="24" BorderBrush="#3F3F46" BorderThickness="1">
-                        <Panel>
+                    <Border Name="DesignViewport" Background="#252526" Margin="24" BorderBrush="#3F3F46" BorderThickness="1" ClipToBounds="True">
+                        <Panel RenderTransformOrigin="0,0">
+                            <Panel.RenderTransform>
+                                <ScaleTransform ScaleX="{Binding Canvas.ZoomScale}" ScaleY="{Binding Canvas.ZoomScale}"/>
+                            </Panel.RenderTransform>
                             <TextBlock Text="{Binding Canvas.PlaceholderText}"
                                        HorizontalAlignment="Center"
                                        VerticalAlignment="Center"
