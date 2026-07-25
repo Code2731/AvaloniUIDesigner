@@ -61,6 +61,13 @@ public partial class MainWindowViewModel : ViewModelBase
 
     public bool CanUndo => _undoStack.Count > 0;
     public bool CanRedo => _redoStack.Count > 0;
+    public string UndoMenuLabel => _undoStack.TryPeek(out var entry)
+        ? $"Undo {DescribeAction(entry.ActionType)}"
+        : "Undo";
+    public string RedoMenuLabel => _redoStack.TryPeek(out var entry)
+        ? $"Redo {DescribeAction(entry.ActionType)}"
+        : "Redo";
+    public string HistorySummary => $"{UndoMenuLabel} | {RedoMenuLabel}";
     public bool CanPaste => _clipboardSnapshots is { Count: > 0 };
     public string? CurrentDocumentPath => _currentDocumentPath;
     public string WindowTitle => $"Avalonia UI Designer - {GetDisplayDocumentName()}{(IsDirty ? "*" : string.Empty)}";
@@ -975,6 +982,9 @@ public partial class MainWindowViewModel : ViewModelBase
     {
         OnPropertyChanged(nameof(CanUndo));
         OnPropertyChanged(nameof(CanRedo));
+        OnPropertyChanged(nameof(UndoMenuLabel));
+        OnPropertyChanged(nameof(RedoMenuLabel));
+        OnPropertyChanged(nameof(HistorySummary));
     }
 
     private void ClearHistory()

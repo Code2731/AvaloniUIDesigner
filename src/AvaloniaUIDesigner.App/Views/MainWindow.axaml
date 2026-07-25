@@ -35,8 +35,8 @@
                 <MenuItem Header="Exit" Click="OnExitMenuClicked"/>
             </MenuItem>
             <MenuItem Header="Edit">
-                <MenuItem Header="Undo" Click="OnUndoMenuClicked" IsEnabled="{Binding CanUndo}"/>
-                <MenuItem Header="Redo" Click="OnRedoMenuClicked" IsEnabled="{Binding CanRedo}"/>
+                <MenuItem Header="{Binding UndoMenuLabel}" Click="OnUndoMenuClicked" IsEnabled="{Binding CanUndo}"/>
+                <MenuItem Header="{Binding RedoMenuLabel}" Click="OnRedoMenuClicked" IsEnabled="{Binding CanRedo}"/>
                 <Separator/>
                 <MenuItem Header="Copy" Click="OnCopyMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
                 <MenuItem Header="Paste" Click="OnPasteMenuClicked" IsEnabled="{Binding CanPaste}"/>
@@ -102,6 +102,7 @@
         <Border DockPanel.Dock="Bottom" Height="24" Background="#2D2D30" BorderBrush="#3F3F46" BorderThickness="0,1,0,0">
             <DockPanel>
                 <TextBlock Text="{Binding Canvas.ZoomPercentage}" DockPanel.Dock="Right" VerticalAlignment="Center" Margin="8,0" Foreground="#CCCCCC"/>
+                <TextBlock Text="{Binding HistorySummary}" DockPanel.Dock="Right" VerticalAlignment="Center" Margin="8,0" Foreground="#9CDCFE"/>
                 <TextBlock Text="{Binding StatusText}" VerticalAlignment="Center" Margin="8,0" Foreground="#CCCCCC"/>
             </DockPanel>
         </Border>
