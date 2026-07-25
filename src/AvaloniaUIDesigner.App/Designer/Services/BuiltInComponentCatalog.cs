@@ -87,6 +87,12 @@ public sealed class BuiltInComponentCatalog : IComponentCatalog
             DefaultHeight: 32,
             VisualFactory: static () => new DatePicker()),
         new(
+            DisplayName: "TimePicker",
+            AvaloniaTypeName: "Avalonia.Controls.TimePicker",
+            DefaultWidth: 180,
+            DefaultHeight: 32,
+            VisualFactory: static () => new TimePicker()),
+        new(
             DisplayName: "Border",
             AvaloniaTypeName: "Avalonia.Controls.Border",
             DefaultWidth: 240,

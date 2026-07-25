@@ -1241,6 +1241,15 @@ public partial class MainWindowViewModel : ViewModelBase
             };
         }
 
+        if (visual is TimePicker timePicker)
+        {
+            return new Dictionary<string, string>
+            {
+                ["SelectedTime"] = timePicker.SelectedTime?.ToString("hh\\:mm", CultureInfo.InvariantCulture) ?? string.Empty,
+                ["Opacity"] = timePicker.Opacity.ToString("0.###", CultureInfo.InvariantCulture),
+            };
+        }
+
         if (visual is Border border)
         {
             var properties = new Dictionary<string, string>
@@ -1589,6 +1598,7 @@ public partial class MainWindowViewModel : ViewModelBase
             "ComboBox" or "ListBox" => propertyName == "SelectedIndex",
             "Slider" or "ProgressBar" => propertyName is "Minimum" or "Maximum" or "Value",
             "DatePicker" => propertyName == "SelectedDate",
+            "TimePicker" => propertyName == "SelectedTime",
             "Border" => propertyName is "Background" or "BorderBrush" or "BorderThickness" or "CornerRadius",
             "Grid" => propertyName == "ShowGridLines",
             "StackPanel" => propertyName is "Orientation" or "Spacing",
@@ -2107,6 +2117,18 @@ public partial class MainWindowViewModel : ViewModelBase
                 if (datePicker.SelectedDate is { } selectedDate)
                 {
                     AppendAttribute(sb, "SelectedDate", selectedDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture));
+                }
+
+                sb.AppendLine(" />");
+                break;
+
+            case TimePicker timePicker:
+                sb.Append(indent);
+                sb.Append("<TimePicker");
+                AppendCanvasLayoutAttributes(sb, element);
+                if (timePicker.SelectedTime is { } selectedTime)
+                {
+                    AppendAttribute(sb, "SelectedTime", selectedTime.ToString("hh\\:mm", CultureInfo.InvariantCulture));
                 }
 
                 sb.AppendLine(" />");

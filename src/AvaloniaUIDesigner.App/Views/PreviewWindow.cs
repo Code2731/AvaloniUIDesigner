@@ -79,6 +79,7 @@ public sealed class PreviewWindow : Window
             "Avalonia.Controls.Slider" => new Slider { Minimum = 0, Maximum = 100, Value = 50 },
             "Avalonia.Controls.ProgressBar" => new ProgressBar { Minimum = 0, Maximum = 100, Value = 50 },
             "Avalonia.Controls.DatePicker" => new DatePicker(),
+            "Avalonia.Controls.TimePicker" => new TimePicker(),
             "Avalonia.Controls.Border" => new Border
             {
                 Background = Brush.Parse("#F1F5F9"),
@@ -211,6 +212,9 @@ public sealed class PreviewWindow : Window
                 break;
             case DatePicker datePicker:
                 ApplyDatePickerProperties(datePicker, properties);
+                break;
+            case TimePicker timePicker:
+                ApplyTimePickerProperties(timePicker, properties);
                 break;
             case Border border:
                 ApplyBorderProperties(border, properties);
@@ -345,6 +349,19 @@ public sealed class PreviewWindow : Window
                 out var parsedSelectedDate))
         {
             datePicker.SelectedDate = parsedSelectedDate;
+        }
+    }
+
+    private static void ApplyTimePickerProperties(TimePicker timePicker, IReadOnlyDictionary<string, string> properties)
+    {
+        if (properties.TryGetValue("SelectedTime", out var selectedTime)
+            && TimeSpan.TryParseExact(
+                selectedTime,
+                "hh\\:mm",
+                CultureInfo.InvariantCulture,
+                out var parsedSelectedTime))
+        {
+            timePicker.SelectedTime = parsedSelectedTime;
         }
     }
 

@@ -607,6 +607,21 @@ public partial class CanvasViewModel : ViewModelBase
             return;
         }
 
+        if (visual is TimePicker timePicker)
+        {
+            if (properties.TryGetValue("SelectedTime", out var selectedTime)
+                && TimeSpan.TryParseExact(
+                    selectedTime,
+                    "hh\\:mm",
+                    CultureInfo.InvariantCulture,
+                    out var parsedSelectedTime))
+            {
+                timePicker.SelectedTime = parsedSelectedTime;
+            }
+
+            return;
+        }
+
         if (visual is Border border)
         {
             if (properties.TryGetValue("Background", out var background))

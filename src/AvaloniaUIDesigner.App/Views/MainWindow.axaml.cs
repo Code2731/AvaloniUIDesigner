@@ -816,6 +816,11 @@ public partial class MainWindow : Window
             return propertyName == "SelectedDate";
         }
 
+        if (control is TimePicker)
+        {
+            return propertyName == "SelectedTime";
+        }
+
         if (control is Border)
         {
             return propertyName is "Background" or "BorderBrush" or "BorderThickness" or "CornerRadius";
