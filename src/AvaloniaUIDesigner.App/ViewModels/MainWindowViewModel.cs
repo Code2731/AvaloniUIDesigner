@@ -185,9 +185,10 @@ public partial class MainWindowViewModel : ViewModelBase
 
     public void MoveSelectedElement(double deltaX, double deltaY)
     {
-        var targets = Canvas.SelectedElements.ToList();
+        var targets = Canvas.SelectedElements.Where(element => !element.IsLocked).ToList();
         if (targets.Count == 0)
         {
+            StatusText = "Selected controls are locked.";
             return;
         }
 
@@ -204,10 +205,10 @@ public partial class MainWindowViewModel : ViewModelBase
 
     public void ArrangeSelectedElements(SelectionLayoutAction action)
     {
-        var targets = Canvas.SelectedElements.ToList();
+        var targets = Canvas.SelectedElements.Where(element => !element.IsLocked).ToList();
         if (targets.Count < 2)
         {
-            StatusText = "Select at least two controls to arrange.";
+            StatusText = "Select at least two unlocked controls to arrange.";
             return;
         }
 
