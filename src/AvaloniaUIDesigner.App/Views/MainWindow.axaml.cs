@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Specialized;
 using System.ComponentModel;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
@@ -40,6 +41,7 @@ public partial class MainWindow : Window
 
     private readonly DispatcherTimer _propertyEditTimer;
     private bool _hasPendingPropertyEdit;
+    private bool _hasPendingLayoutEdit;
     private bool _allowCloseWithoutPrompt;
 
     public MainWindow()
@@ -561,6 +563,7 @@ public partial class MainWindow : Window
     private void RebindSelection()
     {
         FlushPendingPropertyHistory();
+        FlushPendingLayoutHistory();
 
         if (_boundVisual is not null)
         {
@@ -586,6 +589,7 @@ public partial class MainWindow : Window
         }
 
         PropGrid.Content = _boundElement?.Visual;
+        UpdateLayoutEditors();
         UpdateHandlePositions();
     }
 
@@ -670,8 +674,80 @@ public partial class MainWindow : Window
             or nameof(DesignElement.Width)
             or nameof(DesignElement.Height))
         {
+            UpdateLayoutEditors();
             UpdateHandlePositions();
         }
+    }
+
+    private void OnLayoutEditorGotFocus(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        if (_boundElement is null || _hasPendingLayoutEdit)
+        {
+            return;
+        }
+
+        FlushPendingPropertyHistory();
+        Vm?.BeginCanvasMutation(MainWindowViewModel.HistoryActionType.TransformElement, "Updated element layout values.");
+        _hasPendingLayoutEdit = true;
+    }
+
+    private void OnLayoutEditorLostFocus(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        if (sender is not TextBox editor || _boundElement is null)
+        {
+            FlushPendingLayoutHistory();
+            return;
+        }
+
+        if (double.TryParse(editor.Text, NumberStyles.Float, CultureInfo.InvariantCulture, out var value))
+        {
+            switch (editor.Name)
+            {
+                case "LayoutXEditor":
+                    _boundElement.X = Math.Max(0, value);
+                    break;
+                case "LayoutYEditor":
+                    _boundElement.Y = Math.Max(0, value);
+                    break;
+                case "LayoutWidthEditor":
+                    _boundElement.Width = Math.Max(MinSize, value);
+                    break;
+                case "LayoutHeightEditor":
+                    _boundElement.Height = Math.Max(MinSize, value);
+                    break;
+            }
+        }
+
+        UpdateLayoutEditors();
+        FlushPendingLayoutHistory();
+    }
+
+    private void UpdateLayoutEditors()
+    {
+        if (_boundElement is null)
+        {
+            LayoutXEditor.Text = string.Empty;
+            LayoutYEditor.Text = string.Empty;
+            LayoutWidthEditor.Text = string.Empty;
+            LayoutHeightEditor.Text = string.Empty;
+            return;
+        }
+
+        LayoutXEditor.Text = _boundElement.X.ToString("0.###", CultureInfo.InvariantCulture);
+        LayoutYEditor.Text = _boundElement.Y.ToString("0.###", CultureInfo.InvariantCulture);
+        LayoutWidthEditor.Text = _boundElement.Width.ToString("0.###", CultureInfo.InvariantCulture);
+        LayoutHeightEditor.Text = _boundElement.Height.ToString("0.###", CultureInfo.InvariantCulture);
+    }
+
+    private void FlushPendingLayoutHistory()
+    {
+        if (!_hasPendingLayoutEdit)
+        {
+            return;
+        }
+
+        _hasPendingLayoutEdit = false;
+        Vm?.CommitCanvasMutation();
     }
 
     private void UpdateHandlePositions()

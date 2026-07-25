@@ -231,6 +231,18 @@
                         <Border DockPanel.Dock="Top" Background="#2D2D30" Padding="8,6">
                             <TextBlock Text="Properties" FontWeight="SemiBold" Foreground="#CCCCCC"/>
                         </Border>
+                        <Border DockPanel.Dock="Top" Padding="8" IsVisible="{Binding Canvas.IsSelectionActive}">
+                            <Grid ColumnDefinitions="Auto,*,Auto,*" RowDefinitions="Auto,Auto">
+                                <TextBlock Grid.Row="0" Grid.Column="0" Text="X" VerticalAlignment="Center" Margin="0,0,4,4"/>
+                                <TextBox Name="LayoutXEditor" Grid.Row="0" Grid.Column="1" GotFocus="OnLayoutEditorGotFocus" LostFocus="OnLayoutEditorLostFocus" Margin="0,0,8,4"/>
+                                <TextBlock Grid.Row="0" Grid.Column="2" Text="Y" VerticalAlignment="Center" Margin="0,0,4,4"/>
+                                <TextBox Name="LayoutYEditor" Grid.Row="0" Grid.Column="3" GotFocus="OnLayoutEditorGotFocus" LostFocus="OnLayoutEditorLostFocus" Margin="0,0,0,4"/>
+                                <TextBlock Grid.Row="1" Grid.Column="0" Text="W" VerticalAlignment="Center" Margin="0,0,4,0"/>
+                                <TextBox Name="LayoutWidthEditor" Grid.Row="1" Grid.Column="1" GotFocus="OnLayoutEditorGotFocus" LostFocus="OnLayoutEditorLostFocus" Margin="0,0,8,0"/>
+                                <TextBlock Grid.Row="1" Grid.Column="2" Text="H" VerticalAlignment="Center" Margin="0,0,4,0"/>
+                                <TextBox Name="LayoutHeightEditor" Grid.Row="1" Grid.Column="3" GotFocus="OnLayoutEditorGotFocus" LostFocus="OnLayoutEditorLostFocus"/>
+                            </Grid>
+                        </Border>
                         <pg:PropertyGrid Name="PropGrid" IsQuickFilterVisible="False" IsHeaderVisible="False"/>
                     </DockPanel>
                 </Border>
