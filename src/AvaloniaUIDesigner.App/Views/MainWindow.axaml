@@ -250,6 +250,12 @@
                             <TextBlock Text="Object Tree" FontWeight="SemiBold" Foreground="#CCCCCC"/>
                         </Border>
                         <TextBox Name="ObjectTreeSearch" DockPanel.Dock="Top" Margin="6" Watermark="Find control..." Text="{Binding ObjectTree.SearchText, Mode=TwoWay}"/>
+                        <TextBlock DockPanel.Dock="Top"
+                                   Text="{Binding ObjectTree.SearchResultText}"
+                                   IsVisible="{Binding ObjectTree.IsSearchActive}"
+                                   Margin="8,0,8,6"
+                                   FontSize="11"
+                                   Foreground="#9CDCFE"/>
                         <TreeView ItemsSource="{Binding ObjectTree.Nodes}"
                                   SelectedItem="{Binding ObjectTree.SelectedNode, Mode=TwoWay}"
                                   Background="Transparent"
