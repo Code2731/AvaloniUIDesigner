@@ -7,7 +7,7 @@ public partial class DesignElement : ViewModelBase
 {
     public DesignElement(string displayName, string typeName, Control visual, double x, double y, double width, double height)
     {
-        DisplayName = displayName;
+        _displayName = displayName;
         TypeName = typeName;
         Visual = visual;
         _x = x;
@@ -16,7 +16,7 @@ public partial class DesignElement : ViewModelBase
         _height = height;
     }
 
-    public string DisplayName { get; }
+    [ObservableProperty] private string _displayName;
     public string TypeName { get; }
     public Control Visual { get; }
 

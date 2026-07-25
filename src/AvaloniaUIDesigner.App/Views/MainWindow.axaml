@@ -277,6 +277,12 @@
                                 <TextBox Name="LayoutHeightEditor" Grid.Row="1" Grid.Column="3" GotFocus="OnLayoutEditorGotFocus" LostFocus="OnLayoutEditorLostFocus"/>
                             </Grid>
                         </Border>
+                        <Border DockPanel.Dock="Top" Padding="8,0,8,8" IsVisible="{Binding Canvas.IsSelectionActive}">
+                            <Grid ColumnDefinitions="Auto,*">
+                                <TextBlock Text="Name" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                                <TextBox Name="ElementNameEditor" Grid.Column="1" GotFocus="OnElementNameEditorGotFocus" LostFocus="OnElementNameEditorLostFocus"/>
+                            </Grid>
+                        </Border>
                         <pg:PropertyGrid Name="PropGrid" IsQuickFilterVisible="False" IsHeaderVisible="False"/>
                     </DockPanel>
                 </Border>

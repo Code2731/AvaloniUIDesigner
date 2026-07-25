@@ -683,6 +683,7 @@ public partial class MainWindow : Window
 
         PropGrid.Content = _boundElement?.Visual;
         UpdateLayoutEditors();
+        UpdateElementNameEditor();
         UpdateHandlePositions();
     }
 
@@ -767,6 +768,11 @@ public partial class MainWindow : Window
 
     private void OnElementPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
+        if (e.PropertyName == nameof(DesignElement.DisplayName))
+        {
+            UpdateElementNameEditor();
+        }
+
         if (e.PropertyName is nameof(DesignElement.X)
             or nameof(DesignElement.Y)
             or nameof(DesignElement.Width)
@@ -793,6 +799,40 @@ public partial class MainWindow : Window
         FlushPendingPropertyHistory();
         Vm?.BeginCanvasMutation(MainWindowViewModel.HistoryActionType.TransformElement, "Updated element layout values.");
         _hasPendingLayoutEdit = true;
+    }
+
+    private void OnElementNameEditorGotFocus(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        if (_boundElement?.IsLocked != true)
+        {
+            Vm?.BeginCanvasMutation(MainWindowViewModel.HistoryActionType.EditProperty, "Renamed control.");
+        }
+    }
+
+    private void OnElementNameEditorLostFocus(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        if (_boundElement is null || _boundElement.IsLocked || sender is not TextBox editor)
+        {
+            Vm?.CommitCanvasMutation();
+            UpdateElementNameEditor();
+            return;
+        }
+
+        var name = editor.Text?.Trim();
+        if (!string.IsNullOrWhiteSpace(name))
+        {
+            _boundElement.DisplayName = name;
+            Vm?.ObjectTree.RebuildFrom(Vm.Canvas.Elements);
+            Vm?.ObjectTree.SelectByElement(_boundElement);
+        }
+
+        Vm?.CommitCanvasMutation();
+        UpdateElementNameEditor();
+    }
+
+    private void UpdateElementNameEditor()
+    {
+        ElementNameEditor.Text = _boundElement?.DisplayName ?? string.Empty;
     }
 
     private void OnLayoutEditorLostFocus(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
