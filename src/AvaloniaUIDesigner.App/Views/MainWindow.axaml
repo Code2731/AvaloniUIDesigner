@@ -56,6 +56,12 @@
                     <MenuItem Header="Opacity 100%" Click="OnOpacity100MenuClicked"/>
                     <MenuItem Header="Opacity 75%" Click="OnOpacity75MenuClicked"/>
                     <MenuItem Header="Opacity 50%" Click="OnOpacity50MenuClicked"/>
+                    <Separator/>
+                    <MenuItem Header="Text Size">
+                        <MenuItem Header="14px" Click="OnTextSize14MenuClicked"/>
+                        <MenuItem Header="18px" Click="OnTextSize18MenuClicked"/>
+                        <MenuItem Header="24px" Click="OnTextSize24MenuClicked"/>
+                    </MenuItem>
                 </MenuItem>
                 <MenuItem Header="Order" IsEnabled="{Binding Canvas.IsSelectionActive}">
                     <MenuItem Header="Bring to Front" Click="OnBringToFrontMenuClicked"/>

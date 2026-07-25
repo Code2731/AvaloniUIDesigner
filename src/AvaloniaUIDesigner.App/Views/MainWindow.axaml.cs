@@ -202,6 +202,10 @@ public partial class MainWindow : Window
     private void OnOpacity50MenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
         => SetSelectionOpacity(0.5);
 
+    private void OnTextSize14MenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e) => Vm?.SetSelectedTextSize(14);
+    private void OnTextSize18MenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e) => Vm?.SetSelectedTextSize(18);
+    private void OnTextSize24MenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e) => Vm?.SetSelectedTextSize(24);
+
     private void SetSelectionOpacity(double opacity)
     {
         FlushPendingPropertyHistory();
@@ -713,7 +717,7 @@ public partial class MainWindow : Window
 
         if (control is TextBlock)
         {
-            return propertyName == "Text";
+            return propertyName is "Text" or "FontSize";
         }
 
         if (control is CheckBox)

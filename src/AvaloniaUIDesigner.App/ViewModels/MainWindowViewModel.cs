@@ -172,6 +172,25 @@ public partial class MainWindowViewModel : ViewModelBase
         StatusText = $"Set opacity to {normalizedOpacity * 100:0}% for {targets.Count} control(s)";
     }
 
+    public void SetSelectedTextSize(double fontSize)
+    {
+        var targets = Canvas.SelectedElements.Where(element => !element.IsLocked && element.Visual is TextBlock).ToList();
+        if (targets.Count == 0)
+        {
+            StatusText = "Select an unlocked TextBlock to change its size.";
+            return;
+        }
+
+        BeginCanvasMutation(HistoryActionType.EditProperty, "Updated text size.");
+        foreach (var target in targets)
+        {
+            ((TextBlock)target.Visual).FontSize = Math.Clamp(fontSize, 8, 96);
+        }
+
+        CommitCanvasMutation();
+        StatusText = $"Set text size to {fontSize:0}px for {targets.Count} control(s)";
+    }
+
     public void ToggleSelectedLock()
     {
         var targets = Canvas.SelectedElements.ToList();
@@ -815,6 +834,7 @@ public partial class MainWindowViewModel : ViewModelBase
             return new Dictionary<string, string>
             {
                 ["Text"] = textBlock.Text ?? string.Empty,
+                ["FontSize"] = textBlock.FontSize.ToString("0.###", CultureInfo.InvariantCulture),
                 ["Opacity"] = textBlock.Opacity.ToString("0.###", CultureInfo.InvariantCulture),
             };
         }
@@ -1027,7 +1047,7 @@ public partial class MainWindowViewModel : ViewModelBase
         {
             "Button" => propertyName == "Content",
             "TextBox" => propertyName is "Text" or "Watermark",
-            "TextBlock" => propertyName == "Text",
+            "TextBlock" => propertyName is "Text" or "FontSize",
             "CheckBox" => propertyName is "Content" or "IsChecked",
             "Slider" => propertyName is "Minimum" or "Maximum" or "Value",
             "Grid" => propertyName == "ShowGridLines",

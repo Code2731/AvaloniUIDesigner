@@ -395,6 +395,12 @@ public partial class CanvasViewModel : ViewModelBase
                 textBlock.Text = text;
             }
 
+            if (properties.TryGetValue("FontSize", out var fontSize)
+                && double.TryParse(fontSize, NumberStyles.Float, CultureInfo.InvariantCulture, out var parsedFontSize))
+            {
+                textBlock.FontSize = Math.Clamp(parsedFontSize, 8, 96);
+            }
+
             return;
         }
 
