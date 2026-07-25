@@ -1050,34 +1050,39 @@ public partial class MainWindow : Window
         var snappedY = y;
         var movingX = new[] { x, x + _dragTarget.Width / 2, x + _dragTarget.Width };
         var movingY = new[] { y, y + _dragTarget.Height / 2, y + _dragTarget.Height };
+        var candidatesX = new System.Collections.Generic.List<double> { 0, Vm.Canvas.ArtboardWidth / 2, Vm.Canvas.ArtboardWidth };
+        var candidatesY = new System.Collections.Generic.List<double> { 0, Vm.Canvas.ArtboardHeight / 2, Vm.Canvas.ArtboardHeight };
 
         foreach (var element in Vm.Canvas.Elements.Where(element => !_dragOrigins.ContainsKey(element)))
         {
-            foreach (var candidate in new[] { element.X, element.X + element.Width / 2, element.X + element.Width })
+            candidatesX.AddRange([element.X, element.X + element.Width / 2, element.X + element.Width]);
+            candidatesY.AddRange([element.Y, element.Y + element.Height / 2, element.Y + element.Height]);
+        }
+
+        foreach (var candidate in candidatesX)
+        {
+            foreach (var moving in movingX)
             {
-                foreach (var moving in movingX)
+                var distance = Math.Abs(candidate - moving);
+                if (distance < bestX)
                 {
-                    var distance = Math.Abs(candidate - moving);
-                    if (distance < bestX)
-                    {
-                        bestX = distance;
-                        snappedX = x + candidate - moving;
-                        guideX = candidate;
-                    }
+                    bestX = distance;
+                    snappedX = x + candidate - moving;
+                    guideX = candidate;
                 }
             }
+        }
 
-            foreach (var candidate in new[] { element.Y, element.Y + element.Height / 2, element.Y + element.Height })
+        foreach (var candidate in candidatesY)
+        {
+            foreach (var moving in movingY)
             {
-                foreach (var moving in movingY)
+                var distance = Math.Abs(candidate - moving);
+                if (distance < bestY)
                 {
-                    var distance = Math.Abs(candidate - moving);
-                    if (distance < bestY)
-                    {
-                        bestY = distance;
-                        snappedY = y + candidate - moving;
-                        guideY = candidate;
-                    }
+                    bestY = distance;
+                    snappedY = y + candidate - moving;
+                    guideY = candidate;
                 }
             }
         }
