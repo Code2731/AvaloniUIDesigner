@@ -64,6 +64,7 @@ public sealed class PreviewWindow : Window
             "Avalonia.Controls.TextBox" => new TextBox { Watermark = "Type here" },
             "Avalonia.Controls.TextBlock" => new TextBlock { Text = "Text" },
             "Avalonia.Controls.CheckBox" => new CheckBox { Content = "CheckBox" },
+            "Avalonia.Controls.RadioButton" => new RadioButton { Content = "Option", GroupName = "Options" },
             "Avalonia.Controls.ToggleSwitch" => new ToggleSwitch { Content = "Toggle" },
             "Avalonia.Controls.ComboBox" => new ComboBox
             {
@@ -164,6 +165,23 @@ public sealed class PreviewWindow : Window
                     && bool.TryParse(isChecked, out var parsedIsChecked))
                 {
                     checkBox.IsChecked = parsedIsChecked;
+                }
+                break;
+            case RadioButton radioButton:
+                if (properties.TryGetValue("Content", out var radioButtonContent))
+                {
+                    radioButton.Content = radioButtonContent;
+                }
+
+                if (properties.TryGetValue("IsChecked", out var radioButtonIsChecked)
+                    && bool.TryParse(radioButtonIsChecked, out var parsedRadioButtonIsChecked))
+                {
+                    radioButton.IsChecked = parsedRadioButtonIsChecked;
+                }
+
+                if (properties.TryGetValue("GroupName", out var radioButtonGroupName))
+                {
+                    radioButton.GroupName = radioButtonGroupName;
                 }
                 break;
             case ToggleSwitch toggleSwitch:

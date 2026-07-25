@@ -476,6 +476,27 @@ public partial class CanvasViewModel : ViewModelBase
             return;
         }
 
+        if (visual is RadioButton radioButton)
+        {
+            if (properties.TryGetValue("Content", out var content))
+            {
+                radioButton.Content = content;
+            }
+
+            if (properties.TryGetValue("IsChecked", out var isChecked)
+                && bool.TryParse(isChecked, out var parsedIsChecked))
+            {
+                radioButton.IsChecked = parsedIsChecked;
+            }
+
+            if (properties.TryGetValue("GroupName", out var groupName))
+            {
+                radioButton.GroupName = groupName;
+            }
+
+            return;
+        }
+
         if (visual is ToggleSwitch toggleSwitch)
         {
             if (properties.TryGetValue("Content", out var content))

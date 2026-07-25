@@ -1169,6 +1169,17 @@ public partial class MainWindowViewModel : ViewModelBase
             };
         }
 
+        if (visual is RadioButton radioButton)
+        {
+            return new Dictionary<string, string>
+            {
+                ["Content"] = radioButton.Content?.ToString() ?? string.Empty,
+                ["IsChecked"] = (radioButton.IsChecked ?? false).ToString(),
+                ["GroupName"] = radioButton.GroupName ?? string.Empty,
+                ["Opacity"] = radioButton.Opacity.ToString("0.###", CultureInfo.InvariantCulture),
+            };
+        }
+
         if (visual is ToggleSwitch toggleSwitch)
         {
             return new Dictionary<string, string>
@@ -1565,6 +1576,7 @@ public partial class MainWindowViewModel : ViewModelBase
             "TextBox" => propertyName is "Text" or "Watermark",
             "TextBlock" => propertyName is "Text" or "FontSize" or "FontWeight" or "Foreground",
             "CheckBox" or "ToggleSwitch" => propertyName is "Content" or "IsChecked",
+            "RadioButton" => propertyName is "Content" or "IsChecked" or "GroupName",
             "ComboBox" or "ListBox" => propertyName == "SelectedIndex",
             "Slider" or "ProgressBar" => propertyName is "Minimum" or "Maximum" or "Value",
             "Border" => propertyName is "Background" or "BorderBrush" or "BorderThickness" or "CornerRadius",
@@ -1992,6 +2004,20 @@ public partial class MainWindowViewModel : ViewModelBase
                 AppendCanvasLayoutAttributes(sb, element);
                 AppendAttribute(sb, "Content", checkBox.Content?.ToString() ?? string.Empty);
                 AppendAttribute(sb, "IsChecked", (checkBox.IsChecked ?? false).ToString());
+                sb.AppendLine(" />");
+                break;
+
+            case RadioButton radioButton:
+                sb.Append(indent);
+                sb.Append("<RadioButton");
+                AppendCanvasLayoutAttributes(sb, element);
+                AppendAttribute(sb, "Content", radioButton.Content?.ToString() ?? string.Empty);
+                AppendAttribute(sb, "IsChecked", (radioButton.IsChecked ?? false).ToString());
+                if (!string.IsNullOrWhiteSpace(radioButton.GroupName))
+                {
+                    AppendAttribute(sb, "GroupName", radioButton.GroupName);
+                }
+
                 sb.AppendLine(" />");
                 break;
 

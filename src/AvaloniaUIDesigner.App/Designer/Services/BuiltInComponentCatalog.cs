@@ -37,6 +37,12 @@ public sealed class BuiltInComponentCatalog : IComponentCatalog
             DefaultHeight: 32,
             VisualFactory: static () => new CheckBox { Content = "CheckBox" }),
         new(
+            DisplayName: "RadioButton",
+            AvaloniaTypeName: "Avalonia.Controls.RadioButton",
+            DefaultWidth: 160,
+            DefaultHeight: 32,
+            VisualFactory: static () => new RadioButton { Content = "Option", GroupName = "Options" }),
+        new(
             DisplayName: "ToggleSwitch",
             AvaloniaTypeName: "Avalonia.Controls.ToggleSwitch",
             DefaultWidth: 180,

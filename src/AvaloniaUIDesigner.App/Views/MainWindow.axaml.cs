@@ -796,6 +796,11 @@ public partial class MainWindow : Window
             return propertyName is "Content" or "IsChecked";
         }
 
+        if (control is RadioButton)
+        {
+            return propertyName is "Content" or "IsChecked" or "GroupName";
+        }
+
         if (control is ComboBox or ListBox)
         {
             return propertyName == "SelectedIndex";
