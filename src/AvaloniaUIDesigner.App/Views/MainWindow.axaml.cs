@@ -545,7 +545,7 @@ public partial class MainWindow : Window
             return;
         }
 
-        if (e.Key == Key.Delete)
+        if (e.Key is Key.Delete or Key.Back)
         {
             FlushPendingPropertyHistory();
             Vm.RemoveSelectedElement();
