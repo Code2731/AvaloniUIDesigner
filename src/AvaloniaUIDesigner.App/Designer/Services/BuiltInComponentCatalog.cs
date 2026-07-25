@@ -177,6 +177,12 @@ public sealed class BuiltInComponentCatalog : IComponentCatalog
                 BorderBrush = Brush.Parse("#94A3B8"),
                 BorderThickness = new Thickness(1),
                 CornerRadius = new CornerRadius(8),
+                Child = new TextBlock
+                {
+                    Text = "Border content",
+                    HorizontalAlignment = HorizontalAlignment.Center,
+                    VerticalAlignment = VerticalAlignment.Center,
+                },
             }),
         new(
             DisplayName: "Grid",

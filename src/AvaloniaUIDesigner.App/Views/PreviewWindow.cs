@@ -124,6 +124,12 @@ public sealed class PreviewWindow : Window
                 BorderBrush = Brush.Parse("#94A3B8"),
                 BorderThickness = new Thickness(1),
                 CornerRadius = new CornerRadius(8),
+                Child = new TextBlock
+                {
+                    Text = "Border content",
+                    HorizontalAlignment = HorizontalAlignment.Center,
+                    VerticalAlignment = VerticalAlignment.Center,
+                },
             },
             "Avalonia.Controls.Grid" => new Grid { ShowGridLines = true },
             "Avalonia.Controls.StackPanel" => new StackPanel
@@ -728,6 +734,20 @@ public sealed class PreviewWindow : Window
             {
                 // Ignore malformed imported corner-radius values.
             }
+        }
+
+        if (properties.TryGetValue("__contentText", out var contentText))
+        {
+            border.Child = new TextBlock
+            {
+                Text = contentText,
+                HorizontalAlignment = HorizontalAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Center,
+            };
+        }
+        else
+        {
+            border.Child = null;
         }
     }
 

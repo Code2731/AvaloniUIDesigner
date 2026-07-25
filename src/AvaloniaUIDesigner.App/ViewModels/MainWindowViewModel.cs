@@ -439,33 +439,41 @@ public partial class MainWindowViewModel : ViewModelBase
     public bool TryGetSelectedExpanderContent(out string controlName, out string content)
     {
         var target = Canvas.SelectedElement;
-        if (target is null || target.IsLocked || target.Visual is not (Expander or ScrollViewer))
+        if (target is null || target.IsLocked || target.Visual is not (Expander or ScrollViewer or Border))
         {
             controlName = string.Empty;
             content = string.Empty;
-            StatusText = "Select an unlocked Expander or ScrollViewer to edit its content.";
+            StatusText = "Select an unlocked Expander, ScrollViewer, or Border to edit its content.";
             return false;
         }
 
         controlName = target.DisplayName;
-        content = target.Visual is Expander expander
-            ? ReadExpanderContent(expander)
-            : ReadScrollViewerContent((ScrollViewer)target.Visual);
+        content = target.Visual switch
+        {
+            Expander expander => ReadExpanderContent(expander),
+            ScrollViewer scrollViewer => ReadScrollViewerContent(scrollViewer),
+            Border border => ReadBorderContent(border),
+            _ => string.Empty,
+        };
         return true;
     }
 
     public void SetSelectedExpanderContent(string content)
     {
         var target = Canvas.SelectedElement;
-        if (target is null || target.IsLocked || target.Visual is not (Expander or ScrollViewer))
+        if (target is null || target.IsLocked || target.Visual is not (Expander or ScrollViewer or Border))
         {
-            StatusText = "Select an unlocked Expander or ScrollViewer to edit its content.";
+            StatusText = "Select an unlocked Expander, ScrollViewer, or Border to edit its content.";
             return;
         }
 
-        var currentContent = target.Visual is Expander expander
-            ? ReadExpanderContent(expander)
-            : ReadScrollViewerContent((ScrollViewer)target.Visual);
+        var currentContent = target.Visual switch
+        {
+            Expander expander => ReadExpanderContent(expander),
+            ScrollViewer scrollViewer => ReadScrollViewerContent(scrollViewer),
+            Border border => ReadBorderContent(border),
+            _ => string.Empty,
+        };
         if (string.Equals(currentContent, content, StringComparison.Ordinal))
         {
             StatusText = "Content is unchanged.";
@@ -477,9 +485,13 @@ public partial class MainWindowViewModel : ViewModelBase
         {
             SetExpanderContent(targetExpander, content);
         }
+        else if (target.Visual is ScrollViewer targetScrollViewer)
+        {
+            SetScrollViewerContent(targetScrollViewer, content);
+        }
         else
         {
-            SetScrollViewerContent((ScrollViewer)target.Visual, content);
+            SetBorderContent((Border)target.Visual, content);
         }
         CommitCanvasMutation();
         StatusText = $"Updated content for {target.DisplayName}.";
@@ -1764,6 +1776,11 @@ public partial class MainWindowViewModel : ViewModelBase
                 ["Opacity"] = border.Opacity.ToString("0.###", CultureInfo.InvariantCulture),
             };
 
+            if (border.Child is TextBlock)
+            {
+                properties["__contentText"] = ReadBorderContent(border);
+            }
+
             if (border.Background is SolidColorBrush background)
             {
                 properties["Background"] = background.Color.ToString();
@@ -1854,6 +1871,19 @@ public partial class MainWindowViewModel : ViewModelBase
 
     private static void SetScrollViewerContent(ScrollViewer scrollViewer, string content)
         => scrollViewer.Content = new TextBlock { Text = content, Margin = new Thickness(8) };
+
+    private static string ReadBorderContent(Border border)
+        => border.Child is TextBlock textBlock
+            ? textBlock.Text ?? string.Empty
+            : border.Child?.ToString() ?? string.Empty;
+
+    private static void SetBorderContent(Border border, string content)
+        => border.Child = new TextBlock
+        {
+            Text = content,
+            HorizontalAlignment = HorizontalAlignment.Center,
+            VerticalAlignment = VerticalAlignment.Center,
+        };
 
     private static bool AreSameDocument(DesignerCanvasDocument left, DesignerCanvasDocument right)
     {
@@ -2167,6 +2197,15 @@ public partial class MainWindowViewModel : ViewModelBase
             map["__contentText"] = element.Elements()
                 .FirstOrDefault(child => string.Equals(child.Name.LocalName, "TextBlock", StringComparison.OrdinalIgnoreCase))?
                 .Attribute("Text")?.Value ?? string.Empty;
+        }
+        else if (string.Equals(element.Name.LocalName, "Border", StringComparison.OrdinalIgnoreCase))
+        {
+            var content = element.Elements()
+                .FirstOrDefault(child => string.Equals(child.Name.LocalName, "TextBlock", StringComparison.OrdinalIgnoreCase));
+            if (content is not null)
+            {
+                map["__contentText"] = content.Attribute("Text")?.Value ?? string.Empty;
+            }
         }
 
         return map.Count == 0 ? null : map;
@@ -2911,7 +2950,19 @@ public partial class MainWindowViewModel : ViewModelBase
 
                 AppendAttribute(sb, "BorderThickness", border.BorderThickness.ToString());
                 AppendAttribute(sb, "CornerRadius", border.CornerRadius.ToString());
+                if (border.Child is not TextBlock)
+                {
+                    sb.AppendLine(" />");
+                    break;
+                }
+
+                sb.AppendLine(">");
+                sb.Append(indent);
+                sb.Append("  <TextBlock");
+                AppendAttribute(sb, "Text", ReadBorderContent(border));
                 sb.AppendLine(" />");
+                sb.Append(indent);
+                sb.AppendLine("</Border>");
                 break;
 
             case Grid grid:

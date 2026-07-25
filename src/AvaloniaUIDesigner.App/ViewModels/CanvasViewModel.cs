@@ -873,6 +873,15 @@ public partial class CanvasViewModel : ViewModelBase
                 border.CornerRadius = parsedCornerRadius;
             }
 
+            if (properties.TryGetValue("__contentText", out var contentText))
+            {
+                SetBorderContent(border, contentText);
+            }
+            else
+            {
+                border.Child = null;
+            }
+
             return;
         }
 
@@ -1056,6 +1065,14 @@ public partial class CanvasViewModel : ViewModelBase
 
     private static void SetScrollViewerContent(ScrollViewer scrollViewer, string contentText)
         => scrollViewer.Content = new TextBlock { Text = contentText, Margin = new Thickness(8) };
+
+    private static void SetBorderContent(Border border, string contentText)
+        => border.Child = new TextBlock
+        {
+            Text = contentText,
+            HorizontalAlignment = HorizontalAlignment.Center,
+            VerticalAlignment = VerticalAlignment.Center,
+        };
 
     private static void TrySetBorderBackground(Border border, string value)
     {
