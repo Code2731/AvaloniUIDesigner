@@ -475,6 +475,22 @@ public partial class CanvasViewModel : ViewModelBase
             return;
         }
 
+        if (visual is ToggleSwitch toggleSwitch)
+        {
+            if (properties.TryGetValue("Content", out var content))
+            {
+                toggleSwitch.Content = content;
+            }
+
+            if (properties.TryGetValue("IsChecked", out var isChecked)
+                && bool.TryParse(isChecked, out var parsedIsChecked))
+            {
+                toggleSwitch.IsChecked = parsedIsChecked;
+            }
+
+            return;
+        }
+
         if (visual is Slider slider)
         {
             if (properties.TryGetValue("Minimum", out var minimum)

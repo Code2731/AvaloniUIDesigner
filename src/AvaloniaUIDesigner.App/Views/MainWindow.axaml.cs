@@ -774,7 +774,7 @@ public partial class MainWindow : Window
             return propertyName is "Text" or "FontSize" or "FontWeight" or "Foreground";
         }
 
-        if (control is CheckBox)
+        if (control is CheckBox or ToggleSwitch)
         {
             return propertyName is "Content" or "IsChecked";
         }

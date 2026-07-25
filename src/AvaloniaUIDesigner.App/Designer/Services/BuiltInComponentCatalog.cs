@@ -35,6 +35,12 @@ public sealed class BuiltInComponentCatalog : IComponentCatalog
             DefaultHeight: 32,
             VisualFactory: static () => new CheckBox { Content = "CheckBox" }),
         new(
+            DisplayName: "ToggleSwitch",
+            AvaloniaTypeName: "Avalonia.Controls.ToggleSwitch",
+            DefaultWidth: 180,
+            DefaultHeight: 32,
+            VisualFactory: static () => new ToggleSwitch { Content = "Toggle" }),
+        new(
             DisplayName: "Slider",
             AvaloniaTypeName: "Avalonia.Controls.Slider",
             DefaultWidth: 180,

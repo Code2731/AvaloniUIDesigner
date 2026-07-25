@@ -64,6 +64,7 @@ public sealed class PreviewWindow : Window
             "Avalonia.Controls.TextBox" => new TextBox { Watermark = "Type here" },
             "Avalonia.Controls.TextBlock" => new TextBlock { Text = "Text" },
             "Avalonia.Controls.CheckBox" => new CheckBox { Content = "CheckBox" },
+            "Avalonia.Controls.ToggleSwitch" => new ToggleSwitch { Content = "Toggle" },
             "Avalonia.Controls.Slider" => new Slider { Minimum = 0, Maximum = 100, Value = 50 },
             "Avalonia.Controls.ProgressBar" => new ProgressBar { Minimum = 0, Maximum = 100, Value = 50 },
             "Avalonia.Controls.Grid" => new Grid { ShowGridLines = true },
@@ -146,6 +147,18 @@ public sealed class PreviewWindow : Window
                     && bool.TryParse(isChecked, out var parsedIsChecked))
                 {
                     checkBox.IsChecked = parsedIsChecked;
+                }
+                break;
+            case ToggleSwitch toggleSwitch:
+                if (properties.TryGetValue("Content", out var toggleSwitchContent))
+                {
+                    toggleSwitch.Content = toggleSwitchContent;
+                }
+
+                if (properties.TryGetValue("IsChecked", out var toggleSwitchIsChecked)
+                    && bool.TryParse(toggleSwitchIsChecked, out var parsedToggleSwitchIsChecked))
+                {
+                    toggleSwitch.IsChecked = parsedToggleSwitchIsChecked;
                 }
                 break;
             case Slider slider:

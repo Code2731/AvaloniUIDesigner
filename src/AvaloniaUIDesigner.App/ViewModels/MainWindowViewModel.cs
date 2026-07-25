@@ -1079,6 +1079,16 @@ public partial class MainWindowViewModel : ViewModelBase
             };
         }
 
+        if (visual is ToggleSwitch toggleSwitch)
+        {
+            return new Dictionary<string, string>
+            {
+                ["Content"] = toggleSwitch.Content?.ToString() ?? string.Empty,
+                ["IsChecked"] = (toggleSwitch.IsChecked ?? false).ToString(),
+                ["Opacity"] = toggleSwitch.Opacity.ToString("0.###", CultureInfo.InvariantCulture),
+            };
+        }
+
         if (visual is Slider slider)
         {
             return new Dictionary<string, string>
@@ -1401,7 +1411,7 @@ public partial class MainWindowViewModel : ViewModelBase
             "Button" => propertyName == "Content",
             "TextBox" => propertyName is "Text" or "Watermark",
             "TextBlock" => propertyName is "Text" or "FontSize" or "FontWeight" or "Foreground",
-            "CheckBox" => propertyName is "Content" or "IsChecked",
+            "CheckBox" or "ToggleSwitch" => propertyName is "Content" or "IsChecked",
             "Slider" or "ProgressBar" => propertyName is "Minimum" or "Maximum" or "Value",
             "Grid" => propertyName == "ShowGridLines",
             "StackPanel" => propertyName is "Orientation" or "Spacing",
@@ -1795,6 +1805,15 @@ public partial class MainWindowViewModel : ViewModelBase
                 AppendCanvasLayoutAttributes(sb, element);
                 AppendAttribute(sb, "Content", checkBox.Content?.ToString() ?? string.Empty);
                 AppendAttribute(sb, "IsChecked", (checkBox.IsChecked ?? false).ToString());
+                sb.AppendLine(" />");
+                break;
+
+            case ToggleSwitch toggleSwitch:
+                sb.Append(indent);
+                sb.Append("<ToggleSwitch");
+                AppendCanvasLayoutAttributes(sb, element);
+                AppendAttribute(sb, "Content", toggleSwitch.Content?.ToString() ?? string.Empty);
+                AppendAttribute(sb, "IsChecked", (toggleSwitch.IsChecked ?? false).ToString());
                 sb.AppendLine(" />");
                 break;
 
