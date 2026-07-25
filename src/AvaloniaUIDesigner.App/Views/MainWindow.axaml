@@ -190,7 +190,14 @@
                                                 Width="{Binding Width}"
                                                 Height="{Binding Height}"
                                                 PointerPressed="OnElementPointerPressed">
-                                            <ContentPresenter Content="{Binding Visual}"/>
+                                            <Grid>
+                                                <ContentPresenter Content="{Binding Visual}"/>
+                                                <Border Background="#B45309" CornerRadius="3" Padding="3,1"
+                                                        HorizontalAlignment="Right" VerticalAlignment="Top"
+                                                        Margin="2" IsVisible="{Binding IsLocked}">
+                                                    <TextBlock Text="LOCK" FontSize="9" FontWeight="Bold" Foreground="White"/>
+                                                </Border>
+                                            </Grid>
                                         </Border>
                                     </DataTemplate>
                                 </ItemsControl.ItemTemplate>
