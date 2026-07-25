@@ -571,6 +571,70 @@ public partial class MainWindowViewModel : ViewModelBase
             : $"Hid {targets.Count} control(s).";
     }
 
+    public bool TryGetSelectedLabelTarget(out string labelName, out string targetName)
+    {
+        if (Canvas.SelectedElement is not { IsLocked: false, Visual: Label label } target)
+        {
+            labelName = string.Empty;
+            targetName = string.Empty;
+            StatusText = "Select an unlocked Label to edit its target.";
+            return false;
+        }
+
+        labelName = target.DisplayName;
+        targetName = label.Tag?.ToString() ?? string.Empty;
+        return true;
+    }
+
+    public void SetSelectedLabelTarget(string targetName)
+    {
+        if (Canvas.SelectedElement is not { IsLocked: false, Visual: Label label } source)
+        {
+            StatusText = "Select an unlocked Label to edit its target.";
+            return;
+        }
+
+        var normalizedName = targetName.Trim();
+        if (string.IsNullOrEmpty(normalizedName))
+        {
+            if (label.Target is null && label.Tag is null)
+            {
+                StatusText = "Label target is unchanged.";
+                return;
+            }
+
+            BeginCanvasMutation(HistoryActionType.EditProperty, "Cleared label target.");
+            label.Target = null;
+            label.Tag = null;
+            CommitCanvasMutation();
+            StatusText = $"Cleared target for {source.DisplayName}.";
+            return;
+        }
+
+        var target = Canvas.Elements.FirstOrDefault(element => string.Equals(
+            element.DisplayName,
+            normalizedName,
+            StringComparison.OrdinalIgnoreCase));
+        if (target is null || ReferenceEquals(target, source))
+        {
+            StatusText = "Choose the name of another control on the canvas.";
+            return;
+        }
+
+        if (ReferenceEquals(label.Target, target.Visual)
+            && string.Equals(label.Tag?.ToString(), target.DisplayName, StringComparison.Ordinal))
+        {
+            StatusText = "Label target is unchanged.";
+            return;
+        }
+
+        BeginCanvasMutation(HistoryActionType.EditProperty, "Updated label target.");
+        label.Target = target.Visual;
+        label.Tag = target.DisplayName;
+        CommitCanvasMutation();
+        StatusText = $"Linked {source.DisplayName} to {target.DisplayName}.";
+    }
+
     public bool TryGetSelectedTabIndex(out string controlName, out int tabIndex)
     {
         var target = Canvas.SelectedElement;
@@ -658,7 +722,16 @@ public partial class MainWindowViewModel : ViewModelBase
         }
 
         BeginCanvasMutation(HistoryActionType.EditProperty, "Renamed control.");
+        var oldName = element.DisplayName;
         element.DisplayName = name;
+        foreach (var label in Canvas.Elements.Select(candidate => candidate.Visual).OfType<Label>())
+        {
+            if (ReferenceEquals(label.Target, element.Visual)
+                || string.Equals(label.Tag?.ToString(), oldName, StringComparison.OrdinalIgnoreCase))
+            {
+                label.Tag = name;
+            }
+        }
         ObjectTree.RebuildFrom(Canvas.Elements);
         ObjectTree.SelectByElement(element);
         CommitCanvasMutation();
@@ -874,6 +947,16 @@ public partial class MainWindowViewModel : ViewModelBase
         }
 
         BeginCanvasMutation(HistoryActionType.RemoveElement, "Removed control from canvas.");
+        var removedVisuals = targets.Select(target => target.Visual).ToHashSet();
+        foreach (var label in Canvas.Elements.Select(element => element.Visual).OfType<Label>())
+        {
+            if (label.Target is Control labelTarget && removedVisuals.Contains(labelTarget))
+            {
+                label.Target = null;
+                label.Tag = null;
+            }
+        }
+
         foreach (var target in targets)
         {
             Canvas.RemoveElement(target);
@@ -1459,6 +1542,16 @@ public partial class MainWindowViewModel : ViewModelBase
             return properties;
         }
 
+        if (visual is Label label)
+        {
+            return new Dictionary<string, string>
+            {
+                ["Content"] = label.Content?.ToString() ?? string.Empty,
+                ["Target"] = label.Tag?.ToString() ?? string.Empty,
+                ["Opacity"] = label.Opacity.ToString("0.###", CultureInfo.InvariantCulture),
+            };
+        }
+
         if (visual is Image image)
         {
             return new Dictionary<string, string>
@@ -2033,6 +2126,7 @@ public partial class MainWindowViewModel : ViewModelBase
             "Button" => propertyName == "Content",
             "TextBox" => propertyName is "Text" or "Watermark" or "PasswordChar" or "RevealPassword",
             "TextBlock" => propertyName is "Text" or "FontSize" or "FontWeight" or "Foreground",
+            "Label" => propertyName is "Content" or "Target",
             "Image" => propertyName is "Source" or "Stretch",
             "CheckBox" or "ToggleSwitch" => propertyName is "Content" or "IsChecked",
             "ToggleButton" => propertyName is "Content" or "IsChecked",
@@ -2495,6 +2589,19 @@ public partial class MainWindowViewModel : ViewModelBase
                 AppendAttribute(sb, "FontSize", textBlock.FontSize.ToString("0.###", CultureInfo.InvariantCulture));
                 AppendAttribute(sb, "FontWeight", textBlock.FontWeight.ToString());
                 AppendTextForegroundAttribute(sb, textBlock);
+                sb.AppendLine(" />");
+                break;
+
+            case Label label:
+                sb.Append(indent);
+                sb.Append("<Label");
+                AppendCanvasLayoutAttributes(sb, element);
+                AppendAttribute(sb, "Content", label.Content?.ToString() ?? string.Empty);
+                if (!string.IsNullOrWhiteSpace(label.Tag?.ToString()))
+                {
+                    AppendAttribute(sb, "Target", label.Tag?.ToString() ?? string.Empty);
+                }
+
                 sb.AppendLine(" />");
                 break;
 

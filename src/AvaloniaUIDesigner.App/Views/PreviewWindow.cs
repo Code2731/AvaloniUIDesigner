@@ -35,6 +35,7 @@ public sealed class PreviewWindow : Window
             Height = Math.Max(settings.Height, document.Elements.Count == 0 ? 0 : document.Elements.Max(element => element.Y + element.Height + 32)),
         };
 
+        var controlsByName = new Dictionary<string, Control>(StringComparer.OrdinalIgnoreCase);
         foreach (var element in document.Elements)
         {
             var control = CreateControl(element);
@@ -43,6 +44,15 @@ public sealed class PreviewWindow : Window
             Canvas.SetLeft(control, element.X);
             Canvas.SetTop(control, element.Y);
             canvas.Children.Add(control);
+            controlsByName[element.DisplayName] = control;
+        }
+
+        foreach (var label in controlsByName.Values.OfType<Label>())
+        {
+            if (label.Tag is string targetName && controlsByName.TryGetValue(targetName, out var target))
+            {
+                label.Target = target;
+            }
         }
 
         Content = new Border
@@ -65,6 +75,7 @@ public sealed class PreviewWindow : Window
             "Avalonia.Controls.Button" => new Button { Content = "Button" },
             "Avalonia.Controls.TextBox" => new TextBox { Watermark = "Type here" },
             "Avalonia.Controls.TextBlock" => new TextBlock { Text = "Text" },
+            "Avalonia.Controls.Label" => new Label { Content = "Label" },
             "Avalonia.Controls.Image" => new Image { Stretch = Stretch.Uniform },
             "Avalonia.Controls.CheckBox" => new CheckBox { Content = "CheckBox" },
             "Avalonia.Controls.RadioButton" => new RadioButton { Content = "Option", GroupName = "Options" },
@@ -220,6 +231,17 @@ public sealed class PreviewWindow : Window
                 {
                     TrySetTextForeground(textBlock, foreground);
                 }
+                break;
+            case Label label:
+                if (properties.TryGetValue("Content", out var labelContent))
+                {
+                    label.Content = labelContent;
+                }
+
+                label.Tag = properties.TryGetValue("Target", out var targetName)
+                    && !string.IsNullOrWhiteSpace(targetName)
+                    ? targetName
+                    : null;
                 break;
             case Image image:
                 ApplyImageProperties(image, properties);

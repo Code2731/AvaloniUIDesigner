@@ -360,6 +360,24 @@ public partial class MainWindow : Window
         Vm?.ToggleSelectedVisibility();
     }
 
+    private async void OnEditLabelTargetMenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        FlushPendingPropertyHistory();
+        if (Vm is null || !Vm.TryGetSelectedLabelTarget(out var labelName, out var targetName))
+        {
+            return;
+        }
+
+        var updatedTargetName = await ShowTextEditorDialogAsync(
+            $"Edit Label Target - {labelName}",
+            targetName,
+            "Enter another control's name, or leave blank to clear the focus association.");
+        if (updatedTargetName is not null)
+        {
+            Vm.SetSelectedLabelTarget(updatedTargetName);
+        }
+    }
+
     private async void OnEditTabOrderMenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
         FlushPendingPropertyHistory();
@@ -916,6 +934,11 @@ public partial class MainWindow : Window
         if (control is TextBlock)
         {
             return propertyName is "Text" or "FontSize" or "FontWeight" or "Foreground";
+        }
+
+        if (control is Label)
+        {
+            return propertyName == "Content";
         }
 
         if (control is Image)

@@ -31,6 +31,12 @@ public sealed class BuiltInComponentCatalog : IComponentCatalog
             DefaultHeight: 24,
             VisualFactory: static () => new TextBlock { Text = "Text" }),
         new(
+            DisplayName: "Label",
+            AvaloniaTypeName: "Avalonia.Controls.Label",
+            DefaultWidth: 160,
+            DefaultHeight: 28,
+            VisualFactory: static () => new Label { Content = "Label" }),
+        new(
             DisplayName: "Image",
             AvaloniaTypeName: "Avalonia.Controls.Image",
             DefaultWidth: 240,

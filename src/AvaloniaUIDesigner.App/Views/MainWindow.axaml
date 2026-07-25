@@ -58,6 +58,7 @@
                 <MenuItem Header="Edit Accessible Name..." Click="OnEditAccessibleNameMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
                 <MenuItem Header="Enable / Disable Selected" Click="OnToggleEnabledMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
                 <MenuItem Header="Show / Hide Selected" Click="OnToggleVisibilityMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
+                <MenuItem Header="Edit Label Target..." Click="OnEditLabelTargetMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
                 <MenuItem Header="Edit Tab Order..." Click="OnEditTabOrderMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
                 <MenuItem Header="Include / Exclude from Tab Navigation" Click="OnToggleTabStopMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
                 <MenuItem Header="Choose Image..." Click="OnChooseImageMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>

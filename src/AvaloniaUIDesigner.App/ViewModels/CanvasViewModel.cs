@@ -155,6 +155,7 @@ public partial class CanvasViewModel : ViewModelBase
             select,
             preserveDisplayName: true);
         element.IsLocked = snapshot.IsLocked;
+        ResolveLabelTargets();
         return element;
     }
 
@@ -181,8 +182,22 @@ public partial class CanvasViewModel : ViewModelBase
                 select: false));
         }
 
+        ResolveLabelTargets();
         SelectMany(placed);
         return placed;
+    }
+
+    public void ResolveLabelTargets()
+    {
+        var elementsByName = Elements.ToDictionary(element => element.DisplayName, StringComparer.OrdinalIgnoreCase);
+        foreach (var label in Elements.Select(element => element.Visual).OfType<Label>())
+        {
+            var targetName = label.Tag?.ToString();
+            label.Target = !string.IsNullOrWhiteSpace(targetName)
+                && elementsByName.TryGetValue(targetName, out var target)
+                ? target.Visual
+                : null;
+        }
     }
 
     public void Clear()
@@ -514,6 +529,20 @@ public partial class CanvasViewModel : ViewModelBase
                 TrySetTextForeground(textBlock, foreground);
             }
 
+            return;
+        }
+
+        if (visual is Label label)
+        {
+            if (properties.TryGetValue("Content", out var content))
+            {
+                label.Content = content;
+            }
+
+            label.Tag = properties.TryGetValue("Target", out var targetName)
+                && !string.IsNullOrWhiteSpace(targetName)
+                ? targetName
+                : null;
             return;
         }
 
