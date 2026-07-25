@@ -172,6 +172,17 @@ public partial class MainWindowViewModel : ViewModelBase
         StatusText = $"Set opacity to {normalizedOpacity * 100:0}% for {targets.Count} control(s)";
     }
 
+    public void ToggleSelectedLock()
+    {
+        var targets = Canvas.SelectedElements.ToList();
+        if (targets.Count == 0) return;
+        BeginCanvasMutation(HistoryActionType.EditProperty, "Updated control lock state.");
+        var locked = targets.Any(element => !element.IsLocked);
+        foreach (var element in targets) element.IsLocked = locked;
+        CommitCanvasMutation();
+        StatusText = locked ? $"Locked {targets.Count} control(s)" : $"Unlocked {targets.Count} control(s)";
+    }
+
     public void MoveSelectedElement(double deltaX, double deltaY)
     {
         var targets = Canvas.SelectedElements.ToList();
@@ -709,7 +720,8 @@ public partial class MainWindowViewModel : ViewModelBase
                 e.Y,
                 e.Width,
                 e.Height,
-                CaptureVisualProperties(e.Visual)))
+                CaptureVisualProperties(e.Visual),
+                e.IsLocked))
             .ToList();
 
         return new DesignerCanvasDocument(snapshots, CaptureCanvasSettings());

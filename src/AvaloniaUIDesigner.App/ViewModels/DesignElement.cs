@@ -29,5 +29,8 @@ public partial class DesignElement : ViewModelBase
     [NotifyPropertyChangedFor(nameof(SelectionThickness))]
     private bool _isSelected;
 
+    [ObservableProperty]
+    private bool _isLocked;
+
     public double SelectionThickness => IsSelected ? 2.0 : 0.0;
 }

@@ -18,4 +18,5 @@ public sealed record DesignerElementSnapshot(
     double Y,
     double Width,
     double Height,
-    IReadOnlyDictionary<string, string>? VisualProperties = null);
+    IReadOnlyDictionary<string, string>? VisualProperties = null,
+    bool IsLocked = false);

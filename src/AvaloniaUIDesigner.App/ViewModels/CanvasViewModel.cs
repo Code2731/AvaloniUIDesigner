@@ -131,7 +131,7 @@ public partial class CanvasViewModel : ViewModelBase
 
         ApplyVisualProperties(visual, snapshot.VisualProperties);
 
-        return AddElement(
+        var element = AddElement(
             snapshot.DisplayName,
             snapshot.TypeName,
             visual,
@@ -141,6 +141,8 @@ public partial class CanvasViewModel : ViewModelBase
             height,
             select,
             preserveDisplayName: true);
+        element.IsLocked = snapshot.IsLocked;
+        return element;
     }
 
     public IReadOnlyList<DesignElement> PlacePreset(ToolboxItem preset, double x, double y)

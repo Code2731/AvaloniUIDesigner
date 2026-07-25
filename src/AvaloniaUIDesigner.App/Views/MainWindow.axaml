@@ -45,6 +45,7 @@
                 <MenuItem Header="{Binding RedoMenuLabel}" Click="OnRedoMenuClicked" IsEnabled="{Binding CanRedo}"/>
                 <Separator/>
                 <MenuItem Header="Select All" Click="OnSelectAllMenuClicked"/>
+                <MenuItem Header="Lock / Unlock Selection" Click="OnToggleLockMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
                 <Separator/>
                 <MenuItem Header="Copy" Click="OnCopyMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
                 <MenuItem Header="Paste" Click="OnPasteMenuClicked" IsEnabled="{Binding CanPaste}"/>

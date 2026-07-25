@@ -190,6 +190,9 @@ public partial class MainWindow : Window
         }
     }
 
+    private void OnToggleLockMenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+        => Vm?.ToggleSelectedLock();
+
     private void OnOpacity100MenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
         => SetSelectionOpacity(1);
 
@@ -877,6 +880,14 @@ public partial class MainWindow : Window
     {
         if (Vm is null || sender is not Control { DataContext: DesignElement element })
         {
+            return;
+        }
+
+        if (element.IsLocked)
+        {
+            Vm.SelectElement(element);
+            Vm.StatusText = "Selected locked control.";
+            e.Handled = true;
             return;
         }
 
