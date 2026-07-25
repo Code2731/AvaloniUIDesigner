@@ -37,6 +37,8 @@
                 <MenuItem Header="Save" Click="OnSaveMenuClicked"/>
                 <MenuItem Header="Save As..." Click="OnSaveAsMenuClicked"/>
                 <MenuItem Header="Copy AXAML to Clipboard" Click="OnCopyAxamlMenuClicked"/>
+                <MenuItem Header="Copy UserControl AXAML" Click="OnCopyUserControlAxamlMenuClicked"/>
+                <MenuItem Header="Export UserControl AXAML..." Click="OnExportUserControlAxamlMenuClicked"/>
                 <MenuItem Header="Validate AXAML" Click="OnValidateAxamlMenuClicked"/>
                 <Separator/>
                 <MenuItem Header="Exit" Click="OnExitMenuClicked"/>

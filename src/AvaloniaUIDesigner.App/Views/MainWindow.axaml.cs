@@ -151,15 +151,87 @@ public partial class MainWindow : Window
         }
 
         FlushPendingPropertyHistory();
-        var clipboard = TopLevel.GetTopLevel(this)?.Clipboard;
-        if (clipboard is null)
+        await CopyAxamlToClipboardAsync(Vm.ExportFullAxaml(), "Copied Window AXAML to clipboard.");
+    }
+
+    private async void OnCopyUserControlAxamlMenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        if (Vm is null)
         {
-            Vm.StatusText = "Clipboard is unavailable.";
             return;
         }
 
-        await clipboard.SetTextAsync(Vm.ExportFullAxaml());
-        Vm.StatusText = "Copied generated AXAML to clipboard.";
+        FlushPendingPropertyHistory();
+        await CopyAxamlToClipboardAsync(Vm.ExportUserControlAxaml(), "Copied UserControl AXAML to clipboard.");
+    }
+
+    private async void OnExportUserControlAxamlMenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        if (Vm is null)
+        {
+            return;
+        }
+
+        FlushPendingPropertyHistory();
+        var file = await StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
+        {
+            Title = "Export UserControl AXAML",
+            SuggestedFileName = "DesignView.axaml",
+            DefaultExtension = "axaml",
+            FileTypeChoices =
+            [
+                new FilePickerFileType("AXAML") { Patterns = ["*.axaml"] }
+            ]
+        });
+
+        if (file is null)
+        {
+            return;
+        }
+
+        try
+        {
+            var axaml = Vm.ExportUserControlAxaml();
+            var localPath = file.TryGetLocalPath();
+            if (!string.IsNullOrWhiteSpace(localPath))
+            {
+                await AtomicFileWriter.WriteAllTextAsync(localPath, axaml);
+            }
+            else
+            {
+                await using var stream = await file.OpenWriteAsync();
+                stream.SetLength(0);
+                using var writer = new StreamWriter(stream);
+                await writer.WriteAsync(axaml);
+                await writer.FlushAsync();
+            }
+
+            Vm.StatusText = $"Exported UserControl AXAML to {file.Name}.";
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        {
+            Vm.StatusText = $"Could not export {file.Name}: {exception.Message}";
+        }
+    }
+
+    private async Task CopyAxamlToClipboardAsync(string axaml, string successStatus)
+    {
+        var clipboard = TopLevel.GetTopLevel(this)?.Clipboard;
+        if (clipboard is null)
+        {
+            if (Vm is not null)
+            {
+                Vm.StatusText = "Clipboard is unavailable.";
+            }
+
+            return;
+        }
+
+        await clipboard.SetTextAsync(axaml);
+        if (Vm is not null)
+        {
+            Vm.StatusText = successStatus;
+        }
     }
 
     private void OnValidateAxamlMenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)

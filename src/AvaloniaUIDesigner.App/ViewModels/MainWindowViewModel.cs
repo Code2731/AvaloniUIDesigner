@@ -1215,13 +1215,22 @@ public partial class MainWindowViewModel : ViewModelBase
 
     public DesignerCanvasDocument CreatePreviewDocument() => CaptureDocument();
 
-    public string ExportFullAxaml()
+    public string ExportFullAxaml() => ExportAxamlDocument("Window");
+
+    public string ExportUserControlAxaml() => ExportAxamlDocument("UserControl");
+
+    private string ExportAxamlDocument(string rootElementName)
     {
         var settings = CaptureCanvasSettings();
         var sb = new StringBuilder();
-        sb.AppendLine("<Window xmlns=\"https://github.com/avaloniaui\"");
+        sb.AppendLine($"<{rootElementName} xmlns=\"https://github.com/avaloniaui\"");
         sb.AppendLine("        xmlns:x=\"http://schemas.microsoft.com/winfx/2006/xaml\"");
         sb.AppendLine($"        Width=\"{settings.Width:0.###}\" Height=\"{settings.Height:0.###}\">");
+        if (string.Equals(rootElementName, "UserControl", StringComparison.Ordinal))
+        {
+            sb.AppendLine("  <!-- Add x:Class when pairing this layout with a code-behind file. -->");
+        }
+
         sb.AppendLine($"  <Canvas Width=\"{settings.Width:0.###}\" Height=\"{settings.Height:0.###}\" Background=\"{EscapeXmlAttribute(settings.Background)}\">");
         sb.AppendLine($"    <!-- {DesignerMetadataPrefix} GridSize={settings.GridSize.ToString(\"0.###\", CultureInfo.InvariantCulture)}; IsGridVisible={settings.IsGridVisible}; SnapToGrid={settings.SnapToGrid} -->");
 
@@ -1236,7 +1245,7 @@ public partial class MainWindowViewModel : ViewModelBase
         }
 
         sb.AppendLine("  </Canvas>");
-        sb.AppendLine("</Window>");
+        sb.AppendLine($"</{rootElementName}>");
         return sb.ToString();
     }
 
@@ -1298,6 +1307,29 @@ public partial class MainWindowViewModel : ViewModelBase
                 .SequenceEqual(Canvas.Elements.Select(element => element.IsLocked)))
             {
                 result = "Validation failed: exported control lock states do not match.";
+                return false;
+            }
+
+            var userControlWarnings = new List<string>();
+            var userControlAxaml = ExportUserControlAxaml();
+            var userControlRoot = XDocument.Parse(userControlAxaml).Root;
+            if (!string.Equals(userControlRoot?.Name.LocalName, "UserControl", StringComparison.Ordinal))
+            {
+                result = "Validation failed: UserControl export has an invalid root element.";
+                return false;
+            }
+
+            var userControl = ParseDraftDocument(userControlAxaml, userControlWarnings);
+            if (!userControl.Elements.Select(element => element.DisplayName)
+                .SequenceEqual(Canvas.Elements.Select(element => element.DisplayName), StringComparer.Ordinal))
+            {
+                result = "Validation failed: UserControl export does not preserve control names.";
+                return false;
+            }
+
+            if (userControl.Settings != settings)
+            {
+                result = "Validation failed: UserControl export does not preserve canvas settings.";
                 return false;
             }
         }
