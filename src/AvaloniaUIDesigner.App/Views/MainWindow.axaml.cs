@@ -1007,6 +1007,13 @@ public partial class MainWindow : Window
             return;
         }
 
+        if (target.IsLocked)
+        {
+            Vm?.StatusText = "Selected control is locked.";
+            e.Handled = true;
+            return;
+        }
+
         var mode = tag switch
         {
             "N" => DragMode.N,
