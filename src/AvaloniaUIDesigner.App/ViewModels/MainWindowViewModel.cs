@@ -48,6 +48,18 @@ public sealed record BindingEditorState(
     IReadOnlyList<string> Lines,
     IReadOnlyList<string> SupportedProperties);
 
+public sealed record LayoutEditorState(
+    string ControlName,
+    string Margin,
+    string Padding,
+    bool SupportsPadding,
+    string HorizontalAlignment,
+    string VerticalAlignment,
+    string MinWidth,
+    string MinHeight,
+    string MaxWidth,
+    string MaxHeight);
+
 public sealed record GridDefinitionEditorState(
     string ControlName,
     string RowDefinitions,
@@ -2560,6 +2572,99 @@ public partial class MainWindowViewModel : ViewModelBase
         return true;
     }
 
+    public bool TryGetSelectedLayoutProperties(out LayoutEditorState state)
+    {
+        var target = Canvas.SelectedElement;
+        if (target is null)
+        {
+            state = new LayoutEditorState(
+                string.Empty,
+                "0",
+                "0",
+                false,
+                HorizontalAlignment.Stretch.ToString(),
+                VerticalAlignment.Stretch.ToString(),
+                "0",
+                "0",
+                string.Empty,
+                string.Empty);
+            StatusText = "Select a control before editing layout properties.";
+            return false;
+        }
+
+        if (target.IsLocked)
+        {
+            state = new LayoutEditorState(
+                string.Empty,
+                "0",
+                "0",
+                false,
+                HorizontalAlignment.Stretch.ToString(),
+                VerticalAlignment.Stretch.ToString(),
+                "0",
+                "0",
+                string.Empty,
+                string.Empty);
+            StatusText = "Unlock the selected control before editing layout properties.";
+            return false;
+        }
+
+        var values = DesignerLayoutRuntime.Read(target.Visual);
+        state = new LayoutEditorState(
+            target.DisplayName,
+            DesignerLayoutRuntime.FormatThickness(values.Margin),
+            DesignerLayoutRuntime.FormatThickness(values.Padding),
+            DesignerLayoutRuntime.SupportsPadding(target.Visual),
+            values.HorizontalAlignment.ToString(),
+            values.VerticalAlignment.ToString(),
+            DesignerLayoutRuntime.FormatNumber(values.MinWidth),
+            DesignerLayoutRuntime.FormatNumber(values.MinHeight),
+            DesignerLayoutRuntime.FormatMaximum(values.MaxWidth),
+            DesignerLayoutRuntime.FormatMaximum(values.MaxHeight));
+        return true;
+    }
+
+    public bool SetSelectedLayoutProperties(
+        string margin,
+        string padding,
+        string horizontalAlignment,
+        string verticalAlignment,
+        string minWidth,
+        string minHeight,
+        string maxWidth,
+        string maxHeight)
+    {
+        var target = Canvas.SelectedElement;
+        if (target is null || target.IsLocked)
+        {
+            StatusText = "Select an unlocked control before editing layout properties.";
+            return false;
+        }
+
+        if (!DesignerLayoutRuntime.TryParseValues(
+                target.Visual,
+                margin,
+                padding,
+                horizontalAlignment,
+                verticalAlignment,
+                minWidth,
+                minHeight,
+                maxWidth,
+                maxHeight,
+                out var values,
+                out var error))
+        {
+            StatusText = $"Layout properties were not changed. {error}";
+            return false;
+        }
+
+        BeginCanvasMutation(HistoryActionType.EditProperty, "Updated common layout properties.");
+        DesignerLayoutRuntime.Apply(target.Visual, values);
+        CommitCanvasMutation();
+        StatusText = $"Updated layout constraints for {target.DisplayName}.";
+        return true;
+    }
+
     public string GetSampleDataEditorText()
         => _sampleDataJson ?? """
         {
@@ -4487,6 +4592,7 @@ public partial class MainWindowViewModel : ViewModelBase
             ? new Dictionary<string, string>(StringComparer.Ordinal)
             : new Dictionary<string, string>(properties, StringComparer.Ordinal);
         CaptureCommonAppearanceProperties(result, visual);
+        DesignerLayoutRuntime.Capture(visual, result);
         foreach (var pair in DesignerResourceReferenceMetadata.GetReferences(visual))
         {
             result[pair.Key] = DesignerResourceReferenceMetadata.FormatExpression(pair.Value);
@@ -5230,6 +5336,14 @@ public partial class MainWindowViewModel : ViewModelBase
             "FontWeight",
             "Opacity",
             "Classes",
+            "Margin",
+            "Padding",
+            "HorizontalAlignment",
+            "VerticalAlignment",
+            "MinWidth",
+            "MinHeight",
+            "MaxWidth",
+            "MaxHeight",
         })
         {
             var expectedBinding = ReadSnapshotBindings(expected).FirstOrDefault(binding =>
@@ -5940,6 +6054,26 @@ public partial class MainWindowViewModel : ViewModelBase
                 continue;
             }
 
+            if (DesignerLayoutRuntime.IsSupportedProperty(tagName, name))
+            {
+                if (DesignerLayoutRuntime.TryNormalizeProperty(
+                        tagName,
+                        name,
+                        attr.Value,
+                        out var canonicalName,
+                        out var normalizedValue,
+                        out var layoutError))
+                {
+                    map[canonicalName] = normalizedValue;
+                }
+                else
+                {
+                    warnings.Add($"Ignored {tagName}.{name}: {layoutError}");
+                }
+
+                continue;
+            }
+
             if (IsSupportedVisualProperty(tagName, name))
             {
                 map[name] = attr.Value;
@@ -5948,6 +6082,15 @@ public partial class MainWindowViewModel : ViewModelBase
             {
                 warnings.Add($"Ignored unsupported property {tagName}.{name}.");
             }
+        }
+
+        if (!DesignerLayoutRuntime.TryValidateConstraints(map, out var constraintError))
+        {
+            warnings.Add($"Ignored {tagName} size constraints: {constraintError}");
+            map.Remove("MinWidth");
+            map.Remove("MinHeight");
+            map.Remove("MaxWidth");
+            map.Remove("MaxHeight");
         }
 
         if (string.Equals(element.Name.LocalName, "Grid", StringComparison.OrdinalIgnoreCase))
@@ -6028,6 +6171,11 @@ public partial class MainWindowViewModel : ViewModelBase
 
     private static bool IsSupportedVisualProperty(string tagName, string propertyName)
     {
+        if (DesignerLayoutRuntime.IsSupportedProperty(tagName, propertyName))
+        {
+            return true;
+        }
+
         if (propertyName is "Opacity" or "Classes")
         {
             return true;
@@ -8214,6 +8362,7 @@ public partial class MainWindowViewModel : ViewModelBase
         }
 
         AppendCommonAppearanceAttributes(sb, element.Visual);
+        AppendCommonLayoutAttributes(sb, element.Visual);
         if (ToolTip.GetTip(element.Visual) is { } toolTip && !string.IsNullOrWhiteSpace(toolTip.ToString()))
         {
             AppendAttribute(sb, "ToolTip.Tip", toolTip.ToString() ?? string.Empty);
@@ -8571,6 +8720,29 @@ public partial class MainWindowViewModel : ViewModelBase
                     shape.IsSet(Shape.StrokeProperty)
                         && !ShouldSuppressInlineStyleProperty(visual, "Stroke"));
                 break;
+        }
+    }
+
+    private static void AppendCommonLayoutAttributes(StringBuilder sb, Control visual)
+    {
+        var properties = new Dictionary<string, string>(StringComparer.Ordinal);
+        DesignerLayoutRuntime.Capture(visual, properties);
+        foreach (var propertyName in new[]
+                 {
+                     "Margin",
+                     "Padding",
+                     "HorizontalAlignment",
+                     "VerticalAlignment",
+                     "MinWidth",
+                     "MinHeight",
+                     "MaxWidth",
+                     "MaxHeight",
+                 })
+        {
+            if (properties.TryGetValue(propertyName, out var value))
+            {
+                AppendAttribute(sb, propertyName, value);
+            }
         }
     }
 

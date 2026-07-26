@@ -2134,6 +2134,7 @@ public partial class CanvasViewModel : ViewModelBase
             SetUserStyleClasses(visual, classes);
         }
 
+        DesignerLayoutRuntime.Apply(visual, properties);
         ApplyTemplatedAppearanceProperties(visual, properties);
 
         if (properties.TryGetValue("__toolTip", out var toolTip))

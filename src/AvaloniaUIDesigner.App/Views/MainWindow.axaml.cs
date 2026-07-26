@@ -625,6 +625,19 @@ public partial class MainWindow : Window
         }
     }
 
+    private async void OnEditLayoutPropertiesMenuClicked(
+        object? sender,
+        Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        FlushPendingPropertyHistory();
+        if (Vm is null || !Vm.TryGetSelectedLayoutProperties(out var state))
+        {
+            return;
+        }
+
+        await ShowLayoutPropertiesDialogAsync(state);
+    }
+
     private async void OnEditGridDefinitionsMenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
         FlushPendingPropertyHistory();
@@ -2739,6 +2752,143 @@ public partial class MainWindow : Window
         dialog.Content = content;
 
         return await dialog.ShowDialog<IReadOnlyList<string>?>(this);
+    }
+
+    private async Task ShowLayoutPropertiesDialogAsync(LayoutEditorState state)
+    {
+        if (Vm is null)
+        {
+            return;
+        }
+
+        var marginEditor = new TextBox { Text = state.Margin };
+        var paddingEditor = new TextBox
+        {
+            Text = state.Padding,
+            IsEnabled = state.SupportsPadding,
+            Watermark = state.SupportsPadding ? null : "Not supported by this control",
+        };
+        var horizontalEditor = new ComboBox
+        {
+            ItemsSource = Enum.GetNames<HorizontalAlignment>(),
+            SelectedItem = state.HorizontalAlignment,
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+        };
+        var verticalEditor = new ComboBox
+        {
+            ItemsSource = Enum.GetNames<VerticalAlignment>(),
+            SelectedItem = state.VerticalAlignment,
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+        };
+        var minWidthEditor = new TextBox { Text = state.MinWidth };
+        var minHeightEditor = new TextBox { Text = state.MinHeight };
+        var maxWidthEditor = new TextBox
+        {
+            Text = state.MaxWidth,
+            Watermark = "No maximum",
+        };
+        var maxHeightEditor = new TextBox
+        {
+            Text = state.MaxHeight,
+            Watermark = "No maximum",
+        };
+        var errorText = new TextBlock
+        {
+            Foreground = Avalonia.Media.Brushes.IndianRed,
+            TextWrapping = Avalonia.Media.TextWrapping.Wrap,
+        };
+        var dialog = new Window
+        {
+            Title = $"Edit Layout Properties - {state.ControlName}",
+            Width = 620,
+            Height = 500,
+            MinWidth = 520,
+            MinHeight = 430,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner,
+        };
+        var applyButton = new Button { Content = "Apply", MinWidth = 84 };
+        applyButton.Click += (_, _) =>
+        {
+            if (!Vm.SetSelectedLayoutProperties(
+                    marginEditor.Text ?? string.Empty,
+                    paddingEditor.Text ?? string.Empty,
+                    horizontalEditor.SelectedItem?.ToString() ?? string.Empty,
+                    verticalEditor.SelectedItem?.ToString() ?? string.Empty,
+                    minWidthEditor.Text ?? string.Empty,
+                    minHeightEditor.Text ?? string.Empty,
+                    maxWidthEditor.Text ?? string.Empty,
+                    maxHeightEditor.Text ?? string.Empty))
+            {
+                errorText.Text = Vm.StatusText;
+                return;
+            }
+
+            dialog.Close();
+        };
+        var cancelButton = new Button { Content = "Cancel", MinWidth = 84 };
+        cancelButton.Click += (_, _) => dialog.Close();
+        var buttons = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            Spacing = 8,
+            HorizontalAlignment = HorizontalAlignment.Right,
+            Children = { cancelButton, applyButton },
+        };
+        var fields = new Grid
+        {
+            ColumnDefinitions = new ColumnDefinitions("*,*"),
+            RowDefinitions = new RowDefinitions("Auto,Auto,Auto,Auto"),
+            ColumnSpacing = 12,
+            RowSpacing = 10,
+        };
+        AddField("Margin", marginEditor, 0, 0);
+        AddField("Padding", paddingEditor, 0, 1);
+        AddField("Horizontal alignment", horizontalEditor, 1, 0);
+        AddField("Vertical alignment", verticalEditor, 1, 1);
+        AddField("Minimum width", minWidthEditor, 2, 0);
+        AddField("Minimum height", minHeightEditor, 2, 1);
+        AddField("Maximum width", maxWidthEditor, 3, 0);
+        AddField("Maximum height", maxHeightEditor, 3, 1);
+
+        var content = new Grid
+        {
+            Margin = new Thickness(16),
+            RowDefinitions = new RowDefinitions("Auto,*,Auto,Auto"),
+            RowSpacing = 12,
+            Children =
+            {
+                new TextBlock
+                {
+                    Text = "Thickness accepts 1, 2, or 4 comma-separated values. Leave a maximum blank for no limit.",
+                    TextWrapping = Avalonia.Media.TextWrapping.Wrap,
+                },
+                fields,
+                errorText,
+                buttons,
+            },
+        };
+        Grid.SetRow(fields, 1);
+        Grid.SetRow(errorText, 2);
+        Grid.SetRow(buttons, 3);
+        dialog.Content = content;
+        await dialog.ShowDialog(this);
+        return;
+
+        void AddField(string label, Control editor, int row, int column)
+        {
+            var field = new StackPanel
+            {
+                Spacing = 4,
+                Children =
+                {
+                    new TextBlock { Text = label },
+                    editor,
+                },
+            };
+            Grid.SetRow(field, row);
+            Grid.SetColumn(field, column);
+            fields.Children.Add(field);
+        }
     }
 
     private async Task ShowSampleDataEditorDialogAsync(string source)
