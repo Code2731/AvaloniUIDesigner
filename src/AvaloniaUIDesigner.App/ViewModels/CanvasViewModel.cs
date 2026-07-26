@@ -1103,11 +1103,14 @@ public partial class CanvasViewModel : ViewModelBase
             return;
         }
 
-        if (visual is Grid grid
-            && properties.TryGetValue("ShowGridLines", out var showGrid)
-            && bool.TryParse(showGrid, out var parsedShowGrid))
+        if (visual is Grid grid)
         {
-            grid.ShowGridLines = parsedShowGrid;
+            DesignerGridDefinitionRuntime.TryApply(grid, properties, out _);
+            if (properties.TryGetValue("ShowGridLines", out var showGrid)
+                && bool.TryParse(showGrid, out var parsedShowGrid))
+            {
+                grid.ShowGridLines = parsedShowGrid;
+            }
         }
     }
 

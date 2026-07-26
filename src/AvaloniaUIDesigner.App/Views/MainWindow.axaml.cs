@@ -25,6 +25,7 @@ public partial class MainWindow : Window
     private enum UnsavedChoice { Save, Discard, Cancel }
     private sealed record ComponentPackExportOptions(string PackName, string DisplayName, string NamePrefix);
     private sealed record ColorResourceApplicationOptions(string ResourceName, string PropertyName);
+    private sealed record GridDefinitionOptions(string RowDefinitions, string ColumnDefinitions, bool ShowGridLines);
 
     private const double HandleHalf = 5;
     private const double MinSize = 10;
@@ -573,6 +574,24 @@ public partial class MainWindow : Window
         if (updatedItems is not null)
         {
             Vm.SetSelectedItems(updatedItems);
+        }
+    }
+
+    private async void OnEditGridDefinitionsMenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        FlushPendingPropertyHistory();
+        if (Vm is null || !Vm.TryGetSelectedGridDefinitions(out var state))
+        {
+            return;
+        }
+
+        var updated = await ShowGridDefinitionsDialogAsync(state);
+        if (updated is not null)
+        {
+            Vm.SetSelectedGridDefinitions(
+                updated.RowDefinitions,
+                updated.ColumnDefinitions,
+                updated.ShowGridLines);
         }
     }
 
@@ -1388,7 +1407,7 @@ public partial class MainWindow : Window
 
         if (control is Grid)
         {
-            return propertyName == "ShowGridLines";
+            return propertyName is "RowDefinitions" or "ColumnDefinitions" or "ShowGridLines";
         }
 
         return false;
@@ -2286,6 +2305,92 @@ public partial class MainWindow : Window
         dialog.Content = content;
 
         return await dialog.ShowDialog<IReadOnlyList<string>?>(this);
+    }
+
+    private async Task<GridDefinitionOptions?> ShowGridDefinitionsDialogAsync(GridDefinitionEditorState state)
+    {
+        var rowsEditor = new TextBox { Text = state.RowDefinitions };
+        var columnsEditor = new TextBox { Text = state.ColumnDefinitions };
+        var showLinesEditor = new CheckBox
+        {
+            Content = "Show grid lines on the design surface and preview",
+            IsChecked = state.ShowGridLines,
+        };
+        var errorText = new TextBlock
+        {
+            Foreground = Avalonia.Media.Brushes.IndianRed,
+            TextWrapping = Avalonia.Media.TextWrapping.Wrap,
+        };
+        var dialog = new Window
+        {
+            Title = $"Edit Grid Definitions - {state.ControlName}",
+            Width = 500,
+            Height = 350,
+            MinWidth = 400,
+            MinHeight = 300,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner,
+        };
+
+        var applyButton = new Button { Content = "Apply", MinWidth = 84 };
+        applyButton.Click += (_, _) =>
+        {
+            var rowDefinitions = rowsEditor.Text ?? string.Empty;
+            var columnDefinitions = columnsEditor.Text ?? string.Empty;
+            if (!DesignerGridDefinitionRuntime.TryParse(
+                    rowDefinitions,
+                    columnDefinitions,
+                    out _,
+                    out _,
+                    out var error))
+            {
+                errorText.Text = error;
+                return;
+            }
+
+            dialog.Close(new GridDefinitionOptions(
+                rowDefinitions,
+                columnDefinitions,
+                showLinesEditor.IsChecked == true));
+        };
+        var cancelButton = new Button { Content = "Cancel", MinWidth = 84 };
+        cancelButton.Click += (_, _) => dialog.Close(null);
+        var buttons = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            Spacing = 8,
+            HorizontalAlignment = HorizontalAlignment.Right,
+            Children = { cancelButton, applyButton },
+        };
+        var fields = new StackPanel
+        {
+            Spacing = 6,
+            Children =
+            {
+                new TextBlock { Text = "Rows" },
+                rowsEditor,
+                new TextBlock { Text = "Columns" },
+                columnsEditor,
+                showLinesEditor,
+                errorText,
+            },
+        };
+        var help = new TextBlock
+        {
+            Text = "Use comma-separated Avalonia GridLength values such as Auto,*,2*,96. Leave a field empty for one implicit cell.",
+            TextWrapping = Avalonia.Media.TextWrapping.Wrap,
+        };
+        var content = new Grid
+        {
+            Margin = new Thickness(16),
+            RowDefinitions = new RowDefinitions("Auto,*,Auto"),
+            RowSpacing = 12,
+            Children = { help, fields, buttons },
+        };
+        Grid.SetRow(fields, 1);
+        Grid.SetRow(buttons, 2);
+        dialog.Content = content;
+
+        return await dialog.ShowDialog<GridDefinitionOptions?>(this);
     }
 
     private async Task<ComponentPackExportOptions?> ShowComponentPackExportDialogAsync(

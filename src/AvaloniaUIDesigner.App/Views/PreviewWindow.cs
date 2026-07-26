@@ -142,7 +142,12 @@ public sealed class PreviewWindow : Window
                     VerticalAlignment = VerticalAlignment.Center,
                 },
             },
-            "Avalonia.Controls.Grid" => new Grid { ShowGridLines = true },
+            "Avalonia.Controls.Grid" => new Grid
+            {
+                RowDefinitions = new RowDefinitions("*,*"),
+                ColumnDefinitions = new ColumnDefinitions("*,*"),
+                ShowGridLines = true,
+            },
             "Avalonia.Controls.StackPanel" => new StackPanel
             {
                 Orientation = Orientation.Vertical,
@@ -419,9 +424,13 @@ public sealed class PreviewWindow : Window
             case Border border:
                 ApplyBorderProperties(border, properties, colorResources);
                 break;
-            case Grid grid when properties.TryGetValue("ShowGridLines", out var showGrid)
-                && bool.TryParse(showGrid, out var parsedShowGrid):
-                grid.ShowGridLines = parsedShowGrid;
+            case Grid grid:
+                DesignerGridDefinitionRuntime.TryApply(grid, properties, out _);
+                if (properties.TryGetValue("ShowGridLines", out var showGrid)
+                    && bool.TryParse(showGrid, out var parsedShowGrid))
+                {
+                    grid.ShowGridLines = parsedShowGrid;
+                }
                 break;
             case StackPanel stackPanel:
                 ApplyStackPanelProperties(stackPanel, properties);

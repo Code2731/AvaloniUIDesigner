@@ -193,7 +193,9 @@ public sealed class BuiltInComponentCatalog : IComponentCatalog
             DefaultHeight: 160,
             VisualFactory: static () => new Grid
             {
-                ShowGridLines = true
+                RowDefinitions = new RowDefinitions("*,*"),
+                ColumnDefinitions = new ColumnDefinitions("*,*"),
+                ShowGridLines = true,
             }),
         new(
             DisplayName: "StackPanel",

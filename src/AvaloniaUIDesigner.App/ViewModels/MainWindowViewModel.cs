@@ -23,6 +23,12 @@ namespace AvaloniaUIDesigner.App.ViewModels;
 
 public sealed record StylePreviewOption(string DisplayName, string? PseudoClass);
 
+public sealed record GridDefinitionEditorState(
+    string ControlName,
+    string RowDefinitions,
+    string ColumnDefinitions,
+    bool ShowGridLines);
+
 public partial class MainWindowViewModel : ViewModelBase
 {
     private const string DesignerMetadataPrefix = "AvaloniaUIDesigner:";
@@ -923,6 +929,61 @@ public partial class MainWindowViewModel : ViewModelBase
         StatusText = enableMultiline
             ? $"Enabled multiline input for {targets.Count} TextBox control(s)."
             : $"Enabled single-line input for {targets.Count} TextBox control(s).";
+    }
+
+    public bool TryGetSelectedGridDefinitions(out GridDefinitionEditorState state)
+    {
+        if (Canvas.SelectedElement is not { Visual: Grid grid } target)
+        {
+            state = new GridDefinitionEditorState(string.Empty, string.Empty, string.Empty, false);
+            StatusText = "Select a Grid to edit its row and column definitions.";
+            return false;
+        }
+
+        if (target.IsLocked)
+        {
+            state = new GridDefinitionEditorState(string.Empty, string.Empty, string.Empty, false);
+            StatusText = "Unlock the selected Grid before editing its definitions.";
+            return false;
+        }
+
+        state = new GridDefinitionEditorState(
+            target.DisplayName,
+            DesignerGridDefinitionRuntime.Format(grid.RowDefinitions),
+            DesignerGridDefinitionRuntime.Format(grid.ColumnDefinitions),
+            grid.ShowGridLines);
+        return true;
+    }
+
+    public bool SetSelectedGridDefinitions(
+        string rowDefinitions,
+        string columnDefinitions,
+        bool showGridLines)
+    {
+        if (Canvas.SelectedElement is not { IsLocked: false, Visual: Grid grid } target)
+        {
+            StatusText = "Select an unlocked Grid to edit its definitions.";
+            return false;
+        }
+
+        if (!DesignerGridDefinitionRuntime.TryParse(
+                rowDefinitions,
+                columnDefinitions,
+                out var parsedRows,
+                out var parsedColumns,
+                out var error))
+        {
+            StatusText = error;
+            return false;
+        }
+
+        BeginCanvasMutation(HistoryActionType.EditProperty, "Updated Grid definitions.");
+        grid.RowDefinitions = parsedRows;
+        grid.ColumnDefinitions = parsedColumns;
+        grid.ShowGridLines = showGridLines;
+        CommitCanvasMutation();
+        StatusText = $"Updated Grid definitions for {target.DisplayName}.";
+        return true;
     }
 
     public bool TryGetSelectedItems(out string controlName, out IReadOnlyList<string> items)
@@ -2774,6 +2835,8 @@ public partial class MainWindowViewModel : ViewModelBase
         {
             return new Dictionary<string, string>
             {
+                ["RowDefinitions"] = DesignerGridDefinitionRuntime.Format(grid.RowDefinitions),
+                ["ColumnDefinitions"] = DesignerGridDefinitionRuntime.Format(grid.ColumnDefinitions),
                 ["ShowGridLines"] = grid.ShowGridLines.ToString(),
                 ["Opacity"] = grid.Opacity.ToString("0.###", CultureInfo.InvariantCulture),
             };
@@ -3323,7 +3386,12 @@ public partial class MainWindowViewModel : ViewModelBase
             }
         }
 
-        if (string.Equals(element.Name.LocalName, "StackPanel", StringComparison.OrdinalIgnoreCase))
+        if (string.Equals(element.Name.LocalName, "Grid", StringComparison.OrdinalIgnoreCase))
+        {
+            map.TryAdd("RowDefinitions", string.Empty);
+            map.TryAdd("ColumnDefinitions", string.Empty);
+        }
+        else if (string.Equals(element.Name.LocalName, "StackPanel", StringComparison.OrdinalIgnoreCase))
         {
             map["__children"] = SerializeStackPanelChildren(element);
         }
@@ -3389,7 +3457,7 @@ public partial class MainWindowViewModel : ViewModelBase
             "Expander" => propertyName is "Header" or "IsExpanded",
             "ScrollViewer" => false,
             "Border" => propertyName is "Background" or "BorderBrush" or "BorderThickness" or "CornerRadius",
-            "Grid" => propertyName == "ShowGridLines",
+            "Grid" => propertyName is "RowDefinitions" or "ColumnDefinitions" or "ShowGridLines",
             "StackPanel" => propertyName is "Orientation" or "Spacing",
             _ => false,
         };
@@ -4665,6 +4733,18 @@ public partial class MainWindowViewModel : ViewModelBase
                 sb.Append(indent);
                 sb.Append("<Grid");
                 AppendCanvasLayoutAttributes(sb, element);
+                var rowDefinitions = DesignerGridDefinitionRuntime.Format(grid.RowDefinitions);
+                var columnDefinitions = DesignerGridDefinitionRuntime.Format(grid.ColumnDefinitions);
+                if (!string.IsNullOrWhiteSpace(rowDefinitions))
+                {
+                    AppendAttribute(sb, "RowDefinitions", rowDefinitions);
+                }
+
+                if (!string.IsNullOrWhiteSpace(columnDefinitions))
+                {
+                    AppendAttribute(sb, "ColumnDefinitions", columnDefinitions);
+                }
+
                 AppendAttribute(sb, "ShowGridLines", grid.ShowGridLines.ToString());
                 sb.AppendLine(" />");
                 break;

@@ -58,6 +58,7 @@
                 <MenuItem Header="Rename Selected Control..." Click="OnRenameSelectedControlMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
                 <MenuItem Header="Delete" Click="OnDeleteMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
                 <MenuItem Header="Edit Items..." Click="OnEditItemsMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
+                <MenuItem Header="Edit Grid Definitions..." Click="OnEditGridDefinitionsMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
                 <MenuItem Header="Edit Content..." Click="OnEditExpanderContentMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
                 <MenuItem Header="Edit Click Handler..." Click="OnEditButtonClickHandlerMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
                 <MenuItem Header="Edit Tooltip..." Click="OnEditToolTipMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
@@ -309,6 +310,7 @@
                                                     <MenuItem Header="Duplicate" Click="OnDuplicateMenuClicked"/>
                                                     <MenuItem Header="Rename..." Click="OnRenameSelectedControlMenuClicked"/>
                                                     <MenuItem Header="Edit Appearance..." Click="OnEditAppearanceMenuClicked"/>
+                                                    <MenuItem Header="Edit Grid Definitions..." Click="OnEditGridDefinitionsMenuClicked"/>
                                                     <MenuItem Header="Delete" Click="OnDeleteMenuClicked"/>
                                                     <Separator/>
                                                     <MenuItem Header="Lock / Unlock Selection" Click="OnToggleLockMenuClicked"/>
