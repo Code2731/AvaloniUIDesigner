@@ -6,7 +6,6 @@ using System.Globalization;
 using System.Linq;
 using System.Text.Json;
 using Avalonia;
-using Avalonia.Automation;
 using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
 using Avalonia.Controls.Shapes;
@@ -2137,17 +2136,8 @@ public partial class CanvasViewModel : ViewModelBase
         DesignerLayoutRuntime.Apply(visual, properties);
         DesignerTypographyRuntime.Apply(visual, properties);
         DesignerTransformRuntime.Apply(visual, properties);
+        DesignerAccessibilityRuntime.Apply(visual, properties);
         ApplyTemplatedAppearanceProperties(visual, properties);
-
-        if (properties.TryGetValue("__toolTip", out var toolTip))
-        {
-            ToolTip.SetTip(visual, string.IsNullOrWhiteSpace(toolTip) ? null : toolTip);
-        }
-
-        if (properties.TryGetValue("__automationName", out var automationName))
-        {
-            AutomationProperties.SetName(visual, automationName);
-        }
 
         if (properties.TryGetValue("__isEnabled", out var isEnabled)
             && bool.TryParse(isEnabled, out var parsedIsEnabled))
@@ -2159,18 +2149,6 @@ public partial class CanvasViewModel : ViewModelBase
             && bool.TryParse(isVisible, out var parsedIsVisible))
         {
             visual.IsVisible = parsedIsVisible;
-        }
-
-        if (properties.TryGetValue("__tabIndex", out var tabIndex)
-            && int.TryParse(tabIndex, NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsedTabIndex))
-        {
-            visual.TabIndex = parsedTabIndex;
-        }
-
-        if (properties.TryGetValue("__isTabStop", out var isTabStop)
-            && bool.TryParse(isTabStop, out var parsedIsTabStop))
-        {
-            visual.IsTabStop = parsedIsTabStop;
         }
 
         if (visual is Shape shape)

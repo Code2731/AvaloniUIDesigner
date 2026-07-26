@@ -4,7 +4,6 @@ using System.Globalization;
 using System.Linq;
 using System.Text.Json;
 using Avalonia;
-using Avalonia.Automation;
 using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
 using Avalonia.Controls.Shapes;
@@ -455,17 +454,8 @@ public sealed class PreviewWindow : Window
         DesignerLayoutRuntime.Apply(control, properties);
         DesignerTypographyRuntime.Apply(control, properties);
         DesignerTransformRuntime.Apply(control, properties);
+        DesignerAccessibilityRuntime.Apply(control, properties);
         ApplyTemplatedAppearanceProperties(control, properties, colorResources);
-
-        if (properties.TryGetValue("__toolTip", out var toolTip))
-        {
-            ToolTip.SetTip(control, string.IsNullOrWhiteSpace(toolTip) ? null : toolTip);
-        }
-
-        if (properties.TryGetValue("__automationName", out var automationName))
-        {
-            AutomationProperties.SetName(control, automationName);
-        }
 
         if (properties.TryGetValue("__isEnabled", out var isEnabled)
             && bool.TryParse(isEnabled, out var parsedIsEnabled))
@@ -477,18 +467,6 @@ public sealed class PreviewWindow : Window
             && bool.TryParse(isVisible, out var parsedIsVisible))
         {
             control.IsVisible = parsedIsVisible;
-        }
-
-        if (properties.TryGetValue("__tabIndex", out var tabIndex)
-            && int.TryParse(tabIndex, NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsedTabIndex))
-        {
-            control.TabIndex = parsedTabIndex;
-        }
-
-        if (properties.TryGetValue("__isTabStop", out var isTabStop)
-            && bool.TryParse(isTabStop, out var parsedIsTabStop))
-        {
-            control.IsTabStop = parsedIsTabStop;
         }
 
         switch (control)

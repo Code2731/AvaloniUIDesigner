@@ -626,6 +626,15 @@ public sealed class AxamlDocumentSerializer : IDesignerSerializer
             return;
         }
 
+        foreach (var attribute in DesignerAccessibilityRuntime.GetAxamlAttributes(properties))
+        {
+            sb.Append(" ");
+            sb.Append(attribute.Name);
+            sb.Append("=\"");
+            sb.Append(EscapeXmlAttribute(attribute.Value));
+            sb.Append("\"");
+        }
+
         var bindings = ReadBindings(properties);
         foreach (var binding in bindings)
         {
@@ -684,6 +693,9 @@ public sealed class AxamlDocumentSerializer : IDesignerSerializer
             .Replace("&", "&amp;")
             .Replace("\"", "&quot;")
             .Replace("<", "&lt;")
-            .Replace(">", "&gt;");
+            .Replace(">", "&gt;")
+            .Replace("\r", "&#13;")
+            .Replace("\n", "&#10;")
+            .Replace("\t", "&#9;");
     }
 }

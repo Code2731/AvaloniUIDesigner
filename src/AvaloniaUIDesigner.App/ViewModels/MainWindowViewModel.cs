@@ -93,6 +93,20 @@ public sealed record TransformEditorState(
     string OriginX,
     string OriginY);
 
+public sealed record AccessibilityEditorState(
+    string ControlName,
+    string ToolTip,
+    string AccessibleName,
+    string AutomationId,
+    string HelpText,
+    string AccessibilityView,
+    string HeadingLevel,
+    string LiveSetting,
+    bool IsRequiredForForm,
+    string TabIndex,
+    bool IsTabStop,
+    bool Focusable);
+
 public sealed record GridDefinitionEditorState(
     string ControlName,
     string RowDefinitions,
@@ -3376,6 +3390,107 @@ public partial class MainWindowViewModel : ViewModelBase
         StatusText = $"Updated content for {target.DisplayName}.";
     }
 
+    public bool TryGetSelectedAccessibilityProperties(out AccessibilityEditorState state)
+    {
+        var target = Canvas.SelectedElement;
+        if (target is null || target.IsLocked)
+        {
+            state = new AccessibilityEditorState(
+                string.Empty,
+                string.Empty,
+                string.Empty,
+                string.Empty,
+                string.Empty,
+                AccessibilityView.Default.ToString(),
+                "0",
+                AutomationLiveSetting.Off.ToString(),
+                false,
+                int.MaxValue.ToString(CultureInfo.InvariantCulture),
+                true,
+                true);
+            StatusText = target is { IsLocked: true }
+                ? "Unlock the selected control before editing accessibility and navigation."
+                : "Select a control before editing accessibility and navigation.";
+            return false;
+        }
+
+        state = CreateAccessibilityEditorState(
+            target.DisplayName,
+            DesignerAccessibilityRuntime.Read(target.Visual));
+        return true;
+    }
+
+    public bool SetSelectedAccessibilityProperties(
+        string toolTip,
+        string accessibleName,
+        string automationId,
+        string helpText,
+        string accessibilityView,
+        string headingLevel,
+        string liveSetting,
+        bool isRequiredForForm,
+        string tabIndex,
+        bool isTabStop,
+        bool focusable)
+    {
+        var target = Canvas.SelectedElement;
+        if (target is null || target.IsLocked)
+        {
+            StatusText = "Select an unlocked control before editing accessibility and navigation.";
+            return false;
+        }
+
+        if (!DesignerAccessibilityRuntime.TryParseValues(
+                toolTip,
+                accessibleName,
+                automationId,
+                helpText,
+                accessibilityView,
+                headingLevel,
+                liveSetting,
+                isRequiredForForm,
+                tabIndex,
+                isTabStop,
+                focusable,
+                out var values,
+                out var error))
+        {
+            StatusText = $"Accessibility properties were not changed. {error}";
+            return false;
+        }
+
+        if (DesignerAccessibilityRuntime.Read(target.Visual) == values)
+        {
+            StatusText = "Accessibility and navigation properties are unchanged.";
+            return true;
+        }
+
+        BeginCanvasMutation(
+            HistoryActionType.EditProperty,
+            "Updated accessibility and navigation properties.");
+        DesignerAccessibilityRuntime.Apply(target.Visual, values);
+        CommitCanvasMutation();
+        StatusText = $"Updated accessibility and navigation for {target.DisplayName}.";
+        return true;
+    }
+
+    private static AccessibilityEditorState CreateAccessibilityEditorState(
+        string controlName,
+        DesignerAccessibilityValues values)
+        => new(
+            controlName,
+            values.ToolTip,
+            values.AccessibleName,
+            values.AutomationId,
+            values.HelpText,
+            values.AccessibilityView.ToString(),
+            values.HeadingLevel.ToString(CultureInfo.InvariantCulture),
+            values.LiveSetting.ToString(),
+            values.IsRequiredForForm,
+            values.TabIndex.ToString(CultureInfo.InvariantCulture),
+            values.IsTabStop,
+            values.Focusable);
+
     public bool TryGetSelectedToolTip(out string controlName, out string toolTip)
     {
         var target = Canvas.SelectedElement;
@@ -4985,8 +5100,6 @@ public partial class MainWindowViewModel : ViewModelBase
     private IReadOnlyDictionary<string, string>? CaptureVisualPropertiesWithoutSample(Control visual)
     {
         var properties = CaptureVisualPropertiesCore(visual);
-        var toolTip = ToolTip.GetTip(visual)?.ToString();
-        var automationName = AutomationProperties.GetName(visual);
 
         var result = properties is null
             ? new Dictionary<string, string>(StringComparer.Ordinal)
@@ -4995,6 +5108,7 @@ public partial class MainWindowViewModel : ViewModelBase
         DesignerLayoutRuntime.Capture(visual, result);
         DesignerTypographyRuntime.Capture(visual, result);
         DesignerTransformRuntime.Capture(visual, result);
+        DesignerAccessibilityRuntime.Capture(visual, result);
         foreach (var pair in DesignerResourceReferenceMetadata.GetReferences(visual))
         {
             result[pair.Key] = DesignerResourceReferenceMetadata.FormatExpression(pair.Value);
@@ -5019,16 +5133,6 @@ public partial class MainWindowViewModel : ViewModelBase
             result["Classes"] = string.Join(" ", classes);
         }
 
-        if (!string.IsNullOrWhiteSpace(toolTip))
-        {
-            result["__toolTip"] = toolTip;
-        }
-
-        if (!string.IsNullOrWhiteSpace(automationName))
-        {
-            result["__automationName"] = automationName;
-        }
-
         var bindings = DesignerBindingRuntime.ReadBindings(visual);
         if (bindings.Count > 0)
         {
@@ -5045,9 +5149,6 @@ public partial class MainWindowViewModel : ViewModelBase
             result["__isVisible"] = bool.FalseString;
         }
 
-        // Defaults vary by control type, so preserve both keyboard navigation values explicitly.
-        result["__tabIndex"] = visual.TabIndex.ToString(CultureInfo.InvariantCulture);
-        result["__isTabStop"] = visual.IsTabStop.ToString();
         if (visual is Button { Tag: ButtonClickHandlerMetadata clickHandler }
             && !string.IsNullOrWhiteSpace(clickHandler.HandlerName))
         {
@@ -6636,21 +6737,28 @@ public partial class MainWindowViewModel : ViewModelBase
                 continue;
             }
 
-            if (name == "ToolTip.Tip")
-            {
-                map["__toolTip"] = attr.Value;
-                continue;
-            }
-
             if (tagName == "Button" && name == "Click")
             {
                 map["__clickHandler"] = attr.Value;
                 continue;
             }
 
-            if (name == "AutomationProperties.Name")
+            if (DesignerAccessibilityRuntime.IsSupportedAxamlProperty(name))
             {
-                map["__automationName"] = attr.Value;
+                if (DesignerAccessibilityRuntime.TryNormalizeAxamlProperty(
+                        name,
+                        attr.Value,
+                        out var internalKey,
+                        out var normalizedValue,
+                        out var accessibilityError))
+                {
+                    map[internalKey] = normalizedValue;
+                }
+                else
+                {
+                    warnings.Add($"Ignored {tagName}.{name}: {accessibilityError}");
+                }
+
                 continue;
             }
 
@@ -6663,18 +6771,6 @@ public partial class MainWindowViewModel : ViewModelBase
             if (name == "IsVisible")
             {
                 map["__isVisible"] = attr.Value;
-                continue;
-            }
-
-            if (name == "TabIndex")
-            {
-                map["__tabIndex"] = attr.Value;
-                continue;
-            }
-
-            if (name == "IsTabStop")
-            {
-                map["__isTabStop"] = attr.Value;
                 continue;
             }
 
@@ -9025,16 +9121,7 @@ public partial class MainWindowViewModel : ViewModelBase
         AppendCommonLayoutAttributes(sb, element.Visual);
         AppendCommonTypographyAttributes(sb, element.Visual);
         AppendCommonTransformAttributes(sb, element.Visual);
-        if (ToolTip.GetTip(element.Visual) is { } toolTip && !string.IsNullOrWhiteSpace(toolTip.ToString()))
-        {
-            AppendAttribute(sb, "ToolTip.Tip", toolTip.ToString() ?? string.Empty);
-        }
-
-        var automationName = AutomationProperties.GetName(element.Visual);
-        if (!string.IsNullOrWhiteSpace(automationName))
-        {
-            AppendAttribute(sb, "AutomationProperties.Name", automationName);
-        }
+        AppendCommonAccessibilityAttributes(sb, element.Visual);
 
         if (!element.Visual.IsEnabled)
         {
@@ -9046,8 +9133,6 @@ public partial class MainWindowViewModel : ViewModelBase
             AppendAttribute(sb, "IsVisible", bool.FalseString);
         }
 
-        AppendAttribute(sb, "TabIndex", element.Visual.TabIndex.ToString(CultureInfo.InvariantCulture));
-        AppendAttribute(sb, "IsTabStop", element.Visual.IsTabStop.ToString());
     }
 
     private bool HasValidGridParent(DesignElement element)
@@ -9443,6 +9528,16 @@ public partial class MainWindowViewModel : ViewModelBase
         }
     }
 
+    private static void AppendCommonAccessibilityAttributes(StringBuilder sb, Control visual)
+    {
+        var properties = new Dictionary<string, string>(StringComparer.Ordinal);
+        DesignerAccessibilityRuntime.Capture(visual, properties);
+        foreach (var attribute in DesignerAccessibilityRuntime.GetAxamlAttributes(properties))
+        {
+            AppendAttribute(sb, attribute.Name, attribute.Value);
+        }
+    }
+
     private static void AppendBrushAppearanceAttribute(
         StringBuilder sb,
         Control visual,
@@ -9503,7 +9598,10 @@ public partial class MainWindowViewModel : ViewModelBase
             .Replace("&", "&amp;")
             .Replace("\"", "&quot;")
             .Replace("<", "&lt;")
-            .Replace(">", "&gt;");
+            .Replace(">", "&gt;")
+            .Replace("\r", "&#13;")
+            .Replace("\n", "&#10;")
+            .Replace("\t", "&#9;");
     }
 
     public enum HistoryActionType

@@ -664,6 +664,19 @@ public partial class MainWindow : Window
         await ShowTransformPropertiesDialogAsync(state);
     }
 
+    private async void OnEditAccessibilityPropertiesMenuClicked(
+        object? sender,
+        Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        FlushPendingPropertyHistory();
+        if (Vm is null || !Vm.TryGetSelectedAccessibilityProperties(out var state))
+        {
+            return;
+        }
+
+        await ShowAccessibilityPropertiesDialogAsync(state);
+    }
+
     private async void OnEditGridDefinitionsMenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
         FlushPendingPropertyHistory();
@@ -3029,6 +3042,184 @@ public partial class MainWindow : Window
                 new TextBlock
                 {
                     Text = "Transform the rendered control without changing its layout slot. Origin values are percentages from 0 to 100.",
+                    TextWrapping = Avalonia.Media.TextWrapping.Wrap,
+                },
+                fields,
+                errorText,
+                buttons,
+            },
+        };
+        Grid.SetRow(fields, 1);
+        Grid.SetRow(errorText, 2);
+        Grid.SetRow(buttons, 3);
+        dialog.Content = content;
+        await dialog.ShowDialog(this);
+        return;
+
+        void AddField(string label, Control editor, int row, int column)
+        {
+            var field = new StackPanel
+            {
+                Spacing = 4,
+                Children =
+                {
+                    new TextBlock { Text = label },
+                    editor,
+                },
+            };
+            Grid.SetRow(field, row);
+            Grid.SetColumn(field, column);
+            fields.Children.Add(field);
+        }
+    }
+
+    private async Task ShowAccessibilityPropertiesDialogAsync(AccessibilityEditorState state)
+    {
+        if (Vm is null)
+        {
+            return;
+        }
+
+        var accessibleNameEditor = new TextBox
+        {
+            Text = state.AccessibleName,
+            Watermark = "Name announced by assistive technology",
+        };
+        var automationIdEditor = new TextBox
+        {
+            Text = state.AutomationId,
+            Watermark = "Stable UI automation identifier",
+        };
+        var helpTextEditor = new TextBox
+        {
+            Text = state.HelpText,
+            AcceptsReturn = true,
+            Height = 70,
+            TextWrapping = Avalonia.Media.TextWrapping.Wrap,
+            Watermark = "Additional instructions for assistive technology",
+        };
+        var toolTipEditor = new TextBox
+        {
+            Text = state.ToolTip,
+            AcceptsReturn = true,
+            Height = 70,
+            TextWrapping = Avalonia.Media.TextWrapping.Wrap,
+            Watermark = "Pointer tooltip",
+        };
+        var accessibilityViewEditor = new ComboBox
+        {
+            ItemsSource = Enum.GetNames<Avalonia.Automation.AccessibilityView>(),
+            SelectedItem = state.AccessibilityView,
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+        };
+        var headingLevelEditor = new TextBox
+        {
+            Text = state.HeadingLevel,
+            Watermark = "0 means not a heading",
+        };
+        var liveSettingEditor = new ComboBox
+        {
+            ItemsSource = Enum.GetNames<Avalonia.Automation.AutomationLiveSetting>(),
+            SelectedItem = state.LiveSetting,
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+        };
+        var tabIndexEditor = new TextBox { Text = state.TabIndex };
+        var requiredEditor = new CheckBox
+        {
+            Content = "Required for form",
+            IsChecked = state.IsRequiredForForm,
+        };
+        var tabStopEditor = new CheckBox
+        {
+            Content = "Include in tab navigation",
+            IsChecked = state.IsTabStop,
+        };
+        var focusableEditor = new CheckBox
+        {
+            Content = "Focusable",
+            IsChecked = state.Focusable,
+        };
+        var errorText = new TextBlock
+        {
+            Foreground = Avalonia.Media.Brushes.IndianRed,
+            TextWrapping = Avalonia.Media.TextWrapping.Wrap,
+        };
+        var dialog = new Window
+        {
+            Title = $"Edit Accessibility & Navigation - {state.ControlName}",
+            Width = 720,
+            Height = 650,
+            MinWidth = 600,
+            MinHeight = 580,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner,
+        };
+        var applyButton = new Button { Content = "Apply", MinWidth = 84 };
+        applyButton.Click += (_, _) =>
+        {
+            if (!Vm.SetSelectedAccessibilityProperties(
+                    toolTipEditor.Text ?? string.Empty,
+                    accessibleNameEditor.Text ?? string.Empty,
+                    automationIdEditor.Text ?? string.Empty,
+                    helpTextEditor.Text ?? string.Empty,
+                    accessibilityViewEditor.SelectedItem?.ToString() ?? string.Empty,
+                    headingLevelEditor.Text ?? string.Empty,
+                    liveSettingEditor.SelectedItem?.ToString() ?? string.Empty,
+                    requiredEditor.IsChecked == true,
+                    tabIndexEditor.Text ?? string.Empty,
+                    tabStopEditor.IsChecked == true,
+                    focusableEditor.IsChecked == true))
+            {
+                errorText.Text = Vm.StatusText;
+                return;
+            }
+
+            dialog.Close();
+        };
+        var cancelButton = new Button { Content = "Cancel", MinWidth = 84 };
+        cancelButton.Click += (_, _) => dialog.Close();
+        var buttons = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            Spacing = 8,
+            HorizontalAlignment = HorizontalAlignment.Right,
+            Children = { cancelButton, applyButton },
+        };
+        var fields = new Grid
+        {
+            ColumnDefinitions = new ColumnDefinitions("*,*"),
+            RowDefinitions = new RowDefinitions("Auto,Auto,Auto,Auto,Auto"),
+            ColumnSpacing = 12,
+            RowSpacing = 10,
+        };
+        AddField("Accessible name", accessibleNameEditor, 0, 0);
+        AddField("Automation ID", automationIdEditor, 0, 1);
+        AddField("Help text", helpTextEditor, 1, 0);
+        AddField("Tooltip", toolTipEditor, 1, 1);
+        AddField("Accessibility view", accessibilityViewEditor, 2, 0);
+        AddField("Heading level (0-9)", headingLevelEditor, 2, 1);
+        AddField("Live setting", liveSettingEditor, 3, 0);
+        AddField("Tab index", tabIndexEditor, 3, 1);
+        var switches = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            Spacing = 20,
+            Margin = new Thickness(0, 4, 0, 0),
+            Children = { requiredEditor, tabStopEditor, focusableEditor },
+        };
+        Grid.SetRow(switches, 4);
+        Grid.SetColumnSpan(switches, 2);
+        fields.Children.Add(switches);
+
+        var content = new Grid
+        {
+            Margin = new Thickness(16),
+            RowDefinitions = new RowDefinitions("Auto,*,Auto,Auto"),
+            RowSpacing = 12,
+            Children =
+            {
+                new TextBlock
+                {
+                    Text = "Configure assistive-technology metadata and keyboard focus behavior. Heading level 0 disables heading semantics.",
                     TextWrapping = Avalonia.Media.TextWrapping.Wrap,
                 },
                 fields,
