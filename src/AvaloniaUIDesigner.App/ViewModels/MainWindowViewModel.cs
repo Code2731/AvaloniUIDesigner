@@ -118,6 +118,16 @@ public sealed record InteractionEditorState(
     string FlowDirection,
     string Cursor);
 
+public sealed record EffectEditorState(
+    string ControlName,
+    string Kind,
+    string BlurRadius,
+    string OffsetX,
+    string OffsetY,
+    string ShadowBlurRadius,
+    string ShadowColor,
+    string ShadowOpacity);
+
 public sealed record GridDefinitionEditorState(
     string ControlName,
     string RowDefinitions,
@@ -3613,6 +3623,93 @@ public partial class MainWindowViewModel : ViewModelBase
             values.FlowDirection.ToString(),
             values.Cursor);
 
+    public bool TryGetSelectedEffectProperties(out EffectEditorState state)
+    {
+        var target = Canvas.SelectedElement;
+        if (target is null || target.IsLocked)
+        {
+            state = CreateEffectEditorState(string.Empty, DesignerEffectRuntime.DefaultValues);
+            StatusText = target is { IsLocked: true }
+                ? "Unlock the selected control before editing visual effects."
+                : "Select a control before editing visual effects.";
+            return false;
+        }
+
+        if (!DesignerEffectRuntime.TryRead(target.Visual, out var values, out var error))
+        {
+            state = CreateEffectEditorState(target.DisplayName, DesignerEffectRuntime.DefaultValues);
+            StatusText = $"Visual effects cannot be edited. {error}";
+            return false;
+        }
+
+        state = CreateEffectEditorState(target.DisplayName, values);
+        return true;
+    }
+
+    public bool SetSelectedEffectProperties(
+        string kind,
+        string blurRadius,
+        string offsetX,
+        string offsetY,
+        string shadowBlurRadius,
+        string shadowColor,
+        string shadowOpacity)
+    {
+        var target = Canvas.SelectedElement;
+        if (target is null || target.IsLocked)
+        {
+            StatusText = "Select an unlocked control before editing visual effects.";
+            return false;
+        }
+
+        if (!DesignerEffectRuntime.TryParseValues(
+                kind,
+                blurRadius,
+                offsetX,
+                offsetY,
+                shadowBlurRadius,
+                shadowColor,
+                shadowOpacity,
+                out var values,
+                out var error))
+        {
+            StatusText = $"Visual effects were not changed. {error}";
+            return false;
+        }
+
+        if (!DesignerEffectRuntime.TryRead(target.Visual, out var current, out error))
+        {
+            StatusText = $"Visual effects were not changed. {error}";
+            return false;
+        }
+
+        if (current == values)
+        {
+            StatusText = "Visual effects are unchanged.";
+            return true;
+        }
+
+        BeginCanvasMutation(HistoryActionType.EditProperty, "Updated visual effects.");
+        DesignerEffectRuntime.Apply(target.Visual, values);
+        Canvas.RefreshDocumentStyles(target.Visual);
+        CommitCanvasMutation();
+        StatusText = $"Updated visual effects for {target.DisplayName}.";
+        return true;
+    }
+
+    private static EffectEditorState CreateEffectEditorState(
+        string controlName,
+        DesignerEffectValues values)
+        => new(
+            controlName,
+            DesignerEffectRuntime.GetDisplayKind(values.Kind),
+            values.BlurRadius.ToString("0.###", CultureInfo.InvariantCulture),
+            values.OffsetX.ToString("0.###", CultureInfo.InvariantCulture),
+            values.OffsetY.ToString("0.###", CultureInfo.InvariantCulture),
+            values.ShadowBlurRadius.ToString("0.###", CultureInfo.InvariantCulture),
+            values.ShadowColor,
+            values.ShadowOpacity.ToString("0.###", CultureInfo.InvariantCulture));
+
     public bool TryGetSelectedToolTip(out string controlName, out string toolTip)
     {
         var target = Canvas.SelectedElement;
@@ -5232,6 +5329,7 @@ public partial class MainWindowViewModel : ViewModelBase
         DesignerTransformRuntime.Capture(visual, result);
         DesignerAccessibilityRuntime.Capture(visual, result);
         DesignerInteractionRuntime.Capture(visual, result);
+        DesignerEffectRuntime.Capture(visual, result);
         foreach (var pair in DesignerResourceReferenceMetadata.GetReferences(visual))
         {
             result[pair.Key] = DesignerResourceReferenceMetadata.FormatExpression(pair.Value);
@@ -6889,6 +6987,25 @@ public partial class MainWindowViewModel : ViewModelBase
                 else
                 {
                     warnings.Add($"Ignored {tagName}.{name}: {interactionError}");
+                }
+
+                continue;
+            }
+
+            if (DesignerEffectRuntime.IsSupportedAxamlProperty(name))
+            {
+                if (DesignerEffectRuntime.TryNormalizeAxamlProperty(
+                        name,
+                        attr.Value,
+                        out var internalKey,
+                        out var normalizedValue,
+                        out var effectError))
+                {
+                    map[internalKey] = normalizedValue;
+                }
+                else
+                {
+                    warnings.Add($"Ignored {tagName}.{name}: {effectError}");
                 }
 
                 continue;
@@ -9243,6 +9360,7 @@ public partial class MainWindowViewModel : ViewModelBase
         AppendCommonTransformAttributes(sb, element.Visual);
         AppendCommonAccessibilityAttributes(sb, element.Visual);
         AppendCommonInteractionAttributes(sb, element.Visual);
+        AppendCommonEffectAttributes(sb, element.Visual);
 
     }
 
@@ -9654,6 +9772,16 @@ public partial class MainWindowViewModel : ViewModelBase
         var properties = new Dictionary<string, string>(StringComparer.Ordinal);
         DesignerInteractionRuntime.Capture(visual, properties);
         foreach (var attribute in DesignerInteractionRuntime.GetAxamlAttributes(properties))
+        {
+            AppendAttribute(sb, attribute.Name, attribute.Value);
+        }
+    }
+
+    private static void AppendCommonEffectAttributes(StringBuilder sb, Control visual)
+    {
+        var properties = new Dictionary<string, string>(StringComparer.Ordinal);
+        DesignerEffectRuntime.Capture(visual, properties);
+        foreach (var attribute in DesignerEffectRuntime.GetAxamlAttributes(properties))
         {
             AppendAttribute(sb, attribute.Name, attribute.Value);
         }

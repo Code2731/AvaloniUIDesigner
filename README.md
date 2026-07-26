@@ -32,6 +32,7 @@ dotnet run --project src/AvaloniaUIDesigner.App/AvaloniaUIDesigner.App.csproj
 - **공통 Transform 속성**: 이동·회전·크기·기울기·변환 기준점을 레이아웃 슬롯과 독립적으로 편집하고 Undo/Redo, 복제, Preview, Draft·Full·UserControl AXAML 왕복에 보존
 - **Accessibility & Navigation 속성**: Tooltip·접근 가능한 이름·Automation ID·HelpText·접근성 뷰·HeadingLevel·LiveSetting·필수 입력·TabIndex·TabStop·Focusable을 통합 편집하고 Undo/Redo, 복제, Preview, Draft·Full·UserControl AXAML 왕복에 보존
 - **Interaction & Rendering 속성**: Opacity·Enabled·Visible·HitTest·ClipToBounds·LayoutRounding·FlowDirection·Cursor를 통합 편집하고 Undo/Redo, 복제, Preview, Draft·Full·UserControl AXAML 왕복에 보존
+- **Visual Effects 속성**: None·Blur·Drop Shadow 모드와 반경·오프셋·색상·불투명도를 편집하고 Undo/Redo, 복제, Preview, Draft·Full·UserControl AXAML 왕복에 보존
 - **문서 루트 속성**: Window/UserControl 루트 종류와 Window 제목·리사이즈·시작 위치, 루트 Min/Max 크기를 편집하고 Undo/Redo, Preview, Draft·Full AXAML 왕복에 보존
 - **벡터 Shape 편집**: Rectangle, Ellipse, Line, Path의 Fill·Stroke·대시·끝점·결합 스타일과 반지름·점 좌표를 편집하고, 검증된 Path geometry를 리소스·Undo/Redo·복제·미리보기·AXAML 왕복에 보존
 - **요소 선택**: 배치된 요소 클릭 시 파란 외곽선
@@ -64,6 +65,7 @@ dotnet run --project src/AvaloniaUIDesigner.App/AvaloniaUIDesigner.App.csproj
 14. `Edit > Edit Transform Properties...`에서 선택 컨트롤의 이동·회전·크기·기울기와 변환 기준점 편집
 15. `Edit > Edit Accessibility & Navigation...`에서 스크린리더 메타데이터와 키보드 포커스 순서 편집
 16. `Edit > Edit Interaction & Rendering...`에서 표시·입력 참여·클리핑·RTL·포인터 커서 편집
+17. `Edit > Edit Visual Effects...`에서 선택 컨트롤의 Blur 또는 Drop Shadow 편집
 
 DataGrid가 포함된 생성 AXAML을 다른 프로젝트에서 사용할 때는 같은 Avalonia 버전의 `Avalonia.Controls.DataGrid` 패키지와 `avares://Avalonia.Controls.DataGrid/Themes/Fluent.xaml` 스타일 include가 필요합니다.
 
@@ -80,6 +82,8 @@ Transform 편집기는 이동 값을 픽셀, 회전과 기울기를 도, 기준�
 Accessibility & Navigation 편집기는 Avalonia의 `AutomationProperties`와 키보드 포커스 속성을 한 번에 편집합니다. Heading level `0`은 heading 의미를 사용하지 않으며, Live setting의 `Polite`와 `Assertive`는 동적 변경 알림 우선순위를 지정합니다. Tooltip과 HelpText는 멀티라인 문자열도 AXAML 왕복에서 보존됩니다. 기존 `Edit Tooltip`, `Edit Accessible Name`, `Edit Tab Order` 개별 명령과 값이 동기화됩니다.
 
 Interaction & Rendering 편집기는 컨트롤의 레이아웃 크기를 바꾸지 않고 렌더링과 포인터 입력 동작을 조정합니다. `ClipToBounds`는 Button과 Panel처럼 타입마다 다른 기본값을 그대로 읽고 보존하며, FlowDirection은 좌우 언어 방향을 전환합니다. Cursor는 Avalonia의 표준 Cursor 목록과 `Default`를 지원합니다. 기존 Opacity·Enable·Visibility 개별 명령과 값이 동기화됩니다.
+
+Visual Effects 편집기는 레이아웃 슬롯과 독립적인 Avalonia `Visual.Effect`를 설정합니다. Blur는 `blur(radius)`, Drop Shadow는 `drop-shadow(offsetX offsetY blurRadius color)` AXAML 문법으로 정규화됩니다. Drop Shadow 불투명도는 Avalonia의 단일 속성 문법과 호환되도록 색상 알파 채널에 결합되며, 가져올 때 다시 편집 가능한 불투명도로 복원됩니다. 지원하지 않는 사용자 정의 Effect는 기존 값을 손실하지 않도록 편집을 거부합니다.
 
 문서 루트 편집기에서 선택한 종류는 일반 저장과 Full AXAML 복사에 반영됩니다. UserControl은 Window 전용 속성을 사용하지 않으며, `File > Export UserControl AXAML...`은 현재 문서 종류와 관계없이 재사용 가능한 UserControl을 생성합니다.
 

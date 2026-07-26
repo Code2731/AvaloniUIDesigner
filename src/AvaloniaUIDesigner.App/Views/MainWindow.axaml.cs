@@ -690,6 +690,19 @@ public partial class MainWindow : Window
         await ShowInteractionPropertiesDialogAsync(state);
     }
 
+    private async void OnEditEffectPropertiesMenuClicked(
+        object? sender,
+        Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        FlushPendingPropertyHistory();
+        if (Vm is null || !Vm.TryGetSelectedEffectProperties(out var state))
+        {
+            return;
+        }
+
+        await ShowEffectPropertiesDialogAsync(state);
+    }
+
     private async void OnEditGridDefinitionsMenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
         FlushPendingPropertyHistory();
@@ -3422,6 +3435,145 @@ public partial class MainWindow : Window
             Grid.SetRow(field, row);
             Grid.SetColumn(field, column);
             fields.Children.Add(field);
+        }
+    }
+
+    private async Task ShowEffectPropertiesDialogAsync(EffectEditorState state)
+    {
+        if (Vm is null)
+        {
+            return;
+        }
+
+        var kindEditor = new ComboBox
+        {
+            ItemsSource = DesignerEffectRuntime.EffectKinds,
+            SelectedItem = state.Kind,
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+        };
+        var blurEditor = new TextBox { Text = state.BlurRadius, Watermark = "0 to 1000" };
+        var offsetXEditor = new TextBox { Text = state.OffsetX, Watermark = "-10000 to 10000" };
+        var offsetYEditor = new TextBox { Text = state.OffsetY, Watermark = "-10000 to 10000" };
+        var shadowBlurEditor = new TextBox { Text = state.ShadowBlurRadius, Watermark = "0 to 1000" };
+        var colorEditor = new TextBox { Text = state.ShadowColor, Watermark = "#000000" };
+        var shadowOpacityEditor = new TextBox { Text = state.ShadowOpacity, Watermark = "0 to 1" };
+        var errorText = new TextBlock
+        {
+            Foreground = Avalonia.Media.Brushes.IndianRed,
+            TextWrapping = Avalonia.Media.TextWrapping.Wrap,
+        };
+        var dialog = new Window
+        {
+            Title = $"Edit Visual Effects - {state.ControlName}",
+            Width = 680,
+            Height = 540,
+            MinWidth = 560,
+            MinHeight = 480,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner,
+        };
+        var applyButton = new Button { Content = "Apply", MinWidth = 84 };
+        applyButton.Click += (_, _) =>
+        {
+            if (!Vm.SetSelectedEffectProperties(
+                    kindEditor.SelectedItem?.ToString() ?? string.Empty,
+                    blurEditor.Text ?? string.Empty,
+                    offsetXEditor.Text ?? string.Empty,
+                    offsetYEditor.Text ?? string.Empty,
+                    shadowBlurEditor.Text ?? string.Empty,
+                    colorEditor.Text ?? string.Empty,
+                    shadowOpacityEditor.Text ?? string.Empty))
+            {
+                errorText.Text = Vm.StatusText;
+                return;
+            }
+
+            dialog.Close();
+        };
+        var cancelButton = new Button { Content = "Cancel", MinWidth = 84 };
+        cancelButton.Click += (_, _) => dialog.Close();
+        var buttons = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            Spacing = 8,
+            HorizontalAlignment = HorizontalAlignment.Right,
+            Children = { cancelButton, applyButton },
+        };
+        var blurFields = new Grid
+        {
+            ColumnDefinitions = new ColumnDefinitions("*"),
+            RowDefinitions = new RowDefinitions("Auto"),
+        };
+        var shadowFields = new Grid
+        {
+            ColumnDefinitions = new ColumnDefinitions("*,*"),
+            RowDefinitions = new RowDefinitions("Auto,Auto"),
+            ColumnSpacing = 12,
+            RowSpacing = 10,
+        };
+        AddField(blurFields, "Blur radius", blurEditor, 0, 0);
+        AddField(shadowFields, "Horizontal offset", offsetXEditor, 0, 0);
+        AddField(shadowFields, "Vertical offset", offsetYEditor, 0, 1);
+        AddField(shadowFields, "Shadow blur radius", shadowBlurEditor, 1, 0);
+        var colorAndOpacity = new Grid
+        {
+            ColumnDefinitions = new ColumnDefinitions("2*,*"),
+            ColumnSpacing = 8,
+        };
+        colorAndOpacity.Children.Add(colorEditor);
+        Grid.SetColumn(shadowOpacityEditor, 1);
+        colorAndOpacity.Children.Add(shadowOpacityEditor);
+        AddField(shadowFields, "Color / opacity", colorAndOpacity, 1, 1);
+
+        void RefreshMode()
+        {
+            var kind = kindEditor.SelectedItem?.ToString();
+            blurFields.IsVisible = string.Equals(kind, "Blur", StringComparison.Ordinal);
+            shadowFields.IsVisible = string.Equals(kind, "Drop Shadow", StringComparison.Ordinal);
+        }
+
+        kindEditor.SelectionChanged += (_, _) => RefreshMode();
+        RefreshMode();
+        var content = new Grid
+        {
+            Margin = new Thickness(16),
+            RowDefinitions = new RowDefinitions("Auto,Auto,Auto,Auto,*,Auto,Auto"),
+            RowSpacing = 12,
+            Children =
+            {
+                new TextBlock
+                {
+                    Text = "Apply a blur or drop shadow without changing the control's layout size. Shadow opacity is exported through the AXAML color alpha channel.",
+                    TextWrapping = Avalonia.Media.TextWrapping.Wrap,
+                },
+                kindEditor,
+                blurFields,
+                shadowFields,
+                errorText,
+                buttons,
+            },
+        };
+        Grid.SetRow(kindEditor, 1);
+        Grid.SetRow(blurFields, 2);
+        Grid.SetRow(shadowFields, 3);
+        Grid.SetRow(errorText, 5);
+        Grid.SetRow(buttons, 6);
+        dialog.Content = content;
+        await dialog.ShowDialog(this);
+
+        static void AddField(Grid owner, string label, Control editor, int row, int column)
+        {
+            var field = new StackPanel
+            {
+                Spacing = 4,
+                Children =
+                {
+                    new TextBlock { Text = label },
+                    editor,
+                },
+            };
+            Grid.SetRow(field, row);
+            Grid.SetColumn(field, column);
+            owner.Children.Add(field);
         }
     }
 

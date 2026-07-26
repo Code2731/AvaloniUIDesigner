@@ -450,6 +450,7 @@ public sealed class PreviewWindow : Window
         DesignerTransformRuntime.Apply(control, properties);
         DesignerAccessibilityRuntime.Apply(control, properties);
         DesignerInteractionRuntime.Apply(control, properties);
+        DesignerEffectRuntime.Apply(control, properties);
         ApplyTemplatedAppearanceProperties(control, properties, colorResources);
 
         switch (control)

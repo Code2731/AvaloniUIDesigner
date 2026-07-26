@@ -2132,6 +2132,7 @@ public partial class CanvasViewModel : ViewModelBase
         DesignerTransformRuntime.Apply(visual, properties);
         DesignerAccessibilityRuntime.Apply(visual, properties);
         DesignerInteractionRuntime.Apply(visual, properties);
+        DesignerEffectRuntime.Apply(visual, properties);
         ApplyTemplatedAppearanceProperties(visual, properties);
 
         if (visual is Shape shape)
