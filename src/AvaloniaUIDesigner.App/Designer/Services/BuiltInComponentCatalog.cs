@@ -215,6 +215,20 @@ public sealed class BuiltInComponentCatalog : IComponentCatalog
             VisualFactory: static () => new DockPanel
             {
                 LastChildFill = true,
+            }),
+        new(
+            DisplayName: "WrapPanel",
+            AvaloniaTypeName: "Avalonia.Controls.WrapPanel",
+            DefaultWidth: 260,
+            DefaultHeight: 180,
+            VisualFactory: static () => new WrapPanel
+            {
+                Orientation = Orientation.Horizontal,
+                ItemWidth = 96,
+                ItemHeight = 36,
+                ItemSpacing = 8,
+                LineSpacing = 8,
+                ItemsAlignment = WrapPanelItemsAlignment.Start,
             })
     };
 

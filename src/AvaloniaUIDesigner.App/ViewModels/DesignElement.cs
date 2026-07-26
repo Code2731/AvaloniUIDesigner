@@ -38,10 +38,12 @@ public partial class DesignElement : ViewModelBase
     [NotifyPropertyChangedFor(nameof(IsGridChild))]
     [NotifyPropertyChangedFor(nameof(IsStackPanelChild))]
     [NotifyPropertyChangedFor(nameof(IsDockPanelChild))]
+    [NotifyPropertyChangedFor(nameof(IsWrapPanelChild))]
     [NotifyPropertyChangedFor(nameof(IsContentChild))]
     [NotifyPropertyChangedFor(nameof(GridCellLabel))]
     [NotifyPropertyChangedFor(nameof(StackPanelItemLabel))]
     [NotifyPropertyChangedFor(nameof(DockPanelItemLabel))]
+    [NotifyPropertyChangedFor(nameof(WrapPanelItemLabel))]
     [NotifyPropertyChangedFor(nameof(ContainerLayoutLabel))]
     private string? _parentName;
 
@@ -75,10 +77,12 @@ public partial class DesignElement : ViewModelBase
     [NotifyPropertyChangedFor(nameof(IsGridChild))]
     [NotifyPropertyChangedFor(nameof(IsStackPanelChild))]
     [NotifyPropertyChangedFor(nameof(IsDockPanelChild))]
+    [NotifyPropertyChangedFor(nameof(IsWrapPanelChild))]
     [NotifyPropertyChangedFor(nameof(IsContentChild))]
     [NotifyPropertyChangedFor(nameof(GridCellLabel))]
     [NotifyPropertyChangedFor(nameof(StackPanelItemLabel))]
     [NotifyPropertyChangedFor(nameof(DockPanelItemLabel))]
+    [NotifyPropertyChangedFor(nameof(WrapPanelItemLabel))]
     [NotifyPropertyChangedFor(nameof(ContainerLayoutLabel))]
     private DesignerParentLayoutKind _parentLayout;
 
@@ -92,6 +96,10 @@ public partial class DesignElement : ViewModelBase
 
     [ObservableProperty]
     private double _dockPanelItemSize = 40;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(WrapPanelItemLabel))]
+    private int _wrapPanelIndex = -1;
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(HasStylePreviewState))]
@@ -108,6 +116,8 @@ public partial class DesignElement : ViewModelBase
     public bool IsStackPanelChild => IsContainerChild && ParentLayout == DesignerParentLayoutKind.StackPanel;
 
     public bool IsDockPanelChild => IsContainerChild && ParentLayout == DesignerParentLayoutKind.DockPanel;
+
+    public bool IsWrapPanelChild => IsContainerChild && ParentLayout == DesignerParentLayoutKind.WrapPanel;
 
     public bool IsContentChild => IsContainerChild && ParentLayout == DesignerParentLayoutKind.Content;
 
@@ -134,6 +144,9 @@ public partial class DesignElement : ViewModelBase
         => IsDockPanelChild
             ? $"DOCK #{DockPanelIndex + 1} {DockPanelDock.ToString().ToUpperInvariant()}"
             : string.Empty;
+
+    public string WrapPanelItemLabel
+        => IsWrapPanelChild ? $"WRAP #{WrapPanelIndex + 1}" : string.Empty;
 
     public string ContainerLayoutLabel
         => IsContentChild ? "CONTENT" : string.Empty;

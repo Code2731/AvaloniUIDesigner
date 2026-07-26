@@ -65,6 +65,7 @@ public sealed class PreviewWindow : Window
             .Where(element => string.Equals(element.TypeName, "Avalonia.Controls.Grid", StringComparison.Ordinal)
                 || string.Equals(element.TypeName, "Avalonia.Controls.StackPanel", StringComparison.Ordinal)
                 || string.Equals(element.TypeName, "Avalonia.Controls.DockPanel", StringComparison.Ordinal)
+                || string.Equals(element.TypeName, "Avalonia.Controls.WrapPanel", StringComparison.Ordinal)
                 || string.Equals(element.TypeName, "Avalonia.Controls.Border", StringComparison.Ordinal)
                 || string.Equals(element.TypeName, "Avalonia.Controls.ScrollViewer", StringComparison.Ordinal)
                 || string.Equals(element.TypeName, "Avalonia.Controls.Expander", StringComparison.Ordinal))
@@ -107,10 +108,12 @@ public sealed class PreviewWindow : Window
                 ? children.OrderBy(child => child.StackPanelIndex).ToList()
                 : parent is DockPanel
                     ? children.OrderBy(child => child.DockPanelIndex).ToList()
+                    : parent is WrapPanel
+                        ? children.OrderBy(child => child.WrapPanelIndex).ToList()
                 : children;
-            if (parent is StackPanel stackPanel)
+            if (parent is Panel panel)
             {
-                stackPanel.Children.Clear();
+                panel.Children.Clear();
             }
 
             for (var index = 0; index < orderedChildren.Count; index++)
@@ -159,6 +162,9 @@ public sealed class PreviewWindow : Window
                         }
 
                         dock.Children.Add(child);
+                        break;
+                    case WrapPanel wrap:
+                        wrap.Children.Add(child);
                         break;
                     case Border border:
                         border.Child = child;
@@ -259,6 +265,15 @@ public sealed class PreviewWindow : Window
             "Avalonia.Controls.DockPanel" => new DockPanel
             {
                 LastChildFill = true,
+            },
+            "Avalonia.Controls.WrapPanel" => new WrapPanel
+            {
+                Orientation = Orientation.Horizontal,
+                ItemWidth = 96,
+                ItemHeight = 36,
+                ItemSpacing = 8,
+                LineSpacing = 8,
+                ItemsAlignment = WrapPanelItemsAlignment.Start,
             },
             _ => new TextBlock { Text = $"[Unsupported: {snapshot.DisplayName}]" },
         };
@@ -542,6 +557,46 @@ public sealed class PreviewWindow : Window
                     && bool.TryParse(lastChildFill, out var parsedLastChildFill))
                 {
                     dockPanel.LastChildFill = parsedLastChildFill;
+                }
+                break;
+            case WrapPanel wrapPanel:
+                if (properties.TryGetValue("Orientation", out var orientation)
+                    && Enum.TryParse<Orientation>(orientation, ignoreCase: true, out var parsedOrientation))
+                {
+                    wrapPanel.Orientation = parsedOrientation;
+                }
+
+                if (properties.TryGetValue("ItemWidth", out var itemWidth)
+                    && double.TryParse(itemWidth, NumberStyles.Float, CultureInfo.InvariantCulture, out var parsedItemWidth))
+                {
+                    wrapPanel.ItemWidth = Math.Max(10, parsedItemWidth);
+                }
+
+                if (properties.TryGetValue("ItemHeight", out var itemHeight)
+                    && double.TryParse(itemHeight, NumberStyles.Float, CultureInfo.InvariantCulture, out var parsedItemHeight))
+                {
+                    wrapPanel.ItemHeight = Math.Max(10, parsedItemHeight);
+                }
+
+                if (properties.TryGetValue("ItemSpacing", out var itemSpacing)
+                    && double.TryParse(itemSpacing, NumberStyles.Float, CultureInfo.InvariantCulture, out var parsedItemSpacing))
+                {
+                    wrapPanel.ItemSpacing = Math.Max(0, parsedItemSpacing);
+                }
+
+                if (properties.TryGetValue("LineSpacing", out var lineSpacing)
+                    && double.TryParse(lineSpacing, NumberStyles.Float, CultureInfo.InvariantCulture, out var parsedLineSpacing))
+                {
+                    wrapPanel.LineSpacing = Math.Max(0, parsedLineSpacing);
+                }
+
+                if (properties.TryGetValue("ItemsAlignment", out var itemsAlignment)
+                    && Enum.TryParse<WrapPanelItemsAlignment>(
+                        itemsAlignment,
+                        ignoreCase: true,
+                        out var parsedItemsAlignment))
+                {
+                    wrapPanel.ItemsAlignment = parsedItemsAlignment;
                 }
                 break;
         }

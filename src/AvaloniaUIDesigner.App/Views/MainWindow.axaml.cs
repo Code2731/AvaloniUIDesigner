@@ -43,6 +43,7 @@ public partial class MainWindow : Window
         DesignerDockSide Dock,
         double ItemSize,
         bool LastChildFill);
+    private sealed record WrapPanelAssignmentOptions(string ParentName, int ItemIndex);
     private sealed record ContentAssignmentOptions(string ParentName);
 
     private const double HandleHalf = 5;
@@ -682,6 +683,27 @@ public partial class MainWindow : Window
 
     private void OnMoveDockPanelItemLaterMenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
         => Vm?.MoveSelectedDockPanelItem(1);
+
+    private async void OnAssignToWrapPanelMenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        FlushPendingPropertyHistory();
+        if (Vm is null || !Vm.TryGetSelectedWrapPanelAssignment(out var state))
+        {
+            return;
+        }
+
+        var updated = await ShowWrapPanelAssignmentDialogAsync(state);
+        if (updated is not null)
+        {
+            Vm.SetSelectedWrapPanelAssignment(updated.ParentName, updated.ItemIndex);
+        }
+    }
+
+    private void OnMoveWrapPanelItemEarlierMenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+        => Vm?.MoveSelectedWrapPanelItem(-1);
+
+    private void OnMoveWrapPanelItemLaterMenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+        => Vm?.MoveSelectedWrapPanelItem(1);
 
     private void OnRemoveFromContainerMenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
@@ -1406,6 +1428,14 @@ public partial class MainWindow : Window
             Vm?.Canvas.ReflowContainerChildren(_boundElement);
         }
 
+        if (control is WrapPanel
+            && e.Property.Name is "Orientation" or "ItemWidth" or "ItemHeight"
+                or "ItemSpacing" or "LineSpacing" or "ItemsAlignment"
+            && _boundElement is not null)
+        {
+            Vm?.Canvas.ReflowContainerChildren(_boundElement);
+        }
+
         if (control is Border
             && e.Property.Name == "BorderThickness"
             && _boundElement is not null)
@@ -1547,6 +1577,12 @@ public partial class MainWindow : Window
         if (control is DockPanel)
         {
             return propertyName == "LastChildFill";
+        }
+
+        if (control is WrapPanel)
+        {
+            return propertyName is "Orientation" or "ItemWidth" or "ItemHeight"
+                or "ItemSpacing" or "LineSpacing" or "ItemsAlignment";
         }
 
         if (control is Grid)
@@ -2895,6 +2931,96 @@ public partial class MainWindow : Window
         dialog.Content = content;
 
         return await dialog.ShowDialog<DockPanelAssignmentOptions?>(this);
+    }
+
+    private async Task<WrapPanelAssignmentOptions?> ShowWrapPanelAssignmentDialogAsync(
+        WrapPanelAssignmentEditorState state)
+    {
+        var parentSelector = new ComboBox
+        {
+            ItemsSource = state.Parents,
+            SelectedItem = state.Parents.First(parent => string.Equals(
+                parent.DisplayName,
+                state.SelectedParentName,
+                StringComparison.OrdinalIgnoreCase)),
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+        };
+        var positionEditor = new NumericUpDown
+        {
+            Minimum = 1,
+            Value = state.ItemIndex + 1,
+        };
+        var layoutHint = new TextBlock
+        {
+            Foreground = Avalonia.Media.Brushes.Gray,
+            TextWrapping = Avalonia.Media.TextWrapping.Wrap,
+            Text = "Item size, spacing, orientation, and alignment are edited on the parent WrapPanel in the Property Inspector.",
+        };
+        var dialog = new Window
+        {
+            Title = $"Assign to WrapPanel - {state.ControlName}",
+            Width = 460,
+            Height = 320,
+            MinWidth = 400,
+            MinHeight = 290,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner,
+        };
+
+        void UpdateParentState()
+        {
+            if (parentSelector.SelectedItem is WrapPanelParentOption parent)
+            {
+                positionEditor.Maximum = parent.ChildCount + 1;
+            }
+        }
+
+        parentSelector.SelectionChanged += (_, _) => UpdateParentState();
+        UpdateParentState();
+
+        var assignButton = new Button { Content = "Assign", MinWidth = 84 };
+        assignButton.Click += (_, _) =>
+        {
+            if (parentSelector.SelectedItem is not WrapPanelParentOption parent)
+            {
+                return;
+            }
+
+            dialog.Close(new WrapPanelAssignmentOptions(
+                parent.DisplayName,
+                (int)(positionEditor.Value ?? 1) - 1));
+        };
+        var cancelButton = new Button { Content = "Cancel", MinWidth = 84 };
+        cancelButton.Click += (_, _) => dialog.Close(null);
+        var buttons = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            Spacing = 8,
+            HorizontalAlignment = HorizontalAlignment.Right,
+            Children = { cancelButton, assignButton },
+        };
+        var fields = new StackPanel
+        {
+            Spacing = 6,
+            Children =
+            {
+                new TextBlock { Text = "Parent WrapPanel" },
+                parentSelector,
+                new TextBlock { Text = "Position (1-based)" },
+                positionEditor,
+                layoutHint,
+            },
+        };
+        var content = new Grid
+        {
+            Margin = new Thickness(16),
+            RowDefinitions = new RowDefinitions("*,Auto"),
+            RowSpacing = 12,
+            Children = { fields, buttons },
+        };
+        Grid.SetRow(buttons, 1);
+        dialog.Content = content;
+
+        return await dialog.ShowDialog<WrapPanelAssignmentOptions?>(this);
     }
 
     private async Task<ContentAssignmentOptions?> ShowContentAssignmentDialogAsync(

@@ -75,6 +75,20 @@ public sealed record DockPanelAssignmentEditorState(
     double ItemSize,
     bool LastChildFill);
 
+public sealed record WrapPanelParentOption(
+    string DisplayName,
+    Orientation Orientation,
+    int ChildCount)
+{
+    public override string ToString() => $"{DisplayName} ({Orientation})";
+}
+
+public sealed record WrapPanelAssignmentEditorState(
+    string ControlName,
+    IReadOnlyList<WrapPanelParentOption> Parents,
+    string SelectedParentName,
+    int ItemIndex);
+
 public sealed record ContentParentOption(string DisplayName, string ContainerType)
 {
     public override string ToString() => $"{DisplayName} ({ContainerType})";
@@ -1137,6 +1151,7 @@ public partial class MainWindowViewModel : ViewModelBase
         target.DockPanelIndex = -1;
         target.DockPanelDock = DesignerDockSide.Left;
         target.DockPanelItemSize = 40;
+        target.WrapPanelIndex = -1;
         target.ParentLayout = DesignerParentLayoutKind.Grid;
         target.ParentName = parent.DisplayName;
         Canvas.MoveElementsToFront([target]);
@@ -1169,6 +1184,7 @@ public partial class MainWindowViewModel : ViewModelBase
         target.DockPanelIndex = -1;
         target.DockPanelDock = DesignerDockSide.Left;
         target.DockPanelItemSize = 40;
+        target.WrapPanelIndex = -1;
         target.ParentLayout = DesignerParentLayoutKind.None;
         Canvas.NormalizeContainerRelationships();
         ObjectTree.RebuildFrom(Canvas.Elements);
@@ -1476,6 +1492,138 @@ public partial class MainWindowViewModel : ViewModelBase
             DesignerDockSide.Left,
             40,
             true);
+
+    public bool TryGetSelectedWrapPanelAssignment(out WrapPanelAssignmentEditorState state)
+    {
+        if (Canvas.SelectedElement is not { IsLocked: false } target
+            || target.Visual is WrapPanel)
+        {
+            state = EmptyWrapPanelAssignmentState();
+            StatusText = "Select an unlocked non-WrapPanel control to assign it to a WrapPanel.";
+            return false;
+        }
+
+        var parents = Canvas.Elements
+            .Where(element => element.Visual is WrapPanel && !element.IsContainerChild && !element.IsLocked)
+            .Select(element =>
+            {
+                var wrapPanel = (WrapPanel)element.Visual;
+                var childCount = Canvas.Elements.Count(child =>
+                    !ReferenceEquals(child, target)
+                    && child.IsWrapPanelChild
+                    && string.Equals(child.ParentName, element.DisplayName, StringComparison.OrdinalIgnoreCase));
+                return new WrapPanelParentOption(element.DisplayName, wrapPanel.Orientation, childCount);
+            })
+            .ToList();
+        if (parents.Count == 0)
+        {
+            state = EmptyWrapPanelAssignmentState();
+            StatusText = "Place an unlocked root WrapPanel before assigning a control.";
+            return false;
+        }
+
+        var selectedParent = parents.FirstOrDefault(parent => string.Equals(
+                parent.DisplayName,
+                target.ParentName,
+                StringComparison.OrdinalIgnoreCase))
+            ?? parents[0];
+        state = new WrapPanelAssignmentEditorState(
+            target.DisplayName,
+            parents,
+            selectedParent.DisplayName,
+            target.IsWrapPanelChild
+                ? Math.Clamp(target.WrapPanelIndex, 0, selectedParent.ChildCount)
+                : selectedParent.ChildCount);
+        return true;
+    }
+
+    public bool SetSelectedWrapPanelAssignment(string parentName, int itemIndex)
+    {
+        if (Canvas.SelectedElement is not { IsLocked: false } target
+            || target.Visual is WrapPanel)
+        {
+            StatusText = "Select an unlocked non-WrapPanel control to assign it to a WrapPanel.";
+            return false;
+        }
+
+        var parent = Canvas.Elements.FirstOrDefault(element =>
+            !element.IsContainerChild
+            && !element.IsLocked
+            && element.Visual is WrapPanel
+            && string.Equals(element.DisplayName, parentName, StringComparison.OrdinalIgnoreCase));
+        if (parent is null)
+        {
+            StatusText = $"WrapPanel '{parentName}' is not available.";
+            return false;
+        }
+
+        var siblings = Canvas.Elements
+            .Where(element => !ReferenceEquals(element, target)
+                && element.IsWrapPanelChild
+                && string.Equals(element.ParentName, parent.DisplayName, StringComparison.OrdinalIgnoreCase))
+            .OrderBy(element => element.WrapPanelIndex)
+            .ThenBy(element => Canvas.Elements.IndexOf(element))
+            .ToList();
+        if (itemIndex < 0 || itemIndex > siblings.Count)
+        {
+            StatusText = $"WrapPanel position must be between 1 and {siblings.Count + 1}.";
+            return false;
+        }
+
+        BeginCanvasMutation(HistoryActionType.EditProperty, "Assigned control to WrapPanel.");
+        siblings.Insert(itemIndex, target);
+        Canvas.SetWrapPanelChildOrder(parent, siblings);
+        Canvas.MoveElementsToFrontInOrder(siblings);
+        Canvas.NormalizeContainerRelationships();
+        ObjectTree.RebuildFrom(Canvas.Elements);
+        ObjectTree.SelectByElement(target);
+        CommitCanvasMutation();
+        StatusText = $"Assigned {target.DisplayName} to {parent.DisplayName} at position {itemIndex + 1}.";
+        return true;
+    }
+
+    public bool MoveSelectedWrapPanelItem(int offset)
+    {
+        if (Canvas.SelectedElement is not { IsLocked: false, IsWrapPanelChild: true } target)
+        {
+            StatusText = "Select an unlocked WrapPanel child to change its order.";
+            return false;
+        }
+
+        var siblings = Canvas.Elements
+            .Where(element => element.IsWrapPanelChild
+                && string.Equals(element.ParentName, target.ParentName, StringComparison.OrdinalIgnoreCase))
+            .OrderBy(element => element.WrapPanelIndex)
+            .ThenBy(element => Canvas.Elements.IndexOf(element))
+            .ToList();
+        var currentIndex = siblings.IndexOf(target);
+        var nextIndex = currentIndex + offset;
+        if (currentIndex < 0 || nextIndex < 0 || nextIndex >= siblings.Count)
+        {
+            StatusText = offset < 0
+                ? $"{target.DisplayName} is already the first WrapPanel item."
+                : $"{target.DisplayName} is already the last WrapPanel item.";
+            return false;
+        }
+
+        var parent = Canvas.Elements.First(element => string.Equals(
+            element.DisplayName,
+            target.ParentName,
+            StringComparison.OrdinalIgnoreCase));
+        BeginCanvasMutation(HistoryActionType.EditProperty, "Reordered WrapPanel item.");
+        (siblings[currentIndex], siblings[nextIndex]) = (siblings[nextIndex], siblings[currentIndex]);
+        Canvas.SetWrapPanelChildOrder(parent, siblings);
+        Canvas.MoveElementsToFrontInOrder(siblings);
+        Canvas.NormalizeContainerRelationships();
+        ObjectTree.RebuildFrom(Canvas.Elements);
+        ObjectTree.SelectByElement(target);
+        CommitCanvasMutation();
+        StatusText = $"Moved {target.DisplayName} to WrapPanel position {nextIndex + 1}.";
+        return true;
+    }
+
+    private static WrapPanelAssignmentEditorState EmptyWrapPanelAssignmentState()
+        => new(string.Empty, Array.Empty<WrapPanelParentOption>(), string.Empty, 0);
 
     public bool TryGetSelectedContentAssignment(out ContentAssignmentEditorState state)
     {
@@ -3013,7 +3161,8 @@ public partial class MainWindowViewModel : ViewModelBase
                 e.ParentLayout,
                 e.DockPanelIndex,
                 e.DockPanelDock,
-                e.DockPanelItemSize))
+                e.DockPanelItemSize,
+                e.WrapPanelIndex))
             .ToList();
 
         return new DesignerCanvasDocument(
@@ -3131,7 +3280,8 @@ public partial class MainWindowViewModel : ViewModelBase
             element.ParentLayout,
             element.DockPanelIndex,
             element.DockPanelDock,
-            element.DockPanelItemSize);
+            element.DockPanelItemSize,
+            element.WrapPanelIndex);
     }
 
     private IReadOnlyDictionary<string, string>? CaptureVisualProperties(Control visual)
@@ -3526,6 +3676,20 @@ public partial class MainWindowViewModel : ViewModelBase
             };
         }
 
+        if (visual is WrapPanel wrapPanel)
+        {
+            return new Dictionary<string, string>
+            {
+                ["Orientation"] = wrapPanel.Orientation.ToString(),
+                ["ItemWidth"] = wrapPanel.ItemWidth.ToString("0.###", CultureInfo.InvariantCulture),
+                ["ItemHeight"] = wrapPanel.ItemHeight.ToString("0.###", CultureInfo.InvariantCulture),
+                ["ItemSpacing"] = wrapPanel.ItemSpacing.ToString("0.###", CultureInfo.InvariantCulture),
+                ["LineSpacing"] = wrapPanel.LineSpacing.ToString("0.###", CultureInfo.InvariantCulture),
+                ["ItemsAlignment"] = wrapPanel.ItemsAlignment.ToString(),
+                ["Opacity"] = wrapPanel.Opacity.ToString("0.###", CultureInfo.InvariantCulture),
+            };
+        }
+
         if (visual is Grid grid)
         {
             return new Dictionary<string, string>
@@ -3653,6 +3817,7 @@ public partial class MainWindowViewModel : ViewModelBase
                 || a.DockPanelIndex != b.DockPanelIndex
                 || a.DockPanelDock != b.DockPanelDock
                 || a.DockPanelItemSize != b.DockPanelItemSize
+                || a.WrapPanelIndex != b.WrapPanelIndex
                 || !DictionaryEquals(a.VisualProperties, b.VisualProperties))
             {
                 return false;
@@ -3714,6 +3879,7 @@ public partial class MainWindowViewModel : ViewModelBase
             var nextIsLocked = false;
             var stackPanelIndex = 0;
             var dockPanelIndex = 0;
+            var wrapPanelIndex = 0;
             foreach (var node in container.Nodes())
             {
                 if (node is XComment comment)
@@ -3773,6 +3939,10 @@ public partial class MainWindowViewModel : ViewModelBase
                     parent?.TypeName,
                     "Avalonia.Controls.DockPanel",
                     StringComparison.Ordinal);
+                var isWrapPanelChild = string.Equals(
+                    parent?.TypeName,
+                    "Avalonia.Controls.WrapPanel",
+                    StringComparison.Ordinal);
                 var dockSide = Enum.TryParse<DesignerDockSide>(
                     child.Attribute("DockPanel.Dock")?.Value,
                     ignoreCase: true,
@@ -3788,6 +3958,7 @@ public partial class MainWindowViewModel : ViewModelBase
                     "Avalonia.Controls.Grid" => DesignerParentLayoutKind.Grid,
                     "Avalonia.Controls.StackPanel" => DesignerParentLayoutKind.StackPanel,
                     "Avalonia.Controls.DockPanel" => DesignerParentLayoutKind.DockPanel,
+                    "Avalonia.Controls.WrapPanel" => DesignerParentLayoutKind.WrapPanel,
                     "Avalonia.Controls.Border"
                         or "Avalonia.Controls.ScrollViewer"
                         or "Avalonia.Controls.Expander" => DesignerParentLayoutKind.Content,
@@ -3820,13 +3991,15 @@ public partial class MainWindowViewModel : ViewModelBase
                         ? dockSide is DesignerDockSide.Top or DesignerDockSide.Bottom
                             ? height
                             : width
-                        : 40);
+                        : 40,
+                    isWrapPanelChild ? wrapPanelIndex++ : -1);
                 snapshots.Add(snapshot);
                 nextIsLocked = false;
 
                 if (string.Equals(typeName, "Avalonia.Controls.Grid", StringComparison.Ordinal)
                     || string.Equals(typeName, "Avalonia.Controls.StackPanel", StringComparison.Ordinal)
                     || string.Equals(typeName, "Avalonia.Controls.DockPanel", StringComparison.Ordinal)
+                    || string.Equals(typeName, "Avalonia.Controls.WrapPanel", StringComparison.Ordinal)
                     || string.Equals(typeName, "Avalonia.Controls.Border", StringComparison.Ordinal)
                     || string.Equals(typeName, "Avalonia.Controls.ScrollViewer", StringComparison.Ordinal)
                     || string.Equals(typeName, "Avalonia.Controls.Expander", StringComparison.Ordinal))
@@ -4250,6 +4423,8 @@ public partial class MainWindowViewModel : ViewModelBase
             "Grid" => propertyName is "RowDefinitions" or "ColumnDefinitions" or "ShowGridLines",
             "StackPanel" => propertyName is "Orientation" or "Spacing",
             "DockPanel" => propertyName == "LastChildFill",
+            "WrapPanel" => propertyName is "Orientation" or "ItemWidth" or "ItemHeight"
+                or "ItemSpacing" or "LineSpacing" or "ItemsAlignment",
             _ => false,
         };
     }
@@ -5673,6 +5848,41 @@ public partial class MainWindowViewModel : ViewModelBase
                 sb.AppendLine("</DockPanel>");
                 break;
 
+            case WrapPanel wrapPanel:
+                sb.Append(indent);
+                sb.Append("<WrapPanel");
+                AppendCanvasLayoutAttributes(sb, element);
+                AppendAttribute(sb, "Orientation", wrapPanel.Orientation.ToString());
+                AppendAttribute(sb, "ItemWidth", wrapPanel.ItemWidth.ToString("0.###", CultureInfo.InvariantCulture));
+                AppendAttribute(sb, "ItemHeight", wrapPanel.ItemHeight.ToString("0.###", CultureInfo.InvariantCulture));
+                AppendAttribute(sb, "ItemSpacing", wrapPanel.ItemSpacing.ToString("0.###", CultureInfo.InvariantCulture));
+                AppendAttribute(sb, "LineSpacing", wrapPanel.LineSpacing.ToString("0.###", CultureInfo.InvariantCulture));
+                AppendAttribute(sb, "ItemsAlignment", wrapPanel.ItemsAlignment.ToString());
+                var wrapPanelChildren = Canvas.Elements
+                    .Where(child => child.IsWrapPanelChild
+                        && string.Equals(
+                            child.ParentName,
+                            element.DisplayName,
+                            StringComparison.OrdinalIgnoreCase))
+                    .OrderBy(child => child.WrapPanelIndex)
+                    .ThenBy(child => Canvas.Elements.IndexOf(child))
+                    .ToList();
+                if (wrapPanelChildren.Count == 0)
+                {
+                    sb.AppendLine(" />");
+                    break;
+                }
+
+                sb.AppendLine(">");
+                foreach (var child in wrapPanelChildren)
+                {
+                    WriteDesignerChildAxaml(sb, child, indent + "  ");
+                }
+
+                sb.Append(indent);
+                sb.AppendLine("</WrapPanel>");
+                break;
+
             default:
                 sb.Append(indent);
                 sb.Append("<TextBlock");
@@ -5798,6 +6008,10 @@ public partial class MainWindowViewModel : ViewModelBase
                     element.DockPanelItemSize.ToString("0.###", CultureInfo.InvariantCulture));
             }
         }
+        else if (TryGetWrapPanelParent(element, out _))
+        {
+            // WrapPanel owns item size, spacing, and placement.
+        }
         else
         {
             AppendAttribute(sb, "Canvas.Left", element.X.ToString("0.###", CultureInfo.InvariantCulture));
@@ -5853,6 +6067,7 @@ public partial class MainWindowViewModel : ViewModelBase
         => HasValidGridParent(element)
             || TryGetStackPanelParent(element, out _)
             || TryGetDockPanelParent(element, out _, out _)
+            || TryGetWrapPanelParent(element, out _)
             || TryGetContentParent(element, out _);
 
     private bool TryGetStackPanelParent(DesignElement element, out StackPanel stackPanel)
@@ -5897,6 +6112,20 @@ public partial class MainWindowViewModel : ViewModelBase
                     StringComparison.OrdinalIgnoreCase))!;
         dockPanel = parent?.Visual as DockPanel ?? null!;
         return dockPanel is not null;
+    }
+
+    private bool TryGetWrapPanelParent(DesignElement element, out WrapPanel wrapPanel)
+    {
+        var parent = element.ParentName is null
+            ? null
+            : Canvas.Elements.FirstOrDefault(candidate =>
+                candidate.Visual is WrapPanel
+                && string.Equals(
+                    candidate.DisplayName,
+                    element.ParentName,
+                    StringComparison.OrdinalIgnoreCase));
+        wrapPanel = parent?.Visual as WrapPanel ?? null!;
+        return wrapPanel is not null;
     }
 
     private DesignElement? GetDesignerContentChild(DesignElement parent)

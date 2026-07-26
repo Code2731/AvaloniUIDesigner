@@ -319,6 +319,7 @@ public partial class CanvasViewModel : ViewModelBase
             element.DockPanelIndex = snapshot.DockPanelIndex;
             element.DockPanelDock = snapshot.DockPanelDock;
             element.DockPanelItemSize = Math.Max(10, snapshot.DockPanelItemSize);
+            element.WrapPanelIndex = snapshot.WrapPanelIndex;
             element.ParentName = snapshot.ParentName;
         }
         finally
@@ -476,6 +477,7 @@ public partial class CanvasViewModel : ViewModelBase
             child.DockPanelIndex = -1;
             child.DockPanelDock = DesignerDockSide.Left;
             child.DockPanelItemSize = 40;
+            child.WrapPanelIndex = -1;
         }
 
         element.PropertyChanged -= OnDesignElementPropertyChanged;
@@ -546,10 +548,14 @@ public partial class CanvasViewModel : ViewModelBase
                 {
                     element.ParentLayout = DesignerParentLayoutKind.Grid;
                     element.StackPanelIndex = -1;
+                    element.DockPanelIndex = -1;
+                    element.WrapPanelIndex = -1;
                 }
                 else if (parent.Visual is StackPanel)
                 {
                     element.ParentLayout = DesignerParentLayoutKind.StackPanel;
+                    element.DockPanelIndex = -1;
+                    element.WrapPanelIndex = -1;
                     if (element.StackPanelIndex < 0)
                     {
                         element.StackPanelIndex = GetDirectChildren(parent).Count(child =>
@@ -563,6 +569,7 @@ public partial class CanvasViewModel : ViewModelBase
                 {
                     element.ParentLayout = DesignerParentLayoutKind.DockPanel;
                     element.StackPanelIndex = -1;
+                    element.WrapPanelIndex = -1;
                     if (element.DockPanelIndex < 0)
                     {
                         element.DockPanelIndex = GetDirectChildren(parent).Count(child =>
@@ -572,10 +579,24 @@ public partial class CanvasViewModel : ViewModelBase
 
                     element.DockPanelItemSize = Math.Max(10, element.DockPanelItemSize);
                 }
+                else if (parent.Visual is WrapPanel)
+                {
+                    element.ParentLayout = DesignerParentLayoutKind.WrapPanel;
+                    element.StackPanelIndex = -1;
+                    element.DockPanelIndex = -1;
+                    if (element.WrapPanelIndex < 0)
+                    {
+                        element.WrapPanelIndex = GetDirectChildren(parent).Count(child =>
+                            child.ParentLayout == DesignerParentLayoutKind.WrapPanel
+                            && child.WrapPanelIndex >= 0);
+                    }
+                }
                 else
                 {
                     element.ParentLayout = DesignerParentLayoutKind.Content;
                     element.StackPanelIndex = -1;
+                    element.DockPanelIndex = -1;
+                    element.WrapPanelIndex = -1;
                 }
             }
 
@@ -625,6 +646,7 @@ public partial class CanvasViewModel : ViewModelBase
                 child.DockPanelIndex = -1;
                 child.DockPanelDock = DesignerDockSide.Left;
                 child.DockPanelItemSize = 40;
+                child.WrapPanelIndex = -1;
                 child.ParentLayout = DesignerParentLayoutKind.StackPanel;
                 child.ParentName = parent.DisplayName;
             }
@@ -661,6 +683,7 @@ public partial class CanvasViewModel : ViewModelBase
             child.DockPanelIndex = -1;
             child.DockPanelDock = DesignerDockSide.Left;
             child.DockPanelItemSize = 40;
+            child.WrapPanelIndex = -1;
             child.ParentLayout = DesignerParentLayoutKind.Content;
             child.ParentName = parent.DisplayName;
             ClearBuiltInContent(parent.Visual);
@@ -696,7 +719,45 @@ public partial class CanvasViewModel : ViewModelBase
                 child.StackPanelIndex = -1;
                 child.StackPanelItemSize = 40;
                 child.DockPanelIndex = index;
+                child.WrapPanelIndex = -1;
                 child.ParentLayout = DesignerParentLayoutKind.DockPanel;
+                child.ParentName = parent.DisplayName;
+            }
+
+            ReflowContainerTreeCore(parent);
+        }
+        finally
+        {
+            _isReflowingContainerChildren = false;
+        }
+    }
+
+    public void SetWrapPanelChildOrder(
+        DesignElement parent,
+        IReadOnlyList<DesignElement> orderedChildren)
+    {
+        if (parent.Visual is not WrapPanel)
+        {
+            return;
+        }
+
+        _isReflowingContainerChildren = true;
+        try
+        {
+            for (var index = 0; index < orderedChildren.Count; index++)
+            {
+                var child = orderedChildren[index];
+                child.GridRow = 0;
+                child.GridColumn = 0;
+                child.GridRowSpan = 1;
+                child.GridColumnSpan = 1;
+                child.StackPanelIndex = -1;
+                child.StackPanelItemSize = 40;
+                child.DockPanelIndex = -1;
+                child.DockPanelDock = DesignerDockSide.Left;
+                child.DockPanelItemSize = 40;
+                child.WrapPanelIndex = index;
+                child.ParentLayout = DesignerParentLayoutKind.WrapPanel;
                 child.ParentName = parent.DisplayName;
             }
 
@@ -971,6 +1032,10 @@ public partial class CanvasViewModel : ViewModelBase
         {
             ReflowDockPanelChildrenCore(parent, dockPanel);
         }
+        else if (parent.Visual is WrapPanel wrapPanel)
+        {
+            ReflowWrapPanelChildrenCore(parent, wrapPanel);
+        }
         else if (parent.Visual is Grid)
         {
             foreach (var child in GetDirectChildren(parent))
@@ -1137,6 +1202,91 @@ public partial class CanvasViewModel : ViewModelBase
         }
     }
 
+    private void ReflowWrapPanelChildrenCore(DesignElement parent, WrapPanel wrapPanel)
+    {
+        var children = GetDirectChildren(parent)
+            .Where(child => child.IsWrapPanelChild)
+            .OrderBy(child => child.WrapPanelIndex)
+            .ThenBy(Elements.IndexOf)
+            .ToList();
+        if (children.Count == 0)
+        {
+            return;
+        }
+
+        wrapPanel.Children.Clear();
+        var itemWidth = double.IsFinite(wrapPanel.ItemWidth) && wrapPanel.ItemWidth > 0
+            ? Math.Max(10, wrapPanel.ItemWidth)
+            : 96;
+        var itemHeight = double.IsFinite(wrapPanel.ItemHeight) && wrapPanel.ItemHeight > 0
+            ? Math.Max(10, wrapPanel.ItemHeight)
+            : 36;
+        var itemSpacing = double.IsFinite(wrapPanel.ItemSpacing)
+            ? Math.Max(0, wrapPanel.ItemSpacing)
+            : 0;
+        var lineSpacing = double.IsFinite(wrapPanel.LineSpacing)
+            ? Math.Max(0, wrapPanel.LineSpacing)
+            : 0;
+
+        if (wrapPanel.Orientation == Orientation.Horizontal)
+        {
+            var itemsPerLine = Math.Max(
+                1,
+                (int)Math.Floor((parent.Width + itemSpacing) / (itemWidth + itemSpacing)));
+            for (var index = 0; index < children.Count; index++)
+            {
+                var line = index / itemsPerLine;
+                var item = index % itemsPerLine;
+                var lineItemCount = Math.Min(itemsPerLine, children.Count - (line * itemsPerLine));
+                var lineWidth = (lineItemCount * itemWidth) + ((lineItemCount - 1) * itemSpacing);
+                var offset = GetWrapAlignmentOffset(parent.Width, lineWidth, wrapPanel.ItemsAlignment);
+                var child = children[index];
+                child.WrapPanelIndex = index;
+                SetElementBounds(
+                    child,
+                    new Rect(
+                        parent.X + offset + (item * (itemWidth + itemSpacing)),
+                        parent.Y + (line * (itemHeight + lineSpacing)),
+                        itemWidth,
+                        itemHeight));
+            }
+        }
+        else
+        {
+            var itemsPerLine = Math.Max(
+                1,
+                (int)Math.Floor((parent.Height + itemSpacing) / (itemHeight + itemSpacing)));
+            for (var index = 0; index < children.Count; index++)
+            {
+                var line = index / itemsPerLine;
+                var item = index % itemsPerLine;
+                var lineItemCount = Math.Min(itemsPerLine, children.Count - (line * itemsPerLine));
+                var lineHeight = (lineItemCount * itemHeight) + ((lineItemCount - 1) * itemSpacing);
+                var offset = GetWrapAlignmentOffset(parent.Height, lineHeight, wrapPanel.ItemsAlignment);
+                var child = children[index];
+                child.WrapPanelIndex = index;
+                SetElementBounds(
+                    child,
+                    new Rect(
+                        parent.X + (line * (itemWidth + lineSpacing)),
+                        parent.Y + offset + (item * (itemHeight + itemSpacing)),
+                        itemWidth,
+                        itemHeight));
+            }
+        }
+    }
+
+    private static double GetWrapAlignmentOffset(
+        double available,
+        double occupied,
+        WrapPanelItemsAlignment alignment)
+        => alignment switch
+        {
+            WrapPanelItemsAlignment.Center => Math.Max(0, (available - occupied) / 2),
+            WrapPanelItemsAlignment.End => Math.Max(0, available - occupied),
+            _ => 0,
+        };
+
     private static void SetElementBounds(DesignElement element, Rect bounds)
     {
         element.X = bounds.X;
@@ -1173,6 +1323,7 @@ public partial class CanvasViewModel : ViewModelBase
         child.DockPanelIndex = -1;
         child.DockPanelDock = DesignerDockSide.Left;
         child.DockPanelItemSize = 40;
+        child.WrapPanelIndex = -1;
     }
 
     private void OnDesignElementPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
@@ -1192,6 +1343,7 @@ public partial class CanvasViewModel : ViewModelBase
             or nameof(DesignElement.DockPanelIndex)
             or nameof(DesignElement.DockPanelDock)
             or nameof(DesignElement.DockPanelItemSize)
+            or nameof(DesignElement.WrapPanelIndex)
             or nameof(DesignElement.ParentLayout))
         {
             ReflowContainerChild(element);
@@ -1215,7 +1367,7 @@ public partial class CanvasViewModel : ViewModelBase
     }
 
     private static bool IsDesignerContainer(Control visual)
-        => visual is Grid or StackPanel or DockPanel or Border or ScrollViewer or Expander;
+        => visual is Grid or StackPanel or DockPanel or WrapPanel or Border or ScrollViewer or Expander;
 
     private static bool IsContentContainer(Control visual)
         => visual is Border or ScrollViewer or Expander;
@@ -1758,6 +1910,50 @@ public partial class CanvasViewModel : ViewModelBase
                 && bool.TryParse(lastChildFill, out var parsedLastChildFill))
             {
                 dockPanel.LastChildFill = parsedLastChildFill;
+            }
+
+            return;
+        }
+
+        if (visual is WrapPanel wrapPanel)
+        {
+            if (properties.TryGetValue("Orientation", out var orientation)
+                && Enum.TryParse<Orientation>(orientation, ignoreCase: true, out var parsedOrientation))
+            {
+                wrapPanel.Orientation = parsedOrientation;
+            }
+
+            if (properties.TryGetValue("ItemWidth", out var itemWidth)
+                && double.TryParse(itemWidth, NumberStyles.Float, CultureInfo.InvariantCulture, out var parsedItemWidth))
+            {
+                wrapPanel.ItemWidth = Math.Max(10, parsedItemWidth);
+            }
+
+            if (properties.TryGetValue("ItemHeight", out var itemHeight)
+                && double.TryParse(itemHeight, NumberStyles.Float, CultureInfo.InvariantCulture, out var parsedItemHeight))
+            {
+                wrapPanel.ItemHeight = Math.Max(10, parsedItemHeight);
+            }
+
+            if (properties.TryGetValue("ItemSpacing", out var itemSpacing)
+                && double.TryParse(itemSpacing, NumberStyles.Float, CultureInfo.InvariantCulture, out var parsedItemSpacing))
+            {
+                wrapPanel.ItemSpacing = Math.Max(0, parsedItemSpacing);
+            }
+
+            if (properties.TryGetValue("LineSpacing", out var lineSpacing)
+                && double.TryParse(lineSpacing, NumberStyles.Float, CultureInfo.InvariantCulture, out var parsedLineSpacing))
+            {
+                wrapPanel.LineSpacing = Math.Max(0, parsedLineSpacing);
+            }
+
+            if (properties.TryGetValue("ItemsAlignment", out var itemsAlignment)
+                && Enum.TryParse<WrapPanelItemsAlignment>(
+                    itemsAlignment,
+                    ignoreCase: true,
+                    out var parsedItemsAlignment))
+            {
+                wrapPanel.ItemsAlignment = parsedItemsAlignment;
             }
 
             return;
