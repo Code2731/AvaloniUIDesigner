@@ -19,6 +19,11 @@ using AvaloniaUIDesigner.App.Designer.Core;
 using AvaloniaUIDesigner.App.Designer.Services;
 using AvaloniaUIDesigner.App.Models;
 using CommunityToolkit.Mvvm.ComponentModel;
+using EllipseShape = Avalonia.Controls.Shapes.Ellipse;
+using LineShape = Avalonia.Controls.Shapes.Line;
+using PathShape = Avalonia.Controls.Shapes.Path;
+using RectangleShape = Avalonia.Controls.Shapes.Rectangle;
+using Shape = Avalonia.Controls.Shapes.Shape;
 
 namespace AvaloniaUIDesigner.App.ViewModels;
 
@@ -581,6 +586,32 @@ public partial class MainWindowViewModel : ViewModelBase
                 values["Foreground"] = textBlock.Foreground?.ToString() ?? string.Empty;
                 break;
 
+            case Shape shape:
+                values["Fill"] = shape.Fill?.ToString() ?? string.Empty;
+                values["Stroke"] = shape.Stroke?.ToString() ?? string.Empty;
+                values["StrokeThickness"] = shape.StrokeThickness.ToString("0.###", CultureInfo.InvariantCulture);
+                values["Stretch"] = shape.Stretch.ToString();
+                values["StrokeDashArray"] = string.Join(
+                    ",",
+                    (shape.StrokeDashArray ?? [])
+                    .Select(value => value.ToString("0.###", CultureInfo.InvariantCulture)));
+                values["StrokeDashOffset"] = shape.StrokeDashOffset.ToString("0.###", CultureInfo.InvariantCulture);
+                values["StrokeLineCap"] = shape.StrokeLineCap.ToString();
+                values["StrokeJoin"] = shape.StrokeJoin.ToString();
+                values["StrokeMiterLimit"] = shape.StrokeMiterLimit.ToString("0.###", CultureInfo.InvariantCulture);
+                if (shape is RectangleShape rectangle)
+                {
+                    values["RadiusX"] = rectangle.RadiusX.ToString("0.###", CultureInfo.InvariantCulture);
+                    values["RadiusY"] = rectangle.RadiusY.ToString("0.###", CultureInfo.InvariantCulture);
+                }
+                else if (shape is LineShape line)
+                {
+                    values["StartPoint"] = FormatPoint(line.StartPoint);
+                    values["EndPoint"] = FormatPoint(line.EndPoint);
+                }
+
+                break;
+
             default:
                 controlName = string.Empty;
                 appearance = new Dictionary<string, string>();
@@ -609,7 +640,7 @@ public partial class MainWindowViewModel : ViewModelBase
             return false;
         }
 
-        if (target.Visual is not (Avalonia.Controls.Primitives.TemplatedControl or Border or TextBlock))
+        if (target.Visual is not (Avalonia.Controls.Primitives.TemplatedControl or Border or TextBlock or Shape))
         {
             StatusText = "The selected control does not expose editable appearance properties.";
             return false;
@@ -619,8 +650,21 @@ public partial class MainWindowViewModel : ViewModelBase
             || !TryReadOptionalBrush(resolvedAppearance, "Background", out var hasBackground, out var background, out error)
             || !TryReadOptionalBrush(resolvedAppearance, "Foreground", out var hasForeground, out var foreground, out error)
             || !TryReadOptionalBrush(resolvedAppearance, "BorderBrush", out var hasBorderBrush, out var borderBrush, out error)
+            || !TryReadOptionalBrush(resolvedAppearance, "Fill", out var hasFill, out var fill, out error)
+            || !TryReadOptionalBrush(resolvedAppearance, "Stroke", out var hasStroke, out var stroke, out error)
             || !TryReadThickness(appearance, "BorderThickness", out var hasBorderThickness, out var borderThickness, out error)
-            || !TryReadCornerRadius(appearance, "CornerRadius", out var hasCornerRadius, out var cornerRadius, out error))
+            || !TryReadCornerRadius(appearance, "CornerRadius", out var hasCornerRadius, out var cornerRadius, out error)
+            || !TryReadOptionalDouble(appearance, "StrokeThickness", 0, out var hasStrokeThickness, out var strokeThickness, out error)
+            || !TryReadOptionalEnum<Stretch>(appearance, "Stretch", out var hasStretch, out var stretch, out error)
+            || !TryReadDoubleList(appearance, "StrokeDashArray", out var hasStrokeDashArray, out var strokeDashArray, out error)
+            || !TryReadOptionalDouble(appearance, "StrokeDashOffset", double.NegativeInfinity, out var hasStrokeDashOffset, out var strokeDashOffset, out error)
+            || !TryReadOptionalEnum<PenLineCap>(appearance, "StrokeLineCap", out var hasStrokeLineCap, out var strokeLineCap, out error)
+            || !TryReadOptionalEnum<PenLineJoin>(appearance, "StrokeJoin", out var hasStrokeJoin, out var strokeJoin, out error)
+            || !TryReadOptionalDouble(appearance, "StrokeMiterLimit", 0, out var hasStrokeMiterLimit, out var strokeMiterLimit, out error)
+            || !TryReadOptionalDouble(appearance, "RadiusX", 0, out var hasRadiusX, out var radiusX, out error)
+            || !TryReadOptionalDouble(appearance, "RadiusY", 0, out var hasRadiusY, out var radiusY, out error)
+            || !TryReadOptionalPoint(appearance, "StartPoint", out var hasStartPoint, out var startPoint, out error)
+            || !TryReadOptionalPoint(appearance, "EndPoint", out var hasEndPoint, out var endPoint, out error))
         {
             StatusText = error;
             return false;
@@ -648,6 +692,35 @@ public partial class MainWindowViewModel : ViewModelBase
                 if (hasBackground) textBlock.Background = background;
                 if (hasForeground) textBlock.Foreground = foreground;
                 break;
+
+            case Shape shape:
+                if (hasFill) shape.Fill = fill;
+                if (hasStroke) shape.Stroke = stroke;
+                if (hasStrokeThickness) shape.StrokeThickness = strokeThickness;
+                if (hasStretch) shape.Stretch = stretch;
+                if (hasStrokeDashArray)
+                {
+                    shape.StrokeDashArray ??= [];
+                    shape.StrokeDashArray.Clear();
+                    shape.StrokeDashArray.AddRange(strokeDashArray);
+                }
+
+                if (hasStrokeDashOffset) shape.StrokeDashOffset = strokeDashOffset;
+                if (hasStrokeLineCap) shape.StrokeLineCap = strokeLineCap;
+                if (hasStrokeJoin) shape.StrokeJoin = strokeJoin;
+                if (hasStrokeMiterLimit) shape.StrokeMiterLimit = strokeMiterLimit;
+                if (shape is RectangleShape rectangle)
+                {
+                    if (hasRadiusX) rectangle.RadiusX = radiusX;
+                    if (hasRadiusY) rectangle.RadiusY = radiusY;
+                }
+                else if (shape is LineShape line)
+                {
+                    if (hasStartPoint) line.StartPoint = startPoint;
+                    if (hasEndPoint) line.EndPoint = endPoint;
+                }
+
+                break;
         }
 
         void PreserveBrushReference(string propertyName, bool hasValue)
@@ -667,6 +740,8 @@ public partial class MainWindowViewModel : ViewModelBase
         PreserveBrushReference("Background", hasBackground);
         PreserveBrushReference("Foreground", hasForeground);
         PreserveBrushReference("BorderBrush", hasBorderBrush);
+        PreserveBrushReference("Fill", hasFill);
+        PreserveBrushReference("Stroke", hasStroke);
         if (hasBorderThickness)
         {
             DesignerStyleApplicationMetadata.ClearApplied(target.Visual, "BorderThickness");
@@ -675,6 +750,19 @@ public partial class MainWindowViewModel : ViewModelBase
         if (hasCornerRadius)
         {
             DesignerStyleApplicationMetadata.ClearApplied(target.Visual, "CornerRadius");
+        }
+
+        foreach (var propertyName in new[]
+                 {
+                     "StrokeThickness", "Stretch", "StrokeDashArray", "StrokeDashOffset",
+                     "StrokeLineCap", "StrokeJoin", "StrokeMiterLimit", "RadiusX", "RadiusY",
+                     "StartPoint", "EndPoint",
+                 })
+        {
+            if (appearance.ContainsKey(propertyName))
+            {
+                DesignerStyleApplicationMetadata.ClearApplied(target.Visual, propertyName);
+            }
         }
 
         if (target.Visual is Border)
@@ -950,6 +1038,7 @@ public partial class MainWindowViewModel : ViewModelBase
             Avalonia.Controls.Primitives.TemplatedControl => new[] { "Background", "Foreground", "BorderBrush" },
             Border => new[] { "Background", "BorderBrush" },
             TextBlock => new[] { "Background", "Foreground" },
+            Shape => new[] { "Fill", "Stroke" },
             _ => Array.Empty<string>(),
         };
         if (propertyNames.Count == 0)
@@ -2526,6 +2615,76 @@ public partial class MainWindowViewModel : ViewModelBase
 
         CommitCanvasMutation();
         StatusText = $"Set image source for {target.DisplayName}.";
+        return true;
+    }
+
+    public bool TryGetSelectedPathData(out string controlName, out string data)
+    {
+        if (Canvas.SelectedElement is not
+            {
+                IsLocked: false,
+                Visual: PathShape path,
+            } target)
+        {
+            controlName = string.Empty;
+            data = string.Empty;
+            StatusText = "Select an unlocked Path control to edit its geometry data.";
+            return false;
+        }
+
+        controlName = target.DisplayName;
+        data = path.Tag is DesignerPathDataMetadata metadata
+            ? metadata.Data
+            : string.Empty;
+        return true;
+    }
+
+    public bool SetSelectedPathData(string data)
+    {
+        if (Canvas.SelectedElement is not
+            {
+                IsLocked: false,
+                Visual: PathShape path,
+            } target)
+        {
+            StatusText = "Select an unlocked Path control to edit its geometry data.";
+            return false;
+        }
+
+        var normalized = data.Trim();
+        var current = path.Tag is DesignerPathDataMetadata metadata
+            ? metadata.Data
+            : string.Empty;
+        if (string.Equals(current, normalized, StringComparison.Ordinal))
+        {
+            StatusText = "Path data is unchanged.";
+            return true;
+        }
+
+        Geometry? geometry = null;
+        if (normalized.Length > 0)
+        {
+            try
+            {
+                geometry = Geometry.Parse(normalized);
+            }
+            catch (Exception exception) when (
+                exception is FormatException or ArgumentException or InvalidDataException)
+            {
+                StatusText = "Path data must be valid Avalonia geometry mini-language.";
+                return false;
+            }
+        }
+
+        BeginCanvasMutation(HistoryActionType.EditProperty, "Updated Path geometry data.");
+        path.Data = geometry;
+        path.Tag = normalized.Length == 0
+            ? null
+            : new DesignerPathDataMetadata(normalized);
+        CommitCanvasMutation();
+        StatusText = normalized.Length == 0
+            ? $"Cleared Path data for {target.DisplayName}."
+            : $"Updated Path data for {target.DisplayName}.";
         return true;
     }
 
@@ -4169,6 +4328,54 @@ public partial class MainWindowViewModel : ViewModelBase
             };
         }
 
+        if (visual is Shape shape)
+        {
+            var properties = new Dictionary<string, string>
+            {
+                ["StrokeThickness"] = shape.StrokeThickness.ToString("0.###", CultureInfo.InvariantCulture),
+                ["Stretch"] = shape.Stretch.ToString(),
+                ["StrokeDashOffset"] = shape.StrokeDashOffset.ToString("0.###", CultureInfo.InvariantCulture),
+                ["StrokeLineCap"] = shape.StrokeLineCap.ToString(),
+                ["StrokeJoin"] = shape.StrokeJoin.ToString(),
+                ["StrokeMiterLimit"] = shape.StrokeMiterLimit.ToString("0.###", CultureInfo.InvariantCulture),
+                ["Opacity"] = shape.Opacity.ToString("0.###", CultureInfo.InvariantCulture),
+            };
+            if (shape.Fill is { } fill)
+            {
+                properties["Fill"] = FormatBrushValue(fill);
+            }
+
+            if (shape.Stroke is { } stroke)
+            {
+                properties["Stroke"] = FormatBrushValue(stroke);
+            }
+
+            if (shape.StrokeDashArray is { Count: > 0 } dashArray)
+            {
+                properties["StrokeDashArray"] = string.Join(
+                    ",",
+                    dashArray.Select(value =>
+                        value.ToString("0.###", CultureInfo.InvariantCulture)));
+            }
+
+            switch (shape)
+            {
+                case RectangleShape rectangle:
+                    properties["RadiusX"] = rectangle.RadiusX.ToString("0.###", CultureInfo.InvariantCulture);
+                    properties["RadiusY"] = rectangle.RadiusY.ToString("0.###", CultureInfo.InvariantCulture);
+                    break;
+                case LineShape line:
+                    properties["StartPoint"] = FormatPoint(line.StartPoint);
+                    properties["EndPoint"] = FormatPoint(line.EndPoint);
+                    break;
+                case PathShape { Tag: DesignerPathDataMetadata pathData }:
+                    properties["Data"] = pathData.Data;
+                    break;
+            }
+
+            return properties;
+        }
+
         if (visual is CheckBox checkBox)
         {
             return new Dictionary<string, string>
@@ -5335,6 +5542,13 @@ public partial class MainWindowViewModel : ViewModelBase
             "TextBlock" => propertyName is "Text" or "FontSize" or "FontWeight" or "Background" or "Foreground",
             "Label" => propertyName is "Content" or "Target",
             "Image" => propertyName is "Source" or "Stretch",
+            "Rectangle" => IsSupportedShapeProperty(propertyName)
+                || propertyName is "RadiusX" or "RadiusY",
+            "Ellipse" => IsSupportedShapeProperty(propertyName),
+            "Line" => IsSupportedShapeProperty(propertyName)
+                || propertyName is "StartPoint" or "EndPoint",
+            "Path" => IsSupportedShapeProperty(propertyName)
+                || propertyName == "Data",
             "CheckBox" or "ToggleSwitch" => propertyName is "Content" or "IsChecked",
             "ToggleButton" => propertyName is "Content" or "IsChecked",
             "RadioButton" => propertyName is "Content" or "IsChecked" or "GroupName",
@@ -5370,6 +5584,11 @@ public partial class MainWindowViewModel : ViewModelBase
             or "ToggleSwitch" or "ToggleButton" or "ComboBox" or "ListBox" or "TreeView" or "Menu" or "Slider"
             or "ProgressBar" or "DatePicker" or "CalendarDatePicker" or "TimePicker"
             or "NumericUpDown" or "TabControl" or "Expander" or "ScrollViewer";
+
+    private static bool IsSupportedShapeProperty(string propertyName)
+        => propertyName is "Fill" or "Stroke" or "StrokeThickness" or "Stretch"
+            or "StrokeDashArray" or "StrokeDashOffset" or "StrokeLineCap"
+            or "StrokeJoin" or "StrokeMiterLimit";
 
     private static string FormatWarnings(IReadOnlyCollection<string> warnings)
     {
@@ -6017,6 +6236,7 @@ public partial class MainWindowViewModel : ViewModelBase
             "Background" => visual is Avalonia.Controls.Primitives.TemplatedControl or Border or TextBlock,
             "Foreground" => visual is Avalonia.Controls.Primitives.TemplatedControl or TextBlock,
             "BorderBrush" => visual is Avalonia.Controls.Primitives.TemplatedControl or Border,
+            "Fill" or "Stroke" => visual is Shape,
             _ => false,
         };
 
@@ -6044,6 +6264,12 @@ public partial class MainWindowViewModel : ViewModelBase
                 return true;
             case "BorderBrush" when visual is Border border:
                 border.BorderBrush = brush;
+                return true;
+            case "Fill" when visual is Shape shape:
+                shape.Fill = brush;
+                return true;
+            case "Stroke" when visual is Shape shape:
+                shape.Stroke = brush;
                 return true;
             default:
                 return false;
@@ -6130,6 +6356,138 @@ public partial class MainWindowViewModel : ViewModelBase
             return false;
         }
     }
+
+    private static bool TryReadOptionalDouble(
+        IReadOnlyDictionary<string, string> values,
+        string propertyName,
+        double minimum,
+        out bool hasValue,
+        out double value,
+        out string error)
+    {
+        hasValue = values.TryGetValue(propertyName, out var rawValue);
+        value = 0;
+        error = string.Empty;
+        if (!hasValue)
+        {
+            return true;
+        }
+
+        if (!double.TryParse(
+                rawValue,
+                NumberStyles.Float,
+                CultureInfo.InvariantCulture,
+                out value)
+            || !double.IsFinite(value)
+            || value < minimum)
+        {
+            error = double.IsNegativeInfinity(minimum)
+                ? $"{propertyName} must be a finite number."
+                : $"{propertyName} must be a finite number greater than or equal to {minimum:0.###}.";
+            return false;
+        }
+
+        return true;
+    }
+
+    private static bool TryReadOptionalEnum<T>(
+        IReadOnlyDictionary<string, string> values,
+        string propertyName,
+        out bool hasValue,
+        out T value,
+        out string error)
+        where T : struct, Enum
+    {
+        hasValue = values.TryGetValue(propertyName, out var rawValue);
+        value = default;
+        error = string.Empty;
+        if (!hasValue)
+        {
+            return true;
+        }
+
+        if (!Enum.TryParse<T>(rawValue, ignoreCase: true, out value)
+            || !Enum.IsDefined(value))
+        {
+            error = $"{propertyName} must be one of: {string.Join(", ", Enum.GetNames<T>())}.";
+            return false;
+        }
+
+        return true;
+    }
+
+    private static bool TryReadDoubleList(
+        IReadOnlyDictionary<string, string> values,
+        string propertyName,
+        out bool hasValue,
+        out IReadOnlyList<double> parsedValues,
+        out string error)
+    {
+        hasValue = values.TryGetValue(propertyName, out var rawValue);
+        var result = new List<double>();
+        parsedValues = result;
+        error = string.Empty;
+        if (!hasValue || string.IsNullOrWhiteSpace(rawValue))
+        {
+            return true;
+        }
+
+        foreach (var token in rawValue.Split(
+                     [',', ' ', '\t'],
+                     StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+        {
+            if (!double.TryParse(
+                    token,
+                    NumberStyles.Float,
+                    CultureInfo.InvariantCulture,
+                    out var parsed)
+                || !double.IsFinite(parsed)
+                || parsed < 0)
+            {
+                error = $"{propertyName} must contain non-negative numbers separated by commas.";
+                return false;
+            }
+
+            result.Add(parsed);
+        }
+
+        return true;
+    }
+
+    private static bool TryReadOptionalPoint(
+        IReadOnlyDictionary<string, string> values,
+        string propertyName,
+        out bool hasValue,
+        out Point point,
+        out string error)
+    {
+        hasValue = values.TryGetValue(propertyName, out var rawValue);
+        point = default;
+        error = string.Empty;
+        if (!hasValue)
+        {
+            return true;
+        }
+
+        try
+        {
+            point = Point.Parse(rawValue ?? string.Empty);
+            if (!double.IsFinite(point.X) || !double.IsFinite(point.Y))
+            {
+                throw new FormatException();
+            }
+
+            return true;
+        }
+        catch (FormatException)
+        {
+            error = $"{propertyName} must use X,Y coordinates, for example 0,60.";
+            return false;
+        }
+    }
+
+    private static string FormatPoint(Point point)
+        => $"{point.X.ToString("0.###", CultureInfo.InvariantCulture)},{point.Y.ToString("0.###", CultureInfo.InvariantCulture)}";
 
     private static bool IsValidControlName(string name)
     {
@@ -6414,6 +6772,15 @@ public partial class MainWindowViewModel : ViewModelBase
                 }
 
                 AppendAttribute(sb, "Stretch", image.Stretch.ToString());
+                sb.AppendLine(" />");
+                break;
+
+            case Shape shape:
+                sb.Append(indent);
+                sb.Append('<');
+                sb.Append(shape.GetType().Name);
+                AppendCanvasLayoutAttributes(sb, element);
+                AppendShapeAttributes(sb, shape);
                 sb.AppendLine(" />");
                 break;
 
@@ -7045,6 +7412,57 @@ public partial class MainWindowViewModel : ViewModelBase
         }
     }
 
+    private void AppendShapeAttributes(StringBuilder sb, Shape shape)
+    {
+        if (!ShouldSuppressInlineStyleProperty(shape, "StrokeThickness"))
+        {
+            AppendAttribute(
+                sb,
+                "StrokeThickness",
+                shape.StrokeThickness.ToString("0.###", CultureInfo.InvariantCulture));
+        }
+
+        AppendAttribute(sb, "Stretch", shape.Stretch.ToString());
+        if (shape.StrokeDashArray is { Count: > 0 } dashArray)
+        {
+            AppendAttribute(
+                sb,
+                "StrokeDashArray",
+                string.Join(",", dashArray.Select(value =>
+                    value.ToString("0.###", CultureInfo.InvariantCulture))));
+        }
+
+        if (Math.Abs(shape.StrokeDashOffset) > double.Epsilon)
+        {
+            AppendAttribute(
+                sb,
+                "StrokeDashOffset",
+                shape.StrokeDashOffset.ToString("0.###", CultureInfo.InvariantCulture));
+        }
+
+        AppendAttribute(sb, "StrokeLineCap", shape.StrokeLineCap.ToString());
+        AppendAttribute(sb, "StrokeJoin", shape.StrokeJoin.ToString());
+        AppendAttribute(
+            sb,
+            "StrokeMiterLimit",
+            shape.StrokeMiterLimit.ToString("0.###", CultureInfo.InvariantCulture));
+
+        switch (shape)
+        {
+            case RectangleShape rectangle:
+                AppendAttribute(sb, "RadiusX", rectangle.RadiusX.ToString("0.###", CultureInfo.InvariantCulture));
+                AppendAttribute(sb, "RadiusY", rectangle.RadiusY.ToString("0.###", CultureInfo.InvariantCulture));
+                break;
+            case LineShape line:
+                AppendAttribute(sb, "StartPoint", FormatPoint(line.StartPoint));
+                AppendAttribute(sb, "EndPoint", FormatPoint(line.EndPoint));
+                break;
+            case PathShape { Tag: DesignerPathDataMetadata pathData }:
+                AppendAttribute(sb, "Data", pathData.Data);
+                break;
+        }
+    }
+
     private static void WriteTreeItemsAxaml(
         StringBuilder sb,
         IEnumerable<DesignerTreeItemDefinition> definitions,
@@ -7557,6 +7975,23 @@ public partial class MainWindowViewModel : ViewModelBase
                     textBlock.Foreground,
                     textBlock.IsSet(TextBlock.ForegroundProperty)
                         && !ShouldSuppressInlineStyleProperty(visual, "Foreground"));
+                break;
+
+            case Shape shape:
+                AppendBrushAppearanceAttribute(
+                    sb,
+                    visual,
+                    "Fill",
+                    shape.Fill,
+                    shape.IsSet(Shape.FillProperty)
+                        && !ShouldSuppressInlineStyleProperty(visual, "Fill"));
+                AppendBrushAppearanceAttribute(
+                    sb,
+                    visual,
+                    "Stroke",
+                    shape.Stroke,
+                    shape.IsSet(Shape.StrokeProperty)
+                        && !ShouldSuppressInlineStyleProperty(visual, "Stroke"));
                 break;
         }
     }

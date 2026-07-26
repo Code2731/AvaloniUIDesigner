@@ -90,6 +90,7 @@
                 <MenuItem Header="Edit Tab Order..." Click="OnEditTabOrderMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
                 <MenuItem Header="Include / Exclude from Tab Navigation" Click="OnToggleTabStopMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
                 <MenuItem Header="Choose Image..." Click="OnChooseImageMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
+                <MenuItem Header="Edit Path Data..." Click="OnEditPathDataMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
                 <Separator/>
                 <MenuItem Header="Style">
                     <MenuItem Header="Edit Appearance..." Click="OnEditAppearanceMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
@@ -331,6 +332,7 @@
                                                     <MenuItem Header="Duplicate" Click="OnDuplicateMenuClicked"/>
                                                     <MenuItem Header="Rename..." Click="OnRenameSelectedControlMenuClicked"/>
                                                     <MenuItem Header="Edit Appearance..." Click="OnEditAppearanceMenuClicked"/>
+                                                    <MenuItem Header="Edit Path Data..." Click="OnEditPathDataMenuClicked"/>
                                                     <MenuItem Header="Edit Grid Definitions..." Click="OnEditGridDefinitionsMenuClicked"/>
                                                     <MenuItem Header="Assign to Grid Cell..." Click="OnAssignToGridCellMenuClicked"/>
                                                     <MenuItem Header="Assign to StackPanel..." Click="OnAssignToStackPanelMenuClicked"/>

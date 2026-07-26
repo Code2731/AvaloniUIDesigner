@@ -9,6 +9,7 @@ using Avalonia;
 using Avalonia.Automation;
 using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
+using Avalonia.Controls.Shapes;
 using Avalonia.Layout;
 using Avalonia.Media;
 using Avalonia.Media.Imaging;
@@ -17,6 +18,9 @@ using AvaloniaUIDesigner.App.Designer.Core;
 using AvaloniaUIDesigner.App.Designer.Services;
 using AvaloniaUIDesigner.App.Models;
 using CommunityToolkit.Mvvm.ComponentModel;
+using LineShape = Avalonia.Controls.Shapes.Line;
+using PathShape = Avalonia.Controls.Shapes.Path;
+using RectangleShape = Avalonia.Controls.Shapes.Rectangle;
 
 namespace AvaloniaUIDesigner.App.ViewModels;
 
@@ -2160,6 +2164,12 @@ public partial class CanvasViewModel : ViewModelBase
             visual.IsTabStop = parsedIsTabStop;
         }
 
+        if (visual is Shape shape)
+        {
+            ApplyShapeProperties(shape, properties);
+            return;
+        }
+
         if (visual is Button button)
         {
             if (properties.TryGetValue("Content", out var content))
@@ -2841,6 +2851,163 @@ public partial class CanvasViewModel : ViewModelBase
             && TryParseCornerRadius(cornerRadius, out var parsedCornerRadius))
         {
             templated.CornerRadius = parsedCornerRadius;
+        }
+    }
+
+    private void ApplyShapeProperties(
+        Shape shape,
+        IReadOnlyDictionary<string, string> properties)
+    {
+        if (properties.TryGetValue("Fill", out var fill))
+        {
+            TrySetAppearanceBrush(shape, "Fill", value => shape.Fill = value, fill);
+        }
+
+        if (properties.TryGetValue("Stroke", out var stroke))
+        {
+            TrySetAppearanceBrush(shape, "Stroke", value => shape.Stroke = value, stroke);
+        }
+
+        if (TryReadFiniteDouble(properties, "StrokeThickness", out var strokeThickness))
+        {
+            shape.StrokeThickness = Math.Max(0, strokeThickness);
+        }
+
+        if (properties.TryGetValue("Stretch", out var stretch)
+            && Enum.TryParse<Stretch>(stretch, true, out var parsedStretch))
+        {
+            shape.Stretch = parsedStretch;
+        }
+
+        if (properties.TryGetValue("StrokeDashArray", out var dashArray))
+        {
+            shape.StrokeDashArray ??= [];
+            shape.StrokeDashArray.Clear();
+            foreach (var value in ParseNonNegativeDoubleList(dashArray))
+            {
+                shape.StrokeDashArray.Add(value);
+            }
+        }
+
+        if (TryReadFiniteDouble(properties, "StrokeDashOffset", out var dashOffset))
+        {
+            shape.StrokeDashOffset = dashOffset;
+        }
+
+        if (properties.TryGetValue("StrokeLineCap", out var lineCap)
+            && Enum.TryParse<PenLineCap>(lineCap, true, out var parsedLineCap))
+        {
+            shape.StrokeLineCap = parsedLineCap;
+        }
+
+        if (properties.TryGetValue("StrokeJoin", out var lineJoin)
+            && Enum.TryParse<PenLineJoin>(lineJoin, true, out var parsedLineJoin))
+        {
+            shape.StrokeJoin = parsedLineJoin;
+        }
+
+        if (TryReadFiniteDouble(properties, "StrokeMiterLimit", out var miterLimit))
+        {
+            shape.StrokeMiterLimit = Math.Max(0, miterLimit);
+        }
+
+        if (shape is RectangleShape rectangle)
+        {
+            if (TryReadFiniteDouble(properties, "RadiusX", out var radiusX))
+            {
+                rectangle.RadiusX = Math.Max(0, radiusX);
+            }
+
+            if (TryReadFiniteDouble(properties, "RadiusY", out var radiusY))
+            {
+                rectangle.RadiusY = Math.Max(0, radiusY);
+            }
+        }
+        else if (shape is LineShape line)
+        {
+            if (TryReadPoint(properties, "StartPoint", out var startPoint))
+            {
+                line.StartPoint = startPoint;
+            }
+
+            if (TryReadPoint(properties, "EndPoint", out var endPoint))
+            {
+                line.EndPoint = endPoint;
+            }
+        }
+        else if (shape is PathShape path
+                 && properties.TryGetValue("Data", out var data))
+        {
+            try
+            {
+                path.Data = string.IsNullOrWhiteSpace(data)
+                    ? null
+                    : Geometry.Parse(data);
+                path.Tag = string.IsNullOrWhiteSpace(data)
+                    ? null
+                    : new DesignerPathDataMetadata(data);
+            }
+            catch (Exception exception) when (
+                exception is FormatException or ArgumentException or System.IO.InvalidDataException)
+            {
+                // Keep the default geometry when imported Path data is malformed.
+            }
+        }
+    }
+
+    private static bool TryReadFiniteDouble(
+        IReadOnlyDictionary<string, string> properties,
+        string propertyName,
+        out double value)
+    {
+        value = 0;
+        return properties.TryGetValue(propertyName, out var rawValue)
+            && double.TryParse(
+                rawValue,
+                NumberStyles.Float,
+                CultureInfo.InvariantCulture,
+                out value)
+            && double.IsFinite(value);
+    }
+
+    private static IEnumerable<double> ParseNonNegativeDoubleList(string value)
+    {
+        foreach (var token in value.Split(
+                     [',', ' ', '\t'],
+                     StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+        {
+            if (double.TryParse(
+                    token,
+                    NumberStyles.Float,
+                    CultureInfo.InvariantCulture,
+                    out var parsed)
+                && double.IsFinite(parsed)
+                && parsed >= 0)
+            {
+                yield return parsed;
+            }
+        }
+    }
+
+    private static bool TryReadPoint(
+        IReadOnlyDictionary<string, string> properties,
+        string propertyName,
+        out Point point)
+    {
+        point = default;
+        if (!properties.TryGetValue(propertyName, out var value))
+        {
+            return false;
+        }
+
+        try
+        {
+            point = Point.Parse(value);
+            return double.IsFinite(point.X) && double.IsFinite(point.Y);
+        }
+        catch (FormatException)
+        {
+            return false;
         }
     }
 

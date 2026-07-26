@@ -4,10 +4,12 @@ using System.Linq;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
+using Avalonia.Controls.Shapes;
 using Avalonia.Layout;
 using Avalonia.Media;
 using AvaloniaUIDesigner.App.Designer.Contracts;
 using AvaloniaUIDesigner.App.Designer.Core;
+using AvaloniaUIDesigner.App.Models;
 
 namespace AvaloniaUIDesigner.App.Designer.Services;
 
@@ -45,6 +47,50 @@ public sealed class BuiltInComponentCatalog : IComponentCatalog
             DefaultWidth: 240,
             DefaultHeight: 160,
             VisualFactory: static () => new Image { Stretch = Stretch.Uniform }),
+        new(
+            DisplayName: "Rectangle",
+            AvaloniaTypeName: "Avalonia.Controls.Shapes.Rectangle",
+            DefaultWidth: 180,
+            DefaultHeight: 100,
+            VisualFactory: static () => new Rectangle
+            {
+                Fill = Brush.Parse("#DBEAFE"),
+                Stroke = Brush.Parse("#2563EB"),
+                StrokeThickness = 2,
+                RadiusX = 10,
+                RadiusY = 10,
+            }),
+        new(
+            DisplayName: "Ellipse",
+            AvaloniaTypeName: "Avalonia.Controls.Shapes.Ellipse",
+            DefaultWidth: 120,
+            DefaultHeight: 120,
+            VisualFactory: static () => new Ellipse
+            {
+                Fill = Brush.Parse("#DCFCE7"),
+                Stroke = Brush.Parse("#16A34A"),
+                StrokeThickness = 2,
+            }),
+        new(
+            DisplayName: "Line",
+            AvaloniaTypeName: "Avalonia.Controls.Shapes.Line",
+            DefaultWidth: 180,
+            DefaultHeight: 60,
+            VisualFactory: static () => new Line
+            {
+                StartPoint = new Point(0, 60),
+                EndPoint = new Point(180, 0),
+                Stroke = Brush.Parse("#334155"),
+                StrokeThickness = 3,
+                StrokeLineCap = PenLineCap.Round,
+                Stretch = Stretch.Fill,
+            }),
+        new(
+            DisplayName: "Path",
+            AvaloniaTypeName: "Avalonia.Controls.Shapes.Path",
+            DefaultWidth: 180,
+            DefaultHeight: 80,
+            VisualFactory: CreateDefaultPath),
         new(
             DisplayName: "CheckBox",
             AvaloniaTypeName: "Avalonia.Controls.CheckBox",
@@ -333,5 +379,20 @@ public sealed class BuiltInComponentCatalog : IComponentCatalog
         _definitions.Add(definition with { VisualFactory = baseDefinition.VisualFactory });
         error = string.Empty;
         return true;
+    }
+
+    private static Path CreateDefaultPath()
+    {
+        const string data = "M 10,70 L 50,10 90,70 130,10 170,70 Z";
+        return new Path
+        {
+            Data = Geometry.Parse(data),
+            Fill = Brush.Parse("#FDE68A"),
+            Stroke = Brush.Parse("#D97706"),
+            StrokeThickness = 2,
+            StrokeJoin = PenLineJoin.Round,
+            Stretch = Stretch.Fill,
+            Tag = new DesignerPathDataMetadata(data),
+        };
     }
 }

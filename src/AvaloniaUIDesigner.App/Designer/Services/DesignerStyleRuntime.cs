@@ -5,6 +5,7 @@ using System.Linq;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
+using Avalonia.Controls.Shapes;
 using Avalonia.Media;
 using AvaloniaUIDesigner.App.Designer.Core;
 using AvaloniaUIDesigner.App.Models;
@@ -13,7 +14,7 @@ namespace AvaloniaUIDesigner.App.Designer.Services;
 
 public static class DesignerStyleRuntime
 {
-    private static readonly string[] BrushProperties = ["Background", "Foreground", "BorderBrush"];
+    private static readonly string[] BrushProperties = ["Background", "Foreground", "BorderBrush", "Fill", "Stroke"];
 
     public static bool IsSupportedProperty(string targetType, string propertyName)
     {
@@ -30,6 +31,11 @@ public static class DesignerStyleRuntime
         if (targetType == "Border")
         {
             return propertyName is "Background" or "BorderBrush" or "BorderThickness" or "CornerRadius";
+        }
+
+        if (targetType is "Rectangle" or "Ellipse" or "Line" or "Path")
+        {
+            return propertyName is "Fill" or "Stroke" or "StrokeThickness";
         }
 
         return SupportsTemplatedControl(targetType)
@@ -138,6 +144,10 @@ public static class DesignerStyleRuntime
                 => textBlock.FontSize.ToString("0.###", CultureInfo.InvariantCulture),
             "FontWeight" when control is TemplatedControl templated => templated.FontWeight.ToString(),
             "FontWeight" when control is TextBlock textBlock => textBlock.FontWeight.ToString(),
+            "Fill" when control is Shape shape && shape.Fill is { } brush => FormatBrush(brush),
+            "Stroke" when control is Shape shape && shape.Stroke is { } brush => FormatBrush(brush),
+            "StrokeThickness" when control is Shape shape
+                => shape.StrokeThickness.ToString("0.###", CultureInfo.InvariantCulture),
             _ => string.Empty,
         };
 
@@ -227,6 +237,9 @@ public static class DesignerStyleRuntime
             "FontSize" when control is TextBlock => TextBlock.FontSizeProperty,
             "FontWeight" when control is TemplatedControl => TemplatedControl.FontWeightProperty,
             "FontWeight" when control is TextBlock => TextBlock.FontWeightProperty,
+            "Fill" when control is Shape => Shape.FillProperty,
+            "Stroke" when control is Shape => Shape.StrokeProperty,
+            "StrokeThickness" when control is Shape => Shape.StrokeThicknessProperty,
             _ => null,
         };
 
@@ -261,6 +274,22 @@ public static class DesignerStyleRuntime
                     return TryApplyBrush(control, propertyName, rawValue, colorResources);
                 case "BorderBrush":
                     return TryApplyBrush(control, propertyName, rawValue, colorResources);
+                case "Fill":
+                    return TryApplyBrush(control, propertyName, rawValue, colorResources);
+                case "Stroke":
+                    return TryApplyBrush(control, propertyName, rawValue, colorResources);
+                case "StrokeThickness" when double.TryParse(
+                    rawValue,
+                    NumberStyles.Float,
+                    CultureInfo.InvariantCulture,
+                    out var strokeThickness):
+                    if (control is Shape shape && double.IsFinite(strokeThickness))
+                    {
+                        shape.StrokeThickness = Math.Max(0, strokeThickness);
+                        return true;
+                    }
+
+                    return false;
                 case "BorderThickness":
                     return TryApplyBorderThickness(control, Thickness.Parse(rawValue));
                 case "CornerRadius":
@@ -324,6 +353,12 @@ public static class DesignerStyleRuntime
                 return true;
             case "BorderBrush" when control is Border border:
                 border.BorderBrush = brush;
+                return true;
+            case "Fill" when control is Shape shape:
+                shape.Fill = brush;
+                return true;
+            case "Stroke" when control is Shape shape:
+                shape.Stroke = brush;
                 return true;
             default:
                 return false;

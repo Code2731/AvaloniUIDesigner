@@ -851,6 +851,26 @@ public partial class MainWindow : Window
         Vm.TrySetSelectedImageSource(files[0].Path.AbsoluteUri);
     }
 
+    private async void OnEditPathDataMenuClicked(
+        object? sender,
+        Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        FlushPendingPropertyHistory();
+        if (Vm is null || !Vm.TryGetSelectedPathData(out var controlName, out var data))
+        {
+            return;
+        }
+
+        var updated = await ShowTextEditorDialogAsync(
+            $"Edit Path Data - {controlName}",
+            data,
+            "Enter Avalonia geometry mini-language, for example M 10,70 L 50,10 90,70 Z.");
+        if (updated is not null)
+        {
+            Vm.SetSelectedPathData(updated);
+        }
+    }
+
     private async void OnEditExpanderContentMenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
         FlushPendingPropertyHistory();
