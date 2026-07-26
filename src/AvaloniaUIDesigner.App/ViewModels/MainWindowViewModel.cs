@@ -81,6 +81,18 @@ public sealed record TypographyEditorState(
     bool SupportsTextAlignment,
     bool SupportsTextWrapping);
 
+public sealed record TransformEditorState(
+    string ControlName,
+    string TranslateX,
+    string TranslateY,
+    string Rotation,
+    string ScaleX,
+    string ScaleY,
+    string SkewX,
+    string SkewY,
+    string OriginX,
+    string OriginY);
+
 public sealed record GridDefinitionEditorState(
     string ControlName,
     string RowDefinitions,
@@ -2783,6 +2795,103 @@ public partial class MainWindowViewModel : ViewModelBase
         return true;
     }
 
+    public bool TryGetSelectedTransformProperties(out TransformEditorState state)
+    {
+        var target = Canvas.SelectedElement;
+        if (target is null || target.IsLocked)
+        {
+            state = CreateTransformEditorState(string.Empty, DesignerTransformValues.Default);
+            StatusText = target is { IsLocked: true }
+                ? "Unlock the selected control before editing its transform."
+                : "Select a control before editing its transform.";
+            return false;
+        }
+
+        if (!DesignerTransformRuntime.TryRead(target.Visual, out var values, out var error))
+        {
+            state = CreateTransformEditorState(target.DisplayName, DesignerTransformValues.Default);
+            StatusText = $"Transform properties cannot be edited. {error}";
+            return false;
+        }
+
+        state = CreateTransformEditorState(target.DisplayName, values);
+        return true;
+    }
+
+    public bool SetSelectedTransformProperties(
+        string translateX,
+        string translateY,
+        string rotation,
+        string scaleX,
+        string scaleY,
+        string skewX,
+        string skewY,
+        string originX,
+        string originY)
+    {
+        var target = Canvas.SelectedElement;
+        if (target is null || target.IsLocked)
+        {
+            StatusText = "Select an unlocked control before editing its transform.";
+            return false;
+        }
+
+        if (!DesignerTransformRuntime.TryParseValues(
+                translateX,
+                translateY,
+                rotation,
+                scaleX,
+                scaleY,
+                skewX,
+                skewY,
+                originX,
+                originY,
+                out var values,
+                out var error))
+        {
+            StatusText = $"Transform properties were not changed. {error}";
+            return false;
+        }
+
+        if (!DesignerTransformRuntime.TryRead(target.Visual, out var current, out error))
+        {
+            StatusText = $"Transform properties were not changed. {error}";
+            return false;
+        }
+
+        if (DesignerTransformRuntime.AreEquivalent(current, values))
+        {
+            StatusText = "Transform properties are unchanged.";
+            return true;
+        }
+
+        BeginCanvasMutation(HistoryActionType.EditProperty, "Updated common transform properties.");
+        DesignerTransformRuntime.Apply(target.Visual, values);
+        DesignerStyleApplicationMetadata.ClearApplied(target.Visual, "RenderTransform");
+        DesignerStyleApplicationMetadata.ClearApplied(target.Visual, "RenderTransformOrigin");
+        CommitCanvasMutation();
+        StatusText = $"Updated transform for {target.DisplayName}.";
+        return true;
+    }
+
+    private static TransformEditorState CreateTransformEditorState(
+        string controlName,
+        DesignerTransformValues values)
+        => new(
+            controlName,
+            FormatTransformEditorNumber(values.TranslateX),
+            FormatTransformEditorNumber(values.TranslateY),
+            FormatTransformEditorNumber(values.Rotation),
+            FormatTransformEditorNumber(values.ScaleX),
+            FormatTransformEditorNumber(values.ScaleY),
+            FormatTransformEditorNumber(values.SkewX),
+            FormatTransformEditorNumber(values.SkewY),
+            FormatTransformEditorNumber(values.OriginX),
+            FormatTransformEditorNumber(values.OriginY));
+
+    private static string FormatTransformEditorNumber(double value)
+        => value.ToString("0.###", CultureInfo.InvariantCulture);
+
     public RootEditorState GetRootEditorState()
         => new(
             _rootSettings.Kind.ToString(),
@@ -4885,6 +4994,7 @@ public partial class MainWindowViewModel : ViewModelBase
         CaptureCommonAppearanceProperties(result, visual);
         DesignerLayoutRuntime.Capture(visual, result);
         DesignerTypographyRuntime.Capture(visual, result);
+        DesignerTransformRuntime.Capture(visual, result);
         foreach (var pair in DesignerResourceReferenceMetadata.GetReferences(visual))
         {
             result[pair.Key] = DesignerResourceReferenceMetadata.FormatExpression(pair.Value);
@@ -6611,6 +6721,25 @@ public partial class MainWindowViewModel : ViewModelBase
                 else
                 {
                     warnings.Add($"Ignored {tagName}.{name}: {typographyError}");
+                }
+
+                continue;
+            }
+
+            if (DesignerTransformRuntime.IsSupportedProperty(name))
+            {
+                if (DesignerTransformRuntime.TryNormalizeProperty(
+                        name,
+                        attr.Value,
+                        out var canonicalName,
+                        out var normalizedValue,
+                        out var transformError))
+                {
+                    map[canonicalName] = normalizedValue;
+                }
+                else
+                {
+                    warnings.Add($"Ignored {tagName}.{name}: {transformError}");
                 }
 
                 continue;
@@ -8895,6 +9024,7 @@ public partial class MainWindowViewModel : ViewModelBase
         AppendCommonAppearanceAttributes(sb, element.Visual);
         AppendCommonLayoutAttributes(sb, element.Visual);
         AppendCommonTypographyAttributes(sb, element.Visual);
+        AppendCommonTransformAttributes(sb, element.Visual);
         if (ToolTip.GetTip(element.Visual) is { } toolTip && !string.IsNullOrWhiteSpace(toolTip.ToString()))
         {
             AppendAttribute(sb, "ToolTip.Tip", toolTip.ToString() ?? string.Empty);
@@ -9294,6 +9424,19 @@ public partial class MainWindowViewModel : ViewModelBase
         {
             if (properties.TryGetValue(propertyName, out var value)
                 && !ShouldSuppressInlineStyleProperty(visual, propertyName))
+            {
+                AppendAttribute(sb, propertyName, value);
+            }
+        }
+    }
+
+    private static void AppendCommonTransformAttributes(StringBuilder sb, Control visual)
+    {
+        var properties = new Dictionary<string, string>(StringComparer.Ordinal);
+        DesignerTransformRuntime.Capture(visual, properties);
+        foreach (var propertyName in new[] { "RenderTransform", "RenderTransformOrigin" })
+        {
+            if (properties.TryGetValue(propertyName, out var value))
             {
                 AppendAttribute(sb, propertyName, value);
             }

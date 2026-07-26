@@ -651,6 +651,19 @@ public partial class MainWindow : Window
         await ShowTypographyPropertiesDialogAsync(state);
     }
 
+    private async void OnEditTransformPropertiesMenuClicked(
+        object? sender,
+        Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        FlushPendingPropertyHistory();
+        if (Vm is null || !Vm.TryGetSelectedTransformProperties(out var state))
+        {
+            return;
+        }
+
+        await ShowTransformPropertiesDialogAsync(state);
+    }
+
     private async void OnEditGridDefinitionsMenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
         FlushPendingPropertyHistory();
@@ -2883,6 +2896,139 @@ public partial class MainWindow : Window
                 new TextBlock
                 {
                     Text = "Font settings apply to text and font-aware controls. Alignment and wrapping are available for TextBlock and TextBox.",
+                    TextWrapping = Avalonia.Media.TextWrapping.Wrap,
+                },
+                fields,
+                errorText,
+                buttons,
+            },
+        };
+        Grid.SetRow(fields, 1);
+        Grid.SetRow(errorText, 2);
+        Grid.SetRow(buttons, 3);
+        dialog.Content = content;
+        await dialog.ShowDialog(this);
+        return;
+
+        void AddField(string label, Control editor, int row, int column)
+        {
+            var field = new StackPanel
+            {
+                Spacing = 4,
+                Children =
+                {
+                    new TextBlock { Text = label },
+                    editor,
+                },
+            };
+            Grid.SetRow(field, row);
+            Grid.SetColumn(field, column);
+            fields.Children.Add(field);
+        }
+    }
+
+    private async Task ShowTransformPropertiesDialogAsync(TransformEditorState state)
+    {
+        if (Vm is null)
+        {
+            return;
+        }
+
+        var translateXEditor = new TextBox { Text = state.TranslateX };
+        var translateYEditor = new TextBox { Text = state.TranslateY };
+        var rotationEditor = new TextBox { Text = state.Rotation };
+        var scaleXEditor = new TextBox { Text = state.ScaleX };
+        var scaleYEditor = new TextBox { Text = state.ScaleY };
+        var skewXEditor = new TextBox { Text = state.SkewX };
+        var skewYEditor = new TextBox { Text = state.SkewY };
+        var originXEditor = new TextBox { Text = state.OriginX };
+        var originYEditor = new TextBox { Text = state.OriginY };
+        var errorText = new TextBlock
+        {
+            Foreground = Avalonia.Media.Brushes.IndianRed,
+            TextWrapping = Avalonia.Media.TextWrapping.Wrap,
+        };
+        var dialog = new Window
+        {
+            Title = $"Edit Transform Properties - {state.ControlName}",
+            Width = 620,
+            Height = 560,
+            MinWidth = 520,
+            MinHeight = 500,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner,
+        };
+        var applyButton = new Button { Content = "Apply", MinWidth = 84 };
+        applyButton.Click += (_, _) =>
+        {
+            if (!Vm.SetSelectedTransformProperties(
+                    translateXEditor.Text ?? string.Empty,
+                    translateYEditor.Text ?? string.Empty,
+                    rotationEditor.Text ?? string.Empty,
+                    scaleXEditor.Text ?? string.Empty,
+                    scaleYEditor.Text ?? string.Empty,
+                    skewXEditor.Text ?? string.Empty,
+                    skewYEditor.Text ?? string.Empty,
+                    originXEditor.Text ?? string.Empty,
+                    originYEditor.Text ?? string.Empty))
+            {
+                errorText.Text = Vm.StatusText;
+                return;
+            }
+
+            dialog.Close();
+        };
+        var resetButton = new Button { Content = "Reset", MinWidth = 84 };
+        resetButton.Click += (_, _) =>
+        {
+            translateXEditor.Text = "0";
+            translateYEditor.Text = "0";
+            rotationEditor.Text = "0";
+            scaleXEditor.Text = "1";
+            scaleYEditor.Text = "1";
+            skewXEditor.Text = "0";
+            skewYEditor.Text = "0";
+            originXEditor.Text = "50";
+            originYEditor.Text = "50";
+            errorText.Text = string.Empty;
+        };
+        var cancelButton = new Button { Content = "Cancel", MinWidth = 84 };
+        cancelButton.Click += (_, _) => dialog.Close();
+        var buttons = new Grid
+        {
+            ColumnDefinitions = new ColumnDefinitions("Auto,*,Auto,Auto"),
+            ColumnSpacing = 8,
+            Children = { resetButton, cancelButton, applyButton },
+        };
+        Grid.SetColumn(cancelButton, 2);
+        Grid.SetColumn(applyButton, 3);
+
+        var fields = new Grid
+        {
+            ColumnDefinitions = new ColumnDefinitions("*,*"),
+            RowDefinitions = new RowDefinitions("Auto,Auto,Auto,Auto,Auto"),
+            ColumnSpacing = 12,
+            RowSpacing = 10,
+        };
+        AddField("Translate X (px)", translateXEditor, 0, 0);
+        AddField("Translate Y (px)", translateYEditor, 0, 1);
+        AddField("Rotation (degrees)", rotationEditor, 1, 0);
+        AddField("Scale X", scaleXEditor, 1, 1);
+        AddField("Scale Y", scaleYEditor, 2, 0);
+        AddField("Skew X (degrees)", skewXEditor, 2, 1);
+        AddField("Skew Y (degrees)", skewYEditor, 3, 0);
+        AddField("Origin X (%)", originXEditor, 3, 1);
+        AddField("Origin Y (%)", originYEditor, 4, 0);
+
+        var content = new Grid
+        {
+            Margin = new Thickness(16),
+            RowDefinitions = new RowDefinitions("Auto,*,Auto,Auto"),
+            RowSpacing = 12,
+            Children =
+            {
+                new TextBlock
+                {
+                    Text = "Transform the rendered control without changing its layout slot. Origin values are percentages from 0 to 100.",
                     TextWrapping = Avalonia.Media.TextWrapping.Wrap,
                 },
                 fields,

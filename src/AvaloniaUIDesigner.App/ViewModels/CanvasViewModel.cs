@@ -2136,6 +2136,7 @@ public partial class CanvasViewModel : ViewModelBase
 
         DesignerLayoutRuntime.Apply(visual, properties);
         DesignerTypographyRuntime.Apply(visual, properties);
+        DesignerTransformRuntime.Apply(visual, properties);
         ApplyTemplatedAppearanceProperties(visual, properties);
 
         if (properties.TryGetValue("__toolTip", out var toolTip))
