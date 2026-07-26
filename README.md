@@ -26,7 +26,7 @@ dotnet run --project src/AvaloniaUIDesigner.App/AvaloniaUIDesigner.App.csproj
 - **PropertyGrid 연동**: 선택된 컨트롤의 속성을 bodong PropertyGrid로 실시간 편집
 - **Appearance 편집**: 배경·전경·테두리·두께·모서리를 편집하고 Undo/Redo, 미리보기, AXAML 왕복에 보존
 - **색상 리소스**: 문서 단위 SolidColorBrush를 편집하고 DynamicResource로 컨트롤에 적용
-- **클래스·상태 스타일**: `[Button.primary:pointerover]` 형식의 Setter, 디자인 타임 상태 시뮬레이션, 대화형 미리보기와 로컬 속성 우선순위 지원
+- **클래스·상태 스타일**: `[Button.primary:pointerover]` 형식의 Setter, 선택 컨트롤별 상태 선택기와 캔버스 배지, 대화형 미리보기, 로컬 속성 우선순위 지원
 - **이벤트 선언**: Button Click 핸들러 이름 편집 및 AXAML 내보내기
 - **AXAML 워크플로**: Window 저장/열기, 유효성 확인, UserControl 내보내기, 복사, 미리보기
 - 상태바 피드백

@@ -215,7 +215,28 @@
             <Border Grid.Column="2" Background="#1E1E1E">
                 <DockPanel>
                     <Border DockPanel.Dock="Top" Background="#2D2D30" Padding="8,6" BorderBrush="#3F3F46" BorderThickness="0,0,0,1">
-                        <TextBlock Text="Design Surface" FontWeight="SemiBold" Foreground="#CCCCCC"/>
+                        <DockPanel>
+                            <StackPanel DockPanel.Dock="Right"
+                                        Orientation="Horizontal"
+                                        Spacing="6"
+                                        IsVisible="{Binding HasStylePreviewOptions}">
+                                <TextBlock Text="State"
+                                           VerticalAlignment="Center"
+                                           FontSize="11"
+                                           Foreground="#9CA3AF"/>
+                                <ComboBox Width="142"
+                                          Height="24"
+                                          ItemsSource="{Binding StylePreviewOptions}"
+                                          SelectedItem="{Binding SelectedStylePreviewOption, Mode=TwoWay}">
+                                    <ComboBox.ItemTemplate>
+                                        <DataTemplate>
+                                            <TextBlock Text="{Binding DisplayName}"/>
+                                        </DataTemplate>
+                                    </ComboBox.ItemTemplate>
+                                </ComboBox>
+                            </StackPanel>
+                            <TextBlock Text="Design Surface" FontWeight="SemiBold" Foreground="#CCCCCC"/>
+                        </DockPanel>
                     </Border>
                     <Border Name="DesignViewport" Background="#252526" Margin="24" BorderBrush="#3F3F46" BorderThickness="1" ClipToBounds="True">
                         <Border Width="{Binding Canvas.ArtboardWidth}"
@@ -316,11 +337,30 @@
                                             </Border.ContextMenu>
                                             <Grid>
                                                 <ContentPresenter Content="{Binding Visual}"/>
-                                                <Border Background="#B45309" CornerRadius="3" Padding="3,1"
-                                                        HorizontalAlignment="Right" VerticalAlignment="Top"
-                                                        Margin="2" IsVisible="{Binding IsLocked}">
-                                                    <TextBlock Text="LOCK" FontSize="9" FontWeight="Bold" Foreground="White"/>
-                                                </Border>
+                                                <StackPanel HorizontalAlignment="Right"
+                                                            VerticalAlignment="Top"
+                                                            Margin="2"
+                                                            Spacing="2">
+                                                    <Border Background="#B45309"
+                                                            CornerRadius="3"
+                                                            Padding="3,1"
+                                                            HorizontalAlignment="Right"
+                                                            IsVisible="{Binding IsLocked}">
+                                                        <TextBlock Text="LOCK" FontSize="9" FontWeight="Bold" Foreground="White"/>
+                                                    </Border>
+                                                    <Border Background="#1D4ED8"
+                                                            BorderBrush="#60A5FA"
+                                                            BorderThickness="1"
+                                                            CornerRadius="3"
+                                                            Padding="4,1"
+                                                            HorizontalAlignment="Right"
+                                                            IsVisible="{Binding HasStylePreviewState}">
+                                                        <TextBlock Text="{Binding StylePreviewStateLabel}"
+                                                                   FontSize="9"
+                                                                   FontWeight="SemiBold"
+                                                                   Foreground="White"/>
+                                                    </Border>
+                                                </StackPanel>
                                             </Grid>
                                         </Border>
                                     </DataTemplate>

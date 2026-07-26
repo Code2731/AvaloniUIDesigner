@@ -32,5 +32,11 @@ public partial class DesignElement : ViewModelBase
     [ObservableProperty]
     private bool _isLocked;
 
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasStylePreviewState))]
+    private string? _stylePreviewStateLabel;
+
     public double SelectionThickness => IsSelected ? 2.0 : 0.0;
+
+    public bool HasStylePreviewState => !string.IsNullOrWhiteSpace(StylePreviewStateLabel);
 }

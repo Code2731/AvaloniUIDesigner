@@ -80,6 +80,8 @@ public partial class CanvasViewModel : ViewModelBase
 
     public bool HasMultipleSelection => SelectedElements.Count > 1;
 
+    public string? ActiveStylePreviewPseudoClass => _stylePreviewPseudoClass;
+
     public string ZoomPercentage => $"{ZoomScale * 100:0}%";
 
     public IBrush ArtboardBrush => Brush.Parse(ArtboardBackground);
@@ -178,17 +180,25 @@ public partial class CanvasViewModel : ViewModelBase
         _stylePreviewPseudoClass = null;
         if (previousControl is not null)
         {
+            SetStylePreviewBadge(previousControl, null);
             RefreshDocumentStyles(previousControl);
         }
 
         if (string.IsNullOrWhiteSpace(pseudoClass))
         {
+            if (previousControl is not null)
+            {
+                OnPropertyChanged(nameof(ActiveStylePreviewPseudoClass));
+            }
+
             return;
         }
 
         _stylePreviewControl = visual;
         _stylePreviewPseudoClass = pseudoClass;
+        SetStylePreviewBadge(visual, $":{pseudoClass}");
         RefreshDocumentStyles(visual);
+        OnPropertyChanged(nameof(ActiveStylePreviewPseudoClass));
     }
 
     public void ClearStylePreviewState()
@@ -201,8 +211,13 @@ public partial class CanvasViewModel : ViewModelBase
         var previousControl = _stylePreviewControl;
         _stylePreviewControl = null;
         _stylePreviewPseudoClass = null;
+        SetStylePreviewBadge(previousControl, null);
         RefreshDocumentStyles(previousControl);
+        OnPropertyChanged(nameof(ActiveStylePreviewPseudoClass));
     }
+
+    public bool IsStylePreviewTarget(Control visual)
+        => ReferenceEquals(visual, _stylePreviewControl);
 
     public static IReadOnlyList<string> GetUserStyleClasses(Control visual)
         => visual.Classes
@@ -393,6 +408,8 @@ public partial class CanvasViewModel : ViewModelBase
         {
             _stylePreviewControl = null;
             _stylePreviewPseudoClass = null;
+            element.StylePreviewStateLabel = null;
+            OnPropertyChanged(nameof(ActiveStylePreviewPseudoClass));
         }
 
         var removed = Elements.Remove(element);
@@ -530,6 +547,15 @@ public partial class CanvasViewModel : ViewModelBase
     {
         OnPropertyChanged(nameof(IsSelectionActive));
         OnPropertyChanged(nameof(HasMultipleSelection));
+    }
+
+    private void SetStylePreviewBadge(Control visual, string? label)
+    {
+        var element = Elements.FirstOrDefault(candidate => ReferenceEquals(candidate.Visual, visual));
+        if (element is not null)
+        {
+            element.StylePreviewStateLabel = label;
+        }
     }
 
     private DesignElement AddElement(

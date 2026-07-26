@@ -21,9 +21,23 @@ using CommunityToolkit.Mvvm.ComponentModel;
 
 namespace AvaloniaUIDesigner.App.ViewModels;
 
+public sealed record StylePreviewOption(string DisplayName, string? PseudoClass);
+
 public partial class MainWindowViewModel : ViewModelBase
 {
     private const string DesignerMetadataPrefix = "AvaloniaUIDesigner:";
+    private static readonly string[] StylePreviewStateOrder =
+    [
+        "pointerover",
+        "pressed",
+        "disabled",
+        "focus",
+        "focus-visible",
+        "checked",
+        "unchecked",
+        "expanded",
+        "collapsed",
+    ];
 
     private readonly IComponentCatalog _componentCatalog;
     private readonly IDesignerSerializer _serializer;
@@ -35,6 +49,7 @@ public partial class MainWindowViewModel : ViewModelBase
 
     private PendingMutation? _pendingMutation;
     private bool _isSyncingSelection;
+    private bool _isRefreshingStylePreviewOptions;
     private string? _currentDocumentPath;
     private DesignerCanvasDocument _lastSavedSnapshot = new(Array.Empty<DesignerElementSnapshot>());
     private List<DesignerElementSnapshot>? _clipboardSnapshots;
@@ -57,8 +72,10 @@ public partial class MainWindowViewModel : ViewModelBase
         ObjectTree = new ObjectTreeViewModel();
         PropertyInspector = new PropertyInspectorViewModel();
         RecentFiles = new ObservableCollection<string>();
+        StylePreviewOptions = new ObservableCollection<StylePreviewOption>();
 
         ObjectTree.PropertyChanged += OnObjectTreePropertyChanged;
+        Canvas.PropertyChanged += OnDesignerCanvasPropertyChanged;
         LoadRecentFilesFromDisk();
     }
 
@@ -67,6 +84,7 @@ public partial class MainWindowViewModel : ViewModelBase
     public ObjectTreeViewModel ObjectTree { get; }
     public PropertyInspectorViewModel PropertyInspector { get; }
     public ObservableCollection<string> RecentFiles { get; }
+    public ObservableCollection<StylePreviewOption> StylePreviewOptions { get; }
 
     public bool CanUndo => _undoStack.Count > 0;
     public bool CanRedo => _redoStack.Count > 0;
@@ -80,6 +98,7 @@ public partial class MainWindowViewModel : ViewModelBase
     public bool CanPaste => _clipboardSnapshots is { Count: > 0 };
     public string? CurrentDocumentPath => _currentDocumentPath;
     public string WindowTitle => $"Avalonia UI Designer - {GetDisplayDocumentName()}{(IsDirty ? "*" : string.Empty)}";
+    public bool HasStylePreviewOptions => StylePreviewOptions.Count > 1;
 
     [ObservableProperty]
     private string _statusText = "Ready";
@@ -87,6 +106,17 @@ public partial class MainWindowViewModel : ViewModelBase
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(WindowTitle))]
     private bool _isDirty;
+
+    [ObservableProperty]
+    private StylePreviewOption? _selectedStylePreviewOption;
+
+    partial void OnSelectedStylePreviewOptionChanged(StylePreviewOption? value)
+    {
+        if (!_isRefreshingStylePreviewOptions && value is not null)
+        {
+            SetSelectedStylePreviewState(value.PseudoClass);
+        }
+    }
 
     public void PlaceFromToolbox(double x, double y)
     {
@@ -316,6 +346,7 @@ public partial class MainWindowViewModel : ViewModelBase
             _isSyncingSelection = false;
         }
 
+        RefreshStylePreviewOptions();
         StatusText = Canvas.SelectedElement is null
             ? "Ready"
             : $"Selected {Canvas.SelectedElements.Count} control(s)";
@@ -338,6 +369,7 @@ public partial class MainWindowViewModel : ViewModelBase
             _isSyncingSelection = false;
         }
 
+        RefreshStylePreviewOptions();
         StatusText = selection.Count == 0 ? "Ready" : $"Selected {selection.Count} control(s)";
     }
 
@@ -529,6 +561,7 @@ public partial class MainWindowViewModel : ViewModelBase
         _documentStyles.Clear();
         _documentStyles.AddRange(styles);
         Canvas.SetDocumentStyles(_documentStyles);
+        RefreshStylePreviewOptions();
         CommitCanvasMutation();
         StatusText = $"Updated {_documentStyles.Count} document style(s).";
         return true;
@@ -571,6 +604,7 @@ public partial class MainWindowViewModel : ViewModelBase
 
         BeginCanvasMutation(HistoryActionType.EditProperty, "Updated control style classes.");
         Canvas.SetStyleClasses(target.Visual, classes, clearNewStyleConflicts: true);
+        RefreshStylePreviewOptions();
         CommitCanvasMutation();
         StatusText = classes.Count == 0
             ? $"Cleared style classes from {target.DisplayName}."
@@ -589,6 +623,7 @@ public partial class MainWindowViewModel : ViewModelBase
         if (string.IsNullOrWhiteSpace(pseudoClass))
         {
             Canvas.SetStylePreviewState(target.Visual, null);
+            SyncSelectedStylePreviewOption(null);
             StatusText = $"Reset style preview for {target.DisplayName}.";
             return true;
         }
@@ -612,8 +647,50 @@ public partial class MainWindowViewModel : ViewModelBase
         }
 
         Canvas.SetStylePreviewState(target.Visual, normalizedPseudoClass);
+        SyncSelectedStylePreviewOption(normalizedPseudoClass);
         StatusText = $"Previewing :{normalizedPseudoClass} on {target.DisplayName}.";
         return true;
+    }
+
+    public void RefreshStylePreviewOptions()
+    {
+        var selected = Canvas.SelectedElement;
+        var activePseudoClass = selected is not null && Canvas.IsStylePreviewTarget(selected.Visual)
+            ? Canvas.ActiveStylePreviewPseudoClass
+            : null;
+        var pseudoClasses = selected is null
+            ? []
+            : GetMatchingStylePreviewStates(selected);
+
+        if (activePseudoClass is not null && !pseudoClasses.Contains(activePseudoClass, StringComparer.Ordinal))
+        {
+            Canvas.ClearStylePreviewState();
+            activePseudoClass = null;
+        }
+
+        _isRefreshingStylePreviewOptions = true;
+        try
+        {
+            StylePreviewOptions.Clear();
+            if (selected is not null)
+            {
+                StylePreviewOptions.Add(new StylePreviewOption("Normal", null));
+                foreach (var state in pseudoClasses)
+                {
+                    StylePreviewOptions.Add(new StylePreviewOption(FormatStylePreviewState(state), state));
+                }
+            }
+
+            SelectedStylePreviewOption = StylePreviewOptions.FirstOrDefault(option =>
+                    string.Equals(option.PseudoClass, activePseudoClass, StringComparison.Ordinal))
+                ?? StylePreviewOptions.FirstOrDefault();
+        }
+        finally
+        {
+            _isRefreshingStylePreviewOptions = false;
+        }
+
+        OnPropertyChanged(nameof(HasStylePreviewOptions));
     }
 
     public bool SetColorResourcesFromText(string text)
@@ -2054,6 +2131,58 @@ public partial class MainWindowViewModel : ViewModelBase
         StatusText = element is null ? "Ready" : $"Selected {element.DisplayName} from Object Tree";
     }
 
+    private void OnDesignerCanvasPropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (!_isSyncingSelection
+            && e.PropertyName == nameof(CanvasViewModel.SelectedElement))
+        {
+            RefreshStylePreviewOptions();
+        }
+    }
+
+    private IReadOnlyList<string> GetMatchingStylePreviewStates(DesignElement element)
+    {
+        var targetType = element.Visual.GetType().Name;
+        var classes = CanvasViewModel.GetUserStyleClasses(element.Visual).ToHashSet(StringComparer.Ordinal);
+        return _documentStyles
+            .Where(style =>
+                string.Equals(style.TargetType, targetType, StringComparison.Ordinal)
+                && style.PseudoClass is not null
+                && classes.Contains(style.ClassName))
+            .Select(style => style.PseudoClass!)
+            .Distinct(StringComparer.Ordinal)
+            .OrderBy(state =>
+            {
+                var index = StylePreviewStateOrder.IndexOf(state);
+                return index < 0 ? int.MaxValue : index;
+            })
+            .ThenBy(state => state, StringComparer.Ordinal)
+            .ToList();
+    }
+
+    private void SyncSelectedStylePreviewOption(string? pseudoClass)
+    {
+        _isRefreshingStylePreviewOptions = true;
+        try
+        {
+            SelectedStylePreviewOption = StylePreviewOptions.FirstOrDefault(option =>
+                    string.Equals(option.PseudoClass, pseudoClass, StringComparison.Ordinal))
+                ?? StylePreviewOptions.FirstOrDefault();
+        }
+        finally
+        {
+            _isRefreshingStylePreviewOptions = false;
+        }
+    }
+
+    private static string FormatStylePreviewState(string pseudoClass)
+        => pseudoClass switch
+        {
+            "pointerover" => "Pointer Over",
+            "focus-visible" => "Focus Visible",
+            _ => CultureInfo.InvariantCulture.TextInfo.ToTitleCase(pseudoClass.Replace('-', ' ')),
+        };
+
     private static void DistributeHorizontally(IReadOnlyList<DesignElement> elements)
     {
         if (elements.Count < 3)
@@ -2134,6 +2263,8 @@ public partial class MainWindowViewModel : ViewModelBase
         {
             _isSyncingSelection = false;
         }
+
+        RefreshStylePreviewOptions();
     }
 
     private DesignerCanvasDocument CaptureDocument()
