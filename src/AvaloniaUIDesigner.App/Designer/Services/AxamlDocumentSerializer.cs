@@ -42,7 +42,7 @@ public sealed class AxamlDocumentSerializer : IDesignerSerializer
             foreach (var style in document.Styles)
             {
                 sb.Append("    <Style Selector=\"");
-                sb.Append(EscapeXmlAttribute($"{style.TargetType}.{style.ClassName}"));
+                sb.Append(EscapeXmlAttribute(style.Selector));
                 sb.AppendLine("\">");
                 foreach (var setter in style.Setters)
                 {

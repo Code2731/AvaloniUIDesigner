@@ -25,6 +25,8 @@ public partial class CanvasViewModel : ViewModelBase
     private readonly IControlRenderer _renderer;
     private readonly Dictionary<string, string> _colorResources = new(StringComparer.Ordinal);
     private readonly List<DesignerStyleDefinition> _documentStyles = new();
+    private Control? _stylePreviewControl;
+    private string? _stylePreviewPseudoClass;
 
     public CanvasViewModel()
         : this(new BuiltInComponentCatalog(), new DefaultControlRenderer())
@@ -161,7 +163,46 @@ public partial class CanvasViewModel : ViewModelBase
     }
 
     public void RefreshDocumentStyles(Control visual)
-        => DesignerStyleRuntime.ApplyStyles(visual, _documentStyles, _colorResources);
+    {
+        var previewStates = ReferenceEquals(visual, _stylePreviewControl)
+            && _stylePreviewPseudoClass is not null
+                ? new[] { _stylePreviewPseudoClass }
+                : null;
+        DesignerStyleRuntime.ApplyStyles(visual, _documentStyles, _colorResources, previewStates);
+    }
+
+    public void SetStylePreviewState(Control visual, string? pseudoClass)
+    {
+        var previousControl = _stylePreviewControl;
+        _stylePreviewControl = null;
+        _stylePreviewPseudoClass = null;
+        if (previousControl is not null)
+        {
+            RefreshDocumentStyles(previousControl);
+        }
+
+        if (string.IsNullOrWhiteSpace(pseudoClass))
+        {
+            return;
+        }
+
+        _stylePreviewControl = visual;
+        _stylePreviewPseudoClass = pseudoClass;
+        RefreshDocumentStyles(visual);
+    }
+
+    public void ClearStylePreviewState()
+    {
+        if (_stylePreviewControl is null)
+        {
+            return;
+        }
+
+        var previousControl = _stylePreviewControl;
+        _stylePreviewControl = null;
+        _stylePreviewPseudoClass = null;
+        RefreshDocumentStyles(previousControl);
+    }
 
     public static IReadOnlyList<string> GetUserStyleClasses(Control visual)
         => visual.Classes
@@ -294,12 +335,19 @@ public partial class CanvasViewModel : ViewModelBase
 
     public void Clear()
     {
+        ClearStylePreviewState();
         ClearSelection();
         Elements.Clear();
     }
 
     public void Select(DesignElement? element, bool toggle = false)
     {
+        if (_stylePreviewControl is not null
+            && (element is null || !ReferenceEquals(element.Visual, _stylePreviewControl)))
+        {
+            ClearStylePreviewState();
+        }
+
         if (element is null)
         {
             ClearSelection();
@@ -329,6 +377,7 @@ public partial class CanvasViewModel : ViewModelBase
 
     public void ClearSelection()
     {
+        ClearStylePreviewState();
         foreach (var element in SelectedElements)
         {
             element.IsSelected = false;
@@ -340,6 +389,12 @@ public partial class CanvasViewModel : ViewModelBase
 
     public bool RemoveElement(DesignElement element)
     {
+        if (ReferenceEquals(element.Visual, _stylePreviewControl))
+        {
+            _stylePreviewControl = null;
+            _stylePreviewPseudoClass = null;
+        }
+
         var removed = Elements.Remove(element);
         if (!removed)
         {
@@ -447,6 +502,11 @@ public partial class CanvasViewModel : ViewModelBase
             .Where(Elements.Contains)
             .Distinct()
             .ToList();
+        if (_stylePreviewControl is not null
+            && (next.Count != 1 || !ReferenceEquals(next[0].Visual, _stylePreviewControl)))
+        {
+            ClearStylePreviewState();
+        }
 
         foreach (var element in SelectedElements)
         {

@@ -432,7 +432,7 @@ public partial class MainWindow : Window
         var updatedStyles = await ShowTextEditorDialogAsync(
             "Edit Document Styles",
             Vm.GetDocumentStyleEditorText(),
-            "Use [Control.class] sections with Property = Value setters. Example: [Button.primary] then Background = {DynamicResource AccentBrush}.");
+            "Use [Control.class] or [Control.class:pseudo] sections with Property = Value setters. Example: [Button.primary:pointerover].");
         if (updatedStyles is not null)
         {
             Vm.SetDocumentStylesFromText(updatedStyles);
@@ -456,6 +456,36 @@ public partial class MainWindow : Window
         {
             Vm.SetSelectedStyleClassesFromText(updatedClasses);
         }
+    }
+
+    private void OnPreviewStateNormalMenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+        => SetStylePreviewState(null);
+
+    private void OnPreviewStatePointerOverMenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+        => SetStylePreviewState("pointerover");
+
+    private void OnPreviewStatePressedMenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+        => SetStylePreviewState("pressed");
+
+    private void OnPreviewStateDisabledMenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+        => SetStylePreviewState("disabled");
+
+    private void OnPreviewStateFocusMenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+        => SetStylePreviewState("focus");
+
+    private void OnPreviewStateFocusVisibleMenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+        => SetStylePreviewState("focus-visible");
+
+    private void OnPreviewStateCheckedMenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+        => SetStylePreviewState("checked");
+
+    private void OnPreviewStateExpandedMenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+        => SetStylePreviewState("expanded");
+
+    private void SetStylePreviewState(string? pseudoClass)
+    {
+        FlushPendingPropertyHistory();
+        Vm?.SetSelectedStylePreviewState(pseudoClass);
     }
 
     private async void OnApplyColorResourceMenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
@@ -1218,6 +1248,11 @@ public partial class MainWindow : Window
             {
                 DesignerResourceReferenceMetadata.SetReference(control, e.Property.Name, null);
             }
+        }
+
+        if (e.Property.Name is "IsEnabled" or "IsChecked" or "IsExpanded")
+        {
+            Vm?.Canvas.RefreshDocumentStyles(control);
         }
 
         if (!_hasPendingPropertyEdit)

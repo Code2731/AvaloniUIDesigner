@@ -158,7 +158,31 @@ public sealed class PreviewWindow : Window
 
         ApplyProperties(control, snapshot.VisualProperties, colorResources);
         DesignerStyleRuntime.ApplyStyles(control, styles, colorResources);
+        WireInteractiveStyleStates(control, styles, colorResources);
         return control;
+    }
+
+    private static void WireInteractiveStyleStates(
+        Control control,
+        IReadOnlyList<DesignerStyleDefinition> styles,
+        IReadOnlyDictionary<string, string> colorResources)
+    {
+        if (!styles.Any(style =>
+                style.PseudoClass is not null
+                && string.Equals(style.TargetType, control.GetType().Name, StringComparison.Ordinal)
+                && control.Classes.Contains(style.ClassName)))
+        {
+            return;
+        }
+
+        control.PropertyChanged += (_, args) =>
+        {
+            if (args.Property.Name is "IsEnabled" or "IsPointerOver" or "IsFocused"
+                or "IsPressed" or "IsChecked" or "IsExpanded")
+            {
+                DesignerStyleRuntime.ApplyStyles(control, styles, colorResources);
+            }
+        };
     }
 
     private static void ApplyProperties(

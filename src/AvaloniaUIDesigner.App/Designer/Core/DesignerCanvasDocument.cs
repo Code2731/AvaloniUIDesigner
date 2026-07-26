@@ -11,7 +11,11 @@ public sealed record DesignerCanvasDocument(
 public sealed record DesignerStyleDefinition(
     string TargetType,
     string ClassName,
-    IReadOnlyDictionary<string, string> Setters);
+    IReadOnlyDictionary<string, string> Setters,
+    string? PseudoClass = null)
+{
+    public string Selector => $"{TargetType}.{ClassName}{(PseudoClass is null ? string.Empty : $":{PseudoClass}")}";
+}
 
 public sealed record DesignerCanvasSettings(
     double Width = 1280,

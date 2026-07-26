@@ -40,10 +40,26 @@ public static class DesignerStyleRuntime
     public static bool IsBrushProperty(string propertyName)
         => BrushProperties.Contains(propertyName, StringComparer.Ordinal);
 
+    public static bool HasLocalValue(Control control, string propertyName)
+        => GetProperty(control, propertyName) is { } property
+            && control.IsSet(property)
+            && !DesignerStyleApplicationMetadata.IsApplied(control, propertyName);
+
+    public static bool IsSupportedPseudoClass(string targetType, string pseudoClass)
+        => pseudoClass switch
+        {
+            "pointerover" or "disabled" or "focus" or "focus-visible" => true,
+            "pressed" => targetType is "Button" or "ToggleButton" or "CheckBox" or "RadioButton",
+            "checked" or "unchecked" => targetType is "ToggleButton" or "CheckBox" or "RadioButton" or "ToggleSwitch",
+            "expanded" or "collapsed" => targetType == "Expander",
+            _ => false,
+        };
+
     public static void ApplyStyles(
         Control control,
         IReadOnlyList<DesignerStyleDefinition>? styles,
-        IReadOnlyDictionary<string, string>? colorResources)
+        IReadOnlyDictionary<string, string>? colorResources,
+        IEnumerable<string>? simulatedPseudoClasses = null)
     {
         DesignerStyleApplicationMetadata.BeginProgrammaticUpdate(control);
         try
@@ -54,17 +70,18 @@ public static class DesignerStyleRuntime
                 return;
             }
 
-            foreach (var style in styles)
+            var activePseudoClasses = GetActivePseudoClasses(control, simulatedPseudoClasses);
+            foreach (var style in styles.Where(style => style.PseudoClass is null)
+                         .Concat(styles.Where(style => style.PseudoClass is not null)))
             {
-                if (!Matches(control, style))
+                if (!Matches(control, style, activePseudoClasses))
                 {
                     continue;
                 }
 
                 foreach (var setter in style.Setters)
                 {
-                    if (IsLocallySet(control, setter.Key)
-                        && !DesignerStyleApplicationMetadata.IsApplied(control, setter.Key))
+                    if (HasLocalValue(control, setter.Key))
                     {
                         continue;
                     }
@@ -127,9 +144,59 @@ public static class DesignerStyleRuntime
         return !string.IsNullOrWhiteSpace(value);
     }
 
-    private static bool Matches(Control control, DesignerStyleDefinition style)
+    private static bool Matches(
+        Control control,
+        DesignerStyleDefinition style,
+        IReadOnlySet<string> activePseudoClasses)
         => string.Equals(control.GetType().Name, style.TargetType, StringComparison.Ordinal)
-            && control.Classes.Contains(style.ClassName);
+            && control.Classes.Contains(style.ClassName)
+            && (style.PseudoClass is null || activePseudoClasses.Contains(style.PseudoClass));
+
+    private static IReadOnlySet<string> GetActivePseudoClasses(
+        Control control,
+        IEnumerable<string>? simulatedPseudoClasses)
+    {
+        var active = simulatedPseudoClasses?
+            .Where(pseudoClass => !string.IsNullOrWhiteSpace(pseudoClass))
+            .ToHashSet(StringComparer.Ordinal)
+            ?? new HashSet<string>(StringComparer.Ordinal);
+
+        if (!control.IsEnabled)
+        {
+            active.Add("disabled");
+        }
+
+        if (control.IsPointerOver)
+        {
+            active.Add("pointerover");
+        }
+
+        if (control.IsFocused)
+        {
+            active.Add("focus");
+        }
+
+        if (control is Button { IsPressed: true })
+        {
+            active.Add("pressed");
+        }
+
+        if (control is ToggleButton toggleButton
+            && !active.Contains("checked")
+            && !active.Contains("unchecked"))
+        {
+            active.Add(toggleButton.IsChecked == true ? "checked" : "unchecked");
+        }
+
+        if (control is Expander expander
+            && !active.Contains("expanded")
+            && !active.Contains("collapsed"))
+        {
+            active.Add(expander.IsExpanded ? "expanded" : "collapsed");
+        }
+
+        return active;
+    }
 
     private static void ResetAppliedValues(Control control)
     {
@@ -140,9 +207,6 @@ public static class DesignerStyleRuntime
 
         DesignerStyleApplicationMetadata.ClearAll(control);
     }
-
-    private static bool IsLocallySet(Control control, string propertyName)
-        => GetProperty(control, propertyName) is { } property && control.IsSet(property);
 
     private static AvaloniaProperty? GetProperty(Control control, string propertyName)
         => propertyName switch

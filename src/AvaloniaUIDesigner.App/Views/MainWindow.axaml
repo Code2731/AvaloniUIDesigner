@@ -74,6 +74,17 @@
                     <MenuItem Header="Edit Appearance..." Click="OnEditAppearanceMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
                     <MenuItem Header="Edit Document Styles..." Click="OnEditDocumentStylesMenuClicked"/>
                     <MenuItem Header="Edit Selected Classes..." Click="OnEditSelectedClassesMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
+                    <MenuItem Header="Preview State" IsEnabled="{Binding Canvas.IsSelectionActive}">
+                        <MenuItem Header="Normal" Click="OnPreviewStateNormalMenuClicked"/>
+                        <Separator/>
+                        <MenuItem Header="Pointer Over" Click="OnPreviewStatePointerOverMenuClicked"/>
+                        <MenuItem Header="Pressed" Click="OnPreviewStatePressedMenuClicked"/>
+                        <MenuItem Header="Disabled" Click="OnPreviewStateDisabledMenuClicked"/>
+                        <MenuItem Header="Focus" Click="OnPreviewStateFocusMenuClicked"/>
+                        <MenuItem Header="Focus Visible" Click="OnPreviewStateFocusVisibleMenuClicked"/>
+                        <MenuItem Header="Checked" Click="OnPreviewStateCheckedMenuClicked"/>
+                        <MenuItem Header="Expanded" Click="OnPreviewStateExpandedMenuClicked"/>
+                    </MenuItem>
                     <Separator/>
                     <MenuItem Header="Edit Color Resources..." Click="OnEditColorResourcesMenuClicked"/>
                     <MenuItem Header="Apply Color Resource..." Click="OnApplyColorResourceMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
