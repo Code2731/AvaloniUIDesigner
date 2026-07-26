@@ -2388,6 +2388,17 @@ public partial class CanvasViewModel : ViewModelBase
             return;
         }
 
+        if (visual is Menu menu)
+        {
+            if (properties.TryGetValue("__menuItems", out var menuItemsJson)
+                && DesignerMenuItemRuntime.TryDeserialize(menuItemsJson, out var definitions))
+            {
+                DesignerMenuItemRuntime.ReplaceItems(menu, definitions);
+            }
+
+            return;
+        }
+
         if (visual is Slider slider)
         {
             if (properties.TryGetValue("Minimum", out var minimum)

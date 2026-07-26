@@ -598,15 +598,12 @@ public partial class MainWindow : Window
     private async void OnEditItemsMenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
         FlushPendingPropertyHistory();
-        if (Vm is null || !Vm.TryGetSelectedItems(
-                out var controlName,
-                out var items,
-                out var supportsHierarchy))
+        if (Vm is null || !Vm.TryGetSelectedItemsEditor(out var state))
         {
             return;
         }
 
-        var updatedItems = await ShowItemsEditorDialogAsync(controlName, items, supportsHierarchy);
+        var updatedItems = await ShowItemsEditorDialogAsync(state);
         if (updatedItems is not null)
         {
             Vm.SetSelectedItems(updatedItems);
@@ -2579,23 +2576,20 @@ public partial class MainWindow : Window
         return await dialog.ShowDialog<UnsavedChoice>(this);
     }
 
-    private async Task<IReadOnlyList<string>?> ShowItemsEditorDialogAsync(
-        string controlName,
-        IReadOnlyList<string> items,
-        bool supportsHierarchy)
+    private async Task<IReadOnlyList<string>?> ShowItemsEditorDialogAsync(ItemsEditorState state)
     {
         var editor = new TextBox
         {
-            Text = string.Join(Environment.NewLine, items),
+            Text = string.Join(Environment.NewLine, state.Items),
             AcceptsReturn = true,
             MinHeight = 200,
         };
 
         var dialog = new Window
         {
-            Title = $"Edit Items - {controlName}",
-            Width = 460,
-            Height = 380,
+            Title = $"Edit Items - {state.ControlName}",
+            Width = state.Mode == ItemsEditorMode.Menu ? 620 : 460,
+            Height = state.Mode == ItemsEditorMode.Menu ? 430 : 380,
             MinWidth = 360,
             MinHeight = 260,
             WindowStartupLocation = WindowStartupLocation.CenterOwner,
@@ -2611,14 +2605,21 @@ public partial class MainWindow : Window
         {
             var updatedItems = (editor.Text ?? string.Empty)
                 .Replace("\r\n", "\n", StringComparison.Ordinal)
-                .Split('\n', supportsHierarchy
+                .Split('\n', state.Mode != ItemsEditorMode.Flat
                     ? StringSplitOptions.None
                     : StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
                 .ToList();
-            if (supportsHierarchy
+            if (state.Mode == ItemsEditorMode.TreeView
                 && !DesignerTreeItemRuntime.TryParseEditorLines(updatedItems, out _, out var error))
             {
                 errorText.Text = error;
+                return;
+            }
+
+            if (state.Mode == ItemsEditorMode.Menu
+                && !DesignerMenuItemRuntime.TryParseEditorLines(updatedItems, out _, out var menuError))
+            {
+                errorText.Text = menuError;
                 return;
             }
 
@@ -2645,9 +2646,14 @@ public partial class MainWindow : Window
             {
                 new TextBlock
                 {
-                    Text = supportsHierarchy
-                        ? "Use [-] for expanded, [+] for collapsed, and two spaces per child level."
-                        : "Enter one item per line. Empty lines are ignored.",
+                    Text = state.Mode switch
+                    {
+                        ItemsEditorMode.TreeView =>
+                            "Use [-] for expanded, [+] for collapsed, and two spaces per child level.",
+                        ItemsEditorMode.Menu =>
+                            "Use two spaces per child level; --- separator; [x]/[ ] check; (x)/( ) radio with {Group}; | Ctrl+N shortcut.",
+                        _ => "Enter one item per line. Empty lines are ignored.",
+                    },
                     TextWrapping = Avalonia.Media.TextWrapping.Wrap,
                 },
                 editor,

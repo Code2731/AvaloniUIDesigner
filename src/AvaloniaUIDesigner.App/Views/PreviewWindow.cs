@@ -260,6 +260,7 @@ public sealed class PreviewWindow : Window
                 Items = { "Item 1", "Item 2", "Item 3" },
             },
             "Avalonia.Controls.TreeView" => DesignerTreeItemRuntime.CreateDefaultTreeView(),
+            "Avalonia.Controls.Menu" => DesignerMenuItemRuntime.CreateDefaultMenu(),
             "Avalonia.Controls.Slider" => new Slider { Minimum = 0, Maximum = 100, Value = 50 },
             "Avalonia.Controls.ProgressBar" => new ProgressBar { Minimum = 0, Maximum = 100, Value = 50 },
             "Avalonia.Controls.DatePicker" => new DatePicker(),
@@ -585,6 +586,9 @@ public sealed class PreviewWindow : Window
                 break;
             case TreeView treeView:
                 ApplyTreeViewProperties(treeView, properties);
+                break;
+            case Menu menu:
+                ApplyMenuProperties(menu, properties);
                 break;
             case Slider slider:
                 ApplySliderProperties(slider, properties);
@@ -1110,6 +1114,17 @@ public sealed class PreviewWindow : Window
             && DesignerTreeItemRuntime.TryDeserialize(treeItemsJson, out var definitions))
         {
             DesignerTreeItemRuntime.ReplaceItems(treeView, definitions);
+        }
+    }
+
+    private static void ApplyMenuProperties(
+        Menu menu,
+        IReadOnlyDictionary<string, string> properties)
+    {
+        if (properties.TryGetValue("__menuItems", out var menuItemsJson)
+            && DesignerMenuItemRuntime.TryDeserialize(menuItemsJson, out var definitions))
+        {
+            DesignerMenuItemRuntime.ReplaceItems(menu, definitions);
         }
     }
 

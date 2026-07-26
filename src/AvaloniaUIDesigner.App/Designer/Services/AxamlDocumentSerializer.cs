@@ -147,6 +147,15 @@ public sealed class AxamlDocumentSerializer : IDesignerSerializer
         }
 
         AppendVisualAttributes(sb, element.VisualProperties);
+        if (string.Equals(element.TypeName, "Avalonia.Controls.Menu", StringComparison.Ordinal))
+        {
+            sb.AppendLine(">");
+            AppendMenuEntries(sb, ReadMenuEntries(element), indent + "  ");
+            sb.Append(indent);
+            sb.AppendLine("</Menu>");
+            return;
+        }
+
         if (string.Equals(element.TypeName, "Avalonia.Controls.TreeView", StringComparison.Ordinal))
         {
             sb.AppendLine(">");
@@ -372,6 +381,72 @@ public sealed class AxamlDocumentSerializer : IDesignerSerializer
         }
 
         return definitions;
+    }
+
+    private static IReadOnlyList<DesignerMenuEntryDefinition> ReadMenuEntries(
+        DesignerElementSnapshot element)
+    {
+        if (element.VisualProperties is null
+            || !element.VisualProperties.TryGetValue("__menuItems", out var json)
+            || !DesignerMenuItemRuntime.TryDeserialize(json, out var definitions))
+        {
+            return [];
+        }
+
+        return definitions;
+    }
+
+    private static void AppendMenuEntries(
+        StringBuilder sb,
+        IEnumerable<DesignerMenuEntryDefinition> definitions,
+        string indent)
+    {
+        foreach (var definition in definitions)
+        {
+            sb.Append(indent);
+            if (definition.Kind == DesignerMenuEntryKind.Separator)
+            {
+                sb.AppendLine("<Separator />");
+                continue;
+            }
+
+            sb.Append("<MenuItem Header=\"");
+            sb.Append(EscapeXmlAttribute(definition.Header));
+            sb.Append('"');
+            AppendMenuEntryAttribute(sb, "InputGesture", definition.InputGesture);
+            AppendMenuEntryAttribute(sb, "HotKey", definition.InputGesture);
+            if (definition.ToggleType != Avalonia.Controls.MenuItemToggleType.None)
+            {
+                AppendMenuEntryAttribute(sb, "ToggleType", definition.ToggleType.ToString());
+                AppendMenuEntryAttribute(sb, "IsChecked", definition.IsChecked.ToString());
+            }
+
+            AppendMenuEntryAttribute(sb, "GroupName", definition.GroupName);
+            if (definition.Children.Count == 0)
+            {
+                sb.AppendLine(" />");
+                continue;
+            }
+
+            sb.AppendLine(">");
+            AppendMenuEntries(sb, definition.Children, indent + "  ");
+            sb.Append(indent);
+            sb.AppendLine("</MenuItem>");
+        }
+    }
+
+    private static void AppendMenuEntryAttribute(StringBuilder sb, string name, string value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return;
+        }
+
+        sb.Append(' ');
+        sb.Append(name);
+        sb.Append("=\"");
+        sb.Append(EscapeXmlAttribute(value));
+        sb.Append('"');
     }
 
     private static void AppendTreeItems(

@@ -96,6 +96,12 @@ public sealed class BuiltInComponentCatalog : IComponentCatalog
             DefaultHeight: 220,
             VisualFactory: DesignerTreeItemRuntime.CreateDefaultTreeView),
         new(
+            DisplayName: "Menu",
+            AvaloniaTypeName: "Avalonia.Controls.Menu",
+            DefaultWidth: 420,
+            DefaultHeight: 32,
+            VisualFactory: DesignerMenuItemRuntime.CreateDefaultMenu),
+        new(
             DisplayName: "Slider",
             AvaloniaTypeName: "Avalonia.Controls.Slider",
             DefaultWidth: 180,

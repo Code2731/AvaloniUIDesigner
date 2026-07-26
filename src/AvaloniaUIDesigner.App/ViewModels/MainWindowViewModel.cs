@@ -24,6 +24,18 @@ namespace AvaloniaUIDesigner.App.ViewModels;
 
 public sealed record StylePreviewOption(string DisplayName, string? PseudoClass);
 
+public enum ItemsEditorMode
+{
+    Flat,
+    TreeView,
+    Menu,
+}
+
+public sealed record ItemsEditorState(
+    string ControlName,
+    IReadOnlyList<string> Items,
+    ItemsEditorMode Mode);
+
 public sealed record GridDefinitionEditorState(
     string ControlName,
     string RowDefinitions,
@@ -2287,56 +2299,90 @@ public partial class MainWindowViewModel : ViewModelBase
         => new(string.Empty, Array.Empty<ContentParentOption>(), string.Empty);
 
     public bool TryGetSelectedItems(out string controlName, out IReadOnlyList<string> items)
-        => TryGetSelectedItems(out controlName, out items, out _);
+    {
+        if (!TryGetSelectedItemsEditor(out var state))
+        {
+            controlName = string.Empty;
+            items = Array.Empty<string>();
+            return false;
+        }
+
+        controlName = state.ControlName;
+        items = state.Items;
+        return true;
+    }
 
     public bool TryGetSelectedItems(
         out string controlName,
         out IReadOnlyList<string> items,
         out bool supportsHierarchy)
     {
-        var target = Canvas.SelectedElement;
-        if (target is null)
+        if (!TryGetSelectedItemsEditor(out var state))
         {
             controlName = string.Empty;
             items = Array.Empty<string>();
             supportsHierarchy = false;
-            StatusText = "Select a ComboBox, ListBox, TreeView, or TabControl to edit its items.";
+            return false;
+        }
+
+        controlName = state.ControlName;
+        items = state.Items;
+        supportsHierarchy = state.Mode != ItemsEditorMode.Flat;
+        return true;
+    }
+
+    public bool TryGetSelectedItemsEditor(out ItemsEditorState state)
+    {
+        var target = Canvas.SelectedElement;
+        if (target is null)
+        {
+            state = EmptyItemsEditorState();
+            StatusText = "Select a ComboBox, ListBox, TreeView, Menu, or TabControl to edit its items.";
             return false;
         }
 
         if (target.IsLocked)
         {
-            controlName = string.Empty;
-            items = Array.Empty<string>();
-            supportsHierarchy = false;
+            state = EmptyItemsEditorState();
             StatusText = "Unlock the selected control before editing its items.";
             return false;
         }
 
-        supportsHierarchy = false;
         switch (target.Visual)
         {
             case ComboBox comboBox:
-                controlName = target.DisplayName;
-                items = ReadItems(comboBox);
+                state = new ItemsEditorState(
+                    target.DisplayName,
+                    ReadItems(comboBox),
+                    ItemsEditorMode.Flat);
                 return true;
             case ListBox listBox:
-                controlName = target.DisplayName;
-                items = ReadItems(listBox);
+                state = new ItemsEditorState(
+                    target.DisplayName,
+                    ReadItems(listBox),
+                    ItemsEditorMode.Flat);
                 return true;
             case TreeView treeView:
-                controlName = target.DisplayName;
-                items = DesignerTreeItemRuntime.FormatEditorLines(treeView);
-                supportsHierarchy = true;
+                state = new ItemsEditorState(
+                    target.DisplayName,
+                    DesignerTreeItemRuntime.FormatEditorLines(treeView),
+                    ItemsEditorMode.TreeView);
+                return true;
+            case Menu menu:
+                state = new ItemsEditorState(
+                    target.DisplayName,
+                    DesignerMenuItemRuntime.FormatEditorLines(menu),
+                    ItemsEditorMode.Menu);
                 return true;
             case TabControl tabControl:
-                controlName = target.DisplayName;
-                items = ReadTabHeaders(tabControl);
+                state = new ItemsEditorState(
+                    target.DisplayName,
+                    ReadTabHeaders(tabControl),
+                    ItemsEditorMode.Flat);
                 return true;
             default:
-                controlName = string.Empty;
-                items = Array.Empty<string>();
-                StatusText = "Item editing is available for ComboBox, ListBox, TreeView, and TabControl controls.";
+                state = EmptyItemsEditorState();
+                StatusText = "Item editing is available for ComboBox, ListBox, TreeView, Menu, and TabControl controls.";
                 return false;
         }
     }
@@ -2346,7 +2392,7 @@ public partial class MainWindowViewModel : ViewModelBase
         var target = Canvas.SelectedElement;
         if (target is null || target.IsLocked)
         {
-            StatusText = "Select an unlocked ComboBox, ListBox, TreeView, or TabControl to edit its items.";
+            StatusText = "Select an unlocked ComboBox, ListBox, TreeView, Menu, or TabControl to edit its items.";
             return;
         }
 
@@ -2369,6 +2415,28 @@ public partial class MainWindowViewModel : ViewModelBase
             DesignerTreeItemRuntime.ReplaceItems(treeView, definitions);
             CommitCanvasMutation();
             StatusText = $"Updated {CountTreeItems(definitions)} TreeView item(s).";
+            return;
+        }
+
+        if (target.Visual is Menu menu)
+        {
+            if (!DesignerMenuItemRuntime.TryParseEditorLines(items, out var definitions, out var error))
+            {
+                StatusText = $"Menu items were not changed. {error}";
+                return;
+            }
+
+            var currentDefinitions = DesignerMenuItemRuntime.ReadItems(menu);
+            if (DesignerMenuItemRuntime.AreEquivalent(currentDefinitions, definitions))
+            {
+                StatusText = "Menu items are unchanged.";
+                return;
+            }
+
+            BeginCanvasMutation(HistoryActionType.EditProperty, "Updated Menu items.");
+            DesignerMenuItemRuntime.ReplaceItems(menu, definitions);
+            CommitCanvasMutation();
+            StatusText = $"Updated {DesignerMenuItemRuntime.CountEntries(definitions)} Menu entry(s).";
             return;
         }
 
@@ -2431,10 +2499,13 @@ public partial class MainWindowViewModel : ViewModelBase
                 return;
 
             default:
-                StatusText = "Item editing is available for ComboBox, ListBox, TreeView, and TabControl controls.";
+                StatusText = "Item editing is available for ComboBox, ListBox, TreeView, Menu, and TabControl controls.";
                 return;
         }
     }
+
+    private static ItemsEditorState EmptyItemsEditorState()
+        => new(string.Empty, Array.Empty<string>(), ItemsEditorMode.Flat);
 
     public bool TrySetSelectedImageSource(string source)
     {
@@ -4168,6 +4239,15 @@ public partial class MainWindowViewModel : ViewModelBase
             };
         }
 
+        if (visual is Menu menu)
+        {
+            return new Dictionary<string, string>
+            {
+                ["__menuItems"] = DesignerMenuItemRuntime.Serialize(menu),
+                ["Opacity"] = menu.Opacity.ToString("0.###", CultureInfo.InvariantCulture),
+            };
+        }
+
         if (visual is Slider slider)
         {
             return new Dictionary<string, string>
@@ -5186,6 +5266,10 @@ public partial class MainWindowViewModel : ViewModelBase
         {
             map["__treeItems"] = DesignerTreeItemRuntime.Serialize(element);
         }
+        else if (string.Equals(element.Name.LocalName, "Menu", StringComparison.OrdinalIgnoreCase))
+        {
+            map["__menuItems"] = DesignerMenuItemRuntime.Serialize(element);
+        }
         else if (string.Equals(element.Name.LocalName, "TabControl", StringComparison.OrdinalIgnoreCase))
         {
             map["__tabs"] = SerializeTabHeaders(element);
@@ -5256,6 +5340,7 @@ public partial class MainWindowViewModel : ViewModelBase
             "RadioButton" => propertyName is "Content" or "IsChecked" or "GroupName",
             "ComboBox" or "ListBox" => propertyName == "SelectedIndex",
             "TreeView" => false,
+            "Menu" => false,
             "Slider" or "ProgressBar" => propertyName is "Minimum" or "Maximum" or "Value",
             "DatePicker" => propertyName == "SelectedDate",
             "CalendarDatePicker" => propertyName is "SelectedDate" or "Watermark",
@@ -5282,7 +5367,7 @@ public partial class MainWindowViewModel : ViewModelBase
 
     private static bool SupportsTemplatedAppearance(string tagName)
         => tagName is "Button" or "TextBox" or "Label" or "CheckBox" or "RadioButton"
-            or "ToggleSwitch" or "ToggleButton" or "ComboBox" or "ListBox" or "TreeView" or "Slider"
+            or "ToggleSwitch" or "ToggleButton" or "ComboBox" or "ListBox" or "TreeView" or "Menu" or "Slider"
             or "ProgressBar" or "DatePicker" or "CalendarDatePicker" or "TimePicker"
             or "NumericUpDown" or "TabControl" or "Expander" or "ScrollViewer";
 
@@ -6423,6 +6508,16 @@ public partial class MainWindowViewModel : ViewModelBase
                 sb.AppendLine("</TreeView>");
                 break;
 
+            case Menu menu:
+                sb.Append(indent);
+                sb.Append("<Menu");
+                AppendCanvasLayoutAttributes(sb, element);
+                sb.AppendLine(">");
+                WriteMenuEntriesAxaml(sb, DesignerMenuItemRuntime.ReadItems(menu), indent + "  ");
+                sb.Append(indent);
+                sb.AppendLine("</Menu>");
+                break;
+
             case Slider slider:
                 sb.Append(indent);
                 sb.Append("<Slider");
@@ -6971,6 +7066,52 @@ public partial class MainWindowViewModel : ViewModelBase
             WriteTreeItemsAxaml(sb, definition.Children, indent + "  ");
             sb.Append(indent);
             sb.AppendLine("</TreeViewItem>");
+        }
+    }
+
+    private static void WriteMenuEntriesAxaml(
+        StringBuilder sb,
+        IEnumerable<DesignerMenuEntryDefinition> definitions,
+        string indent)
+    {
+        foreach (var definition in definitions)
+        {
+            sb.Append(indent);
+            if (definition.Kind == DesignerMenuEntryKind.Separator)
+            {
+                sb.AppendLine("<Separator />");
+                continue;
+            }
+
+            sb.Append("<MenuItem");
+            AppendAttribute(sb, "Header", definition.Header);
+            if (!string.IsNullOrWhiteSpace(definition.InputGesture))
+            {
+                AppendAttribute(sb, "InputGesture", definition.InputGesture);
+                AppendAttribute(sb, "HotKey", definition.InputGesture);
+            }
+
+            if (definition.ToggleType != MenuItemToggleType.None)
+            {
+                AppendAttribute(sb, "ToggleType", definition.ToggleType.ToString());
+                AppendAttribute(sb, "IsChecked", definition.IsChecked.ToString());
+            }
+
+            if (!string.IsNullOrWhiteSpace(definition.GroupName))
+            {
+                AppendAttribute(sb, "GroupName", definition.GroupName);
+            }
+
+            if (definition.Children.Count == 0)
+            {
+                sb.AppendLine(" />");
+                continue;
+            }
+
+            sb.AppendLine(">");
+            WriteMenuEntriesAxaml(sb, definition.Children, indent + "  ");
+            sb.Append(indent);
+            sb.AppendLine("</MenuItem>");
         }
     }
 
