@@ -206,11 +206,6 @@ public sealed class BuiltInComponentCatalog : IComponentCatalog
             {
                 Orientation = Orientation.Vertical,
                 Spacing = 6,
-                Children =
-                {
-                    new TextBlock { Text = "StackPanel" },
-                    new Button { Content = "Item" }
-                }
             })
     };
 

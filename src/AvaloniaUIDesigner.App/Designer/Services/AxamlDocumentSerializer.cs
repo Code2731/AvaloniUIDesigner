@@ -60,18 +60,17 @@ public sealed class AxamlDocumentSerializer : IDesignerSerializer
             sb.AppendLine("  </Canvas.Styles>");
         }
 
-        var gridNames = document.Elements
-            .Where(element => string.Equals(element.TypeName, "Avalonia.Controls.Grid", StringComparison.Ordinal))
-            .Select(element => element.DisplayName)
-            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var containersByName = document.Elements
+            .Where(IsContainer)
+            .ToDictionary(element => element.DisplayName, StringComparer.OrdinalIgnoreCase);
         var childrenByParent = document.Elements
-            .Where(element => element.ParentName is not null && gridNames.Contains(element.ParentName))
+            .Where(element => element.ParentName is not null && containersByName.ContainsKey(element.ParentName))
             .GroupBy(element => element.ParentName!, StringComparer.OrdinalIgnoreCase)
             .ToDictionary(group => group.Key, group => group.ToList(), StringComparer.OrdinalIgnoreCase);
         foreach (var element in document.Elements.Where(element =>
-                     element.ParentName is null || !gridNames.Contains(element.ParentName)))
+                     element.ParentName is null || !containersByName.ContainsKey(element.ParentName)))
         {
-            AppendElement(sb, element, "  ", childrenByParent, isGridChild: false);
+            AppendElement(sb, element, "  ", childrenByParent, parent: null);
         }
 
         sb.AppendLine("</Canvas>");
@@ -92,7 +91,7 @@ public sealed class AxamlDocumentSerializer : IDesignerSerializer
         DesignerElementSnapshot element,
         string indent,
         IReadOnlyDictionary<string, List<DesignerElementSnapshot>> childrenByParent,
-        bool isGridChild)
+        DesignerElementSnapshot? parent)
     {
         sb.Append(indent);
         sb.Append('<');
@@ -100,7 +99,7 @@ public sealed class AxamlDocumentSerializer : IDesignerSerializer
         sb.Append(" x:Name=\"");
         sb.Append(EscapeXmlAttribute(element.DisplayName));
         sb.Append('"');
-        if (!isGridChild)
+        if (parent is null)
         {
             sb.Append(" Canvas.Left=\"");
             sb.Append(ToInvariantString(element.X));
@@ -112,9 +111,13 @@ public sealed class AxamlDocumentSerializer : IDesignerSerializer
             sb.Append(ToInvariantString(element.Height));
             sb.Append('"');
         }
-        else
+        else if (string.Equals(parent.TypeName, "Avalonia.Controls.Grid", StringComparison.Ordinal))
         {
             AppendGridCellAttributes(sb, element);
+        }
+        else
+        {
+            AppendStackPanelItemSize(sb, element, parent);
         }
 
         AppendVisualAttributes(sb, element.VisualProperties);
@@ -125,9 +128,15 @@ public sealed class AxamlDocumentSerializer : IDesignerSerializer
         }
 
         sb.AppendLine(">");
-        foreach (var child in children)
+        var orderedChildren = string.Equals(
+                element.TypeName,
+                "Avalonia.Controls.StackPanel",
+                StringComparison.Ordinal)
+            ? children.OrderBy(child => child.StackPanelIndex).ToList()
+            : children;
+        foreach (var child in orderedChildren)
         {
-            AppendElement(sb, child, indent + "  ", childrenByParent, isGridChild: true);
+            AppendElement(sb, child, indent + "  ", childrenByParent, element);
         }
 
         sb.Append(indent);
@@ -158,6 +167,31 @@ public sealed class AxamlDocumentSerializer : IDesignerSerializer
             sb.Append($" Grid.ColumnSpan=\"{element.GridColumnSpan}\"");
         }
     }
+
+    private static void AppendStackPanelItemSize(
+        StringBuilder sb,
+        DesignerElementSnapshot element,
+        DesignerElementSnapshot parent)
+    {
+        var orientation = parent.VisualProperties is not null
+            && parent.VisualProperties.TryGetValue("Orientation", out var value)
+            ? value
+            : "Vertical";
+        var size = element.StackPanelItemSize > 0
+            ? element.StackPanelItemSize
+            : string.Equals(orientation, "Horizontal", StringComparison.OrdinalIgnoreCase)
+                ? element.Width
+                : element.Height;
+        sb.Append(string.Equals(orientation, "Horizontal", StringComparison.OrdinalIgnoreCase)
+            ? " Width=\""
+            : " Height=\"");
+        sb.Append(ToInvariantString(size));
+        sb.Append('"');
+    }
+
+    private static bool IsContainer(DesignerElementSnapshot element)
+        => string.Equals(element.TypeName, "Avalonia.Controls.Grid", StringComparison.Ordinal)
+            || string.Equals(element.TypeName, "Avalonia.Controls.StackPanel", StringComparison.Ordinal);
 
     private static void AppendVisualAttributes(StringBuilder sb, IReadOnlyDictionary<string, string>? properties)
     {

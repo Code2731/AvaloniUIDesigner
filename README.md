@@ -20,7 +20,7 @@ dotnet run --project src/AvaloniaUIDesigner.App/AvaloniaUIDesigner.App.csproj
 - 4-Pane 레이아웃 (Toolbox / Canvas / Object Tree / Property Inspector)
 - **Toolbox**: 내장 컨트롤, 복합 프리셋, JSON 컴포넌트 팩
 - **배치**: 클릭-투-플레이스와 드래그 앤 드롭으로 실제 Avalonia 컨트롤 생성
-- **컨테이너 편집**: Grid의 `Auto`·픽셀·별 크기 행/열 정의와 자식 row/column/span을 편집하고 계층 Object Tree·AXAML·미리보기에 보존
+- **컨테이너 편집**: Grid의 행/열·셀 span과 StackPanel의 방향·간격·자식 순서·주축 크기를 편집하고 계층 Object Tree·AXAML·미리보기에 보존
 - **요소 선택**: 배치된 요소 클릭 시 파란 외곽선
 - **Object Tree 자동 동기화**: 배치된 요소가 루트(Window) 아래에 추가
 - **이동/리사이즈 기즈모**: 선택된 요소를 드래그로 이동, 8방향 핸들로 리사이즈 (최소 10px)

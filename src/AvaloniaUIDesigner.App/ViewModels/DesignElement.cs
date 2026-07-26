@@ -33,8 +33,11 @@ public partial class DesignElement : ViewModelBase
     private bool _isLocked;
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsContainerChild))]
     [NotifyPropertyChangedFor(nameof(IsGridChild))]
+    [NotifyPropertyChangedFor(nameof(IsStackPanelChild))]
     [NotifyPropertyChangedFor(nameof(GridCellLabel))]
+    [NotifyPropertyChangedFor(nameof(StackPanelItemLabel))]
     private string? _parentName;
 
     [ObservableProperty]
@@ -54,6 +57,16 @@ public partial class DesignElement : ViewModelBase
     private int _gridColumnSpan = 1;
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsGridChild))]
+    [NotifyPropertyChangedFor(nameof(IsStackPanelChild))]
+    [NotifyPropertyChangedFor(nameof(GridCellLabel))]
+    [NotifyPropertyChangedFor(nameof(StackPanelItemLabel))]
+    private int _stackPanelIndex = -1;
+
+    [ObservableProperty]
+    private double _stackPanelItemSize = 40;
+
+    [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(HasStylePreviewState))]
     private string? _stylePreviewStateLabel;
 
@@ -61,7 +74,11 @@ public partial class DesignElement : ViewModelBase
 
     public bool HasStylePreviewState => !string.IsNullOrWhiteSpace(StylePreviewStateLabel);
 
-    public bool IsGridChild => !string.IsNullOrWhiteSpace(ParentName);
+    public bool IsContainerChild => !string.IsNullOrWhiteSpace(ParentName);
+
+    public bool IsGridChild => IsContainerChild && StackPanelIndex < 0;
+
+    public bool IsStackPanelChild => IsContainerChild && StackPanelIndex >= 0;
 
     public string GridCellLabel
     {
@@ -78,4 +95,7 @@ public partial class DesignElement : ViewModelBase
             return $"GRID R{GridRow + 1} C{GridColumn + 1}{span}";
         }
     }
+
+    public string StackPanelItemLabel
+        => IsStackPanelChild ? $"STACK #{StackPanelIndex + 1}" : string.Empty;
 }

@@ -43,6 +43,21 @@ public sealed record GridCellAssignmentEditorState(
     int GridRowSpan,
     int GridColumnSpan);
 
+public sealed record StackPanelParentOption(
+    string DisplayName,
+    Orientation Orientation,
+    int ChildCount)
+{
+    public override string ToString() => $"{DisplayName} ({Orientation})";
+}
+
+public sealed record StackPanelAssignmentEditorState(
+    string ControlName,
+    IReadOnlyList<StackPanelParentOption> Parents,
+    string SelectedParentName,
+    int ItemIndex,
+    double ItemSize);
+
 public partial class MainWindowViewModel : ViewModelBase
 {
     private const string DesignerMetadataPrefix = "AvaloniaUIDesigner:";
@@ -1012,7 +1027,7 @@ public partial class MainWindowViewModel : ViewModelBase
         }
 
         var parents = Canvas.Elements
-            .Where(element => element.Visual is Grid && !element.IsGridChild && !element.IsLocked)
+            .Where(element => element.Visual is Grid && !element.IsContainerChild && !element.IsLocked)
             .Select(element =>
             {
                 var grid = (Grid)element.Visual;
@@ -1060,7 +1075,7 @@ public partial class MainWindowViewModel : ViewModelBase
         }
 
         var parent = Canvas.Elements.FirstOrDefault(element =>
-            !element.IsGridChild
+            !element.IsContainerChild
             && !element.IsLocked
             && element.Visual is Grid
             && string.Equals(element.DisplayName, parentName, StringComparison.OrdinalIgnoreCase));
@@ -1086,9 +1101,10 @@ public partial class MainWindowViewModel : ViewModelBase
         target.GridColumn = column;
         target.GridRowSpan = rowSpan;
         target.GridColumnSpan = columnSpan;
+        target.StackPanelIndex = -1;
         target.ParentName = parent.DisplayName;
         Canvas.MoveElementsToFront([target]);
-        Canvas.ReflowGridChildren(parent);
+        Canvas.NormalizeContainerRelationships();
         ObjectTree.RebuildFrom(Canvas.Elements);
         ObjectTree.SelectByElement(target);
         CommitCanvasMutation();
@@ -1096,20 +1112,25 @@ public partial class MainWindowViewModel : ViewModelBase
         return true;
     }
 
-    public bool RemoveSelectedFromGrid()
+    public bool RemoveSelectedFromGrid() => RemoveSelectedFromContainer();
+
+    public bool RemoveSelectedFromContainer()
     {
-        if (Canvas.SelectedElement is not { IsLocked: false, IsGridChild: true } target)
+        if (Canvas.SelectedElement is not { IsLocked: false, IsContainerChild: true } target)
         {
-            StatusText = "Select an unlocked Grid child to move it back to the Canvas root.";
+            StatusText = "Select an unlocked container child to move it back to the Canvas root.";
             return false;
         }
 
-        BeginCanvasMutation(HistoryActionType.EditProperty, "Removed control from Grid cell.");
+        BeginCanvasMutation(HistoryActionType.EditProperty, "Removed control from container.");
         target.ParentName = null;
         target.GridRow = 0;
         target.GridColumn = 0;
         target.GridRowSpan = 1;
         target.GridColumnSpan = 1;
+        target.StackPanelIndex = -1;
+        target.StackPanelItemSize = 40;
+        Canvas.NormalizeContainerRelationships();
         ObjectTree.RebuildFrom(Canvas.Elements);
         ObjectTree.SelectByElement(target);
         CommitCanvasMutation();
@@ -1119,6 +1140,149 @@ public partial class MainWindowViewModel : ViewModelBase
 
     private static GridCellAssignmentEditorState EmptyGridCellAssignmentState()
         => new(string.Empty, Array.Empty<GridCellParentOption>(), string.Empty, 0, 0, 1, 1);
+
+    public bool TryGetSelectedStackPanelAssignment(out StackPanelAssignmentEditorState state)
+    {
+        if (Canvas.SelectedElement is not { IsLocked: false } target
+            || target.Visual is Grid or StackPanel)
+        {
+            state = EmptyStackPanelAssignmentState();
+            StatusText = "Select an unlocked non-container control to assign it to a StackPanel.";
+            return false;
+        }
+
+        var parents = Canvas.Elements
+            .Where(element => element.Visual is StackPanel && !element.IsContainerChild && !element.IsLocked)
+            .Select(element =>
+            {
+                var stackPanel = (StackPanel)element.Visual;
+                var childCount = Canvas.Elements.Count(child =>
+                    !ReferenceEquals(child, target)
+                    && string.Equals(child.ParentName, element.DisplayName, StringComparison.OrdinalIgnoreCase)
+                    && child.IsStackPanelChild);
+                return new StackPanelParentOption(element.DisplayName, stackPanel.Orientation, childCount);
+            })
+            .ToList();
+        if (parents.Count == 0)
+        {
+            state = EmptyStackPanelAssignmentState();
+            StatusText = "Place an unlocked root StackPanel before assigning a control.";
+            return false;
+        }
+
+        var selectedParent = parents.FirstOrDefault(parent => string.Equals(
+                parent.DisplayName,
+                target.ParentName,
+                StringComparison.OrdinalIgnoreCase))
+            ?? parents[0];
+        var itemIndex = target.IsStackPanelChild
+            ? Math.Clamp(target.StackPanelIndex, 0, selectedParent.ChildCount)
+            : selectedParent.ChildCount;
+        var itemSize = target.IsStackPanelChild
+            ? target.StackPanelItemSize
+            : selectedParent.Orientation == Orientation.Vertical
+                ? target.Height
+                : target.Width;
+        state = new StackPanelAssignmentEditorState(
+            target.DisplayName,
+            parents,
+            selectedParent.DisplayName,
+            itemIndex,
+            Math.Max(10, itemSize));
+        return true;
+    }
+
+    public bool SetSelectedStackPanelAssignment(
+        string parentName,
+        int itemIndex,
+        double itemSize)
+    {
+        if (Canvas.SelectedElement is not { IsLocked: false } target
+            || target.Visual is Grid or StackPanel)
+        {
+            StatusText = "Select an unlocked non-container control to assign it to a StackPanel.";
+            return false;
+        }
+
+        var parent = Canvas.Elements.FirstOrDefault(element =>
+            !element.IsContainerChild
+            && !element.IsLocked
+            && element.Visual is StackPanel
+            && string.Equals(element.DisplayName, parentName, StringComparison.OrdinalIgnoreCase));
+        if (parent is null)
+        {
+            StatusText = $"StackPanel '{parentName}' is not available.";
+            return false;
+        }
+
+        var siblings = Canvas.Elements
+            .Where(element => !ReferenceEquals(element, target)
+                && element.IsStackPanelChild
+                && string.Equals(element.ParentName, parent.DisplayName, StringComparison.OrdinalIgnoreCase))
+            .OrderBy(element => element.StackPanelIndex)
+            .ThenBy(element => Canvas.Elements.IndexOf(element))
+            .ToList();
+        if (itemIndex < 0 || itemIndex > siblings.Count || !double.IsFinite(itemSize) || itemSize < 10)
+        {
+            StatusText = $"StackPanel position must be between 1 and {siblings.Count + 1}, with a size of at least 10.";
+            return false;
+        }
+
+        BeginCanvasMutation(HistoryActionType.EditProperty, "Assigned control to StackPanel.");
+        target.StackPanelItemSize = itemSize;
+        siblings.Insert(itemIndex, target);
+        Canvas.SetStackPanelChildOrder(parent, siblings);
+        Canvas.MoveElementsToFront(siblings);
+        Canvas.NormalizeContainerRelationships();
+        ObjectTree.RebuildFrom(Canvas.Elements);
+        ObjectTree.SelectByElement(target);
+        CommitCanvasMutation();
+        StatusText = $"Assigned {target.DisplayName} to {parent.DisplayName} at position {itemIndex + 1}.";
+        return true;
+    }
+
+    public bool MoveSelectedStackPanelItem(int offset)
+    {
+        if (Canvas.SelectedElement is not { IsLocked: false, IsStackPanelChild: true } target)
+        {
+            StatusText = "Select an unlocked StackPanel child to change its order.";
+            return false;
+        }
+
+        var siblings = Canvas.Elements
+            .Where(element => element.IsStackPanelChild
+                && string.Equals(element.ParentName, target.ParentName, StringComparison.OrdinalIgnoreCase))
+            .OrderBy(element => element.StackPanelIndex)
+            .ThenBy(element => Canvas.Elements.IndexOf(element))
+            .ToList();
+        var currentIndex = siblings.IndexOf(target);
+        var nextIndex = currentIndex + offset;
+        if (currentIndex < 0 || nextIndex < 0 || nextIndex >= siblings.Count)
+        {
+            StatusText = offset < 0
+                ? $"{target.DisplayName} is already the first StackPanel item."
+                : $"{target.DisplayName} is already the last StackPanel item.";
+            return false;
+        }
+
+        BeginCanvasMutation(HistoryActionType.EditProperty, "Reordered StackPanel item.");
+        (siblings[currentIndex], siblings[nextIndex]) = (siblings[nextIndex], siblings[currentIndex]);
+        var parent = Canvas.Elements.First(element => string.Equals(
+            element.DisplayName,
+            target.ParentName,
+            StringComparison.OrdinalIgnoreCase));
+        Canvas.SetStackPanelChildOrder(parent, siblings);
+        Canvas.MoveElementsToFront(siblings);
+        Canvas.NormalizeContainerRelationships();
+        ObjectTree.RebuildFrom(Canvas.Elements);
+        ObjectTree.SelectByElement(target);
+        CommitCanvasMutation();
+        StatusText = $"Moved {target.DisplayName} to StackPanel position {nextIndex + 1}.";
+        return true;
+    }
+
+    private static StackPanelAssignmentEditorState EmptyStackPanelAssignmentState()
+        => new(string.Empty, Array.Empty<StackPanelParentOption>(), string.Empty, 0, 40);
 
     public bool TryGetSelectedItems(out string controlName, out IReadOnlyList<string> items)
     {
@@ -1699,12 +1863,12 @@ public partial class MainWindowViewModel : ViewModelBase
     public void MoveSelectedElement(double deltaX, double deltaY)
     {
         var targets = Canvas.SelectedElements
-            .Where(element => !element.IsLocked && !element.IsGridChild)
+            .Where(element => !element.IsLocked && !element.IsContainerChild)
             .ToList();
         if (targets.Count == 0)
         {
-            StatusText = Canvas.SelectedElements.Any(element => element.IsGridChild)
-                ? "Grid child positions are managed by their assigned cells."
+            StatusText = Canvas.SelectedElements.Any(element => element.IsContainerChild)
+                ? "Container child positions are managed by their parent layout."
                 : "Selected controls are locked.";
             return;
         }
@@ -1946,11 +2110,14 @@ public partial class MainWindowViewModel : ViewModelBase
                         ? duplicateParentName
                         : target.ParentName,
             };
-            var duplicated = Canvas.AddElementFromSnapshot(duplicatedSnapshot, select: false);
+            var duplicated = Canvas.AddElementFromSnapshot(
+                duplicatedSnapshot,
+                select: false,
+                deferContainerReflow: true);
             duplicates.Add(duplicated);
         }
 
-        Canvas.NormalizeGridRelationships();
+        Canvas.NormalizeContainerRelationships();
         ObjectTree.RebuildFrom(Canvas.Elements);
         _isSyncingSelection = true;
         try
@@ -2035,12 +2202,15 @@ public partial class MainWindowViewModel : ViewModelBase
                         ? pastedParentName
                         : snapshot.ParentName,
             };
-            var pasted = Canvas.AddElementFromSnapshot(pastedSnapshot, select: false);
+            var pasted = Canvas.AddElementFromSnapshot(
+                pastedSnapshot,
+                select: false,
+                deferContainerReflow: true);
             pastedSnapshots.Add(pastedSnapshot);
             pastedElements.Add(pasted);
         }
 
-        Canvas.NormalizeGridRelationships();
+        Canvas.NormalizeContainerRelationships();
         ObjectTree.RebuildFrom(Canvas.Elements);
         _isSyncingSelection = true;
         try
@@ -2150,7 +2320,7 @@ public partial class MainWindowViewModel : ViewModelBase
         sb.AppendLine($"  <Canvas Width=\"{settings.Width:0.###}\" Height=\"{settings.Height:0.###}\" Background=\"{EscapeXmlAttribute(settings.Background)}\">");
         sb.AppendLine($"    <!-- {DesignerMetadataPrefix} GridSize={settings.GridSize.ToString("0.###", CultureInfo.InvariantCulture)}; IsGridVisible={settings.IsGridVisible}; SnapToGrid={settings.SnapToGrid} -->");
 
-        foreach (var element in Canvas.Elements.Where(element => !HasValidGridParent(element)))
+        foreach (var element in Canvas.Elements.Where(element => !HasValidContainerParent(element)))
         {
             if (element.IsLocked)
             {
@@ -2496,10 +2666,13 @@ public partial class MainWindowViewModel : ViewModelBase
             Canvas.SetDocumentStyles(_documentStyles);
             foreach (var snapshot in document.Elements)
             {
-                Canvas.AddElementFromSnapshot(snapshot, select: false);
+                Canvas.AddElementFromSnapshot(
+                    snapshot,
+                    select: false,
+                    deferContainerReflow: true);
             }
 
-            Canvas.NormalizeGridRelationships();
+            Canvas.NormalizeContainerRelationships();
             ObjectTree.RebuildFrom(Canvas.Elements);
             Canvas.Select(null);
         }
@@ -2527,7 +2700,9 @@ public partial class MainWindowViewModel : ViewModelBase
                 e.GridRow,
                 e.GridColumn,
                 e.GridRowSpan,
-                e.GridColumnSpan))
+                e.GridColumnSpan,
+                e.StackPanelIndex,
+                e.StackPanelItemSize))
             .ToList();
 
         return new DesignerCanvasDocument(
@@ -2639,7 +2814,9 @@ public partial class MainWindowViewModel : ViewModelBase
             element.GridRow,
             element.GridColumn,
             element.GridRowSpan,
-            element.GridColumnSpan);
+            element.GridColumnSpan,
+            element.StackPanelIndex,
+            element.StackPanelItemSize);
     }
 
     private IReadOnlyDictionary<string, string>? CaptureVisualProperties(Control visual)
@@ -3146,6 +3323,8 @@ public partial class MainWindowViewModel : ViewModelBase
                 || a.GridColumn != b.GridColumn
                 || a.GridRowSpan != b.GridRowSpan
                 || a.GridColumnSpan != b.GridColumnSpan
+                || a.StackPanelIndex != b.StackPanelIndex
+                || a.StackPanelItemSize != b.StackPanelItemSize
                 || !DictionaryEquals(a.VisualProperties, b.VisualProperties))
             {
                 return false;
@@ -3202,9 +3381,10 @@ public partial class MainWindowViewModel : ViewModelBase
         var snapshots = new List<DesignerElementSnapshot>();
         ReadElementNodes(parseRoot, null);
 
-        void ReadElementNodes(XElement container, string? parentName)
+        void ReadElementNodes(XElement container, DesignerElementSnapshot? parent)
         {
             var nextIsLocked = false;
+            var stackPanelIndex = 0;
             foreach (var node in container.Nodes())
             {
                 if (node is XComment comment)
@@ -3241,26 +3421,43 @@ public partial class MainWindowViewModel : ViewModelBase
                     snapshots.Count + 1,
                     snapshots,
                     warnings);
+                var width = ReadDouble(child, "Width", 120);
+                var height = ReadDouble(child, "Height", 40);
+                var isStackPanelChild = string.Equals(
+                    parent?.TypeName,
+                    "Avalonia.Controls.StackPanel",
+                    StringComparison.Ordinal);
+                var parentOrientation = parent?.VisualProperties is not null
+                    && parent.VisualProperties.TryGetValue("Orientation", out var orientation)
+                    ? orientation
+                    : "Vertical";
                 var snapshot = new DesignerElementSnapshot(
                     displayName,
                     typeName,
                     ReadDouble(child, "Canvas.Left", 0),
                     ReadDouble(child, "Canvas.Top", 0),
-                    ReadDouble(child, "Width", 120),
-                    ReadDouble(child, "Height", 40),
+                    width,
+                    height,
                     ReadVisualProperties(child, warnings),
                     nextIsLocked,
-                    parentName,
+                    parent?.DisplayName,
                     ReadInt(child, "Grid.Row", 0),
                     ReadInt(child, "Grid.Column", 0),
                     Math.Max(1, ReadInt(child, "Grid.RowSpan", 1)),
-                    Math.Max(1, ReadInt(child, "Grid.ColumnSpan", 1)));
+                    Math.Max(1, ReadInt(child, "Grid.ColumnSpan", 1)),
+                    isStackPanelChild ? stackPanelIndex++ : -1,
+                    isStackPanelChild
+                        ? string.Equals(parentOrientation, "Horizontal", StringComparison.OrdinalIgnoreCase)
+                            ? width
+                            : height
+                        : 40);
                 snapshots.Add(snapshot);
                 nextIsLocked = false;
 
-                if (string.Equals(typeName, "Avalonia.Controls.Grid", StringComparison.Ordinal))
+                if (string.Equals(typeName, "Avalonia.Controls.Grid", StringComparison.Ordinal)
+                    || string.Equals(typeName, "Avalonia.Controls.StackPanel", StringComparison.Ordinal))
                 {
-                    ReadElementNodes(child, displayName);
+                    ReadElementNodes(child, snapshot);
                 }
             }
         }
@@ -3612,10 +3809,6 @@ public partial class MainWindowViewModel : ViewModelBase
         {
             map.TryAdd("RowDefinitions", string.Empty);
             map.TryAdd("ColumnDefinitions", string.Empty);
-        }
-        else if (string.Equals(element.Name.LocalName, "StackPanel", StringComparison.OrdinalIgnoreCase))
-        {
-            map["__children"] = SerializeStackPanelChildren(element);
         }
         else if (string.Equals(element.Name.LocalName, "ComboBox", StringComparison.OrdinalIgnoreCase)
             || string.Equals(element.Name.LocalName, "ListBox", StringComparison.OrdinalIgnoreCase))
@@ -5008,17 +5201,41 @@ public partial class MainWindowViewModel : ViewModelBase
                 AppendCanvasLayoutAttributes(sb, element);
                 AppendAttribute(sb, "Orientation", stackPanel.Orientation.ToString());
                 AppendAttribute(sb, "Spacing", stackPanel.Spacing.ToString("0.###", CultureInfo.InvariantCulture));
+                var stackPanelChildren = Canvas.Elements
+                    .Where(child => child.IsStackPanelChild
+                        && string.Equals(
+                            child.ParentName,
+                            element.DisplayName,
+                            StringComparison.OrdinalIgnoreCase))
+                    .OrderBy(child => child.StackPanelIndex)
+                    .ThenBy(child => Canvas.Elements.IndexOf(child))
+                    .ToList();
 
-                if (stackPanel.Children.Count == 0)
+                if (stackPanelChildren.Count == 0 && stackPanel.Children.Count == 0)
                 {
                     sb.AppendLine(" />");
                     break;
                 }
 
                 sb.AppendLine(">");
-                foreach (var child in stackPanel.Children)
+                if (stackPanelChildren.Count > 0)
                 {
-                    WriteChildControlAxaml(sb, child, indent + "  ");
+                    foreach (var child in stackPanelChildren)
+                    {
+                        if (child.IsLocked)
+                        {
+                            sb.AppendLine($"{indent}  <!-- {DesignerMetadataPrefix} IsLocked=true -->");
+                        }
+
+                        WriteTopLevelElementAxaml(sb, child, indent + "  ");
+                    }
+                }
+                else
+                {
+                    foreach (var child in stackPanel.Children)
+                    {
+                        WriteChildControlAxaml(sb, child, indent + "  ");
+                    }
                 }
 
                 sb.Append(indent);
@@ -5115,6 +5332,13 @@ public partial class MainWindowViewModel : ViewModelBase
                 AppendAttribute(sb, "Grid.ColumnSpan", element.GridColumnSpan.ToString(CultureInfo.InvariantCulture));
             }
         }
+        else if (TryGetStackPanelParent(element, out var stackPanel))
+        {
+            AppendAttribute(
+                sb,
+                stackPanel.Orientation == Orientation.Vertical ? "Height" : "Width",
+                element.StackPanelItemSize.ToString("0.###", CultureInfo.InvariantCulture));
+        }
         else
         {
             AppendAttribute(sb, "Canvas.Left", element.X.ToString("0.###", CultureInfo.InvariantCulture));
@@ -5165,6 +5389,23 @@ public partial class MainWindowViewModel : ViewModelBase
             && Canvas.Elements.Any(parent =>
                 parent.Visual is Grid
                 && string.Equals(parent.DisplayName, element.ParentName, StringComparison.OrdinalIgnoreCase));
+
+    private bool HasValidContainerParent(DesignElement element)
+        => HasValidGridParent(element) || TryGetStackPanelParent(element, out _);
+
+    private bool TryGetStackPanelParent(DesignElement element, out StackPanel stackPanel)
+    {
+        var parent = element.ParentName is null
+            ? null
+            : Canvas.Elements.FirstOrDefault(candidate =>
+                candidate.Visual is StackPanel
+                && string.Equals(
+                    candidate.DisplayName,
+                    element.ParentName,
+                    StringComparison.OrdinalIgnoreCase));
+        stackPanel = parent?.Visual as StackPanel ?? null!;
+        return stackPanel is not null;
+    }
 
     private void AppendColorResourcesAxaml(StringBuilder sb, string rootElementName, string indent)
     {

@@ -107,13 +107,27 @@ public partial class ObjectTreeViewModel : ViewModelBase
             {
                 if (node.Element?.ParentName is { Length: > 0 } parentName
                     && nodesByName.TryGetValue(parentName, out var parent)
-                    && parent.Element?.Visual is Avalonia.Controls.Grid)
+                    && parent.Element?.Visual is Avalonia.Controls.Grid or Avalonia.Controls.StackPanel)
                 {
                     parent.Children.Add(node);
                 }
                 else
                 {
                     Root.Children.Add(node);
+                }
+            }
+
+            foreach (var parent in _allChildren.Where(node =>
+                         node.Element?.Visual is Avalonia.Controls.StackPanel
+                         && node.Children.Count > 1))
+            {
+                var ordered = parent.Children
+                    .OrderBy(node => node.Element?.StackPanelIndex ?? int.MaxValue)
+                    .ToList();
+                parent.Children.Clear();
+                foreach (var child in ordered)
+                {
+                    parent.Children.Add(child);
                 }
             }
         }

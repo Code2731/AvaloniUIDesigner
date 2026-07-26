@@ -32,6 +32,10 @@ public partial class MainWindow : Window
         int Column,
         int RowSpan,
         int ColumnSpan);
+    private sealed record StackPanelAssignmentOptions(
+        string ParentName,
+        int ItemIndex,
+        double ItemSize);
 
     private const double HandleHalf = 5;
     private const double MinSize = 10;
@@ -621,10 +625,34 @@ public partial class MainWindow : Window
         }
     }
 
-    private void OnRemoveFromGridMenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    private async void OnAssignToStackPanelMenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
         FlushPendingPropertyHistory();
-        Vm?.RemoveSelectedFromGrid();
+        if (Vm is null || !Vm.TryGetSelectedStackPanelAssignment(out var state))
+        {
+            return;
+        }
+
+        var updated = await ShowStackPanelAssignmentDialogAsync(state);
+        if (updated is not null)
+        {
+            Vm.SetSelectedStackPanelAssignment(
+                updated.ParentName,
+                updated.ItemIndex,
+                updated.ItemSize);
+        }
+    }
+
+    private void OnMoveStackPanelItemEarlierMenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+        => Vm?.MoveSelectedStackPanelItem(-1);
+
+    private void OnMoveStackPanelItemLaterMenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+        => Vm?.MoveSelectedStackPanelItem(1);
+
+    private void OnRemoveFromContainerMenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        FlushPendingPropertyHistory();
+        Vm?.RemoveSelectedFromContainer();
     }
 
     private async void OnChooseImageMenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
@@ -1313,6 +1341,13 @@ public partial class MainWindow : Window
             Vm?.Canvas.ReflowGridChildren(_boundElement);
         }
 
+        if (control is StackPanel
+            && e.Property.Name is "Orientation" or "Spacing"
+            && _boundElement is not null)
+        {
+            Vm?.Canvas.ReflowContainerChildren(_boundElement);
+        }
+
         if (!_hasPendingPropertyEdit)
         {
             Vm?.BeginCanvasMutation(MainWindowViewModel.HistoryActionType.EditProperty, "Updated control properties.");
@@ -1517,7 +1552,7 @@ public partial class MainWindow : Window
     private void UpdateSelectionEditability()
     {
         var canEdit = _boundElement is { IsLocked: false };
-        var canEditLayout = canEdit && _boundElement is not { IsGridChild: true };
+        var canEditLayout = canEdit && _boundElement is not { IsContainerChild: true };
 
         PropGrid.IsEnabled = canEdit;
         ElementNameEditor.IsEnabled = canEdit;
@@ -1779,9 +1814,9 @@ public partial class MainWindow : Window
             return;
         }
 
-        if (element.IsGridChild)
+        if (element.IsContainerChild)
         {
-            Vm.StatusText = "Grid child position and size are managed by its assigned cell.";
+            Vm.StatusText = "Container child position and size are managed by its parent layout.";
             e.Handled = true;
             return;
         }
@@ -1810,9 +1845,9 @@ public partial class MainWindow : Window
             return;
         }
 
-        if (target.IsGridChild)
+        if (target.IsContainerChild)
         {
-            Vm?.StatusText = "Grid child position and size are managed by its assigned cell.";
+            Vm?.StatusText = "Container child position and size are managed by its parent layout.";
             e.Handled = true;
             return;
         }
@@ -2558,6 +2593,110 @@ public partial class MainWindow : Window
         dialog.Content = content;
 
         return await dialog.ShowDialog<GridCellAssignmentOptions?>(this);
+    }
+
+    private async Task<StackPanelAssignmentOptions?> ShowStackPanelAssignmentDialogAsync(
+        StackPanelAssignmentEditorState state)
+    {
+        var parentSelector = new ComboBox
+        {
+            ItemsSource = state.Parents,
+            SelectedItem = state.Parents.First(parent => string.Equals(
+                parent.DisplayName,
+                state.SelectedParentName,
+                StringComparison.OrdinalIgnoreCase)),
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+        };
+        var positionEditor = new NumericUpDown
+        {
+            Minimum = 1,
+            Value = state.ItemIndex + 1,
+        };
+        var sizeEditor = new NumericUpDown
+        {
+            Minimum = 10,
+            Maximum = 2000,
+            Increment = 4,
+            Value = (decimal)state.ItemSize,
+        };
+        var orientationHint = new TextBlock
+        {
+            Foreground = Avalonia.Media.Brushes.Gray,
+            TextWrapping = Avalonia.Media.TextWrapping.Wrap,
+        };
+        var dialog = new Window
+        {
+            Title = $"Assign to StackPanel - {state.ControlName}",
+            Width = 440,
+            Height = 350,
+            MinWidth = 380,
+            MinHeight = 320,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner,
+        };
+
+        void UpdateParentState()
+        {
+            if (parentSelector.SelectedItem is not StackPanelParentOption parent)
+            {
+                return;
+            }
+
+            positionEditor.Maximum = parent.ChildCount + 1;
+            orientationHint.Text = parent.Orientation == Orientation.Vertical
+                ? "Item size controls Height. Width stretches to the StackPanel."
+                : "Item size controls Width. Height stretches to the StackPanel.";
+        }
+
+        parentSelector.SelectionChanged += (_, _) => UpdateParentState();
+        UpdateParentState();
+
+        var assignButton = new Button { Content = "Assign", MinWidth = 84 };
+        assignButton.Click += (_, _) =>
+        {
+            if (parentSelector.SelectedItem is not StackPanelParentOption parent)
+            {
+                return;
+            }
+
+            dialog.Close(new StackPanelAssignmentOptions(
+                parent.DisplayName,
+                (int)(positionEditor.Value ?? 1) - 1,
+                (double)(sizeEditor.Value ?? 40)));
+        };
+        var cancelButton = new Button { Content = "Cancel", MinWidth = 84 };
+        cancelButton.Click += (_, _) => dialog.Close(null);
+        var buttons = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            Spacing = 8,
+            HorizontalAlignment = HorizontalAlignment.Right,
+            Children = { cancelButton, assignButton },
+        };
+        var fields = new StackPanel
+        {
+            Spacing = 6,
+            Children =
+            {
+                new TextBlock { Text = "Parent StackPanel" },
+                parentSelector,
+                new TextBlock { Text = "Position (1-based)" },
+                positionEditor,
+                new TextBlock { Text = "Item size" },
+                sizeEditor,
+                orientationHint,
+            },
+        };
+        var content = new Grid
+        {
+            Margin = new Thickness(16),
+            RowDefinitions = new RowDefinitions("*,Auto"),
+            RowSpacing = 12,
+            Children = { fields, buttons },
+        };
+        Grid.SetRow(buttons, 1);
+        dialog.Content = content;
+
+        return await dialog.ShowDialog<StackPanelAssignmentOptions?>(this);
     }
 
     private async Task<ComponentPackExportOptions?> ShowComponentPackExportDialogAsync(

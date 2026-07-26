@@ -61,16 +61,16 @@ public sealed class PreviewWindow : Window
         }
 
         var controlsByName = new Dictionary<string, Control>(StringComparer.OrdinalIgnoreCase);
-        var gridNames = document.Elements
-            .Where(element => string.Equals(element.TypeName, "Avalonia.Controls.Grid", StringComparison.Ordinal))
-            .Select(element => element.DisplayName)
-            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var containersByName = document.Elements
+            .Where(element => string.Equals(element.TypeName, "Avalonia.Controls.Grid", StringComparison.Ordinal)
+                || string.Equals(element.TypeName, "Avalonia.Controls.StackPanel", StringComparison.Ordinal))
+            .ToDictionary(element => element.DisplayName, StringComparer.OrdinalIgnoreCase);
         var childrenByParent = document.Elements
-            .Where(element => element.ParentName is not null && gridNames.Contains(element.ParentName))
+            .Where(element => element.ParentName is not null && containersByName.ContainsKey(element.ParentName))
             .GroupBy(element => element.ParentName!, StringComparer.OrdinalIgnoreCase)
             .ToDictionary(group => group.Key, group => group.ToList(), StringComparer.OrdinalIgnoreCase);
         foreach (var element in document.Elements.Where(element =>
-                     element.ParentName is null || !gridNames.Contains(element.ParentName)))
+                     element.ParentName is null || !containersByName.ContainsKey(element.ParentName)))
         {
             var control = CreateControl(element, colorResources, styles);
             control.Width = element.Width;
@@ -79,10 +79,7 @@ public sealed class PreviewWindow : Window
             Canvas.SetTop(control, element.Y);
             canvas.Children.Add(control);
             controlsByName[element.DisplayName] = control;
-            if (control is Grid grid)
-            {
-                AddGridChildren(grid, element.DisplayName);
-            }
+            AddContainerChildren(control, element);
         }
 
         foreach (var label in controlsByName.Values.OfType<Label>())
@@ -95,26 +92,51 @@ public sealed class PreviewWindow : Window
 
         return canvas;
 
-        void AddGridChildren(Grid parent, string parentName)
+        void AddContainerChildren(Control parent, DesignerElementSnapshot parentSnapshot)
         {
-            if (!childrenByParent.TryGetValue(parentName, out var children))
+            if (!childrenByParent.TryGetValue(parentSnapshot.DisplayName, out var children))
             {
                 return;
             }
 
-            foreach (var childSnapshot in children)
+            var orderedChildren = parent is StackPanel
+                ? children.OrderBy(child => child.StackPanelIndex).ToList()
+                : children;
+            if (parent is StackPanel stackPanel)
+            {
+                stackPanel.Children.Clear();
+            }
+
+            foreach (var childSnapshot in orderedChildren)
             {
                 var child = CreateControl(childSnapshot, colorResources, styles);
-                Grid.SetRow(child, Math.Max(0, childSnapshot.GridRow));
-                Grid.SetColumn(child, Math.Max(0, childSnapshot.GridColumn));
-                Grid.SetRowSpan(child, Math.Max(1, childSnapshot.GridRowSpan));
-                Grid.SetColumnSpan(child, Math.Max(1, childSnapshot.GridColumnSpan));
-                parent.Children.Add(child);
-                controlsByName[childSnapshot.DisplayName] = child;
-                if (child is Grid childGrid)
+                switch (parent)
                 {
-                    AddGridChildren(childGrid, childSnapshot.DisplayName);
+                    case Grid grid:
+                        Grid.SetRow(child, Math.Max(0, childSnapshot.GridRow));
+                        Grid.SetColumn(child, Math.Max(0, childSnapshot.GridColumn));
+                        Grid.SetRowSpan(child, Math.Max(1, childSnapshot.GridRowSpan));
+                        Grid.SetColumnSpan(child, Math.Max(1, childSnapshot.GridColumnSpan));
+                        grid.Children.Add(child);
+                        break;
+                    case StackPanel stack:
+                        if (stack.Orientation == Orientation.Vertical)
+                        {
+                            child.Height = Math.Max(10, childSnapshot.StackPanelItemSize);
+                        }
+                        else
+                        {
+                            child.Width = Math.Max(10, childSnapshot.StackPanelItemSize);
+                        }
+
+                        stack.Children.Add(child);
+                        break;
+                    default:
+                        continue;
                 }
+
+                controlsByName[childSnapshot.DisplayName] = child;
+                AddContainerChildren(child, childSnapshot);
             }
         }
     }
@@ -195,11 +217,6 @@ public sealed class PreviewWindow : Window
             {
                 Orientation = Orientation.Vertical,
                 Spacing = 6,
-                Children =
-                {
-                    new TextBlock { Text = "StackPanel" },
-                    new Button { Content = "Item" },
-                },
             },
             _ => new TextBlock { Text = $"[Unsupported: {snapshot.DisplayName}]" },
         };

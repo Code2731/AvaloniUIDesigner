@@ -38,4 +38,6 @@ public sealed record DesignerElementSnapshot(
     int GridRow = 0,
     int GridColumn = 0,
     int GridRowSpan = 1,
-    int GridColumnSpan = 1);
+    int GridColumnSpan = 1,
+    int StackPanelIndex = -1,
+    double StackPanelItemSize = 40);
