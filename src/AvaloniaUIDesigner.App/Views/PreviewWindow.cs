@@ -865,16 +865,7 @@ public sealed class PreviewWindow : Window
 
     private static void ApplyExpanderProperties(Expander expander, IReadOnlyDictionary<string, string> properties)
     {
-        if (properties.TryGetValue("Header", out var header))
-        {
-            expander.Header = header;
-        }
-
-        if (properties.TryGetValue("IsExpanded", out var isExpanded)
-            && bool.TryParse(isExpanded, out var parsedIsExpanded))
-        {
-            expander.IsExpanded = parsedIsExpanded;
-        }
+        DesignerContainerBehaviorRuntime.Apply(expander, properties);
 
         if (properties.TryGetValue("__contentText", out var contentText))
         {
@@ -884,6 +875,7 @@ public sealed class PreviewWindow : Window
 
     private static void ApplyScrollViewerProperties(ScrollViewer scrollViewer, IReadOnlyDictionary<string, string> properties)
     {
+        DesignerContainerBehaviorRuntime.Apply(scrollViewer, properties);
         if (properties.TryGetValue("__contentText", out var contentText))
         {
             scrollViewer.Content = new TextBlock { Text = contentText, Margin = new Thickness(8) };

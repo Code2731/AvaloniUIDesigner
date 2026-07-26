@@ -230,6 +230,25 @@ public sealed record ToggleEditorState(
     string HorizontalContentAlignment,
     string VerticalContentAlignment);
 
+public sealed record ContainerBehaviorEditorState(
+    string ControlName,
+    string ControlKind,
+    string Header,
+    bool IsExpanded,
+    string ExpandDirection,
+    string HorizontalContentAlignment,
+    string VerticalContentAlignment,
+    string HorizontalScrollBarVisibility,
+    string VerticalScrollBarVisibility,
+    bool AllowAutoHide,
+    bool IsScrollChainingEnabled,
+    bool IsDeferredScrollingEnabled,
+    bool BringIntoViewOnFocusChange,
+    string HorizontalSnapPointsType,
+    string VerticalSnapPointsType,
+    string HorizontalSnapPointsAlignment,
+    string VerticalSnapPointsAlignment);
+
 public sealed record GridDefinitionEditorState(
     string ControlName,
     string RowDefinitions,
@@ -4321,6 +4340,132 @@ public partial class MainWindowViewModel : ViewModelBase
             values.HorizontalContentAlignment.ToString(),
             values.VerticalContentAlignment.ToString());
 
+    public bool TryGetSelectedContainerBehaviorProperties(
+        out ContainerBehaviorEditorState state)
+    {
+        var target = Canvas.SelectedElement;
+        if (target is null
+            || target.IsLocked
+            || !DesignerContainerBehaviorRuntime.IsSupportedControl(target.Visual))
+        {
+            state = default!;
+            StatusText = target switch
+            {
+                null => "Select an Expander or ScrollViewer before editing container behavior.",
+                { IsLocked: true } => "Unlock the selected control before editing container behavior.",
+                _ => "Container behavior editing is available for Expander and ScrollViewer controls.",
+            };
+            return false;
+        }
+
+        if (!DesignerContainerBehaviorRuntime.TryRead(
+                target.Visual,
+                out var values,
+                out var error))
+        {
+            state = default!;
+            StatusText = $"Container behavior cannot be edited. {error}";
+            return false;
+        }
+
+        state = CreateContainerBehaviorEditorState(target.DisplayName, values);
+        return true;
+    }
+
+    public bool SetSelectedContainerBehaviorProperties(
+        DesignerContainerBehaviorEditorInput input)
+    {
+        var target = Canvas.SelectedElement;
+        if (target is null
+            || target.IsLocked
+            || !DesignerContainerBehaviorRuntime.IsSupportedControl(target.Visual))
+        {
+            StatusText = "Select an unlocked Expander or ScrollViewer before editing container behavior.";
+            return false;
+        }
+
+        if (!DesignerContainerBehaviorRuntime.TryParseValues(
+                target.Visual,
+                input,
+                out var values,
+                out var error))
+        {
+            StatusText = $"Container behavior was not changed. {error}";
+            return false;
+        }
+
+        if (!DesignerContainerBehaviorRuntime.TryRead(
+                target.Visual,
+                out var current,
+                out error))
+        {
+            StatusText = $"Container behavior was not changed. {error}";
+            return false;
+        }
+
+        if (current == values)
+        {
+            StatusText = "Container behavior is unchanged.";
+            return true;
+        }
+
+        BeginCanvasMutation(
+            HistoryActionType.EditProperty,
+            "Updated container behavior.");
+        DesignerContainerBehaviorRuntime.Apply(target.Visual, values);
+        Canvas.ReflowContainerChildren(target);
+        foreach (var propertyName in new[]
+                 {
+                     "Header",
+                     "IsExpanded",
+                     "ExpandDirection",
+                     "HorizontalContentAlignment",
+                     "VerticalContentAlignment",
+                     "HorizontalScrollBarVisibility",
+                     "VerticalScrollBarVisibility",
+                     "AllowAutoHide",
+                     "IsScrollChainingEnabled",
+                     "IsDeferredScrollingEnabled",
+                     "BringIntoViewOnFocusChange",
+                     "HorizontalSnapPointsType",
+                     "VerticalSnapPointsType",
+                     "HorizontalSnapPointsAlignment",
+                     "VerticalSnapPointsAlignment",
+                 })
+        {
+            DesignerStyleApplicationMetadata.ClearApplied(
+                target.Visual,
+                propertyName);
+        }
+
+        Canvas.RefreshDocumentStyles(target.Visual);
+        CommitCanvasMutation();
+        StatusText = $"Updated container behavior for {target.DisplayName}.";
+        return true;
+    }
+
+    private static ContainerBehaviorEditorState CreateContainerBehaviorEditorState(
+        string controlName,
+        DesignerContainerBehaviorValues values)
+        => new(
+            controlName,
+            values.Kind.ToString(),
+            values.Header,
+            values.IsExpanded,
+            values.ExpandDirection.ToString(),
+            values.HorizontalContentAlignment.ToString(),
+            values.VerticalContentAlignment.ToString(),
+            values.HorizontalScrollBarVisibility.ToString(),
+            values.VerticalScrollBarVisibility.ToString(),
+            values.AllowAutoHide,
+            values.IsScrollChainingEnabled,
+            values.IsDeferredScrollingEnabled,
+            values.BringIntoViewOnFocusChange,
+            values.HorizontalSnapPointsType.ToString(),
+            values.VerticalSnapPointsType.ToString(),
+            values.HorizontalSnapPointsAlignment.ToString(),
+            values.VerticalSnapPointsAlignment.ToString());
+
     public bool TryGetSelectedToolTip(out string controlName, out string toolTip)
     {
         var target = Canvas.SelectedElement;
@@ -5946,6 +6091,7 @@ public partial class MainWindowViewModel : ViewModelBase
         DesignerSelectionRuntime.Capture(visual, result);
         DesignerDateTimeRuntime.Capture(visual, result);
         DesignerToggleRuntime.Capture(visual, result);
+        DesignerContainerBehaviorRuntime.Capture(visual, result);
         foreach (var pair in DesignerResourceReferenceMetadata.GetReferences(visual))
         {
             result[pair.Key] = DesignerResourceReferenceMetadata.FormatExpression(pair.Value);
@@ -7705,6 +7851,27 @@ public partial class MainWindowViewModel : ViewModelBase
                 continue;
             }
 
+            if (DesignerContainerBehaviorRuntime.IsSupportedProperty(tagName, name))
+            {
+                if (DesignerContainerBehaviorRuntime.TryNormalizeProperty(
+                        tagName,
+                        name,
+                        attr.Value,
+                        out var canonicalName,
+                        out var normalizedValue,
+                        out var containerBehaviorError))
+                {
+                    map[canonicalName] = normalizedValue;
+                }
+                else
+                {
+                    warnings.Add(
+                        $"Ignored {tagName}.{name}: {containerBehaviorError}");
+                }
+
+                continue;
+            }
+
             if (DesignerTypographyRuntime.IsSupportedProperty(tagName, name))
             {
                 if (DesignerTypographyRuntime.TryNormalizeProperty(
@@ -7926,6 +8093,11 @@ public partial class MainWindowViewModel : ViewModelBase
             return true;
         }
 
+        if (DesignerContainerBehaviorRuntime.IsSupportedProperty(tagName, propertyName))
+        {
+            return true;
+        }
+
         if (propertyName is "Opacity" or "Classes")
         {
             return true;
@@ -7972,8 +8144,7 @@ public partial class MainWindowViewModel : ViewModelBase
             "SplitView" => propertyName is "DisplayMode" or "IsPaneOpen" or "OpenPaneLength"
                 or "CompactPaneLength" or "PanePlacement" or "PaneBackground"
                 or "UseLightDismissOverlayMode",
-            "Expander" => propertyName is "Header" or "IsExpanded",
-            "ScrollViewer" => false,
+            "Expander" or "ScrollViewer" => false,
             "Border" => propertyName is "Background" or "BorderBrush" or "BorderThickness" or "CornerRadius",
             "Grid" => propertyName is "RowDefinitions" or "ColumnDefinitions" or "ShowGridLines",
             "StackPanel" => propertyName is "Orientation" or "Spacing",
@@ -9433,8 +9604,7 @@ public partial class MainWindowViewModel : ViewModelBase
                 sb.Append(indent);
                 sb.Append("<Expander");
                 AppendCanvasLayoutAttributes(sb, element);
-                AppendAttribute(sb, "Header", expander.Header?.ToString() ?? string.Empty);
-                AppendAttribute(sb, "IsExpanded", expander.IsExpanded.ToString());
+                AppendContainerBehaviorAttributes(sb, expander);
                 sb.AppendLine(">");
                 if (GetDesignerContentChild(element) is { } expanderChild)
                 {
@@ -9456,6 +9626,7 @@ public partial class MainWindowViewModel : ViewModelBase
                 sb.Append(indent);
                 sb.Append("<ScrollViewer");
                 AppendCanvasLayoutAttributes(sb, element);
+                AppendContainerBehaviorAttributes(sb, scrollViewer);
                 sb.AppendLine(">");
                 if (GetDesignerContentChild(element) is { } scrollViewerChild)
                 {
@@ -10529,6 +10700,22 @@ public partial class MainWindowViewModel : ViewModelBase
             .Select(binding => binding.PropertyName)
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
         foreach (var attribute in DesignerToggleRuntime.GetAxamlAttributes(visual))
+        {
+            if (!boundProperties.Contains(attribute.Name))
+            {
+                AppendAttribute(sb, attribute.Name, attribute.Value);
+            }
+        }
+    }
+
+    private static void AppendContainerBehaviorAttributes(
+        StringBuilder sb,
+        Control visual)
+    {
+        var boundProperties = DesignerBindingRuntime.ReadBindings(visual)
+            .Select(binding => binding.PropertyName)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        foreach (var attribute in DesignerContainerBehaviorRuntime.GetAxamlAttributes(visual))
         {
             if (!boundProperties.Contains(attribute.Name))
             {

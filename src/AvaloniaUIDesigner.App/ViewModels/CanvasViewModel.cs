@@ -1549,9 +1549,32 @@ public partial class CanvasViewModel : ViewModelBase
             right = border.BorderThickness.Right;
             bottom = border.BorderThickness.Bottom;
         }
-        else if (parent.Visual is Expander)
+        else if (parent.Visual is Expander expander)
         {
-            top = Math.Min(32, Math.Max(0, parent.Height - 10));
+            if (expander.ExpandDirection is ExpandDirection.Down or ExpandDirection.Up)
+            {
+                var headerHeight = Math.Min(32, Math.Max(0, parent.Height - 10));
+                if (expander.ExpandDirection == ExpandDirection.Down)
+                {
+                    top = headerHeight;
+                }
+                else
+                {
+                    bottom = headerHeight;
+                }
+            }
+            else
+            {
+                var headerWidth = Math.Min(32, Math.Max(0, parent.Width - 10));
+                if (expander.ExpandDirection == ExpandDirection.Right)
+                {
+                    left = headerWidth;
+                }
+                else
+                {
+                    right = headerWidth;
+                }
+            }
         }
 
         child.X = parent.X + left;
@@ -2394,16 +2417,7 @@ public partial class CanvasViewModel : ViewModelBase
 
         if (visual is Expander expander)
         {
-            if (properties.TryGetValue("Header", out var header))
-            {
-                expander.Header = header;
-            }
-
-            if (properties.TryGetValue("IsExpanded", out var isExpanded)
-                && bool.TryParse(isExpanded, out var parsedIsExpanded))
-            {
-                expander.IsExpanded = parsedIsExpanded;
-            }
+            DesignerContainerBehaviorRuntime.Apply(expander, properties);
 
             if (properties.TryGetValue("__contentText", out var contentText))
             {
@@ -2415,6 +2429,7 @@ public partial class CanvasViewModel : ViewModelBase
 
         if (visual is ScrollViewer scrollViewer)
         {
+            DesignerContainerBehaviorRuntime.Apply(scrollViewer, properties);
             if (properties.TryGetValue("__contentText", out var contentText))
             {
                 SetScrollViewerContent(scrollViewer, contentText);

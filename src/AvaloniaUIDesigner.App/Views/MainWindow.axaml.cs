@@ -768,6 +768,20 @@ public partial class MainWindow : Window
         await ShowTogglePropertiesDialogAsync(state);
     }
 
+    private async void OnEditContainerBehaviorPropertiesMenuClicked(
+        object? sender,
+        Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        FlushPendingPropertyHistory();
+        if (Vm is null
+            || !Vm.TryGetSelectedContainerBehaviorProperties(out var state))
+        {
+            return;
+        }
+
+        await ShowContainerBehaviorPropertiesDialogAsync(state);
+    }
+
     private async void OnEditGridDefinitionsMenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
         FlushPendingPropertyHistory();
@@ -1805,6 +1819,13 @@ public partial class MainWindow : Window
 
     private static bool IsUndoTrackedVisualProperty(Control control, string propertyName)
     {
+        if (DesignerContainerBehaviorRuntime.IsSupportedProperty(
+                control.GetType().Name,
+                propertyName))
+        {
+            return true;
+        }
+
         if (DesignerToggleRuntime.IsSupportedProperty(control.GetType().Name, propertyName))
         {
             return true;
@@ -4797,6 +4818,285 @@ public partial class MainWindow : Window
         await dialog.ShowDialog(this);
 
         static void AddField(Grid owner, string label, Control editor, int row, int column)
+        {
+            var field = new StackPanel
+            {
+                Spacing = 4,
+                Children =
+                {
+                    new TextBlock { Text = label },
+                    editor,
+                },
+            };
+            Grid.SetRow(field, row);
+            Grid.SetColumn(field, column);
+            owner.Children.Add(field);
+        }
+    }
+
+    private async Task ShowContainerBehaviorPropertiesDialogAsync(
+        ContainerBehaviorEditorState state)
+    {
+        if (Vm is null)
+        {
+            return;
+        }
+
+        var isExpander =
+            state.ControlKind == nameof(DesignerContainerBehaviorKind.Expander);
+        var headerEditor = new TextBox { Text = state.Header };
+        var expandedEditor = new CheckBox
+        {
+            Content = "Expanded in the design and at startup",
+            IsChecked = state.IsExpanded,
+        };
+        var expandDirectionEditor = new ComboBox
+        {
+            ItemsSource = DesignerContainerBehaviorRuntime.ExpandDirectionNames,
+            SelectedItem = state.ExpandDirection,
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+        };
+        var horizontalContentAlignmentEditor = new ComboBox
+        {
+            ItemsSource =
+                DesignerContainerBehaviorRuntime.HorizontalAlignmentNames,
+            SelectedItem = state.HorizontalContentAlignment,
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+        };
+        var verticalContentAlignmentEditor = new ComboBox
+        {
+            ItemsSource =
+                DesignerContainerBehaviorRuntime.VerticalAlignmentNames,
+            SelectedItem = state.VerticalContentAlignment,
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+        };
+        var horizontalScrollBarEditor = new ComboBox
+        {
+            ItemsSource =
+                DesignerContainerBehaviorRuntime.ScrollBarVisibilityNames,
+            SelectedItem = state.HorizontalScrollBarVisibility,
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+        };
+        var verticalScrollBarEditor = new ComboBox
+        {
+            ItemsSource =
+                DesignerContainerBehaviorRuntime.ScrollBarVisibilityNames,
+            SelectedItem = state.VerticalScrollBarVisibility,
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+        };
+        var horizontalSnapTypeEditor = new ComboBox
+        {
+            ItemsSource = DesignerContainerBehaviorRuntime.SnapPointsTypeNames,
+            SelectedItem = state.HorizontalSnapPointsType,
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+        };
+        var verticalSnapTypeEditor = new ComboBox
+        {
+            ItemsSource = DesignerContainerBehaviorRuntime.SnapPointsTypeNames,
+            SelectedItem = state.VerticalSnapPointsType,
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+        };
+        var horizontalSnapAlignmentEditor = new ComboBox
+        {
+            ItemsSource =
+                DesignerContainerBehaviorRuntime.SnapPointsAlignmentNames,
+            SelectedItem = state.HorizontalSnapPointsAlignment,
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+        };
+        var verticalSnapAlignmentEditor = new ComboBox
+        {
+            ItemsSource =
+                DesignerContainerBehaviorRuntime.SnapPointsAlignmentNames,
+            SelectedItem = state.VerticalSnapPointsAlignment,
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+        };
+        var autoHideEditor = new CheckBox
+        {
+            Content = "Auto-hide scrollbars",
+            IsChecked = state.AllowAutoHide,
+        };
+        var chainingEditor = new CheckBox
+        {
+            Content = "Chain scrolling to parent",
+            IsChecked = state.IsScrollChainingEnabled,
+        };
+        var deferredEditor = new CheckBox
+        {
+            Content = "Use deferred scrolling",
+            IsChecked = state.IsDeferredScrollingEnabled,
+        };
+        var bringIntoViewEditor = new CheckBox
+        {
+            Content = "Bring focused child into view",
+            IsChecked = state.BringIntoViewOnFocusChange,
+        };
+
+        var fields = new Grid
+        {
+            ColumnDefinitions = new ColumnDefinitions("*,*"),
+            RowDefinitions = new RowDefinitions("Auto,Auto,Auto"),
+            ColumnSpacing = 12,
+            RowSpacing = 10,
+        };
+        var switches = new WrapPanel
+        {
+            Orientation = Orientation.Horizontal,
+            ItemSpacing = 18,
+            LineSpacing = 8,
+        };
+        if (isExpander)
+        {
+            AddField(fields, "Header", headerEditor, 0, 0);
+            AddField(fields, "Expand direction", expandDirectionEditor, 0, 1);
+            AddField(
+                fields,
+                "Horizontal content alignment",
+                horizontalContentAlignmentEditor,
+                1,
+                0);
+            AddField(
+                fields,
+                "Vertical content alignment",
+                verticalContentAlignmentEditor,
+                1,
+                1);
+            switches.Children.Add(expandedEditor);
+        }
+        else
+        {
+            AddField(
+                fields,
+                "Horizontal scrollbar",
+                horizontalScrollBarEditor,
+                0,
+                0);
+            AddField(
+                fields,
+                "Vertical scrollbar",
+                verticalScrollBarEditor,
+                0,
+                1);
+            AddField(
+                fields,
+                "Horizontal snap type",
+                horizontalSnapTypeEditor,
+                1,
+                0);
+            AddField(
+                fields,
+                "Vertical snap type",
+                verticalSnapTypeEditor,
+                1,
+                1);
+            AddField(
+                fields,
+                "Horizontal snap alignment",
+                horizontalSnapAlignmentEditor,
+                2,
+                0);
+            AddField(
+                fields,
+                "Vertical snap alignment",
+                verticalSnapAlignmentEditor,
+                2,
+                1);
+            switches.Children.Add(autoHideEditor);
+            switches.Children.Add(chainingEditor);
+            switches.Children.Add(deferredEditor);
+            switches.Children.Add(bringIntoViewEditor);
+        }
+
+        var errorText = new TextBlock
+        {
+            Foreground = Avalonia.Media.Brushes.IndianRed,
+            TextWrapping = Avalonia.Media.TextWrapping.Wrap,
+        };
+        var dialog = new Window
+        {
+            Title = $"Edit Disclosure & Scrolling - {state.ControlName}",
+            Width = 740,
+            Height = 590,
+            MinWidth = 640,
+            MinHeight = 500,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner,
+        };
+        var applyButton = new Button { Content = "Apply", MinWidth = 84 };
+        applyButton.Click += (_, _) =>
+        {
+            var input = new DesignerContainerBehaviorEditorInput(
+                headerEditor.Text ?? string.Empty,
+                expandedEditor.IsChecked == true,
+                expandDirectionEditor.SelectedItem?.ToString() ?? string.Empty,
+                horizontalContentAlignmentEditor.SelectedItem?.ToString()
+                    ?? string.Empty,
+                verticalContentAlignmentEditor.SelectedItem?.ToString()
+                    ?? string.Empty,
+                horizontalScrollBarEditor.SelectedItem?.ToString()
+                    ?? string.Empty,
+                verticalScrollBarEditor.SelectedItem?.ToString()
+                    ?? string.Empty,
+                autoHideEditor.IsChecked == true,
+                chainingEditor.IsChecked == true,
+                deferredEditor.IsChecked == true,
+                bringIntoViewEditor.IsChecked == true,
+                horizontalSnapTypeEditor.SelectedItem?.ToString()
+                    ?? string.Empty,
+                verticalSnapTypeEditor.SelectedItem?.ToString()
+                    ?? string.Empty,
+                horizontalSnapAlignmentEditor.SelectedItem?.ToString()
+                    ?? string.Empty,
+                verticalSnapAlignmentEditor.SelectedItem?.ToString()
+                    ?? string.Empty);
+            if (!Vm.SetSelectedContainerBehaviorProperties(input))
+            {
+                errorText.Text = Vm.StatusText;
+                return;
+            }
+
+            dialog.Close();
+        };
+        var cancelButton = new Button { Content = "Cancel", MinWidth = 84 };
+        cancelButton.Click += (_, _) => dialog.Close();
+        var buttons = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            Spacing = 8,
+            HorizontalAlignment = HorizontalAlignment.Right,
+            Children = { cancelButton, applyButton },
+        };
+        var content = new Grid
+        {
+            Margin = new Thickness(16),
+            RowDefinitions = new RowDefinitions("Auto,Auto,Auto,*,Auto,Auto"),
+            RowSpacing = 12,
+            Children =
+            {
+                new TextBlock
+                {
+                    Text = isExpander
+                        ? "Configure disclosure state, direction, and content alignment without changing the assigned child."
+                        : "Configure scrollbar, chaining, focus, and snap behavior without changing the assigned child.",
+                    TextWrapping = Avalonia.Media.TextWrapping.Wrap,
+                },
+                fields,
+                switches,
+                errorText,
+                buttons,
+            },
+        };
+        Grid.SetRow(fields, 1);
+        Grid.SetRow(switches, 2);
+        Grid.SetRow(errorText, 4);
+        Grid.SetRow(buttons, 5);
+        dialog.Content = content;
+        await dialog.ShowDialog(this);
+
+        static void AddField(
+            Grid owner,
+            string label,
+            Control editor,
+            int row,
+            int column)
         {
             var field = new StackPanel
             {
