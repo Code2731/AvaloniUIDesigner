@@ -1,4 +1,5 @@
 using Avalonia.Controls;
+using AvaloniaUIDesigner.App.Designer.Core;
 using CommunityToolkit.Mvvm.ComponentModel;
 
 namespace AvaloniaUIDesigner.App.ViewModels;
@@ -36,8 +37,10 @@ public partial class DesignElement : ViewModelBase
     [NotifyPropertyChangedFor(nameof(IsContainerChild))]
     [NotifyPropertyChangedFor(nameof(IsGridChild))]
     [NotifyPropertyChangedFor(nameof(IsStackPanelChild))]
+    [NotifyPropertyChangedFor(nameof(IsContentChild))]
     [NotifyPropertyChangedFor(nameof(GridCellLabel))]
     [NotifyPropertyChangedFor(nameof(StackPanelItemLabel))]
+    [NotifyPropertyChangedFor(nameof(ContainerLayoutLabel))]
     private string? _parentName;
 
     [ObservableProperty]
@@ -67,6 +70,15 @@ public partial class DesignElement : ViewModelBase
     private double _stackPanelItemSize = 40;
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsGridChild))]
+    [NotifyPropertyChangedFor(nameof(IsStackPanelChild))]
+    [NotifyPropertyChangedFor(nameof(IsContentChild))]
+    [NotifyPropertyChangedFor(nameof(GridCellLabel))]
+    [NotifyPropertyChangedFor(nameof(StackPanelItemLabel))]
+    [NotifyPropertyChangedFor(nameof(ContainerLayoutLabel))]
+    private DesignerParentLayoutKind _parentLayout;
+
+    [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(HasStylePreviewState))]
     private string? _stylePreviewStateLabel;
 
@@ -76,9 +88,11 @@ public partial class DesignElement : ViewModelBase
 
     public bool IsContainerChild => !string.IsNullOrWhiteSpace(ParentName);
 
-    public bool IsGridChild => IsContainerChild && StackPanelIndex < 0;
+    public bool IsGridChild => IsContainerChild && ParentLayout == DesignerParentLayoutKind.Grid;
 
-    public bool IsStackPanelChild => IsContainerChild && StackPanelIndex >= 0;
+    public bool IsStackPanelChild => IsContainerChild && ParentLayout == DesignerParentLayoutKind.StackPanel;
+
+    public bool IsContentChild => IsContainerChild && ParentLayout == DesignerParentLayoutKind.Content;
 
     public string GridCellLabel
     {
@@ -98,4 +112,7 @@ public partial class DesignElement : ViewModelBase
 
     public string StackPanelItemLabel
         => IsStackPanelChild ? $"STACK #{StackPanelIndex + 1}" : string.Empty;
+
+    public string ContainerLayoutLabel
+        => IsContentChild ? "CONTENT" : string.Empty;
 }

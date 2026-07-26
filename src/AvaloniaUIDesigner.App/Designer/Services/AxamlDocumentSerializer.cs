@@ -115,7 +115,10 @@ public sealed class AxamlDocumentSerializer : IDesignerSerializer
         {
             AppendGridCellAttributes(sb, element);
         }
-        else
+        else if (string.Equals(
+                     parent.TypeName,
+                     "Avalonia.Controls.StackPanel",
+                     StringComparison.Ordinal))
         {
             AppendStackPanelItemSize(sb, element, parent);
         }
@@ -191,7 +194,10 @@ public sealed class AxamlDocumentSerializer : IDesignerSerializer
 
     private static bool IsContainer(DesignerElementSnapshot element)
         => string.Equals(element.TypeName, "Avalonia.Controls.Grid", StringComparison.Ordinal)
-            || string.Equals(element.TypeName, "Avalonia.Controls.StackPanel", StringComparison.Ordinal);
+            || string.Equals(element.TypeName, "Avalonia.Controls.StackPanel", StringComparison.Ordinal)
+            || string.Equals(element.TypeName, "Avalonia.Controls.Border", StringComparison.Ordinal)
+            || string.Equals(element.TypeName, "Avalonia.Controls.ScrollViewer", StringComparison.Ordinal)
+            || string.Equals(element.TypeName, "Avalonia.Controls.Expander", StringComparison.Ordinal);
 
     private static void AppendVisualAttributes(StringBuilder sb, IReadOnlyDictionary<string, string>? properties)
     {

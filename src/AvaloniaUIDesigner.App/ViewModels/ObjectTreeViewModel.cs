@@ -107,7 +107,11 @@ public partial class ObjectTreeViewModel : ViewModelBase
             {
                 if (node.Element?.ParentName is { Length: > 0 } parentName
                     && nodesByName.TryGetValue(parentName, out var parent)
-                    && parent.Element?.Visual is Avalonia.Controls.Grid or Avalonia.Controls.StackPanel)
+                    && parent.Element?.Visual is Avalonia.Controls.Grid
+                        or Avalonia.Controls.StackPanel
+                        or Avalonia.Controls.Border
+                        or Avalonia.Controls.ScrollViewer
+                        or Avalonia.Controls.Expander)
                 {
                     parent.Children.Add(node);
                 }

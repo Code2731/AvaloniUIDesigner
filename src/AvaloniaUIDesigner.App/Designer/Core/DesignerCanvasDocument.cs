@@ -2,6 +2,14 @@
 
 namespace AvaloniaUIDesigner.App.Designer.Core;
 
+public enum DesignerParentLayoutKind
+{
+    None,
+    Grid,
+    StackPanel,
+    Content,
+}
+
 public sealed record DesignerCanvasDocument(
     IReadOnlyList<DesignerElementSnapshot> Elements,
     DesignerCanvasSettings? Settings = null,
@@ -40,4 +48,5 @@ public sealed record DesignerElementSnapshot(
     int GridRowSpan = 1,
     int GridColumnSpan = 1,
     int StackPanelIndex = -1,
-    double StackPanelItemSize = 40);
+    double StackPanelItemSize = 40,
+    DesignerParentLayoutKind ParentLayout = DesignerParentLayoutKind.None);

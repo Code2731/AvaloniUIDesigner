@@ -61,6 +61,7 @@
                 <MenuItem Header="Edit Grid Definitions..." Click="OnEditGridDefinitionsMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
                 <MenuItem Header="Assign to Grid Cell..." Click="OnAssignToGridCellMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
                 <MenuItem Header="Assign to StackPanel..." Click="OnAssignToStackPanelMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
+                <MenuItem Header="Assign as Container Content..." Click="OnAssignAsContainerContentMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
                 <MenuItem Header="Move StackPanel Item Earlier" Click="OnMoveStackPanelItemEarlierMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
                 <MenuItem Header="Move StackPanel Item Later" Click="OnMoveStackPanelItemLaterMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
                 <MenuItem Header="Remove from Container" Click="OnRemoveFromContainerMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
@@ -318,6 +319,7 @@
                                                     <MenuItem Header="Edit Grid Definitions..." Click="OnEditGridDefinitionsMenuClicked"/>
                                                     <MenuItem Header="Assign to Grid Cell..." Click="OnAssignToGridCellMenuClicked"/>
                                                     <MenuItem Header="Assign to StackPanel..." Click="OnAssignToStackPanelMenuClicked"/>
+                                                    <MenuItem Header="Assign as Container Content..." Click="OnAssignAsContainerContentMenuClicked"/>
                                                     <MenuItem Header="Move StackPanel Item Earlier" Click="OnMoveStackPanelItemEarlierMenuClicked"/>
                                                     <MenuItem Header="Move StackPanel Item Later" Click="OnMoveStackPanelItemLaterMenuClicked"/>
                                                     <MenuItem Header="Remove from Container" Click="OnRemoveFromContainerMenuClicked"/>
@@ -392,6 +394,18 @@
                                                             HorizontalAlignment="Right"
                                                             IsVisible="{Binding IsStackPanelChild}">
                                                         <TextBlock Text="{Binding StackPanelItemLabel}"
+                                                                   FontSize="9"
+                                                                   FontWeight="SemiBold"
+                                                                   Foreground="White"/>
+                                                    </Border>
+                                                    <Border Background="#155E75"
+                                                            BorderBrush="#22D3EE"
+                                                            BorderThickness="1"
+                                                            CornerRadius="3"
+                                                            Padding="4,1"
+                                                            HorizontalAlignment="Right"
+                                                            IsVisible="{Binding IsContentChild}">
+                                                        <TextBlock Text="{Binding ContainerLayoutLabel}"
                                                                    FontSize="9"
                                                                    FontWeight="SemiBold"
                                                                    Foreground="White"/>

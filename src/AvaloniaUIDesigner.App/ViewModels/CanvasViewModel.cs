@@ -315,6 +315,7 @@ public partial class CanvasViewModel : ViewModelBase
             element.GridColumnSpan = Math.Max(1, snapshot.GridColumnSpan);
             element.StackPanelIndex = snapshot.StackPanelIndex;
             element.StackPanelItemSize = Math.Max(10, snapshot.StackPanelItemSize);
+            element.ParentLayout = snapshot.ParentLayout;
             element.ParentName = snapshot.ParentName;
         }
         finally
@@ -324,7 +325,15 @@ public partial class CanvasViewModel : ViewModelBase
 
         if (!deferContainerReflow)
         {
-            ReflowContainerChild(element);
+            if (element.IsContainerChild
+                && element.ParentLayout == DesignerParentLayoutKind.None)
+            {
+                NormalizeContainerRelationships();
+            }
+            else
+            {
+                ReflowContainerChild(element);
+            }
         }
 
         ResolveLabelTargets();
@@ -460,6 +469,7 @@ public partial class CanvasViewModel : ViewModelBase
             child.GridColumnSpan = 1;
             child.StackPanelIndex = -1;
             child.StackPanelItemSize = 40;
+            child.ParentLayout = DesignerParentLayoutKind.None;
         }
 
         element.PropertyChanged -= OnDesignElementPropertyChanged;
@@ -491,7 +501,7 @@ public partial class CanvasViewModel : ViewModelBase
             }
 
             foreach (var container in Elements.Where(element =>
-                         element.Visual is Grid or StackPanel && !element.IsContainerChild))
+                         IsDesignerContainer(element.Visual) && !element.IsContainerChild))
             {
                 ReflowContainerTreeCore(container);
             }
@@ -506,27 +516,68 @@ public partial class CanvasViewModel : ViewModelBase
 
     public void NormalizeContainerRelationships()
     {
-        var containers = Elements
-            .Where(element => element.Visual is Grid or StackPanel)
-            .ToDictionary(element => element.DisplayName, StringComparer.OrdinalIgnoreCase);
-        foreach (var element in Elements.Where(element => element.ParentName is not null))
+        if (_isReflowingContainerChildren)
         {
-            if (!containers.TryGetValue(element.ParentName!, out var parent)
-                || ReferenceEquals(parent, element))
+            return;
+        }
+
+        _isReflowingContainerChildren = true;
+        try
+        {
+            var containers = Elements
+                .Where(element => IsDesignerContainer(element.Visual))
+                .ToDictionary(element => element.DisplayName, StringComparer.OrdinalIgnoreCase);
+            foreach (var element in Elements.Where(element => element.ParentName is not null))
             {
-                ResetContainerRelationship(element);
-                continue;
+                if (!containers.TryGetValue(element.ParentName!, out var parent)
+                    || ReferenceEquals(parent, element))
+                {
+                    ResetContainerRelationship(element);
+                    continue;
+                }
+
+                if (parent.Visual is Grid)
+                {
+                    element.ParentLayout = DesignerParentLayoutKind.Grid;
+                    element.StackPanelIndex = -1;
+                }
+                else if (parent.Visual is StackPanel)
+                {
+                    element.ParentLayout = DesignerParentLayoutKind.StackPanel;
+                    if (element.StackPanelIndex < 0)
+                    {
+                        element.StackPanelIndex = GetDirectChildren(parent).Count(child =>
+                            child.ParentLayout == DesignerParentLayoutKind.StackPanel
+                            && child.StackPanelIndex >= 0);
+                    }
+
+                    element.StackPanelItemSize = Math.Max(10, element.StackPanelItemSize);
+                }
+                else
+                {
+                    element.ParentLayout = DesignerParentLayoutKind.Content;
+                    element.StackPanelIndex = -1;
+                }
             }
 
-            if (parent.Visual is Grid)
+            foreach (var contentParent in containers.Values.Where(parent =>
+                         IsContentContainer(parent.Visual)))
             {
-                element.StackPanelIndex = -1;
+                var contentChildren = GetDirectChildren(contentParent);
+                if (contentChildren.Count > 0)
+                {
+                    ClearBuiltInContent(contentParent.Visual);
+                }
+
+                foreach (var extraChild in contentChildren.Skip(1))
+                {
+                    ResetContainerRelationship(extraChild);
+                }
             }
-            else if (element.StackPanelIndex < 0)
-            {
-                element.StackPanelIndex = GetDirectChildren(parent).Count(child => child.StackPanelIndex >= 0);
-                element.StackPanelItemSize = Math.Max(10, element.StackPanelItemSize);
-            }
+        }
+        finally
+        {
+            _isReflowingContainerChildren = false;
         }
 
         ReflowContainerChildren();
@@ -552,6 +603,7 @@ public partial class CanvasViewModel : ViewModelBase
                 child.GridRowSpan = 1;
                 child.GridColumnSpan = 1;
                 child.StackPanelIndex = index;
+                child.ParentLayout = DesignerParentLayoutKind.StackPanel;
                 child.ParentName = parent.DisplayName;
             }
 
@@ -561,6 +613,40 @@ public partial class CanvasViewModel : ViewModelBase
         {
             _isReflowingContainerChildren = false;
         }
+    }
+
+    public DesignElement? SetContentChild(DesignElement parent, DesignElement child)
+    {
+        if (!IsContentContainer(parent.Visual) || ReferenceEquals(parent, child))
+        {
+            return null;
+        }
+
+        var replaced = GetDirectChildren(parent).FirstOrDefault(existing => !ReferenceEquals(existing, child));
+        _isReflowingContainerChildren = true;
+        try
+        {
+            if (replaced is not null)
+            {
+                ResetContainerRelationship(replaced);
+            }
+
+            child.GridRow = 0;
+            child.GridColumn = 0;
+            child.GridRowSpan = 1;
+            child.GridColumnSpan = 1;
+            child.StackPanelIndex = -1;
+            child.ParentLayout = DesignerParentLayoutKind.Content;
+            child.ParentName = parent.DisplayName;
+            ClearBuiltInContent(parent.Visual);
+            ReflowContainerTreeCore(parent);
+        }
+        finally
+        {
+            _isReflowingContainerChildren = false;
+        }
+
+        return replaced;
     }
 
     public bool MoveElementsToFront(IEnumerable<DesignElement> elements)
@@ -798,9 +884,14 @@ public partial class CanvasViewModel : ViewModelBase
                 ReflowContainerChildCore(child);
             }
         }
+        else if (IsContentContainer(parent.Visual)
+                 && GetDirectChildren(parent).FirstOrDefault() is { } contentChild)
+        {
+            ReflowContentChildCore(parent, contentChild);
+        }
 
         foreach (var childContainer in GetDirectChildren(parent).Where(child =>
-                     child.Visual is Grid or StackPanel))
+                     IsDesignerContainer(child.Visual)))
         {
             ReflowContainerTreeCore(childContainer, visited);
         }
@@ -848,6 +939,35 @@ public partial class CanvasViewModel : ViewModelBase
         }
     }
 
+    private static void ReflowContentChildCore(DesignElement parent, DesignElement child)
+    {
+        if (!child.IsContentChild)
+        {
+            return;
+        }
+
+        var left = 0d;
+        var top = 0d;
+        var right = 0d;
+        var bottom = 0d;
+        if (parent.Visual is Border border)
+        {
+            left = border.BorderThickness.Left;
+            top = border.BorderThickness.Top;
+            right = border.BorderThickness.Right;
+            bottom = border.BorderThickness.Bottom;
+        }
+        else if (parent.Visual is Expander)
+        {
+            top = Math.Min(32, Math.Max(0, parent.Height - 10));
+        }
+
+        child.X = parent.X + left;
+        child.Y = parent.Y + top;
+        child.Width = Math.Max(10, parent.Width - left - right);
+        child.Height = Math.Max(10, parent.Height - top - bottom);
+    }
+
     private List<DesignElement> GetDirectChildren(DesignElement parent)
         => Elements.Where(element => string.Equals(
                 element.ParentName,
@@ -872,6 +992,7 @@ public partial class CanvasViewModel : ViewModelBase
         child.GridColumnSpan = 1;
         child.StackPanelIndex = -1;
         child.StackPanelItemSize = 40;
+        child.ParentLayout = DesignerParentLayoutKind.None;
     }
 
     private void OnDesignElementPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
@@ -887,7 +1008,8 @@ public partial class CanvasViewModel : ViewModelBase
             or nameof(DesignElement.GridRowSpan)
             or nameof(DesignElement.GridColumnSpan)
             or nameof(DesignElement.StackPanelIndex)
-            or nameof(DesignElement.StackPanelItemSize))
+            or nameof(DesignElement.StackPanelItemSize)
+            or nameof(DesignElement.ParentLayout))
         {
             ReflowContainerChild(element);
             return;
@@ -902,10 +1024,32 @@ public partial class CanvasViewModel : ViewModelBase
             {
                 ReflowContainerChild(element);
             }
-            else if (element.Visual is Grid or StackPanel)
+            else if (IsDesignerContainer(element.Visual))
             {
                 ReflowContainerChildren(element);
             }
+        }
+    }
+
+    private static bool IsDesignerContainer(Control visual)
+        => visual is Grid or StackPanel or Border or ScrollViewer or Expander;
+
+    private static bool IsContentContainer(Control visual)
+        => visual is Border or ScrollViewer or Expander;
+
+    private static void ClearBuiltInContent(Control visual)
+    {
+        switch (visual)
+        {
+            case Border border:
+                border.Child = null;
+                break;
+            case ScrollViewer scrollViewer:
+                scrollViewer.Content = null;
+                break;
+            case Expander expander:
+                expander.Content = null;
+                break;
         }
     }
 

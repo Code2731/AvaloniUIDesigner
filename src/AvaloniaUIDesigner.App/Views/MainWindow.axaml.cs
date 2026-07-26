@@ -36,6 +36,7 @@ public partial class MainWindow : Window
         string ParentName,
         int ItemIndex,
         double ItemSize);
+    private sealed record ContentAssignmentOptions(string ParentName);
 
     private const double HandleHalf = 5;
     private const double MinSize = 10;
@@ -653,6 +654,23 @@ public partial class MainWindow : Window
     {
         FlushPendingPropertyHistory();
         Vm?.RemoveSelectedFromContainer();
+    }
+
+    private async void OnAssignAsContainerContentMenuClicked(
+        object? sender,
+        Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        FlushPendingPropertyHistory();
+        if (Vm is null || !Vm.TryGetSelectedContentAssignment(out var state))
+        {
+            return;
+        }
+
+        var updated = await ShowContentAssignmentDialogAsync(state);
+        if (updated is not null)
+        {
+            Vm.SetSelectedContentAssignment(updated.ParentName);
+        }
     }
 
     private async void OnChooseImageMenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
@@ -1343,6 +1361,13 @@ public partial class MainWindow : Window
 
         if (control is StackPanel
             && e.Property.Name is "Orientation" or "Spacing"
+            && _boundElement is not null)
+        {
+            Vm?.Canvas.ReflowContainerChildren(_boundElement);
+        }
+
+        if (control is Border
+            && e.Property.Name == "BorderThickness"
             && _boundElement is not null)
         {
             Vm?.Canvas.ReflowContainerChildren(_boundElement);
@@ -2697,6 +2722,72 @@ public partial class MainWindow : Window
         dialog.Content = content;
 
         return await dialog.ShowDialog<StackPanelAssignmentOptions?>(this);
+    }
+
+    private async Task<ContentAssignmentOptions?> ShowContentAssignmentDialogAsync(
+        ContentAssignmentEditorState state)
+    {
+        var parentSelector = new ComboBox
+        {
+            ItemsSource = state.Parents,
+            SelectedItem = state.Parents.First(parent => string.Equals(
+                parent.DisplayName,
+                state.SelectedParentName,
+                StringComparison.OrdinalIgnoreCase)),
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+        };
+        var dialog = new Window
+        {
+            Title = $"Assign as Container Content - {state.ControlName}",
+            Width = 440,
+            Height = 230,
+            MinWidth = 380,
+            MinHeight = 220,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner,
+        };
+        var assignButton = new Button { Content = "Assign", MinWidth = 84 };
+        assignButton.Click += (_, _) =>
+        {
+            if (parentSelector.SelectedItem is ContentParentOption parent)
+            {
+                dialog.Close(new ContentAssignmentOptions(parent.DisplayName));
+            }
+        };
+        var cancelButton = new Button { Content = "Cancel", MinWidth = 84 };
+        cancelButton.Click += (_, _) => dialog.Close(null);
+        var buttons = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            Spacing = 8,
+            HorizontalAlignment = HorizontalAlignment.Right,
+            Children = { cancelButton, assignButton },
+        };
+        var fields = new StackPanel
+        {
+            Spacing = 8,
+            Children =
+            {
+                new TextBlock { Text = "Parent content container" },
+                parentSelector,
+                new TextBlock
+                {
+                    Text = "Border, ScrollViewer, and Expander accept one designer child. Existing designer content is moved back to the Canvas root.",
+                    Foreground = Avalonia.Media.Brushes.Gray,
+                    TextWrapping = Avalonia.Media.TextWrapping.Wrap,
+                },
+            },
+        };
+        var content = new Grid
+        {
+            Margin = new Thickness(16),
+            RowDefinitions = new RowDefinitions("*,Auto"),
+            RowSpacing = 12,
+            Children = { fields, buttons },
+        };
+        Grid.SetRow(buttons, 1);
+        dialog.Content = content;
+
+        return await dialog.ShowDialog<ContentAssignmentOptions?>(this);
     }
 
     private async Task<ComponentPackExportOptions?> ShowComponentPackExportDialogAsync(

@@ -58,6 +58,16 @@ public sealed record StackPanelAssignmentEditorState(
     int ItemIndex,
     double ItemSize);
 
+public sealed record ContentParentOption(string DisplayName, string ContainerType)
+{
+    public override string ToString() => $"{DisplayName} ({ContainerType})";
+}
+
+public sealed record ContentAssignmentEditorState(
+    string ControlName,
+    IReadOnlyList<ContentParentOption> Parents,
+    string SelectedParentName);
+
 public partial class MainWindowViewModel : ViewModelBase
 {
     private const string DesignerMetadataPrefix = "AvaloniaUIDesigner:";
@@ -558,6 +568,11 @@ public partial class MainWindowViewModel : ViewModelBase
         if (hasCornerRadius)
         {
             DesignerStyleApplicationMetadata.ClearApplied(target.Visual, "CornerRadius");
+        }
+
+        if (target.Visual is Border)
+        {
+            Canvas.ReflowContainerChildren(target);
         }
 
         CommitCanvasMutation();
@@ -1102,6 +1117,7 @@ public partial class MainWindowViewModel : ViewModelBase
         target.GridRowSpan = rowSpan;
         target.GridColumnSpan = columnSpan;
         target.StackPanelIndex = -1;
+        target.ParentLayout = DesignerParentLayoutKind.Grid;
         target.ParentName = parent.DisplayName;
         Canvas.MoveElementsToFront([target]);
         Canvas.NormalizeContainerRelationships();
@@ -1130,6 +1146,7 @@ public partial class MainWindowViewModel : ViewModelBase
         target.GridColumnSpan = 1;
         target.StackPanelIndex = -1;
         target.StackPanelItemSize = 40;
+        target.ParentLayout = DesignerParentLayoutKind.None;
         Canvas.NormalizeContainerRelationships();
         ObjectTree.RebuildFrom(Canvas.Elements);
         ObjectTree.SelectByElement(target);
@@ -1284,6 +1301,106 @@ public partial class MainWindowViewModel : ViewModelBase
     private static StackPanelAssignmentEditorState EmptyStackPanelAssignmentState()
         => new(string.Empty, Array.Empty<StackPanelParentOption>(), string.Empty, 0, 40);
 
+    public bool TryGetSelectedContentAssignment(out ContentAssignmentEditorState state)
+    {
+        if (Canvas.SelectedElement is not { IsLocked: false } target)
+        {
+            state = EmptyContentAssignmentState();
+            StatusText = "Select an unlocked control to assign it as container content.";
+            return false;
+        }
+
+        var parents = Canvas.Elements
+            .Where(element => !ReferenceEquals(element, target)
+                && !element.IsContainerChild
+                && !element.IsLocked
+                && element.Visual is Border or ScrollViewer or Expander)
+            .Where(element => !IsDescendantOf(element, target))
+            .Select(element => new ContentParentOption(
+                element.DisplayName,
+                element.Visual.GetType().Name))
+            .ToList();
+        if (parents.Count == 0)
+        {
+            state = EmptyContentAssignmentState();
+            StatusText = "Place an unlocked root Border, ScrollViewer, or Expander first.";
+            return false;
+        }
+
+        var selectedParent = parents.FirstOrDefault(parent => string.Equals(
+                parent.DisplayName,
+                target.ParentName,
+                StringComparison.OrdinalIgnoreCase))
+            ?? parents[0];
+        state = new ContentAssignmentEditorState(
+            target.DisplayName,
+            parents,
+            selectedParent.DisplayName);
+        return true;
+    }
+
+    public bool SetSelectedContentAssignment(string parentName)
+    {
+        if (Canvas.SelectedElement is not { IsLocked: false } target)
+        {
+            StatusText = "Select an unlocked control to assign it as container content.";
+            return false;
+        }
+
+        var parent = Canvas.Elements.FirstOrDefault(element =>
+            !ReferenceEquals(element, target)
+            && !element.IsContainerChild
+            && !element.IsLocked
+            && element.Visual is Border or ScrollViewer or Expander
+            && string.Equals(element.DisplayName, parentName, StringComparison.OrdinalIgnoreCase));
+        if (parent is null || IsDescendantOf(parent, target))
+        {
+            StatusText = $"Content container '{parentName}' is not available.";
+            return false;
+        }
+
+        BeginCanvasMutation(HistoryActionType.EditProperty, "Assigned control as container content.");
+        var replaced = Canvas.SetContentChild(parent, target);
+        Canvas.MoveElementsToFront([target]);
+        Canvas.NormalizeContainerRelationships();
+        ObjectTree.RebuildFrom(Canvas.Elements);
+        ObjectTree.SelectByElement(target);
+        CommitCanvasMutation();
+        StatusText = replaced is null
+            ? $"Assigned {target.DisplayName} as content of {parent.DisplayName}."
+            : $"Assigned {target.DisplayName} as content of {parent.DisplayName}; moved {replaced.DisplayName} to the Canvas root.";
+        return true;
+    }
+
+    private bool IsDescendantOf(DesignElement candidate, DesignElement ancestor)
+    {
+        var current = candidate;
+        var visited = new HashSet<DesignElement>();
+        while (current.ParentName is not null && visited.Add(current))
+        {
+            var parent = Canvas.Elements.FirstOrDefault(element => string.Equals(
+                element.DisplayName,
+                current.ParentName,
+                StringComparison.OrdinalIgnoreCase));
+            if (parent is null)
+            {
+                return false;
+            }
+
+            if (ReferenceEquals(parent, ancestor))
+            {
+                return true;
+            }
+
+            current = parent;
+        }
+
+        return false;
+    }
+
+    private static ContentAssignmentEditorState EmptyContentAssignmentState()
+        => new(string.Empty, Array.Empty<ContentParentOption>(), string.Empty);
+
     public bool TryGetSelectedItems(out string controlName, out IReadOnlyList<string> items)
     {
         var target = Canvas.SelectedElement;
@@ -1425,6 +1542,14 @@ public partial class MainWindowViewModel : ViewModelBase
             return false;
         }
 
+        if (GetDesignerContentChild(target) is not null)
+        {
+            controlName = target.DisplayName;
+            content = string.Empty;
+            StatusText = "This container uses a designer child. Remove it from the container before editing fallback text content.";
+            return false;
+        }
+
         controlName = target.DisplayName;
         content = target.Visual switch
         {
@@ -1442,6 +1567,12 @@ public partial class MainWindowViewModel : ViewModelBase
         if (target is null || target.IsLocked || target.Visual is not (Expander or ScrollViewer or Border))
         {
             StatusText = "Select an unlocked Expander, ScrollViewer, or Border to edit its content.";
+            return;
+        }
+
+        if (GetDesignerContentChild(target) is not null)
+        {
+            StatusText = "This container uses a designer child. Remove it from the container before editing fallback text content.";
             return;
         }
 
@@ -2702,7 +2833,8 @@ public partial class MainWindowViewModel : ViewModelBase
                 e.GridRowSpan,
                 e.GridColumnSpan,
                 e.StackPanelIndex,
-                e.StackPanelItemSize))
+                e.StackPanelItemSize,
+                e.ParentLayout))
             .ToList();
 
         return new DesignerCanvasDocument(
@@ -2816,7 +2948,8 @@ public partial class MainWindowViewModel : ViewModelBase
             element.GridRowSpan,
             element.GridColumnSpan,
             element.StackPanelIndex,
-            element.StackPanelItemSize);
+            element.StackPanelItemSize,
+            element.ParentLayout);
     }
 
     private IReadOnlyDictionary<string, string>? CaptureVisualProperties(Control visual)
@@ -3325,6 +3458,7 @@ public partial class MainWindowViewModel : ViewModelBase
                 || a.GridColumnSpan != b.GridColumnSpan
                 || a.StackPanelIndex != b.StackPanelIndex
                 || a.StackPanelItemSize != b.StackPanelItemSize
+                || a.ParentLayout != b.ParentLayout
                 || !DictionaryEquals(a.VisualProperties, b.VisualProperties))
             {
                 return false;
@@ -3410,6 +3544,19 @@ public partial class MainWindowViewModel : ViewModelBase
                     continue;
                 }
 
+                var parentUsesTextFallback = parent?.TypeName is
+                    "Avalonia.Controls.Border"
+                    or "Avalonia.Controls.ScrollViewer"
+                    or "Avalonia.Controls.Expander";
+                var hasExplicitName = child.Attributes().Any(attribute =>
+                    string.Equals(attribute.Name.LocalName, "Name", StringComparison.Ordinal));
+                if (parentUsesTextFallback
+                    && string.Equals(tagName, "TextBlock", StringComparison.OrdinalIgnoreCase)
+                    && !hasExplicitName)
+                {
+                    continue;
+                }
+
                 if (!TryResolveTypeName(tagName, out var typeName))
                 {
                     warnings.Add($"Unsupported control <{tagName}> was imported as a placeholder.");
@@ -3431,6 +3578,15 @@ public partial class MainWindowViewModel : ViewModelBase
                     && parent.VisualProperties.TryGetValue("Orientation", out var orientation)
                     ? orientation
                     : "Vertical";
+                var parentLayout = parent?.TypeName switch
+                {
+                    "Avalonia.Controls.Grid" => DesignerParentLayoutKind.Grid,
+                    "Avalonia.Controls.StackPanel" => DesignerParentLayoutKind.StackPanel,
+                    "Avalonia.Controls.Border"
+                        or "Avalonia.Controls.ScrollViewer"
+                        or "Avalonia.Controls.Expander" => DesignerParentLayoutKind.Content,
+                    _ => DesignerParentLayoutKind.None,
+                };
                 var snapshot = new DesignerElementSnapshot(
                     displayName,
                     typeName,
@@ -3450,12 +3606,16 @@ public partial class MainWindowViewModel : ViewModelBase
                         ? string.Equals(parentOrientation, "Horizontal", StringComparison.OrdinalIgnoreCase)
                             ? width
                             : height
-                        : 40);
+                        : 40,
+                    parentLayout);
                 snapshots.Add(snapshot);
                 nextIsLocked = false;
 
                 if (string.Equals(typeName, "Avalonia.Controls.Grid", StringComparison.Ordinal)
-                    || string.Equals(typeName, "Avalonia.Controls.StackPanel", StringComparison.Ordinal))
+                    || string.Equals(typeName, "Avalonia.Controls.StackPanel", StringComparison.Ordinal)
+                    || string.Equals(typeName, "Avalonia.Controls.Border", StringComparison.Ordinal)
+                    || string.Equals(typeName, "Avalonia.Controls.ScrollViewer", StringComparison.Ordinal)
+                    || string.Equals(typeName, "Avalonia.Controls.Expander", StringComparison.Ordinal))
                 {
                     ReadElementNodes(child, snapshot);
                 }
@@ -5112,10 +5272,18 @@ public partial class MainWindowViewModel : ViewModelBase
                 AppendAttribute(sb, "Header", expander.Header?.ToString() ?? string.Empty);
                 AppendAttribute(sb, "IsExpanded", expander.IsExpanded.ToString());
                 sb.AppendLine(">");
-                sb.Append(indent);
-                sb.Append("  <TextBlock");
-                AppendAttribute(sb, "Text", ReadExpanderContent(expander));
-                sb.AppendLine(" />");
+                if (GetDesignerContentChild(element) is { } expanderChild)
+                {
+                    WriteDesignerChildAxaml(sb, expanderChild, indent + "  ");
+                }
+                else
+                {
+                    sb.Append(indent);
+                    sb.Append("  <TextBlock");
+                    AppendAttribute(sb, "Text", ReadExpanderContent(expander));
+                    sb.AppendLine(" />");
+                }
+
                 sb.Append(indent);
                 sb.AppendLine("</Expander>");
                 break;
@@ -5125,10 +5293,18 @@ public partial class MainWindowViewModel : ViewModelBase
                 sb.Append("<ScrollViewer");
                 AppendCanvasLayoutAttributes(sb, element);
                 sb.AppendLine(">");
-                sb.Append(indent);
-                sb.Append("  <TextBlock");
-                AppendAttribute(sb, "Text", ReadScrollViewerContent(scrollViewer));
-                sb.AppendLine(" />");
+                if (GetDesignerContentChild(element) is { } scrollViewerChild)
+                {
+                    WriteDesignerChildAxaml(sb, scrollViewerChild, indent + "  ");
+                }
+                else
+                {
+                    sb.Append(indent);
+                    sb.Append("  <TextBlock");
+                    AppendAttribute(sb, "Text", ReadScrollViewerContent(scrollViewer));
+                    sb.AppendLine(" />");
+                }
+
                 sb.Append(indent);
                 sb.AppendLine("</ScrollViewer>");
                 break;
@@ -5137,17 +5313,26 @@ public partial class MainWindowViewModel : ViewModelBase
                 sb.Append(indent);
                 sb.Append("<Border");
                 AppendCanvasLayoutAttributes(sb, element);
-                if (border.Child is not TextBlock)
+                var borderChild = GetDesignerContentChild(element);
+                if (borderChild is null && border.Child is not TextBlock)
                 {
                     sb.AppendLine(" />");
                     break;
                 }
 
                 sb.AppendLine(">");
-                sb.Append(indent);
-                sb.Append("  <TextBlock");
-                AppendAttribute(sb, "Text", ReadBorderContent(border));
-                sb.AppendLine(" />");
+                if (borderChild is not null)
+                {
+                    WriteDesignerChildAxaml(sb, borderChild, indent + "  ");
+                }
+                else
+                {
+                    sb.Append(indent);
+                    sb.Append("  <TextBlock");
+                    AppendAttribute(sb, "Text", ReadBorderContent(border));
+                    sb.AppendLine(" />");
+                }
+
                 sb.Append(indent);
                 sb.AppendLine("</Border>");
                 break;
@@ -5339,6 +5524,10 @@ public partial class MainWindowViewModel : ViewModelBase
                 stackPanel.Orientation == Orientation.Vertical ? "Height" : "Width",
                 element.StackPanelItemSize.ToString("0.###", CultureInfo.InvariantCulture));
         }
+        else if (TryGetContentParent(element, out _))
+        {
+            // Content controls own their child's layout.
+        }
         else
         {
             AppendAttribute(sb, "Canvas.Left", element.X.ToString("0.###", CultureInfo.InvariantCulture));
@@ -5391,7 +5580,9 @@ public partial class MainWindowViewModel : ViewModelBase
                 && string.Equals(parent.DisplayName, element.ParentName, StringComparison.OrdinalIgnoreCase));
 
     private bool HasValidContainerParent(DesignElement element)
-        => HasValidGridParent(element) || TryGetStackPanelParent(element, out _);
+        => HasValidGridParent(element)
+            || TryGetStackPanelParent(element, out _)
+            || TryGetContentParent(element, out _);
 
     private bool TryGetStackPanelParent(DesignElement element, out StackPanel stackPanel)
     {
@@ -5405,6 +5596,40 @@ public partial class MainWindowViewModel : ViewModelBase
                     StringComparison.OrdinalIgnoreCase));
         stackPanel = parent?.Visual as StackPanel ?? null!;
         return stackPanel is not null;
+    }
+
+    private bool TryGetContentParent(DesignElement element, out DesignElement parent)
+    {
+        parent = element.ParentName is null
+            ? null!
+            : Canvas.Elements.FirstOrDefault(candidate =>
+                candidate.Visual is (Border or ScrollViewer or Expander)
+                && string.Equals(
+                    candidate.DisplayName,
+                    element.ParentName,
+                    StringComparison.OrdinalIgnoreCase))!;
+        return parent is not null;
+    }
+
+    private DesignElement? GetDesignerContentChild(DesignElement parent)
+        => Canvas.Elements.FirstOrDefault(child =>
+            child.IsContentChild
+            && string.Equals(
+                child.ParentName,
+                parent.DisplayName,
+                StringComparison.OrdinalIgnoreCase));
+
+    private void WriteDesignerChildAxaml(
+        StringBuilder sb,
+        DesignElement child,
+        string indent)
+    {
+        if (child.IsLocked)
+        {
+            sb.AppendLine($"{indent}<!-- {DesignerMetadataPrefix} IsLocked=true -->");
+        }
+
+        WriteTopLevelElementAxaml(sb, child, indent);
     }
 
     private void AppendColorResourcesAxaml(StringBuilder sb, string rootElementName, string indent)

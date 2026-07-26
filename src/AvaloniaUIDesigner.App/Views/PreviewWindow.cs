@@ -63,7 +63,10 @@ public sealed class PreviewWindow : Window
         var controlsByName = new Dictionary<string, Control>(StringComparer.OrdinalIgnoreCase);
         var containersByName = document.Elements
             .Where(element => string.Equals(element.TypeName, "Avalonia.Controls.Grid", StringComparison.Ordinal)
-                || string.Equals(element.TypeName, "Avalonia.Controls.StackPanel", StringComparison.Ordinal))
+                || string.Equals(element.TypeName, "Avalonia.Controls.StackPanel", StringComparison.Ordinal)
+                || string.Equals(element.TypeName, "Avalonia.Controls.Border", StringComparison.Ordinal)
+                || string.Equals(element.TypeName, "Avalonia.Controls.ScrollViewer", StringComparison.Ordinal)
+                || string.Equals(element.TypeName, "Avalonia.Controls.Expander", StringComparison.Ordinal))
             .ToDictionary(element => element.DisplayName, StringComparer.OrdinalIgnoreCase);
         var childrenByParent = document.Elements
             .Where(element => element.ParentName is not null && containersByName.ContainsKey(element.ParentName))
@@ -130,6 +133,15 @@ public sealed class PreviewWindow : Window
                         }
 
                         stack.Children.Add(child);
+                        break;
+                    case Border border:
+                        border.Child = child;
+                        break;
+                    case ScrollViewer scrollViewer:
+                        scrollViewer.Content = child;
+                        break;
+                    case Expander expander:
+                        expander.Content = child;
                         break;
                     default:
                         continue;
