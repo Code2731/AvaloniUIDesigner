@@ -12,6 +12,7 @@ public enum DesignerParentLayoutKind
     UniformGrid,
     Canvas,
     Content,
+    TabControl,
 }
 
 public enum DesignerDockSide
@@ -69,4 +70,6 @@ public sealed record DesignerElementSnapshot(
     int UniformGridIndex = -1,
     int CanvasChildIndex = -1,
     double CanvasChildLeft = 0,
-    double CanvasChildTop = 0);
+    double CanvasChildTop = 0,
+    int TabIndex = -1,
+    string? TabHeader = null);

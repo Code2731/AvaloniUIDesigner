@@ -65,6 +65,7 @@
                 <MenuItem Header="Assign to WrapPanel..." Click="OnAssignToWrapPanelMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
                 <MenuItem Header="Assign to UniformGrid..." Click="OnAssignToUniformGridMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
                 <MenuItem Header="Assign to Canvas..." Click="OnAssignToCanvasMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
+                <MenuItem Header="Assign to TabControl..." Click="OnAssignToTabControlMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
                 <MenuItem Header="Assign as Container Content..." Click="OnAssignAsContainerContentMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
                 <MenuItem Header="Move StackPanel Item Earlier" Click="OnMoveStackPanelItemEarlierMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
                 <MenuItem Header="Move StackPanel Item Later" Click="OnMoveStackPanelItemLaterMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
@@ -320,6 +321,7 @@
                                                 BorderThickness="{Binding SelectionThickness}"
                                                 Width="{Binding Width}"
                                                 Height="{Binding Height}"
+                                                IsVisible="{Binding IsVisibleOnArtboard}"
                                                 PointerPressed="OnElementPointerPressed">
                                             <Border.ContextMenu>
                                                 <ContextMenu>
@@ -335,6 +337,7 @@
                                                     <MenuItem Header="Assign to WrapPanel..." Click="OnAssignToWrapPanelMenuClicked"/>
                                                     <MenuItem Header="Assign to UniformGrid..." Click="OnAssignToUniformGridMenuClicked"/>
                                                     <MenuItem Header="Assign to Canvas..." Click="OnAssignToCanvasMenuClicked"/>
+                                                    <MenuItem Header="Assign to TabControl..." Click="OnAssignToTabControlMenuClicked"/>
                                                     <MenuItem Header="Assign as Container Content..." Click="OnAssignAsContainerContentMenuClicked"/>
                                                     <MenuItem Header="Move StackPanel Item Earlier" Click="OnMoveStackPanelItemEarlierMenuClicked"/>
                                                     <MenuItem Header="Move StackPanel Item Later" Click="OnMoveStackPanelItemLaterMenuClicked"/>
@@ -478,6 +481,18 @@
                                                             HorizontalAlignment="Right"
                                                             IsVisible="{Binding IsCanvasChild}">
                                                         <TextBlock Text="{Binding CanvasItemLabel}"
+                                                                   FontSize="9"
+                                                                   FontWeight="SemiBold"
+                                                                   Foreground="White"/>
+                                                    </Border>
+                                                    <Border Background="#713F12"
+                                                            BorderBrush="#FBBF24"
+                                                            BorderThickness="1"
+                                                            CornerRadius="3"
+                                                            Padding="4,1"
+                                                            HorizontalAlignment="Right"
+                                                            IsVisible="{Binding IsTabControlChild}">
+                                                        <TextBlock Text="{Binding TabItemLabel}"
                                                                    FontSize="9"
                                                                    FontWeight="SemiBold"
                                                                    Foreground="White"/>

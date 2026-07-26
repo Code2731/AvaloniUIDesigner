@@ -51,6 +51,7 @@ public partial class MainWindow : Window
         int ItemIndex,
         double Left,
         double Top);
+    private sealed record TabControlAssignmentOptions(string ParentName, int TabIndex);
     private sealed record ContentAssignmentOptions(string ParentName);
 
     private const double HandleHalf = 5;
@@ -757,6 +758,23 @@ public partial class MainWindow : Window
 
     private void OnMoveCanvasItemLaterMenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
         => Vm?.MoveSelectedCanvasItem(1);
+
+    private async void OnAssignToTabControlMenuClicked(
+        object? sender,
+        Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        FlushPendingPropertyHistory();
+        if (Vm is null || !Vm.TryGetSelectedTabControlAssignment(out var state))
+        {
+            return;
+        }
+
+        var updated = await ShowTabControlAssignmentDialogAsync(state);
+        if (updated is not null)
+        {
+            Vm.SetSelectedTabControlAssignment(updated.ParentName, updated.TabIndex);
+        }
+    }
 
     private void OnRemoveFromContainerMenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
@@ -1491,6 +1509,13 @@ public partial class MainWindow : Window
 
         if (control is UniformGrid
             && e.Property.Name is "Rows" or "Columns" or "FirstColumn" or "RowSpacing" or "ColumnSpacing"
+            && _boundElement is not null)
+        {
+            Vm?.Canvas.ReflowContainerChildren(_boundElement);
+        }
+
+        if (control is TabControl
+            && e.Property.Name == "SelectedIndex"
             && _boundElement is not null)
         {
             Vm?.Canvas.ReflowContainerChildren(_boundElement);
@@ -3286,6 +3311,100 @@ public partial class MainWindow : Window
         dialog.Content = content;
 
         return await dialog.ShowDialog<CanvasAssignmentOptions?>(this);
+    }
+
+    private async Task<TabControlAssignmentOptions?> ShowTabControlAssignmentDialogAsync(
+        TabControlAssignmentEditorState state)
+    {
+        var initialParent = state.Parents.First(parent => string.Equals(
+            parent.DisplayName,
+            state.SelectedParentName,
+            StringComparison.OrdinalIgnoreCase));
+        var parentSelector = new ComboBox
+        {
+            ItemsSource = state.Parents,
+            SelectedItem = initialParent,
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+        };
+        var tabSelector = new ComboBox
+        {
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+        };
+        var dialog = new Window
+        {
+            Title = $"Assign to TabControl - {state.ControlName}",
+            Width = 460,
+            Height = 300,
+            MinWidth = 400,
+            MinHeight = 270,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner,
+        };
+
+        void UpdateTabs()
+        {
+            if (parentSelector.SelectedItem is not TabControlParentOption parent)
+            {
+                tabSelector.ItemsSource = null;
+                return;
+            }
+
+            tabSelector.ItemsSource = parent.Tabs;
+            var preferredIndex = ReferenceEquals(parent, initialParent)
+                ? state.TabIndex
+                : parent.Tabs.FirstOrDefault(tab => tab.ChildName is null)?.Index ?? 0;
+            tabSelector.SelectedItem = parent.Tabs.FirstOrDefault(tab => tab.Index == preferredIndex)
+                ?? parent.Tabs[0];
+        }
+
+        parentSelector.SelectionChanged += (_, _) => UpdateTabs();
+        UpdateTabs();
+
+        var assignButton = new Button { Content = "Assign", MinWidth = 84 };
+        assignButton.Click += (_, _) =>
+        {
+            if (parentSelector.SelectedItem is TabControlParentOption parent
+                && tabSelector.SelectedItem is TabSlotOption tab)
+            {
+                dialog.Close(new TabControlAssignmentOptions(parent.DisplayName, tab.Index));
+            }
+        };
+        var cancelButton = new Button { Content = "Cancel", MinWidth = 84 };
+        cancelButton.Click += (_, _) => dialog.Close(null);
+        var buttons = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            Spacing = 8,
+            HorizontalAlignment = HorizontalAlignment.Right,
+            Children = { cancelButton, assignButton },
+        };
+        var fields = new StackPanel
+        {
+            Spacing = 6,
+            Children =
+            {
+                new TextBlock { Text = "Parent TabControl" },
+                parentSelector,
+                new TextBlock { Text = "Tab slot" },
+                tabSelector,
+                new TextBlock
+                {
+                    Text = "Each tab accepts one designer child. Assigning to an occupied tab moves its current child back to the Canvas root.",
+                    Foreground = Avalonia.Media.Brushes.Gray,
+                    TextWrapping = Avalonia.Media.TextWrapping.Wrap,
+                },
+            },
+        };
+        var content = new Grid
+        {
+            Margin = new Thickness(16),
+            RowDefinitions = new RowDefinitions("*,Auto"),
+            RowSpacing = 12,
+            Children = { fields, buttons },
+        };
+        Grid.SetRow(buttons, 1);
+        dialog.Content = content;
+
+        return await dialog.ShowDialog<TabControlAssignmentOptions?>(this);
     }
 
     private async Task<ContentAssignmentOptions?> ShowContentAssignmentDialogAsync(

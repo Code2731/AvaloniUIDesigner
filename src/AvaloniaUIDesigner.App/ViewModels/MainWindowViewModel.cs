@@ -118,6 +118,27 @@ public sealed record CanvasAssignmentEditorState(
     double Left,
     double Top);
 
+public sealed record TabSlotOption(int Index, string Header, string? ChildName)
+{
+    public override string ToString()
+        => string.IsNullOrWhiteSpace(ChildName)
+            ? $"{Index + 1}. {Header}"
+            : $"{Index + 1}. {Header} ({ChildName})";
+}
+
+public sealed record TabControlParentOption(
+    string DisplayName,
+    IReadOnlyList<TabSlotOption> Tabs)
+{
+    public override string ToString() => $"{DisplayName} ({Tabs.Count} tabs)";
+}
+
+public sealed record TabControlAssignmentEditorState(
+    string ControlName,
+    IReadOnlyList<TabControlParentOption> Parents,
+    string SelectedParentName,
+    int TabIndex);
+
 public sealed record ContentParentOption(string DisplayName, string ContainerType)
 {
     public override string ToString() => $"{DisplayName} ({ContainerType})";
@@ -1185,6 +1206,8 @@ public partial class MainWindowViewModel : ViewModelBase
         target.CanvasChildIndex = -1;
         target.CanvasChildLeft = 0;
         target.CanvasChildTop = 0;
+        target.TabIndex = -1;
+        target.TabHeader = null;
         target.ParentLayout = DesignerParentLayoutKind.Grid;
         target.ParentName = parent.DisplayName;
         Canvas.MoveElementsToFront([target]);
@@ -1222,6 +1245,9 @@ public partial class MainWindowViewModel : ViewModelBase
         target.CanvasChildIndex = -1;
         target.CanvasChildLeft = 0;
         target.CanvasChildTop = 0;
+        target.TabIndex = -1;
+        target.TabHeader = null;
+        target.IsVisibleOnArtboard = true;
         target.ParentLayout = DesignerParentLayoutKind.None;
         Canvas.NormalizeContainerRelationships();
         ObjectTree.RebuildFrom(Canvas.Elements);
@@ -1941,6 +1967,106 @@ public partial class MainWindowViewModel : ViewModelBase
     private static CanvasAssignmentEditorState EmptyCanvasAssignmentState()
         => new(string.Empty, Array.Empty<CanvasParentOption>(), string.Empty, 0, 0, 0);
 
+    public bool TryGetSelectedTabControlAssignment(out TabControlAssignmentEditorState state)
+    {
+        if (Canvas.SelectedElement is not { IsLocked: false } target)
+        {
+            state = EmptyTabControlAssignmentState();
+            StatusText = "Select an unlocked control to assign it to a TabControl tab.";
+            return false;
+        }
+
+        var parents = Canvas.Elements
+            .Where(element => !ReferenceEquals(element, target)
+                && !element.IsLocked
+                && element.Visual is TabControl)
+            .Where(element => !IsDescendantOf(element, target))
+            .Select(element =>
+            {
+                var headers = ReadTabHeaders((TabControl)element.Visual);
+                var slots = headers
+                    .Select((header, index) => new TabSlotOption(
+                        index,
+                        header,
+                        Canvas.Elements.FirstOrDefault(child =>
+                            !ReferenceEquals(child, target)
+                            && child.IsTabControlChild
+                            && child.TabIndex == index
+                            && string.Equals(
+                                child.ParentName,
+                                element.DisplayName,
+                                StringComparison.OrdinalIgnoreCase))?.DisplayName))
+                    .ToList();
+                return new TabControlParentOption(element.DisplayName, slots);
+            })
+            .Where(parent => parent.Tabs.Count > 0)
+            .ToList();
+        if (parents.Count == 0)
+        {
+            state = EmptyTabControlAssignmentState();
+            StatusText = "Place an unlocked TabControl with at least one tab before assigning a control.";
+            return false;
+        }
+
+        var selectedParent = parents.FirstOrDefault(parent => string.Equals(
+                parent.DisplayName,
+                target.ParentName,
+                StringComparison.OrdinalIgnoreCase))
+            ?? parents[0];
+        var selectedTabIndex = target.IsTabControlChild
+            && string.Equals(target.ParentName, selectedParent.DisplayName, StringComparison.OrdinalIgnoreCase)
+                ? Math.Clamp(target.TabIndex, 0, selectedParent.Tabs.Count - 1)
+                : selectedParent.Tabs.FirstOrDefault(slot => slot.ChildName is null)?.Index ?? 0;
+        state = new TabControlAssignmentEditorState(
+            target.DisplayName,
+            parents,
+            selectedParent.DisplayName,
+            selectedTabIndex);
+        return true;
+    }
+
+    public bool SetSelectedTabControlAssignment(string parentName, int tabIndex)
+    {
+        if (Canvas.SelectedElement is not { IsLocked: false } target)
+        {
+            StatusText = "Select an unlocked control to assign it to a TabControl tab.";
+            return false;
+        }
+
+        var parent = Canvas.Elements.FirstOrDefault(element =>
+            !ReferenceEquals(element, target)
+            && !element.IsLocked
+            && element.Visual is TabControl
+            && string.Equals(element.DisplayName, parentName, StringComparison.OrdinalIgnoreCase));
+        if (parent is null || IsDescendantOf(parent, target))
+        {
+            StatusText = $"TabControl '{parentName}' is not available.";
+            return false;
+        }
+
+        var headers = ReadTabHeaders((TabControl)parent.Visual);
+        if (tabIndex < 0 || tabIndex >= headers.Count)
+        {
+            StatusText = $"Tab index must be between 1 and {headers.Count}.";
+            return false;
+        }
+
+        BeginCanvasMutation(HistoryActionType.EditProperty, "Assigned control to TabControl tab.");
+        var replaced = Canvas.SetTabControlChild(parent, target, tabIndex);
+        Canvas.MoveElementsToFront([target]);
+        Canvas.NormalizeContainerRelationships();
+        ObjectTree.RebuildFrom(Canvas.Elements);
+        ObjectTree.SelectByElement(target);
+        CommitCanvasMutation();
+        StatusText = replaced is null
+            ? $"Assigned {target.DisplayName} to {parent.DisplayName} tab '{headers[tabIndex]}'."
+            : $"Assigned {target.DisplayName} to {parent.DisplayName} tab '{headers[tabIndex]}'; moved {replaced.DisplayName} to the Canvas root.";
+        return true;
+    }
+
+    private static TabControlAssignmentEditorState EmptyTabControlAssignmentState()
+        => new(string.Empty, Array.Empty<TabControlParentOption>(), string.Empty, 0);
+
     public bool TryGetSelectedContentAssignment(out ContentAssignmentEditorState state)
     {
         if (Canvas.SelectedElement is not { IsLocked: false } target)
@@ -2139,8 +2265,14 @@ public partial class MainWindowViewModel : ViewModelBase
                 var tabControlSelectedIndex = tabControl.SelectedIndex;
                 ReplaceTabHeaders(tabControl, updatedItems);
                 tabControl.SelectedIndex = Math.Clamp(tabControlSelectedIndex, -1, updatedItems.Count - 1);
+                var promotedTabChildren = Canvas.SynchronizeTabControlChildren(target, updatedItems);
+                Canvas.NormalizeContainerRelationships();
+                ObjectTree.RebuildFrom(Canvas.Elements);
+                ObjectTree.SelectByElement(target);
                 CommitCanvasMutation();
-                StatusText = $"Updated {updatedItems.Count} TabControl tab(s).";
+                StatusText = promotedTabChildren.Count == 0
+                    ? $"Updated {updatedItems.Count} TabControl tab(s)."
+                    : $"Updated {updatedItems.Count} TabControl tab(s); moved {promotedTabChildren.Count} orphaned child control(s) to the Canvas root.";
                 return;
 
             default:
@@ -3144,8 +3276,15 @@ public partial class MainWindowViewModel : ViewModelBase
                 return false;
             }
 
-            if (!parsed.Elements.Select(element => element.DisplayName)
-                .SequenceEqual(Canvas.Elements.Select(element => element.DisplayName), StringComparer.Ordinal))
+            var current = CaptureDocument();
+            var currentByName = current.Elements.ToDictionary(
+                element => element.DisplayName,
+                StringComparer.Ordinal);
+            var parsedByName = parsed.Elements.ToDictionary(
+                element => element.DisplayName,
+                StringComparer.Ordinal);
+            if (!currentByName.Keys.ToHashSet(StringComparer.Ordinal)
+                .SetEquals(parsedByName.Keys))
             {
                 result = "Validation failed: exported control names do not match the canvas.";
                 return false;
@@ -3160,14 +3299,13 @@ public partial class MainWindowViewModel : ViewModelBase
                 return false;
             }
 
-            if (!parsed.Elements.Select(element => element.IsLocked)
-                .SequenceEqual(Canvas.Elements.Select(element => element.IsLocked)))
+            if (currentByName.Any(pair =>
+                    parsedByName[pair.Key].IsLocked != pair.Value.IsLocked))
             {
                 result = "Validation failed: exported control lock states do not match.";
                 return false;
             }
 
-            var current = CaptureDocument();
             if (!DictionaryEquals(current.ColorResources, parsed.ColorResources))
             {
                 result = "Validation failed: color resources do not round-trip.";
@@ -3180,11 +3318,11 @@ public partial class MainWindowViewModel : ViewModelBase
                 return false;
             }
 
-            for (var index = 0; index < current.Elements.Count; index++)
+            foreach (var pair in currentByName)
             {
-                if (!HaveSameAppearance(current.Elements[index], parsed.Elements[index]))
+                if (!HaveSameAppearance(pair.Value, parsedByName[pair.Key]))
                 {
-                    result = $"Validation failed: appearance properties do not round-trip for {current.Elements[index].DisplayName}.";
+                    result = $"Validation failed: appearance properties do not round-trip for {pair.Key}.";
                     return false;
                 }
             }
@@ -3200,7 +3338,8 @@ public partial class MainWindowViewModel : ViewModelBase
 
             var userControl = ParseDraftDocument(userControlAxaml, userControlWarnings);
             if (!userControl.Elements.Select(element => element.DisplayName)
-                .SequenceEqual(Canvas.Elements.Select(element => element.DisplayName), StringComparer.Ordinal))
+                .ToHashSet(StringComparer.Ordinal)
+                .SetEquals(currentByName.Keys))
             {
                 result = "Validation failed: UserControl export does not preserve control names.";
                 return false;
@@ -3482,7 +3621,9 @@ public partial class MainWindowViewModel : ViewModelBase
                 e.UniformGridIndex,
                 e.CanvasChildIndex,
                 e.CanvasChildLeft,
-                e.CanvasChildTop))
+                e.CanvasChildTop,
+                e.TabIndex,
+                e.TabHeader))
             .ToList();
 
         return new DesignerCanvasDocument(
@@ -3605,7 +3746,9 @@ public partial class MainWindowViewModel : ViewModelBase
             element.UniformGridIndex,
             element.CanvasChildIndex,
             element.CanvasChildLeft,
-            element.CanvasChildTop);
+            element.CanvasChildTop,
+            element.TabIndex,
+            element.TabHeader);
     }
 
     private IReadOnlyDictionary<string, string>? CaptureVisualProperties(Control visual)
@@ -4170,6 +4313,8 @@ public partial class MainWindowViewModel : ViewModelBase
                 || a.CanvasChildIndex != b.CanvasChildIndex
                 || a.CanvasChildLeft != b.CanvasChildLeft
                 || a.CanvasChildTop != b.CanvasChildTop
+                || a.TabIndex != b.TabIndex
+                || !string.Equals(a.TabHeader, b.TabHeader, StringComparison.Ordinal)
                 || !DictionaryEquals(a.VisualProperties, b.VisualProperties))
             {
                 return false;
@@ -4226,7 +4371,11 @@ public partial class MainWindowViewModel : ViewModelBase
         var snapshots = new List<DesignerElementSnapshot>();
         ReadElementNodes(parseRoot, null);
 
-        void ReadElementNodes(XElement container, DesignerElementSnapshot? parent)
+        void ReadElementNodes(
+            XElement container,
+            DesignerElementSnapshot? parent,
+            int forcedTabIndex = -1,
+            string? forcedTabHeader = null)
         {
             var nextIsLocked = false;
             var stackPanelIndex = 0;
@@ -4234,6 +4383,7 @@ public partial class MainWindowViewModel : ViewModelBase
             var wrapPanelIndex = 0;
             var uniformGridIndex = 0;
             var canvasChildIndex = 0;
+            var tabItemIndex = 0;
             foreach (var node in container.Nodes())
             {
                 if (node is XComment comment)
@@ -4254,6 +4404,36 @@ public partial class MainWindowViewModel : ViewModelBase
                 }
 
                 var tagName = child.Name.LocalName;
+                if (string.Equals(
+                        parent?.TypeName,
+                        "Avalonia.Controls.TabControl",
+                        StringComparison.Ordinal)
+                    && string.Equals(
+                        tagName,
+                        "TabControl.Items",
+                        StringComparison.OrdinalIgnoreCase))
+                {
+                    ReadElementNodes(child, parent);
+                    continue;
+                }
+
+                if (string.Equals(
+                        parent?.TypeName,
+                        "Avalonia.Controls.TabControl",
+                        StringComparison.Ordinal)
+                    && string.Equals(tagName, "TabItem", StringComparison.OrdinalIgnoreCase))
+                {
+                    var header = child.Attribute("Header")?.Value ?? $"Tab {tabItemIndex + 1}";
+                    var contentHost = child.Elements().FirstOrDefault(element =>
+                            string.Equals(
+                                element.Name.LocalName,
+                                "TabItem.Content",
+                                StringComparison.OrdinalIgnoreCase))
+                        ?? child;
+                    ReadElementNodes(contentHost, parent, tabItemIndex++, header);
+                    continue;
+                }
+
                 if (IsIgnoredContainerTag(tagName) || tagName.Contains('.', StringComparison.Ordinal))
                 {
                     continue;
@@ -4266,6 +4446,13 @@ public partial class MainWindowViewModel : ViewModelBase
                 var hasExplicitName = child.Attributes().Any(attribute =>
                     string.Equals(attribute.Name.LocalName, "Name", StringComparison.Ordinal));
                 if (parentUsesTextFallback
+                    && string.Equals(tagName, "TextBlock", StringComparison.OrdinalIgnoreCase)
+                    && !hasExplicitName)
+                {
+                    continue;
+                }
+
+                if (forcedTabIndex >= 0
                     && string.Equals(tagName, "TextBlock", StringComparison.OrdinalIgnoreCase)
                     && !hasExplicitName)
                 {
@@ -4305,6 +4492,11 @@ public partial class MainWindowViewModel : ViewModelBase
                     parent?.TypeName,
                     "Avalonia.Controls.Canvas",
                     StringComparison.Ordinal);
+                var isTabControlChild = forcedTabIndex >= 0
+                    && string.Equals(
+                        parent?.TypeName,
+                        "Avalonia.Controls.TabControl",
+                        StringComparison.Ordinal);
                 var dockSide = Enum.TryParse<DesignerDockSide>(
                     child.Attribute("DockPanel.Dock")?.Value,
                     ignoreCase: true,
@@ -4323,6 +4515,8 @@ public partial class MainWindowViewModel : ViewModelBase
                     "Avalonia.Controls.WrapPanel" => DesignerParentLayoutKind.WrapPanel,
                     "Avalonia.Controls.Primitives.UniformGrid" => DesignerParentLayoutKind.UniformGrid,
                     "Avalonia.Controls.Canvas" => DesignerParentLayoutKind.Canvas,
+                    "Avalonia.Controls.TabControl" when isTabControlChild
+                        => DesignerParentLayoutKind.TabControl,
                     "Avalonia.Controls.Border"
                         or "Avalonia.Controls.ScrollViewer"
                         or "Avalonia.Controls.Expander" => DesignerParentLayoutKind.Content,
@@ -4360,7 +4554,9 @@ public partial class MainWindowViewModel : ViewModelBase
                     isUniformGridChild ? uniformGridIndex++ : -1,
                     isCanvasChild ? canvasChildIndex++ : -1,
                     isCanvasChild ? ReadDouble(child, "Canvas.Left", 0) : 0,
-                    isCanvasChild ? ReadDouble(child, "Canvas.Top", 0) : 0);
+                    isCanvasChild ? ReadDouble(child, "Canvas.Top", 0) : 0,
+                    isTabControlChild ? forcedTabIndex : -1,
+                    isTabControlChild ? forcedTabHeader : null);
                 snapshots.Add(snapshot);
                 nextIsLocked = false;
 
@@ -4370,6 +4566,7 @@ public partial class MainWindowViewModel : ViewModelBase
                     || string.Equals(typeName, "Avalonia.Controls.WrapPanel", StringComparison.Ordinal)
                     || string.Equals(typeName, "Avalonia.Controls.Primitives.UniformGrid", StringComparison.Ordinal)
                     || string.Equals(typeName, "Avalonia.Controls.Canvas", StringComparison.Ordinal)
+                    || string.Equals(typeName, "Avalonia.Controls.TabControl", StringComparison.Ordinal)
                     || string.Equals(typeName, "Avalonia.Controls.Border", StringComparison.Ordinal)
                     || string.Equals(typeName, "Avalonia.Controls.ScrollViewer", StringComparison.Ordinal)
                     || string.Equals(typeName, "Avalonia.Controls.Expander", StringComparison.Ordinal))
@@ -5749,7 +5946,13 @@ public partial class MainWindowViewModel : ViewModelBase
 
     private static string SerializeTabHeaders(XElement tabControlElement)
     {
-        var headers = tabControlElement.Elements()
+        var itemsHost = tabControlElement.Elements().FirstOrDefault(element =>
+                string.Equals(
+                    element.Name.LocalName,
+                    "TabControl.Items",
+                    StringComparison.OrdinalIgnoreCase))
+            ?? tabControlElement;
+        var headers = itemsHost.Elements()
             .Where(element => string.Equals(element.Name.LocalName, "TabItem", StringComparison.OrdinalIgnoreCase))
             .Select(element => element.Attribute("Header")?.Value ?? string.Empty)
             .ToList();
@@ -6011,16 +6214,26 @@ public partial class MainWindowViewModel : ViewModelBase
                 AppendCanvasLayoutAttributes(sb, element);
                 AppendAttribute(sb, "SelectedIndex", tabControl.SelectedIndex.ToString(CultureInfo.InvariantCulture));
                 sb.AppendLine(">");
-                foreach (var header in ReadTabHeaders(tabControl))
+                var tabHeaders = ReadTabHeaders(tabControl);
+                for (var tabIndex = 0; tabIndex < tabHeaders.Count; tabIndex++)
                 {
+                    var header = tabHeaders[tabIndex];
                     sb.Append(indent);
                     sb.Append("  <TabItem");
                     AppendAttribute(sb, "Header", header);
                     sb.AppendLine(">");
-                    sb.Append(indent);
-                    sb.Append("    <TextBlock");
-                    AppendAttribute(sb, "Text", $"{header} content");
-                    sb.AppendLine(" />");
+                    if (GetDesignerTabChild(element, tabIndex) is { } tabChild)
+                    {
+                        WriteDesignerChildAxaml(sb, tabChild, indent + "    ");
+                    }
+                    else
+                    {
+                        sb.Append(indent);
+                        sb.Append("    <TextBlock");
+                        AppendAttribute(sb, "Text", $"{header} content");
+                        sb.AppendLine(" />");
+                    }
+
                     sb.Append(indent);
                     sb.AppendLine("  </TabItem>");
                 }
@@ -6464,6 +6677,10 @@ public partial class MainWindowViewModel : ViewModelBase
             AppendAttribute(sb, "Width", element.Width.ToString("0.###", CultureInfo.InvariantCulture));
             AppendAttribute(sb, "Height", element.Height.ToString("0.###", CultureInfo.InvariantCulture));
         }
+        else if (TryGetTabControlParent(element, out _))
+        {
+            // TabItem content owns its child's layout.
+        }
         else
         {
             AppendAttribute(sb, "Canvas.Left", element.X.ToString("0.###", CultureInfo.InvariantCulture));
@@ -6522,6 +6739,7 @@ public partial class MainWindowViewModel : ViewModelBase
             || TryGetWrapPanelParent(element, out _)
             || TryGetUniformGridParent(element, out _)
             || TryGetCanvasParent(element, out _)
+            || TryGetTabControlParent(element, out _)
             || TryGetContentParent(element, out _);
 
     private bool TryGetStackPanelParent(DesignElement element, out StackPanel stackPanel)
@@ -6610,9 +6828,31 @@ public partial class MainWindowViewModel : ViewModelBase
         return canvas is not null;
     }
 
+    private bool TryGetTabControlParent(DesignElement element, out DesignElement parent)
+    {
+        parent = element.ParentName is null
+            ? null!
+            : Canvas.Elements.FirstOrDefault(candidate =>
+                candidate.Visual is TabControl
+                && string.Equals(
+                    candidate.DisplayName,
+                    element.ParentName,
+                    StringComparison.OrdinalIgnoreCase))!;
+        return parent is not null;
+    }
+
     private DesignElement? GetDesignerContentChild(DesignElement parent)
         => Canvas.Elements.FirstOrDefault(child =>
             child.IsContentChild
+            && string.Equals(
+                child.ParentName,
+                parent.DisplayName,
+                StringComparison.OrdinalIgnoreCase));
+
+    private DesignElement? GetDesignerTabChild(DesignElement parent, int tabIndex)
+        => Canvas.Elements.FirstOrDefault(child =>
+            child.IsTabControlChild
+            && child.TabIndex == tabIndex
             && string.Equals(
                 child.ParentName,
                 parent.DisplayName,

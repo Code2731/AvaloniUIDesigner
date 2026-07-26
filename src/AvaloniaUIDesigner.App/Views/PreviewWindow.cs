@@ -72,6 +72,7 @@ public sealed class PreviewWindow : Window
                     "Avalonia.Controls.Primitives.UniformGrid",
                     StringComparison.Ordinal)
                 || string.Equals(element.TypeName, "Avalonia.Controls.Canvas", StringComparison.Ordinal)
+                || string.Equals(element.TypeName, "Avalonia.Controls.TabControl", StringComparison.Ordinal)
                 || string.Equals(element.TypeName, "Avalonia.Controls.Border", StringComparison.Ordinal)
                 || string.Equals(element.TypeName, "Avalonia.Controls.ScrollViewer", StringComparison.Ordinal)
                 || string.Equals(element.TypeName, "Avalonia.Controls.Expander", StringComparison.Ordinal))
@@ -120,6 +121,8 @@ public sealed class PreviewWindow : Window
                             ? children.OrderBy(child => child.UniformGridIndex).ToList()
                             : parent is Canvas
                                 ? children.OrderBy(child => child.CanvasChildIndex).ToList()
+                                : parent is TabControl
+                                    ? children.OrderBy(child => child.TabIndex).ToList()
                 : children;
             if (parent is Panel panel)
             {
@@ -186,6 +189,17 @@ public sealed class PreviewWindow : Window
                         Canvas.SetTop(child, childSnapshot.CanvasChildTop);
                         nestedCanvas.Children.Add(child);
                         break;
+                    case TabControl tabControl:
+                    {
+                        var tabs = tabControl.Items.OfType<TabItem>().ToList();
+                        if (childSnapshot.TabIndex < 0 || childSnapshot.TabIndex >= tabs.Count)
+                        {
+                            continue;
+                        }
+
+                        tabs[childSnapshot.TabIndex].Content = child;
+                        break;
+                    }
                     case Border border:
                         border.Child = child;
                         break;

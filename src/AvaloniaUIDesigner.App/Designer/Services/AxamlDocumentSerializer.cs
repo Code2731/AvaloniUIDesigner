@@ -3,6 +3,7 @@ using System;
 using System.Globalization;
 using System.Linq;
 using System.Text;
+using System.Text.Json;
 using AvaloniaUIDesigner.App.Designer.Contracts;
 using AvaloniaUIDesigner.App.Designer.Core;
 
@@ -146,6 +147,41 @@ public sealed class AxamlDocumentSerializer : IDesignerSerializer
         }
 
         AppendVisualAttributes(sb, element.VisualProperties);
+        if (string.Equals(element.TypeName, "Avalonia.Controls.TabControl", StringComparison.Ordinal))
+        {
+            sb.AppendLine(">");
+            var tabHeaders = ReadTabHeaders(element);
+            childrenByParent.TryGetValue(element.DisplayName, out var tabChildren);
+            for (var tabIndex = 0; tabIndex < tabHeaders.Count; tabIndex++)
+            {
+                sb.Append(indent);
+                sb.Append("  <TabItem Header=\"");
+                sb.Append(EscapeXmlAttribute(tabHeaders[tabIndex]));
+                sb.AppendLine("\">");
+                var tabChild = tabChildren?.FirstOrDefault(child =>
+                    child.ParentLayout == DesignerParentLayoutKind.TabControl
+                    && child.TabIndex == tabIndex);
+                if (tabChild is not null)
+                {
+                    AppendElement(sb, tabChild, indent + "    ", childrenByParent, element);
+                }
+                else
+                {
+                    sb.Append(indent);
+                    sb.Append("    <TextBlock Text=\"");
+                    sb.Append(EscapeXmlAttribute($"{tabHeaders[tabIndex]} content"));
+                    sb.AppendLine("\" />");
+                }
+
+                sb.Append(indent);
+                sb.AppendLine("  </TabItem>");
+            }
+
+            sb.Append(indent);
+            sb.AppendLine("</TabControl>");
+            return;
+        }
+
         if (!childrenByParent.TryGetValue(element.DisplayName, out var children) || children.Count == 0)
         {
             sb.AppendLine(" />");
@@ -235,9 +271,33 @@ public sealed class AxamlDocumentSerializer : IDesignerSerializer
                 "Avalonia.Controls.Primitives.UniformGrid",
                 StringComparison.Ordinal)
             || string.Equals(element.TypeName, "Avalonia.Controls.Canvas", StringComparison.Ordinal)
+            || string.Equals(element.TypeName, "Avalonia.Controls.TabControl", StringComparison.Ordinal)
             || string.Equals(element.TypeName, "Avalonia.Controls.Border", StringComparison.Ordinal)
             || string.Equals(element.TypeName, "Avalonia.Controls.ScrollViewer", StringComparison.Ordinal)
             || string.Equals(element.TypeName, "Avalonia.Controls.Expander", StringComparison.Ordinal);
+
+    private static IReadOnlyList<string> ReadTabHeaders(DesignerElementSnapshot element)
+    {
+        if (element.VisualProperties is null
+            || !element.VisualProperties.TryGetValue("__tabs", out var json)
+            || string.IsNullOrWhiteSpace(json))
+        {
+            return Array.Empty<string>();
+        }
+
+        try
+        {
+            return JsonSerializer.Deserialize<List<string>>(json)
+                ?.Where(header => !string.IsNullOrWhiteSpace(header))
+                .Select(header => header.Trim())
+                .ToList()
+                ?? new List<string>();
+        }
+        catch (JsonException)
+        {
+            return Array.Empty<string>();
+        }
+    }
 
     private static void AppendDockPanelAttributes(
         StringBuilder sb,

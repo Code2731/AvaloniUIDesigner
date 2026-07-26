@@ -113,6 +113,7 @@ public partial class ObjectTreeViewModel : ViewModelBase
                         or Avalonia.Controls.WrapPanel
                         or Avalonia.Controls.Primitives.UniformGrid
                         or Avalonia.Controls.Canvas
+                        or Avalonia.Controls.TabControl
                         or Avalonia.Controls.Border
                         or Avalonia.Controls.ScrollViewer
                         or Avalonia.Controls.Expander)
@@ -187,6 +188,20 @@ public partial class ObjectTreeViewModel : ViewModelBase
             {
                 var ordered = parent.Children
                     .OrderBy(node => node.Element?.CanvasChildIndex ?? int.MaxValue)
+                    .ToList();
+                parent.Children.Clear();
+                foreach (var child in ordered)
+                {
+                    parent.Children.Add(child);
+                }
+            }
+
+            foreach (var parent in _allChildren.Where(node =>
+                         node.Element?.Visual is Avalonia.Controls.TabControl
+                         && node.Children.Count > 1))
+            {
+                var ordered = parent.Children
+                    .OrderBy(node => node.Element?.TabIndex ?? int.MaxValue)
                     .ToList();
                 parent.Children.Clear();
                 foreach (var child in ordered)

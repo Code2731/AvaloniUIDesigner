@@ -41,6 +41,7 @@ public partial class DesignElement : ViewModelBase
     [NotifyPropertyChangedFor(nameof(IsWrapPanelChild))]
     [NotifyPropertyChangedFor(nameof(IsUniformGridChild))]
     [NotifyPropertyChangedFor(nameof(IsCanvasChild))]
+    [NotifyPropertyChangedFor(nameof(IsTabControlChild))]
     [NotifyPropertyChangedFor(nameof(IsContentChild))]
     [NotifyPropertyChangedFor(nameof(GridCellLabel))]
     [NotifyPropertyChangedFor(nameof(StackPanelItemLabel))]
@@ -48,6 +49,7 @@ public partial class DesignElement : ViewModelBase
     [NotifyPropertyChangedFor(nameof(WrapPanelItemLabel))]
     [NotifyPropertyChangedFor(nameof(UniformGridItemLabel))]
     [NotifyPropertyChangedFor(nameof(CanvasItemLabel))]
+    [NotifyPropertyChangedFor(nameof(TabItemLabel))]
     [NotifyPropertyChangedFor(nameof(ContainerLayoutLabel))]
     private string? _parentName;
 
@@ -84,6 +86,7 @@ public partial class DesignElement : ViewModelBase
     [NotifyPropertyChangedFor(nameof(IsWrapPanelChild))]
     [NotifyPropertyChangedFor(nameof(IsUniformGridChild))]
     [NotifyPropertyChangedFor(nameof(IsCanvasChild))]
+    [NotifyPropertyChangedFor(nameof(IsTabControlChild))]
     [NotifyPropertyChangedFor(nameof(IsContentChild))]
     [NotifyPropertyChangedFor(nameof(GridCellLabel))]
     [NotifyPropertyChangedFor(nameof(StackPanelItemLabel))]
@@ -91,6 +94,7 @@ public partial class DesignElement : ViewModelBase
     [NotifyPropertyChangedFor(nameof(WrapPanelItemLabel))]
     [NotifyPropertyChangedFor(nameof(UniformGridItemLabel))]
     [NotifyPropertyChangedFor(nameof(CanvasItemLabel))]
+    [NotifyPropertyChangedFor(nameof(TabItemLabel))]
     [NotifyPropertyChangedFor(nameof(ContainerLayoutLabel))]
     private DesignerParentLayoutKind _parentLayout;
 
@@ -126,8 +130,19 @@ public partial class DesignElement : ViewModelBase
     private double _canvasChildTop;
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(TabItemLabel))]
+    private int _tabIndex = -1;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(TabItemLabel))]
+    private string? _tabHeader;
+
+    [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(HasStylePreviewState))]
     private string? _stylePreviewStateLabel;
+
+    [ObservableProperty]
+    private bool _isVisibleOnArtboard = true;
 
     public double SelectionThickness => IsSelected ? 2.0 : 0.0;
 
@@ -146,6 +161,8 @@ public partial class DesignElement : ViewModelBase
     public bool IsUniformGridChild => IsContainerChild && ParentLayout == DesignerParentLayoutKind.UniformGrid;
 
     public bool IsCanvasChild => IsContainerChild && ParentLayout == DesignerParentLayoutKind.Canvas;
+
+    public bool IsTabControlChild => IsContainerChild && ParentLayout == DesignerParentLayoutKind.TabControl;
 
     public bool IsContentChild => IsContainerChild && ParentLayout == DesignerParentLayoutKind.Content;
 
@@ -182,6 +199,11 @@ public partial class DesignElement : ViewModelBase
     public string CanvasItemLabel
         => IsCanvasChild
             ? $"CANVAS #{CanvasChildIndex + 1} ({CanvasChildLeft:0.#}, {CanvasChildTop:0.#})"
+            : string.Empty;
+
+    public string TabItemLabel
+        => IsTabControlChild
+            ? $"TAB #{TabIndex + 1} {TabHeader}"
             : string.Empty;
 
     public string ContainerLayoutLabel

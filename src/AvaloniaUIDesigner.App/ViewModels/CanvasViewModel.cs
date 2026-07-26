@@ -325,6 +325,8 @@ public partial class CanvasViewModel : ViewModelBase
             element.CanvasChildIndex = snapshot.CanvasChildIndex;
             element.CanvasChildLeft = snapshot.CanvasChildLeft;
             element.CanvasChildTop = snapshot.CanvasChildTop;
+            element.TabIndex = snapshot.TabIndex;
+            element.TabHeader = snapshot.TabHeader;
             element.ParentName = snapshot.ParentName;
         }
         finally
@@ -418,12 +420,14 @@ public partial class CanvasViewModel : ViewModelBase
             {
                 element.IsSelected = false;
                 SelectedElement = SelectedElements.LastOrDefault();
+                RefreshTabChildVisibility();
                 return;
             }
 
             SelectedElements.Add(element);
             element.IsSelected = true;
             SelectedElement = element;
+            RefreshTabChildVisibility();
             return;
         }
 
@@ -443,6 +447,7 @@ public partial class CanvasViewModel : ViewModelBase
 
         SelectedElements.Clear();
         SelectedElement = null;
+        RefreshTabChildVisibility();
     }
 
     public bool RemoveElement(DesignElement element)
@@ -487,6 +492,9 @@ public partial class CanvasViewModel : ViewModelBase
             child.CanvasChildIndex = -1;
             child.CanvasChildLeft = 0;
             child.CanvasChildTop = 0;
+            child.TabIndex = -1;
+            child.TabHeader = null;
+            child.IsVisibleOnArtboard = true;
         }
 
         element.PropertyChanged -= OnDesignElementPropertyChanged;
@@ -561,6 +569,8 @@ public partial class CanvasViewModel : ViewModelBase
                     element.WrapPanelIndex = -1;
                     element.UniformGridIndex = -1;
                     element.CanvasChildIndex = -1;
+                    element.TabIndex = -1;
+                    element.TabHeader = null;
                 }
                 else if (parent.Visual is StackPanel)
                 {
@@ -569,6 +579,8 @@ public partial class CanvasViewModel : ViewModelBase
                     element.WrapPanelIndex = -1;
                     element.UniformGridIndex = -1;
                     element.CanvasChildIndex = -1;
+                    element.TabIndex = -1;
+                    element.TabHeader = null;
                     if (element.StackPanelIndex < 0)
                     {
                         element.StackPanelIndex = GetDirectChildren(parent).Count(child =>
@@ -585,6 +597,8 @@ public partial class CanvasViewModel : ViewModelBase
                     element.WrapPanelIndex = -1;
                     element.UniformGridIndex = -1;
                     element.CanvasChildIndex = -1;
+                    element.TabIndex = -1;
+                    element.TabHeader = null;
                     if (element.DockPanelIndex < 0)
                     {
                         element.DockPanelIndex = GetDirectChildren(parent).Count(child =>
@@ -601,6 +615,8 @@ public partial class CanvasViewModel : ViewModelBase
                     element.DockPanelIndex = -1;
                     element.UniformGridIndex = -1;
                     element.CanvasChildIndex = -1;
+                    element.TabIndex = -1;
+                    element.TabHeader = null;
                     if (element.WrapPanelIndex < 0)
                     {
                         element.WrapPanelIndex = GetDirectChildren(parent).Count(child =>
@@ -615,6 +631,8 @@ public partial class CanvasViewModel : ViewModelBase
                     element.DockPanelIndex = -1;
                     element.WrapPanelIndex = -1;
                     element.CanvasChildIndex = -1;
+                    element.TabIndex = -1;
+                    element.TabHeader = null;
                     if (element.UniformGridIndex < 0)
                     {
                         element.UniformGridIndex = GetDirectChildren(parent).Count(child =>
@@ -629,12 +647,34 @@ public partial class CanvasViewModel : ViewModelBase
                     element.DockPanelIndex = -1;
                     element.WrapPanelIndex = -1;
                     element.UniformGridIndex = -1;
+                    element.TabIndex = -1;
+                    element.TabHeader = null;
                     if (element.CanvasChildIndex < 0)
                     {
                         element.CanvasChildIndex = GetDirectChildren(parent).Count(child =>
                             child.ParentLayout == DesignerParentLayoutKind.Canvas
                             && child.CanvasChildIndex >= 0);
                     }
+                }
+                else if (parent.Visual is TabControl tabControl)
+                {
+                    var headers = GetTabHeaders(tabControl);
+                    element.ParentLayout = DesignerParentLayoutKind.TabControl;
+                    element.StackPanelIndex = -1;
+                    element.DockPanelIndex = -1;
+                    element.WrapPanelIndex = -1;
+                    element.UniformGridIndex = -1;
+                    element.CanvasChildIndex = -1;
+                    element.CanvasChildLeft = 0;
+                    element.CanvasChildTop = 0;
+                    if (element.TabIndex < 0 || element.TabIndex >= headers.Count)
+                    {
+                        element.TabIndex = FindFirstAvailableTabIndex(parent, headers.Count, element);
+                    }
+
+                    element.TabHeader = element.TabIndex >= 0 && element.TabIndex < headers.Count
+                        ? headers[element.TabIndex]
+                        : null;
                 }
                 else
                 {
@@ -644,6 +684,8 @@ public partial class CanvasViewModel : ViewModelBase
                     element.WrapPanelIndex = -1;
                     element.UniformGridIndex = -1;
                     element.CanvasChildIndex = -1;
+                    element.TabIndex = -1;
+                    element.TabHeader = null;
                 }
             }
 
@@ -659,6 +701,27 @@ public partial class CanvasViewModel : ViewModelBase
                 foreach (var extraChild in contentChildren.Skip(1))
                 {
                     ResetContainerRelationship(extraChild);
+                }
+            }
+
+            foreach (var tabParent in containers.Values.Where(parent => parent.Visual is TabControl))
+            {
+                var headers = GetTabHeaders((TabControl)tabParent.Visual);
+                var occupiedTabs = new HashSet<int>();
+                foreach (var child in GetDirectChildren(tabParent)
+                             .OrderBy(candidate => candidate.TabIndex)
+                             .ThenBy(Elements.IndexOf))
+                {
+                    if (!child.IsTabControlChild
+                        || child.TabIndex < 0
+                        || child.TabIndex >= headers.Count
+                        || !occupiedTabs.Add(child.TabIndex))
+                    {
+                        ResetContainerRelationship(child);
+                        continue;
+                    }
+
+                    child.TabHeader = headers[child.TabIndex];
                 }
             }
         }
@@ -698,6 +761,8 @@ public partial class CanvasViewModel : ViewModelBase
                 child.CanvasChildIndex = -1;
                 child.CanvasChildLeft = 0;
                 child.CanvasChildTop = 0;
+                child.TabIndex = -1;
+                child.TabHeader = null;
                 child.ParentLayout = DesignerParentLayoutKind.StackPanel;
                 child.ParentName = parent.DisplayName;
             }
@@ -739,6 +804,8 @@ public partial class CanvasViewModel : ViewModelBase
             child.CanvasChildIndex = -1;
             child.CanvasChildLeft = 0;
             child.CanvasChildTop = 0;
+            child.TabIndex = -1;
+            child.TabHeader = null;
             child.ParentLayout = DesignerParentLayoutKind.Content;
             child.ParentName = parent.DisplayName;
             ClearBuiltInContent(parent.Visual);
@@ -779,6 +846,8 @@ public partial class CanvasViewModel : ViewModelBase
                 child.CanvasChildIndex = -1;
                 child.CanvasChildLeft = 0;
                 child.CanvasChildTop = 0;
+                child.TabIndex = -1;
+                child.TabHeader = null;
                 child.ParentLayout = DesignerParentLayoutKind.DockPanel;
                 child.ParentName = parent.DisplayName;
             }
@@ -820,6 +889,8 @@ public partial class CanvasViewModel : ViewModelBase
                 child.CanvasChildIndex = -1;
                 child.CanvasChildLeft = 0;
                 child.CanvasChildTop = 0;
+                child.TabIndex = -1;
+                child.TabHeader = null;
                 child.ParentLayout = DesignerParentLayoutKind.WrapPanel;
                 child.ParentName = parent.DisplayName;
             }
@@ -861,6 +932,8 @@ public partial class CanvasViewModel : ViewModelBase
                 child.CanvasChildIndex = -1;
                 child.CanvasChildLeft = 0;
                 child.CanvasChildTop = 0;
+                child.TabIndex = -1;
+                child.TabHeader = null;
                 child.ParentLayout = DesignerParentLayoutKind.UniformGrid;
                 child.ParentName = parent.DisplayName;
             }
@@ -900,6 +973,8 @@ public partial class CanvasViewModel : ViewModelBase
                 child.WrapPanelIndex = -1;
                 child.UniformGridIndex = -1;
                 child.CanvasChildIndex = index;
+                child.TabIndex = -1;
+                child.TabHeader = null;
                 child.ParentLayout = DesignerParentLayoutKind.Canvas;
                 child.ParentName = parent.DisplayName;
             }
@@ -910,6 +985,104 @@ public partial class CanvasViewModel : ViewModelBase
         {
             _isReflowingContainerChildren = false;
         }
+    }
+
+    public DesignElement? SetTabControlChild(
+        DesignElement parent,
+        DesignElement child,
+        int tabIndex)
+    {
+        if (parent.Visual is not TabControl tabControl || ReferenceEquals(parent, child))
+        {
+            return null;
+        }
+
+        var headers = GetTabHeaders(tabControl);
+        if (tabIndex < 0 || tabIndex >= headers.Count)
+        {
+            return null;
+        }
+
+        var replaced = GetDirectChildren(parent).FirstOrDefault(existing =>
+            !ReferenceEquals(existing, child)
+            && existing.IsTabControlChild
+            && existing.TabIndex == tabIndex);
+        _isReflowingContainerChildren = true;
+        try
+        {
+            if (replaced is not null)
+            {
+                ResetContainerRelationship(replaced);
+            }
+
+            child.GridRow = 0;
+            child.GridColumn = 0;
+            child.GridRowSpan = 1;
+            child.GridColumnSpan = 1;
+            child.StackPanelIndex = -1;
+            child.StackPanelItemSize = 40;
+            child.DockPanelIndex = -1;
+            child.DockPanelDock = DesignerDockSide.Left;
+            child.DockPanelItemSize = 40;
+            child.WrapPanelIndex = -1;
+            child.UniformGridIndex = -1;
+            child.CanvasChildIndex = -1;
+            child.CanvasChildLeft = 0;
+            child.CanvasChildTop = 0;
+            child.TabIndex = tabIndex;
+            child.TabHeader = headers[tabIndex];
+            child.ParentLayout = DesignerParentLayoutKind.TabControl;
+            child.ParentName = parent.DisplayName;
+            tabControl.SelectedIndex = tabIndex;
+            ReflowContainerTreeCore(parent);
+        }
+        finally
+        {
+            _isReflowingContainerChildren = false;
+        }
+
+        return replaced;
+    }
+
+    public IReadOnlyList<DesignElement> SynchronizeTabControlChildren(
+        DesignElement parent,
+        IReadOnlyList<string> headers)
+    {
+        if (parent.Visual is not TabControl)
+        {
+            return Array.Empty<DesignElement>();
+        }
+
+        var promoted = new List<DesignElement>();
+        _isReflowingContainerChildren = true;
+        try
+        {
+            var occupiedTabs = new HashSet<int>();
+            foreach (var child in GetDirectChildren(parent)
+                         .OrderBy(candidate => candidate.TabIndex)
+                         .ThenBy(Elements.IndexOf))
+            {
+                if (!child.IsTabControlChild
+                    || child.TabIndex < 0
+                    || child.TabIndex >= headers.Count
+                    || !occupiedTabs.Add(child.TabIndex))
+                {
+                    ResetContainerRelationship(child);
+                    promoted.Add(child);
+                    continue;
+                }
+
+                child.TabHeader = headers[child.TabIndex];
+            }
+
+            ReflowContainerTreeCore(parent);
+        }
+        finally
+        {
+            _isReflowingContainerChildren = false;
+        }
+
+        return promoted;
     }
 
     public bool MoveElementsToFront(IEnumerable<DesignElement> elements)
@@ -1054,6 +1227,7 @@ public partial class CanvasViewModel : ViewModelBase
         }
 
         SelectedElement = next.LastOrDefault();
+        RefreshTabChildVisibility();
     }
 
     private void OnElementsChanged(object? sender, NotifyCollectionChangedEventArgs e)
@@ -1167,6 +1341,14 @@ public partial class CanvasViewModel : ViewModelBase
             return;
         }
 
+        if (parent.Visual is not TabControl)
+        {
+            foreach (var child in GetDirectChildren(parent))
+            {
+                child.IsVisibleOnArtboard = true;
+            }
+        }
+
         if (parent.Visual is StackPanel stackPanel)
         {
             ReflowStackPanelChildrenCore(parent, stackPanel);
@@ -1186,6 +1368,10 @@ public partial class CanvasViewModel : ViewModelBase
         else if (parent.Visual is Canvas canvas)
         {
             ReflowCanvasChildrenCore(parent, canvas);
+        }
+        else if (parent.Visual is TabControl tabControl)
+        {
+            ReflowTabControlChildrenCore(parent, tabControl);
         }
         else if (parent.Visual is Grid)
         {
@@ -1513,6 +1699,44 @@ public partial class CanvasViewModel : ViewModelBase
         }
     }
 
+    private void ReflowTabControlChildrenCore(DesignElement parent, TabControl tabControl)
+    {
+        var headers = GetTabHeaders(tabControl);
+        var children = GetDirectChildren(parent)
+            .Where(child => child.IsTabControlChild)
+            .OrderBy(child => child.TabIndex)
+            .ThenBy(Elements.IndexOf)
+            .ToList();
+        var activeTabIndex = SelectedElement is { IsTabControlChild: true } selectedChild
+            && string.Equals(
+                selectedChild.ParentName,
+                parent.DisplayName,
+                StringComparison.OrdinalIgnoreCase)
+                ? selectedChild.TabIndex
+                : tabControl.SelectedIndex;
+        var occupiedTabs = new HashSet<int>();
+        foreach (var child in children)
+        {
+            if (child.TabIndex < 0
+                || child.TabIndex >= headers.Count
+                || !occupiedTabs.Add(child.TabIndex))
+            {
+                ResetContainerRelationship(child);
+                continue;
+            }
+
+            child.TabHeader = headers[child.TabIndex];
+            child.IsVisibleOnArtboard = child.TabIndex == activeTabIndex;
+            SetElementBounds(
+                child,
+                new Rect(
+                    parent.X + 8,
+                    parent.Y + 40,
+                    Math.Max(10, parent.Width - 16),
+                    Math.Max(10, parent.Height - 48)));
+        }
+    }
+
     private static void SetElementBounds(DesignElement element, Rect bounds)
     {
         element.X = bounds.X;
@@ -1554,6 +1778,9 @@ public partial class CanvasViewModel : ViewModelBase
         child.CanvasChildIndex = -1;
         child.CanvasChildLeft = 0;
         child.CanvasChildTop = 0;
+        child.TabIndex = -1;
+        child.TabHeader = null;
+        child.IsVisibleOnArtboard = true;
     }
 
     private void OnDesignElementPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
@@ -1578,6 +1805,8 @@ public partial class CanvasViewModel : ViewModelBase
             or nameof(DesignElement.CanvasChildIndex)
             or nameof(DesignElement.CanvasChildLeft)
             or nameof(DesignElement.CanvasChildTop)
+            or nameof(DesignElement.TabIndex)
+            or nameof(DesignElement.TabHeader)
             or nameof(DesignElement.ParentLayout))
         {
             ReflowContainerChild(element);
@@ -1625,10 +1854,48 @@ public partial class CanvasViewModel : ViewModelBase
 
     private static bool IsDesignerContainer(Control visual)
         => visual is Grid or StackPanel or DockPanel or WrapPanel or UniformGrid or Canvas
-            or Border or ScrollViewer or Expander;
+            or TabControl or Border or ScrollViewer or Expander;
 
     private static bool IsContentContainer(Control visual)
         => visual is Border or ScrollViewer or Expander;
+
+    private int FindFirstAvailableTabIndex(
+        DesignElement parent,
+        int tabCount,
+        DesignElement current)
+    {
+        var occupied = GetDirectChildren(parent)
+            .Where(child => !ReferenceEquals(child, current)
+                && child.ParentLayout == DesignerParentLayoutKind.TabControl
+                && child.TabIndex >= 0)
+            .Select(child => child.TabIndex)
+            .ToHashSet();
+        for (var index = 0; index < tabCount; index++)
+        {
+            if (!occupied.Contains(index))
+            {
+                return index;
+            }
+        }
+
+        return -1;
+    }
+
+    private static IReadOnlyList<string> GetTabHeaders(TabControl tabControl)
+        => tabControl.Items
+            .OfType<TabItem>()
+            .Select((item, index) => item.Header?.ToString() ?? $"Tab {index + 1}")
+            .ToList();
+
+    private void RefreshTabChildVisibility()
+    {
+        if (_isReflowingContainerChildren || !Elements.Any(element => element.IsTabControlChild))
+        {
+            return;
+        }
+
+        ReflowContainerChildren();
+    }
 
     private static void ClearBuiltInContent(Control visual)
     {
