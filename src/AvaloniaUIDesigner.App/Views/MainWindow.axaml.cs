@@ -598,12 +598,15 @@ public partial class MainWindow : Window
     private async void OnEditItemsMenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
         FlushPendingPropertyHistory();
-        if (Vm is null || !Vm.TryGetSelectedItems(out var controlName, out var items))
+        if (Vm is null || !Vm.TryGetSelectedItems(
+                out var controlName,
+                out var items,
+                out var supportsHierarchy))
         {
             return;
         }
 
-        var updatedItems = await ShowItemsEditorDialogAsync(controlName, items);
+        var updatedItems = await ShowItemsEditorDialogAsync(controlName, items, supportsHierarchy);
         if (updatedItems is not null)
         {
             Vm.SetSelectedItems(updatedItems);
@@ -2576,7 +2579,10 @@ public partial class MainWindow : Window
         return await dialog.ShowDialog<UnsavedChoice>(this);
     }
 
-    private async Task<IReadOnlyList<string>?> ShowItemsEditorDialogAsync(string controlName, IReadOnlyList<string> items)
+    private async Task<IReadOnlyList<string>?> ShowItemsEditorDialogAsync(
+        string controlName,
+        IReadOnlyList<string> items,
+        bool supportsHierarchy)
     {
         var editor = new TextBox
         {
@@ -2596,12 +2602,26 @@ public partial class MainWindow : Window
         };
 
         var applyButton = new Button { Content = "Apply", MinWidth = 84 };
+        var errorText = new TextBlock
+        {
+            Foreground = Avalonia.Media.Brushes.IndianRed,
+            TextWrapping = Avalonia.Media.TextWrapping.Wrap,
+        };
         applyButton.Click += (_, _) =>
         {
             var updatedItems = (editor.Text ?? string.Empty)
                 .Replace("\r\n", "\n", StringComparison.Ordinal)
-                .Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                .Split('\n', supportsHierarchy
+                    ? StringSplitOptions.None
+                    : StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
                 .ToList();
+            if (supportsHierarchy
+                && !DesignerTreeItemRuntime.TryParseEditorLines(updatedItems, out _, out var error))
+            {
+                errorText.Text = error;
+                return;
+            }
+
             dialog.Close(updatedItems);
         };
 
@@ -2619,17 +2639,25 @@ public partial class MainWindow : Window
         var content = new Grid
         {
             Margin = new Thickness(16),
-            RowDefinitions = new RowDefinitions("Auto,*,Auto"),
+            RowDefinitions = new RowDefinitions("Auto,*,Auto,Auto"),
             RowSpacing = 12,
             Children =
             {
-                new TextBlock { Text = "Enter one item per line. Empty lines are ignored." },
+                new TextBlock
+                {
+                    Text = supportsHierarchy
+                        ? "Use [-] for expanded, [+] for collapsed, and two spaces per child level."
+                        : "Enter one item per line. Empty lines are ignored.",
+                    TextWrapping = Avalonia.Media.TextWrapping.Wrap,
+                },
                 editor,
+                errorText,
                 buttons,
             },
         };
         Grid.SetRow(editor, 1);
-        Grid.SetRow(buttons, 2);
+        Grid.SetRow(errorText, 2);
+        Grid.SetRow(buttons, 3);
         dialog.Content = content;
 
         return await dialog.ShowDialog<IReadOnlyList<string>?>(this);

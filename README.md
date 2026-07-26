@@ -21,6 +21,7 @@ dotnet run --project src/AvaloniaUIDesigner.App/AvaloniaUIDesigner.App.csproj
 - **Toolbox**: 내장 컨트롤, 복합 프리셋, JSON 컴포넌트 팩
 - **배치**: 클릭-투-플레이스와 드래그 앤 드롭으로 실제 Avalonia 컨트롤 생성
 - **컨테이너 편집**: Grid 셀, StackPanel 순서·주축 크기, DockPanel 순서·방향·크기·LastChildFill, WrapPanel 순서·방향·항목 크기·간격·정렬, UniformGrid 순서·행·열·첫 열·간격, 중첩 Canvas 로컬 좌표·직접 변형·z-order, TabControl 탭 정의·탭별 단일 자식·활성 페이지, SplitView Pane·Content 슬롯·Inline/Overlay·배치 방향, Border·ScrollViewer·Expander의 단일 Content 자식을 편집하고 재귀 Object Tree·AXAML·미리보기에 보존
+- **계층 항목 편집**: TreeView 항목을 `[-]`(펼침), `[+]`(접힘), 두 칸 들여쓰기 문법으로 편집하고 Undo/Redo, 복제, 미리보기, AXAML 왕복에 보존
 - **요소 선택**: 배치된 요소 클릭 시 파란 외곽선
 - **Object Tree 자동 동기화**: 배치된 요소가 루트(Window) 아래에 추가
 - **이동/리사이즈 기즈모**: 선택된 요소를 드래그로 이동, 8방향 핸들로 리사이즈 (최소 10px)
@@ -38,6 +39,7 @@ dotnet run --project src/AvaloniaUIDesigner.App/AvaloniaUIDesigner.App.csproj
 2. 중앙 Canvas 영역을 클릭 → 클릭 위치에 기본 크기로 생성
 3. 생성된 요소를 클릭하여 선택 → 8개 핸들로 이동/리사이즈
 4. 우측 하단 Properties 패널에서 속성 편집
+5. ComboBox, ListBox, TreeView, TabControl은 `Edit > Edit Items...`에서 항목 편집
 
 ## 로드맵
 

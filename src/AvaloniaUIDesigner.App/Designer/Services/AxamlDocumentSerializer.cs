@@ -147,6 +147,15 @@ public sealed class AxamlDocumentSerializer : IDesignerSerializer
         }
 
         AppendVisualAttributes(sb, element.VisualProperties);
+        if (string.Equals(element.TypeName, "Avalonia.Controls.TreeView", StringComparison.Ordinal))
+        {
+            sb.AppendLine(">");
+            AppendTreeItems(sb, ReadTreeItems(element), indent + "  ");
+            sb.Append(indent);
+            sb.AppendLine("</TreeView>");
+            return;
+        }
+
         if (string.Equals(element.TypeName, "Avalonia.Controls.TabControl", StringComparison.Ordinal))
         {
             sb.AppendLine(">");
@@ -350,6 +359,43 @@ public sealed class AxamlDocumentSerializer : IDesignerSerializer
         catch (JsonException)
         {
             return Array.Empty<string>();
+        }
+    }
+
+    private static IReadOnlyList<DesignerTreeItemDefinition> ReadTreeItems(DesignerElementSnapshot element)
+    {
+        if (element.VisualProperties is null
+            || !element.VisualProperties.TryGetValue("__treeItems", out var json)
+            || !DesignerTreeItemRuntime.TryDeserialize(json, out var definitions))
+        {
+            return [];
+        }
+
+        return definitions;
+    }
+
+    private static void AppendTreeItems(
+        StringBuilder sb,
+        IEnumerable<DesignerTreeItemDefinition> definitions,
+        string indent)
+    {
+        foreach (var definition in definitions)
+        {
+            sb.Append(indent);
+            sb.Append("<TreeViewItem Header=\"");
+            sb.Append(EscapeXmlAttribute(definition.Header));
+            sb.Append("\" IsExpanded=\"");
+            sb.Append(definition.IsExpanded);
+            if (definition.Children.Count == 0)
+            {
+                sb.AppendLine("\" />");
+                continue;
+            }
+
+            sb.AppendLine("\">");
+            AppendTreeItems(sb, definition.Children, indent + "  ");
+            sb.Append(indent);
+            sb.AppendLine("</TreeViewItem>");
         }
     }
 

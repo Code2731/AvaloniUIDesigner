@@ -2377,6 +2377,17 @@ public partial class CanvasViewModel : ViewModelBase
             return;
         }
 
+        if (visual is TreeView treeView)
+        {
+            if (properties.TryGetValue("__treeItems", out var treeItemsJson)
+                && DesignerTreeItemRuntime.TryDeserialize(treeItemsJson, out var definitions))
+            {
+                DesignerTreeItemRuntime.ReplaceItems(treeView, definitions);
+            }
+
+            return;
+        }
+
         if (visual is Slider slider)
         {
             if (properties.TryGetValue("Minimum", out var minimum)

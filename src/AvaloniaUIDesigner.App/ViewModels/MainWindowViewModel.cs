@@ -2287,13 +2287,20 @@ public partial class MainWindowViewModel : ViewModelBase
         => new(string.Empty, Array.Empty<ContentParentOption>(), string.Empty);
 
     public bool TryGetSelectedItems(out string controlName, out IReadOnlyList<string> items)
+        => TryGetSelectedItems(out controlName, out items, out _);
+
+    public bool TryGetSelectedItems(
+        out string controlName,
+        out IReadOnlyList<string> items,
+        out bool supportsHierarchy)
     {
         var target = Canvas.SelectedElement;
         if (target is null)
         {
             controlName = string.Empty;
             items = Array.Empty<string>();
-            StatusText = "Select a ComboBox or ListBox to edit its items.";
+            supportsHierarchy = false;
+            StatusText = "Select a ComboBox, ListBox, TreeView, or TabControl to edit its items.";
             return false;
         }
 
@@ -2301,10 +2308,12 @@ public partial class MainWindowViewModel : ViewModelBase
         {
             controlName = string.Empty;
             items = Array.Empty<string>();
+            supportsHierarchy = false;
             StatusText = "Unlock the selected control before editing its items.";
             return false;
         }
 
+        supportsHierarchy = false;
         switch (target.Visual)
         {
             case ComboBox comboBox:
@@ -2315,6 +2324,11 @@ public partial class MainWindowViewModel : ViewModelBase
                 controlName = target.DisplayName;
                 items = ReadItems(listBox);
                 return true;
+            case TreeView treeView:
+                controlName = target.DisplayName;
+                items = DesignerTreeItemRuntime.FormatEditorLines(treeView);
+                supportsHierarchy = true;
+                return true;
             case TabControl tabControl:
                 controlName = target.DisplayName;
                 items = ReadTabHeaders(tabControl);
@@ -2322,7 +2336,7 @@ public partial class MainWindowViewModel : ViewModelBase
             default:
                 controlName = string.Empty;
                 items = Array.Empty<string>();
-                StatusText = "Item editing is available for ComboBox, ListBox, and TabControl controls.";
+                StatusText = "Item editing is available for ComboBox, ListBox, TreeView, and TabControl controls.";
                 return false;
         }
     }
@@ -2332,7 +2346,29 @@ public partial class MainWindowViewModel : ViewModelBase
         var target = Canvas.SelectedElement;
         if (target is null || target.IsLocked)
         {
-            StatusText = "Select an unlocked ComboBox, ListBox, or TabControl to edit its items.";
+            StatusText = "Select an unlocked ComboBox, ListBox, TreeView, or TabControl to edit its items.";
+            return;
+        }
+
+        if (target.Visual is TreeView treeView)
+        {
+            if (!DesignerTreeItemRuntime.TryParseEditorLines(items, out var definitions, out var error))
+            {
+                StatusText = $"TreeView items were not changed. {error}";
+                return;
+            }
+
+            var currentDefinitions = DesignerTreeItemRuntime.ReadItems(treeView);
+            if (DesignerTreeItemRuntime.AreEquivalent(currentDefinitions, definitions))
+            {
+                StatusText = "TreeView items are unchanged.";
+                return;
+            }
+
+            BeginCanvasMutation(HistoryActionType.EditProperty, "Updated TreeView items.");
+            DesignerTreeItemRuntime.ReplaceItems(treeView, definitions);
+            CommitCanvasMutation();
+            StatusText = $"Updated {CountTreeItems(definitions)} TreeView item(s).";
             return;
         }
 
@@ -2395,7 +2431,7 @@ public partial class MainWindowViewModel : ViewModelBase
                 return;
 
             default:
-                StatusText = "Item editing is available for ComboBox, ListBox, and TabControl controls.";
+                StatusText = "Item editing is available for ComboBox, ListBox, TreeView, and TabControl controls.";
                 return;
         }
     }
@@ -4123,6 +4159,15 @@ public partial class MainWindowViewModel : ViewModelBase
             };
         }
 
+        if (visual is TreeView treeView)
+        {
+            return new Dictionary<string, string>
+            {
+                ["__treeItems"] = DesignerTreeItemRuntime.Serialize(treeView),
+                ["Opacity"] = treeView.Opacity.ToString("0.###", CultureInfo.InvariantCulture),
+            };
+        }
+
         if (visual is Slider slider)
         {
             return new Dictionary<string, string>
@@ -4368,6 +4413,9 @@ public partial class MainWindowViewModel : ViewModelBase
             itemsControl.Items.Add(item);
         }
     }
+
+    private static int CountTreeItems(IEnumerable<DesignerTreeItemDefinition> definitions)
+        => definitions.Sum(definition => 1 + CountTreeItems(definition.Children));
 
     private static void ReplaceTabHeaders(TabControl tabControl, IReadOnlyList<string> headers)
     {
@@ -5134,6 +5182,10 @@ public partial class MainWindowViewModel : ViewModelBase
         {
             map["__items"] = SerializeItems(element);
         }
+        else if (string.Equals(element.Name.LocalName, "TreeView", StringComparison.OrdinalIgnoreCase))
+        {
+            map["__treeItems"] = DesignerTreeItemRuntime.Serialize(element);
+        }
         else if (string.Equals(element.Name.LocalName, "TabControl", StringComparison.OrdinalIgnoreCase))
         {
             map["__tabs"] = SerializeTabHeaders(element);
@@ -5203,6 +5255,7 @@ public partial class MainWindowViewModel : ViewModelBase
             "ToggleButton" => propertyName is "Content" or "IsChecked",
             "RadioButton" => propertyName is "Content" or "IsChecked" or "GroupName",
             "ComboBox" or "ListBox" => propertyName == "SelectedIndex",
+            "TreeView" => false,
             "Slider" or "ProgressBar" => propertyName is "Minimum" or "Maximum" or "Value",
             "DatePicker" => propertyName == "SelectedDate",
             "CalendarDatePicker" => propertyName is "SelectedDate" or "Watermark",
@@ -5229,7 +5282,7 @@ public partial class MainWindowViewModel : ViewModelBase
 
     private static bool SupportsTemplatedAppearance(string tagName)
         => tagName is "Button" or "TextBox" or "Label" or "CheckBox" or "RadioButton"
-            or "ToggleSwitch" or "ToggleButton" or "ComboBox" or "ListBox" or "Slider"
+            or "ToggleSwitch" or "ToggleButton" or "ComboBox" or "ListBox" or "TreeView" or "Slider"
             or "ProgressBar" or "DatePicker" or "CalendarDatePicker" or "TimePicker"
             or "NumericUpDown" or "TabControl" or "Expander" or "ScrollViewer";
 
@@ -6360,6 +6413,16 @@ public partial class MainWindowViewModel : ViewModelBase
                 sb.AppendLine("</ListBox>");
                 break;
 
+            case TreeView treeView:
+                sb.Append(indent);
+                sb.Append("<TreeView");
+                AppendCanvasLayoutAttributes(sb, element);
+                sb.AppendLine(">");
+                WriteTreeItemsAxaml(sb, DesignerTreeItemRuntime.ReadItems(treeView), indent + "  ");
+                sb.Append(indent);
+                sb.AppendLine("</TreeView>");
+                break;
+
             case Slider slider:
                 sb.Append(indent);
                 sb.Append("<Slider");
@@ -6884,6 +6947,30 @@ public partial class MainWindowViewModel : ViewModelBase
                 sb.Append("<Border />");
                 sb.AppendLine();
                 break;
+        }
+    }
+
+    private static void WriteTreeItemsAxaml(
+        StringBuilder sb,
+        IEnumerable<DesignerTreeItemDefinition> definitions,
+        string indent)
+    {
+        foreach (var definition in definitions)
+        {
+            sb.Append(indent);
+            sb.Append("<TreeViewItem");
+            AppendAttribute(sb, "Header", definition.Header);
+            AppendAttribute(sb, "IsExpanded", definition.IsExpanded.ToString());
+            if (definition.Children.Count == 0)
+            {
+                sb.AppendLine(" />");
+                continue;
+            }
+
+            sb.AppendLine(">");
+            WriteTreeItemsAxaml(sb, definition.Children, indent + "  ");
+            sb.Append(indent);
+            sb.AppendLine("</TreeViewItem>");
         }
     }
 

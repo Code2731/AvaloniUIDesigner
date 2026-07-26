@@ -401,7 +401,7 @@ public static class DesignerStyleRuntime
 
     private static bool SupportsTemplatedControl(string targetType)
         => targetType is "Button" or "TextBox" or "Label" or "CheckBox" or "RadioButton"
-            or "ToggleSwitch" or "ToggleButton" or "ComboBox" or "ListBox" or "Slider"
+            or "ToggleSwitch" or "ToggleButton" or "ComboBox" or "ListBox" or "TreeView" or "Slider"
             or "ProgressBar" or "DatePicker" or "CalendarDatePicker" or "TimePicker"
             or "NumericUpDown" or "TabControl" or "Expander" or "ScrollViewer";
 

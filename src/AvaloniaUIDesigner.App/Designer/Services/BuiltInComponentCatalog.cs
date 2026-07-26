@@ -90,6 +90,12 @@ public sealed class BuiltInComponentCatalog : IComponentCatalog
                 Items = { "Item 1", "Item 2", "Item 3" },
             }),
         new(
+            DisplayName: "TreeView",
+            AvaloniaTypeName: "Avalonia.Controls.TreeView",
+            DefaultWidth: 240,
+            DefaultHeight: 220,
+            VisualFactory: DesignerTreeItemRuntime.CreateDefaultTreeView),
+        new(
             DisplayName: "Slider",
             AvaloniaTypeName: "Avalonia.Controls.Slider",
             DefaultWidth: 180,
