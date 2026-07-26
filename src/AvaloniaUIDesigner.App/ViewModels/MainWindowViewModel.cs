@@ -58,6 +58,23 @@ public sealed record StackPanelAssignmentEditorState(
     int ItemIndex,
     double ItemSize);
 
+public sealed record DockPanelParentOption(
+    string DisplayName,
+    bool LastChildFill,
+    int ChildCount)
+{
+    public override string ToString() => DisplayName;
+}
+
+public sealed record DockPanelAssignmentEditorState(
+    string ControlName,
+    IReadOnlyList<DockPanelParentOption> Parents,
+    string SelectedParentName,
+    int ItemIndex,
+    DesignerDockSide Dock,
+    double ItemSize,
+    bool LastChildFill);
+
 public sealed record ContentParentOption(string DisplayName, string ContainerType)
 {
     public override string ToString() => $"{DisplayName} ({ContainerType})";
@@ -1117,6 +1134,9 @@ public partial class MainWindowViewModel : ViewModelBase
         target.GridRowSpan = rowSpan;
         target.GridColumnSpan = columnSpan;
         target.StackPanelIndex = -1;
+        target.DockPanelIndex = -1;
+        target.DockPanelDock = DesignerDockSide.Left;
+        target.DockPanelItemSize = 40;
         target.ParentLayout = DesignerParentLayoutKind.Grid;
         target.ParentName = parent.DisplayName;
         Canvas.MoveElementsToFront([target]);
@@ -1146,6 +1166,9 @@ public partial class MainWindowViewModel : ViewModelBase
         target.GridColumnSpan = 1;
         target.StackPanelIndex = -1;
         target.StackPanelItemSize = 40;
+        target.DockPanelIndex = -1;
+        target.DockPanelDock = DesignerDockSide.Left;
+        target.DockPanelItemSize = 40;
         target.ParentLayout = DesignerParentLayoutKind.None;
         Canvas.NormalizeContainerRelationships();
         ObjectTree.RebuildFrom(Canvas.Elements);
@@ -1249,7 +1272,7 @@ public partial class MainWindowViewModel : ViewModelBase
         target.StackPanelItemSize = itemSize;
         siblings.Insert(itemIndex, target);
         Canvas.SetStackPanelChildOrder(parent, siblings);
-        Canvas.MoveElementsToFront(siblings);
+        Canvas.MoveElementsToFrontInOrder(siblings);
         Canvas.NormalizeContainerRelationships();
         ObjectTree.RebuildFrom(Canvas.Elements);
         ObjectTree.SelectByElement(target);
@@ -1289,7 +1312,7 @@ public partial class MainWindowViewModel : ViewModelBase
             target.ParentName,
             StringComparison.OrdinalIgnoreCase));
         Canvas.SetStackPanelChildOrder(parent, siblings);
-        Canvas.MoveElementsToFront(siblings);
+        Canvas.MoveElementsToFrontInOrder(siblings);
         Canvas.NormalizeContainerRelationships();
         ObjectTree.RebuildFrom(Canvas.Elements);
         ObjectTree.SelectByElement(target);
@@ -1300,6 +1323,159 @@ public partial class MainWindowViewModel : ViewModelBase
 
     private static StackPanelAssignmentEditorState EmptyStackPanelAssignmentState()
         => new(string.Empty, Array.Empty<StackPanelParentOption>(), string.Empty, 0, 40);
+
+    public bool TryGetSelectedDockPanelAssignment(out DockPanelAssignmentEditorState state)
+    {
+        if (Canvas.SelectedElement is not { IsLocked: false } target
+            || target.Visual is DockPanel)
+        {
+            state = EmptyDockPanelAssignmentState();
+            StatusText = "Select an unlocked non-DockPanel control to assign it to a DockPanel.";
+            return false;
+        }
+
+        var parents = Canvas.Elements
+            .Where(element => element.Visual is DockPanel && !element.IsContainerChild && !element.IsLocked)
+            .Select(element =>
+            {
+                var dockPanel = (DockPanel)element.Visual;
+                var childCount = Canvas.Elements.Count(child =>
+                    !ReferenceEquals(child, target)
+                    && child.IsDockPanelChild
+                    && string.Equals(child.ParentName, element.DisplayName, StringComparison.OrdinalIgnoreCase));
+                return new DockPanelParentOption(
+                    element.DisplayName,
+                    dockPanel.LastChildFill,
+                    childCount);
+            })
+            .ToList();
+        if (parents.Count == 0)
+        {
+            state = EmptyDockPanelAssignmentState();
+            StatusText = "Place an unlocked root DockPanel before assigning a control.";
+            return false;
+        }
+
+        var selectedParent = parents.FirstOrDefault(parent => string.Equals(
+                parent.DisplayName,
+                target.ParentName,
+                StringComparison.OrdinalIgnoreCase))
+            ?? parents[0];
+        state = new DockPanelAssignmentEditorState(
+            target.DisplayName,
+            parents,
+            selectedParent.DisplayName,
+            target.IsDockPanelChild
+                ? Math.Clamp(target.DockPanelIndex, 0, selectedParent.ChildCount)
+                : selectedParent.ChildCount,
+            target.IsDockPanelChild ? target.DockPanelDock : DesignerDockSide.Left,
+            target.IsDockPanelChild ? target.DockPanelItemSize : Math.Max(10, target.Width),
+            selectedParent.LastChildFill);
+        return true;
+    }
+
+    public bool SetSelectedDockPanelAssignment(
+        string parentName,
+        int itemIndex,
+        DesignerDockSide dock,
+        double itemSize,
+        bool lastChildFill)
+    {
+        if (Canvas.SelectedElement is not { IsLocked: false } target
+            || target.Visual is DockPanel)
+        {
+            StatusText = "Select an unlocked non-DockPanel control to assign it to a DockPanel.";
+            return false;
+        }
+
+        var parent = Canvas.Elements.FirstOrDefault(element =>
+            !element.IsContainerChild
+            && !element.IsLocked
+            && element.Visual is DockPanel
+            && string.Equals(element.DisplayName, parentName, StringComparison.OrdinalIgnoreCase));
+        if (parent?.Visual is not DockPanel dockPanel)
+        {
+            StatusText = $"DockPanel '{parentName}' is not available.";
+            return false;
+        }
+
+        var siblings = Canvas.Elements
+            .Where(element => !ReferenceEquals(element, target)
+                && element.IsDockPanelChild
+                && string.Equals(element.ParentName, parent.DisplayName, StringComparison.OrdinalIgnoreCase))
+            .OrderBy(element => element.DockPanelIndex)
+            .ThenBy(element => Canvas.Elements.IndexOf(element))
+            .ToList();
+        if (itemIndex < 0 || itemIndex > siblings.Count || !double.IsFinite(itemSize) || itemSize < 10)
+        {
+            StatusText = $"DockPanel position must be between 1 and {siblings.Count + 1}, with a size of at least 10.";
+            return false;
+        }
+
+        BeginCanvasMutation(HistoryActionType.EditProperty, "Assigned control to DockPanel.");
+        target.DockPanelDock = dock;
+        target.DockPanelItemSize = itemSize;
+        dockPanel.LastChildFill = lastChildFill;
+        siblings.Insert(itemIndex, target);
+        Canvas.SetDockPanelChildOrder(parent, siblings);
+        Canvas.MoveElementsToFrontInOrder(siblings);
+        Canvas.NormalizeContainerRelationships();
+        ObjectTree.RebuildFrom(Canvas.Elements);
+        ObjectTree.SelectByElement(target);
+        CommitCanvasMutation();
+        StatusText = $"Assigned {target.DisplayName} to {parent.DisplayName} at position {itemIndex + 1} ({dock}).";
+        return true;
+    }
+
+    public bool MoveSelectedDockPanelItem(int offset)
+    {
+        if (Canvas.SelectedElement is not { IsLocked: false, IsDockPanelChild: true } target)
+        {
+            StatusText = "Select an unlocked DockPanel child to change its order.";
+            return false;
+        }
+
+        var siblings = Canvas.Elements
+            .Where(element => element.IsDockPanelChild
+                && string.Equals(element.ParentName, target.ParentName, StringComparison.OrdinalIgnoreCase))
+            .OrderBy(element => element.DockPanelIndex)
+            .ThenBy(element => Canvas.Elements.IndexOf(element))
+            .ToList();
+        var currentIndex = siblings.IndexOf(target);
+        var nextIndex = currentIndex + offset;
+        if (currentIndex < 0 || nextIndex < 0 || nextIndex >= siblings.Count)
+        {
+            StatusText = offset < 0
+                ? $"{target.DisplayName} is already the first DockPanel item."
+                : $"{target.DisplayName} is already the last DockPanel item.";
+            return false;
+        }
+
+        var parent = Canvas.Elements.First(element => string.Equals(
+            element.DisplayName,
+            target.ParentName,
+            StringComparison.OrdinalIgnoreCase));
+        BeginCanvasMutation(HistoryActionType.EditProperty, "Reordered DockPanel item.");
+        (siblings[currentIndex], siblings[nextIndex]) = (siblings[nextIndex], siblings[currentIndex]);
+        Canvas.SetDockPanelChildOrder(parent, siblings);
+        Canvas.MoveElementsToFrontInOrder(siblings);
+        Canvas.NormalizeContainerRelationships();
+        ObjectTree.RebuildFrom(Canvas.Elements);
+        ObjectTree.SelectByElement(target);
+        CommitCanvasMutation();
+        StatusText = $"Moved {target.DisplayName} to DockPanel position {nextIndex + 1}.";
+        return true;
+    }
+
+    private static DockPanelAssignmentEditorState EmptyDockPanelAssignmentState()
+        => new(
+            string.Empty,
+            Array.Empty<DockPanelParentOption>(),
+            string.Empty,
+            0,
+            DesignerDockSide.Left,
+            40,
+            true);
 
     public bool TryGetSelectedContentAssignment(out ContentAssignmentEditorState state)
     {
@@ -2834,7 +3010,10 @@ public partial class MainWindowViewModel : ViewModelBase
                 e.GridColumnSpan,
                 e.StackPanelIndex,
                 e.StackPanelItemSize,
-                e.ParentLayout))
+                e.ParentLayout,
+                e.DockPanelIndex,
+                e.DockPanelDock,
+                e.DockPanelItemSize))
             .ToList();
 
         return new DesignerCanvasDocument(
@@ -2949,7 +3128,10 @@ public partial class MainWindowViewModel : ViewModelBase
             element.GridColumnSpan,
             element.StackPanelIndex,
             element.StackPanelItemSize,
-            element.ParentLayout);
+            element.ParentLayout,
+            element.DockPanelIndex,
+            element.DockPanelDock,
+            element.DockPanelItemSize);
     }
 
     private IReadOnlyDictionary<string, string>? CaptureVisualProperties(Control visual)
@@ -3335,6 +3517,15 @@ public partial class MainWindowViewModel : ViewModelBase
             };
         }
 
+        if (visual is DockPanel dockPanel)
+        {
+            return new Dictionary<string, string>
+            {
+                ["LastChildFill"] = dockPanel.LastChildFill.ToString(),
+                ["Opacity"] = dockPanel.Opacity.ToString("0.###", CultureInfo.InvariantCulture),
+            };
+        }
+
         if (visual is Grid grid)
         {
             return new Dictionary<string, string>
@@ -3459,6 +3650,9 @@ public partial class MainWindowViewModel : ViewModelBase
                 || a.StackPanelIndex != b.StackPanelIndex
                 || a.StackPanelItemSize != b.StackPanelItemSize
                 || a.ParentLayout != b.ParentLayout
+                || a.DockPanelIndex != b.DockPanelIndex
+                || a.DockPanelDock != b.DockPanelDock
+                || a.DockPanelItemSize != b.DockPanelItemSize
                 || !DictionaryEquals(a.VisualProperties, b.VisualProperties))
             {
                 return false;
@@ -3519,6 +3713,7 @@ public partial class MainWindowViewModel : ViewModelBase
         {
             var nextIsLocked = false;
             var stackPanelIndex = 0;
+            var dockPanelIndex = 0;
             foreach (var node in container.Nodes())
             {
                 if (node is XComment comment)
@@ -3574,6 +3769,16 @@ public partial class MainWindowViewModel : ViewModelBase
                     parent?.TypeName,
                     "Avalonia.Controls.StackPanel",
                     StringComparison.Ordinal);
+                var isDockPanelChild = string.Equals(
+                    parent?.TypeName,
+                    "Avalonia.Controls.DockPanel",
+                    StringComparison.Ordinal);
+                var dockSide = Enum.TryParse<DesignerDockSide>(
+                    child.Attribute("DockPanel.Dock")?.Value,
+                    ignoreCase: true,
+                    out var parsedDockSide)
+                    ? parsedDockSide
+                    : DesignerDockSide.Left;
                 var parentOrientation = parent?.VisualProperties is not null
                     && parent.VisualProperties.TryGetValue("Orientation", out var orientation)
                     ? orientation
@@ -3582,6 +3787,7 @@ public partial class MainWindowViewModel : ViewModelBase
                 {
                     "Avalonia.Controls.Grid" => DesignerParentLayoutKind.Grid,
                     "Avalonia.Controls.StackPanel" => DesignerParentLayoutKind.StackPanel,
+                    "Avalonia.Controls.DockPanel" => DesignerParentLayoutKind.DockPanel,
                     "Avalonia.Controls.Border"
                         or "Avalonia.Controls.ScrollViewer"
                         or "Avalonia.Controls.Expander" => DesignerParentLayoutKind.Content,
@@ -3607,12 +3813,20 @@ public partial class MainWindowViewModel : ViewModelBase
                             ? width
                             : height
                         : 40,
-                    parentLayout);
+                    parentLayout,
+                    isDockPanelChild ? dockPanelIndex++ : -1,
+                    dockSide,
+                    isDockPanelChild
+                        ? dockSide is DesignerDockSide.Top or DesignerDockSide.Bottom
+                            ? height
+                            : width
+                        : 40);
                 snapshots.Add(snapshot);
                 nextIsLocked = false;
 
                 if (string.Equals(typeName, "Avalonia.Controls.Grid", StringComparison.Ordinal)
                     || string.Equals(typeName, "Avalonia.Controls.StackPanel", StringComparison.Ordinal)
+                    || string.Equals(typeName, "Avalonia.Controls.DockPanel", StringComparison.Ordinal)
                     || string.Equals(typeName, "Avalonia.Controls.Border", StringComparison.Ordinal)
                     || string.Equals(typeName, "Avalonia.Controls.ScrollViewer", StringComparison.Ordinal)
                     || string.Equals(typeName, "Avalonia.Controls.Expander", StringComparison.Ordinal))
@@ -3950,7 +4164,8 @@ public partial class MainWindowViewModel : ViewModelBase
 
             if (attr.IsNamespaceDeclaration
                 || name is "Canvas.Left" or "Canvas.Top" or "Grid.Row" or "Grid.Column"
-                    or "Grid.RowSpan" or "Grid.ColumnSpan" or "Width" or "Height" or "Name")
+                    or "Grid.RowSpan" or "Grid.ColumnSpan" or "DockPanel.Dock"
+                    or "Width" or "Height" or "Name")
             {
                 continue;
             }
@@ -4034,6 +4249,7 @@ public partial class MainWindowViewModel : ViewModelBase
             "Border" => propertyName is "Background" or "BorderBrush" or "BorderThickness" or "CornerRadius",
             "Grid" => propertyName is "RowDefinitions" or "ColumnDefinitions" or "ShowGridLines",
             "StackPanel" => propertyName is "Orientation" or "Spacing",
+            "DockPanel" => propertyName == "LastChildFill",
             _ => false,
         };
     }
@@ -5427,6 +5643,36 @@ public partial class MainWindowViewModel : ViewModelBase
                 sb.AppendLine("</StackPanel>");
                 break;
 
+            case DockPanel dockPanel:
+                sb.Append(indent);
+                sb.Append("<DockPanel");
+                AppendCanvasLayoutAttributes(sb, element);
+                AppendAttribute(sb, "LastChildFill", dockPanel.LastChildFill.ToString());
+                var dockPanelChildren = Canvas.Elements
+                    .Where(child => child.IsDockPanelChild
+                        && string.Equals(
+                            child.ParentName,
+                            element.DisplayName,
+                            StringComparison.OrdinalIgnoreCase))
+                    .OrderBy(child => child.DockPanelIndex)
+                    .ThenBy(child => Canvas.Elements.IndexOf(child))
+                    .ToList();
+                if (dockPanelChildren.Count == 0)
+                {
+                    sb.AppendLine(" />");
+                    break;
+                }
+
+                sb.AppendLine(">");
+                foreach (var child in dockPanelChildren)
+                {
+                    WriteDesignerChildAxaml(sb, child, indent + "  ");
+                }
+
+                sb.Append(indent);
+                sb.AppendLine("</DockPanel>");
+                break;
+
             default:
                 sb.Append(indent);
                 sb.Append("<TextBlock");
@@ -5528,6 +5774,30 @@ public partial class MainWindowViewModel : ViewModelBase
         {
             // Content controls own their child's layout.
         }
+        else if (TryGetDockPanelParent(element, out var dockParent, out var dockPanel))
+        {
+            AppendAttribute(sb, "DockPanel.Dock", element.DockPanelDock.ToString());
+            var siblings = Canvas.Elements
+                .Where(child => child.IsDockPanelChild
+                    && string.Equals(
+                        child.ParentName,
+                        dockParent.DisplayName,
+                        StringComparison.OrdinalIgnoreCase))
+                .OrderBy(child => child.DockPanelIndex)
+                .ThenBy(child => Canvas.Elements.IndexOf(child))
+                .ToList();
+            var isLastFill = dockPanel.LastChildFill
+                && ReferenceEquals(siblings.LastOrDefault(), element);
+            if (!isLastFill)
+            {
+                AppendAttribute(
+                    sb,
+                    element.DockPanelDock is DesignerDockSide.Top or DesignerDockSide.Bottom
+                        ? "Height"
+                        : "Width",
+                    element.DockPanelItemSize.ToString("0.###", CultureInfo.InvariantCulture));
+            }
+        }
         else
         {
             AppendAttribute(sb, "Canvas.Left", element.X.ToString("0.###", CultureInfo.InvariantCulture));
@@ -5582,6 +5852,7 @@ public partial class MainWindowViewModel : ViewModelBase
     private bool HasValidContainerParent(DesignElement element)
         => HasValidGridParent(element)
             || TryGetStackPanelParent(element, out _)
+            || TryGetDockPanelParent(element, out _, out _)
             || TryGetContentParent(element, out _);
 
     private bool TryGetStackPanelParent(DesignElement element, out StackPanel stackPanel)
@@ -5609,6 +5880,23 @@ public partial class MainWindowViewModel : ViewModelBase
                     element.ParentName,
                     StringComparison.OrdinalIgnoreCase))!;
         return parent is not null;
+    }
+
+    private bool TryGetDockPanelParent(
+        DesignElement element,
+        out DesignElement parent,
+        out DockPanel dockPanel)
+    {
+        parent = element.ParentName is null
+            ? null!
+            : Canvas.Elements.FirstOrDefault(candidate =>
+                candidate.Visual is DockPanel
+                && string.Equals(
+                    candidate.DisplayName,
+                    element.ParentName,
+                    StringComparison.OrdinalIgnoreCase))!;
+        dockPanel = parent?.Visual as DockPanel ?? null!;
+        return dockPanel is not null;
     }
 
     private DesignElement? GetDesignerContentChild(DesignElement parent)

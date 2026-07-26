@@ -206,6 +206,15 @@ public sealed class BuiltInComponentCatalog : IComponentCatalog
             {
                 Orientation = Orientation.Vertical,
                 Spacing = 6,
+            }),
+        new(
+            DisplayName: "DockPanel",
+            AvaloniaTypeName: "Avalonia.Controls.DockPanel",
+            DefaultWidth: 260,
+            DefaultHeight: 180,
+            VisualFactory: static () => new DockPanel
+            {
+                LastChildFill = true,
             })
     };
 

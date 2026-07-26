@@ -109,6 +109,7 @@ public partial class ObjectTreeViewModel : ViewModelBase
                     && nodesByName.TryGetValue(parentName, out var parent)
                     && parent.Element?.Visual is Avalonia.Controls.Grid
                         or Avalonia.Controls.StackPanel
+                        or Avalonia.Controls.DockPanel
                         or Avalonia.Controls.Border
                         or Avalonia.Controls.ScrollViewer
                         or Avalonia.Controls.Expander)
@@ -127,6 +128,20 @@ public partial class ObjectTreeViewModel : ViewModelBase
             {
                 var ordered = parent.Children
                     .OrderBy(node => node.Element?.StackPanelIndex ?? int.MaxValue)
+                    .ToList();
+                parent.Children.Clear();
+                foreach (var child in ordered)
+                {
+                    parent.Children.Add(child);
+                }
+            }
+
+            foreach (var parent in _allChildren.Where(node =>
+                         node.Element?.Visual is Avalonia.Controls.DockPanel
+                         && node.Children.Count > 1))
+            {
+                var ordered = parent.Children
+                    .OrderBy(node => node.Element?.DockPanelIndex ?? int.MaxValue)
                     .ToList();
                 parent.Children.Clear();
                 foreach (var child in ordered)

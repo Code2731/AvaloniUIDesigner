@@ -13,6 +13,7 @@ using Avalonia.Input;
 using Avalonia.Layout;
 using Avalonia.Platform.Storage;
 using Avalonia.Threading;
+using AvaloniaUIDesigner.App.Designer.Core;
 using AvaloniaUIDesigner.App.Designer.Services;
 using AvaloniaUIDesigner.App.Models;
 using AvaloniaUIDesigner.App.ViewModels;
@@ -36,6 +37,12 @@ public partial class MainWindow : Window
         string ParentName,
         int ItemIndex,
         double ItemSize);
+    private sealed record DockPanelAssignmentOptions(
+        string ParentName,
+        int ItemIndex,
+        DesignerDockSide Dock,
+        double ItemSize,
+        bool LastChildFill);
     private sealed record ContentAssignmentOptions(string ParentName);
 
     private const double HandleHalf = 5;
@@ -649,6 +656,32 @@ public partial class MainWindow : Window
 
     private void OnMoveStackPanelItemLaterMenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
         => Vm?.MoveSelectedStackPanelItem(1);
+
+    private async void OnAssignToDockPanelMenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        FlushPendingPropertyHistory();
+        if (Vm is null || !Vm.TryGetSelectedDockPanelAssignment(out var state))
+        {
+            return;
+        }
+
+        var updated = await ShowDockPanelAssignmentDialogAsync(state);
+        if (updated is not null)
+        {
+            Vm.SetSelectedDockPanelAssignment(
+                updated.ParentName,
+                updated.ItemIndex,
+                updated.Dock,
+                updated.ItemSize,
+                updated.LastChildFill);
+        }
+    }
+
+    private void OnMoveDockPanelItemEarlierMenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+        => Vm?.MoveSelectedDockPanelItem(-1);
+
+    private void OnMoveDockPanelItemLaterMenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+        => Vm?.MoveSelectedDockPanelItem(1);
 
     private void OnRemoveFromContainerMenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
@@ -1366,6 +1399,13 @@ public partial class MainWindow : Window
             Vm?.Canvas.ReflowContainerChildren(_boundElement);
         }
 
+        if (control is DockPanel
+            && e.Property.Name == "LastChildFill"
+            && _boundElement is not null)
+        {
+            Vm?.Canvas.ReflowContainerChildren(_boundElement);
+        }
+
         if (control is Border
             && e.Property.Name == "BorderThickness"
             && _boundElement is not null)
@@ -1502,6 +1542,11 @@ public partial class MainWindow : Window
         if (control is StackPanel)
         {
             return propertyName is "Orientation" or "Spacing";
+        }
+
+        if (control is DockPanel)
+        {
+            return propertyName == "LastChildFill";
         }
 
         if (control is Grid)
@@ -2722,6 +2767,134 @@ public partial class MainWindow : Window
         dialog.Content = content;
 
         return await dialog.ShowDialog<StackPanelAssignmentOptions?>(this);
+    }
+
+    private async Task<DockPanelAssignmentOptions?> ShowDockPanelAssignmentDialogAsync(
+        DockPanelAssignmentEditorState state)
+    {
+        var parentSelector = new ComboBox
+        {
+            ItemsSource = state.Parents,
+            SelectedItem = state.Parents.First(parent => string.Equals(
+                parent.DisplayName,
+                state.SelectedParentName,
+                StringComparison.OrdinalIgnoreCase)),
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+        };
+        var positionEditor = new NumericUpDown
+        {
+            Minimum = 1,
+            Value = state.ItemIndex + 1,
+        };
+        var dockSelector = new ComboBox
+        {
+            ItemsSource = Enum.GetValues<DesignerDockSide>(),
+            SelectedItem = state.Dock,
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+        };
+        var sizeEditor = new NumericUpDown
+        {
+            Minimum = 10,
+            Maximum = 2000,
+            Increment = 4,
+            Value = (decimal)state.ItemSize,
+        };
+        var lastChildFillCheck = new CheckBox
+        {
+            Content = "Last child fills remaining space",
+            IsChecked = state.LastChildFill,
+        };
+        var sizeHint = new TextBlock
+        {
+            Foreground = Avalonia.Media.Brushes.Gray,
+            TextWrapping = Avalonia.Media.TextWrapping.Wrap,
+        };
+        var dialog = new Window
+        {
+            Title = $"Assign to DockPanel - {state.ControlName}",
+            Width = 460,
+            Height = 440,
+            MinWidth = 400,
+            MinHeight = 400,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner,
+        };
+
+        void UpdateParentState()
+        {
+            if (parentSelector.SelectedItem is not DockPanelParentOption parent)
+            {
+                return;
+            }
+
+            positionEditor.Maximum = parent.ChildCount + 1;
+            lastChildFillCheck.IsChecked = parent.LastChildFill;
+        }
+
+        void UpdateSizeHint()
+        {
+            sizeHint.Text = dockSelector.SelectedItem is DesignerDockSide.Top or DesignerDockSide.Bottom
+                ? "Item size controls Height unless this is the LastChildFill item."
+                : "Item size controls Width unless this is the LastChildFill item.";
+        }
+
+        parentSelector.SelectionChanged += (_, _) => UpdateParentState();
+        dockSelector.SelectionChanged += (_, _) => UpdateSizeHint();
+        UpdateParentState();
+        UpdateSizeHint();
+
+        var assignButton = new Button { Content = "Assign", MinWidth = 84 };
+        assignButton.Click += (_, _) =>
+        {
+            if (parentSelector.SelectedItem is not DockPanelParentOption parent
+                || dockSelector.SelectedItem is not DesignerDockSide dock)
+            {
+                return;
+            }
+
+            dialog.Close(new DockPanelAssignmentOptions(
+                parent.DisplayName,
+                (int)(positionEditor.Value ?? 1) - 1,
+                dock,
+                (double)(sizeEditor.Value ?? 40),
+                lastChildFillCheck.IsChecked == true));
+        };
+        var cancelButton = new Button { Content = "Cancel", MinWidth = 84 };
+        cancelButton.Click += (_, _) => dialog.Close(null);
+        var buttons = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            Spacing = 8,
+            HorizontalAlignment = HorizontalAlignment.Right,
+            Children = { cancelButton, assignButton },
+        };
+        var fields = new StackPanel
+        {
+            Spacing = 6,
+            Children =
+            {
+                new TextBlock { Text = "Parent DockPanel" },
+                parentSelector,
+                new TextBlock { Text = "Position (1-based)" },
+                positionEditor,
+                new TextBlock { Text = "Dock side" },
+                dockSelector,
+                new TextBlock { Text = "Item size" },
+                sizeEditor,
+                lastChildFillCheck,
+                sizeHint,
+            },
+        };
+        var content = new Grid
+        {
+            Margin = new Thickness(16),
+            RowDefinitions = new RowDefinitions("*,Auto"),
+            RowSpacing = 12,
+            Children = { fields, buttons },
+        };
+        Grid.SetRow(buttons, 1);
+        dialog.Content = content;
+
+        return await dialog.ShowDialog<DockPanelAssignmentOptions?>(this);
     }
 
     private async Task<ContentAssignmentOptions?> ShowContentAssignmentDialogAsync(

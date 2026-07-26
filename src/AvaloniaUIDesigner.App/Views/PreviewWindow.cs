@@ -64,6 +64,7 @@ public sealed class PreviewWindow : Window
         var containersByName = document.Elements
             .Where(element => string.Equals(element.TypeName, "Avalonia.Controls.Grid", StringComparison.Ordinal)
                 || string.Equals(element.TypeName, "Avalonia.Controls.StackPanel", StringComparison.Ordinal)
+                || string.Equals(element.TypeName, "Avalonia.Controls.DockPanel", StringComparison.Ordinal)
                 || string.Equals(element.TypeName, "Avalonia.Controls.Border", StringComparison.Ordinal)
                 || string.Equals(element.TypeName, "Avalonia.Controls.ScrollViewer", StringComparison.Ordinal)
                 || string.Equals(element.TypeName, "Avalonia.Controls.Expander", StringComparison.Ordinal))
@@ -104,14 +105,17 @@ public sealed class PreviewWindow : Window
 
             var orderedChildren = parent is StackPanel
                 ? children.OrderBy(child => child.StackPanelIndex).ToList()
+                : parent is DockPanel
+                    ? children.OrderBy(child => child.DockPanelIndex).ToList()
                 : children;
             if (parent is StackPanel stackPanel)
             {
                 stackPanel.Children.Clear();
             }
 
-            foreach (var childSnapshot in orderedChildren)
+            for (var index = 0; index < orderedChildren.Count; index++)
             {
+                var childSnapshot = orderedChildren[index];
                 var child = CreateControl(childSnapshot, colorResources, styles);
                 switch (parent)
                 {
@@ -133,6 +137,28 @@ public sealed class PreviewWindow : Window
                         }
 
                         stack.Children.Add(child);
+                        break;
+                    case DockPanel dock:
+                        DockPanel.SetDock(child, childSnapshot.DockPanelDock switch
+                        {
+                            DesignerDockSide.Top => Dock.Top,
+                            DesignerDockSide.Right => Dock.Right,
+                            DesignerDockSide.Bottom => Dock.Bottom,
+                            _ => Dock.Left,
+                        });
+                        if (!dock.LastChildFill || index != orderedChildren.Count - 1)
+                        {
+                            if (childSnapshot.DockPanelDock is DesignerDockSide.Top or DesignerDockSide.Bottom)
+                            {
+                                child.Height = Math.Max(10, childSnapshot.DockPanelItemSize);
+                            }
+                            else
+                            {
+                                child.Width = Math.Max(10, childSnapshot.DockPanelItemSize);
+                            }
+                        }
+
+                        dock.Children.Add(child);
                         break;
                     case Border border:
                         border.Child = child;
@@ -229,6 +255,10 @@ public sealed class PreviewWindow : Window
             {
                 Orientation = Orientation.Vertical,
                 Spacing = 6,
+            },
+            "Avalonia.Controls.DockPanel" => new DockPanel
+            {
+                LastChildFill = true,
             },
             _ => new TextBlock { Text = $"[Unsupported: {snapshot.DisplayName}]" },
         };
@@ -506,6 +536,13 @@ public sealed class PreviewWindow : Window
                 break;
             case StackPanel stackPanel:
                 ApplyStackPanelProperties(stackPanel, properties);
+                break;
+            case DockPanel dockPanel:
+                if (properties.TryGetValue("LastChildFill", out var lastChildFill)
+                    && bool.TryParse(lastChildFill, out var parsedLastChildFill))
+                {
+                    dockPanel.LastChildFill = parsedLastChildFill;
+                }
                 break;
         }
     }

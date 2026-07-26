@@ -7,7 +7,16 @@ public enum DesignerParentLayoutKind
     None,
     Grid,
     StackPanel,
+    DockPanel,
     Content,
+}
+
+public enum DesignerDockSide
+{
+    Left,
+    Top,
+    Right,
+    Bottom,
 }
 
 public sealed record DesignerCanvasDocument(
@@ -49,4 +58,7 @@ public sealed record DesignerElementSnapshot(
     int GridColumnSpan = 1,
     int StackPanelIndex = -1,
     double StackPanelItemSize = 40,
-    DesignerParentLayoutKind ParentLayout = DesignerParentLayoutKind.None);
+    DesignerParentLayoutKind ParentLayout = DesignerParentLayoutKind.None,
+    int DockPanelIndex = -1,
+    DesignerDockSide DockPanelDock = DesignerDockSide.Left,
+    double DockPanelItemSize = 40);

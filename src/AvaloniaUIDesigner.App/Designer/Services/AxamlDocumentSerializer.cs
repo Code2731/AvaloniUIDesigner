@@ -122,6 +122,13 @@ public sealed class AxamlDocumentSerializer : IDesignerSerializer
         {
             AppendStackPanelItemSize(sb, element, parent);
         }
+        else if (string.Equals(
+                     parent.TypeName,
+                     "Avalonia.Controls.DockPanel",
+                     StringComparison.Ordinal))
+        {
+            AppendDockPanelAttributes(sb, element, parent, childrenByParent);
+        }
 
         AppendVisualAttributes(sb, element.VisualProperties);
         if (!childrenByParent.TryGetValue(element.DisplayName, out var children) || children.Count == 0)
@@ -136,6 +143,8 @@ public sealed class AxamlDocumentSerializer : IDesignerSerializer
                 "Avalonia.Controls.StackPanel",
                 StringComparison.Ordinal)
             ? children.OrderBy(child => child.StackPanelIndex).ToList()
+            : string.Equals(element.TypeName, "Avalonia.Controls.DockPanel", StringComparison.Ordinal)
+                ? children.OrderBy(child => child.DockPanelIndex).ToList()
             : children;
         foreach (var child in orderedChildren)
         {
@@ -195,9 +204,39 @@ public sealed class AxamlDocumentSerializer : IDesignerSerializer
     private static bool IsContainer(DesignerElementSnapshot element)
         => string.Equals(element.TypeName, "Avalonia.Controls.Grid", StringComparison.Ordinal)
             || string.Equals(element.TypeName, "Avalonia.Controls.StackPanel", StringComparison.Ordinal)
+            || string.Equals(element.TypeName, "Avalonia.Controls.DockPanel", StringComparison.Ordinal)
             || string.Equals(element.TypeName, "Avalonia.Controls.Border", StringComparison.Ordinal)
             || string.Equals(element.TypeName, "Avalonia.Controls.ScrollViewer", StringComparison.Ordinal)
             || string.Equals(element.TypeName, "Avalonia.Controls.Expander", StringComparison.Ordinal);
+
+    private static void AppendDockPanelAttributes(
+        StringBuilder sb,
+        DesignerElementSnapshot element,
+        DesignerElementSnapshot parent,
+        IReadOnlyDictionary<string, List<DesignerElementSnapshot>> childrenByParent)
+    {
+        sb.Append(" DockPanel.Dock=\"");
+        sb.Append(element.DockPanelDock);
+        sb.Append('"');
+        var isLastFill = parent.VisualProperties is not null
+            && parent.VisualProperties.TryGetValue("LastChildFill", out var value)
+            && bool.TryParse(value, out var lastChildFill)
+            && lastChildFill
+            && childrenByParent.TryGetValue(parent.DisplayName, out var siblings)
+            && ReferenceEquals(
+                siblings.OrderBy(child => child.DockPanelIndex).LastOrDefault(),
+                element);
+        if (isLastFill)
+        {
+            return;
+        }
+
+        sb.Append(element.DockPanelDock is DesignerDockSide.Top or DesignerDockSide.Bottom
+            ? " Height=\""
+            : " Width=\"");
+        sb.Append(ToInvariantString(element.DockPanelItemSize));
+        sb.Append('"');
+    }
 
     private static void AppendVisualAttributes(StringBuilder sb, IReadOnlyDictionary<string, string>? properties)
     {

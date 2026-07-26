@@ -61,9 +61,12 @@
                 <MenuItem Header="Edit Grid Definitions..." Click="OnEditGridDefinitionsMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
                 <MenuItem Header="Assign to Grid Cell..." Click="OnAssignToGridCellMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
                 <MenuItem Header="Assign to StackPanel..." Click="OnAssignToStackPanelMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
+                <MenuItem Header="Assign to DockPanel..." Click="OnAssignToDockPanelMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
                 <MenuItem Header="Assign as Container Content..." Click="OnAssignAsContainerContentMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
                 <MenuItem Header="Move StackPanel Item Earlier" Click="OnMoveStackPanelItemEarlierMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
                 <MenuItem Header="Move StackPanel Item Later" Click="OnMoveStackPanelItemLaterMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
+                <MenuItem Header="Move DockPanel Item Earlier" Click="OnMoveDockPanelItemEarlierMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
+                <MenuItem Header="Move DockPanel Item Later" Click="OnMoveDockPanelItemLaterMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
                 <MenuItem Header="Remove from Container" Click="OnRemoveFromContainerMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
                 <MenuItem Header="Edit Content..." Click="OnEditExpanderContentMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
                 <MenuItem Header="Edit Click Handler..." Click="OnEditButtonClickHandlerMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
@@ -319,9 +322,12 @@
                                                     <MenuItem Header="Edit Grid Definitions..." Click="OnEditGridDefinitionsMenuClicked"/>
                                                     <MenuItem Header="Assign to Grid Cell..." Click="OnAssignToGridCellMenuClicked"/>
                                                     <MenuItem Header="Assign to StackPanel..." Click="OnAssignToStackPanelMenuClicked"/>
+                                                    <MenuItem Header="Assign to DockPanel..." Click="OnAssignToDockPanelMenuClicked"/>
                                                     <MenuItem Header="Assign as Container Content..." Click="OnAssignAsContainerContentMenuClicked"/>
                                                     <MenuItem Header="Move StackPanel Item Earlier" Click="OnMoveStackPanelItemEarlierMenuClicked"/>
                                                     <MenuItem Header="Move StackPanel Item Later" Click="OnMoveStackPanelItemLaterMenuClicked"/>
+                                                    <MenuItem Header="Move DockPanel Item Earlier" Click="OnMoveDockPanelItemEarlierMenuClicked"/>
+                                                    <MenuItem Header="Move DockPanel Item Later" Click="OnMoveDockPanelItemLaterMenuClicked"/>
                                                     <MenuItem Header="Remove from Container" Click="OnRemoveFromContainerMenuClicked"/>
                                                     <MenuItem Header="Delete" Click="OnDeleteMenuClicked"/>
                                                     <Separator/>
@@ -406,6 +412,18 @@
                                                             HorizontalAlignment="Right"
                                                             IsVisible="{Binding IsContentChild}">
                                                         <TextBlock Text="{Binding ContainerLayoutLabel}"
+                                                                   FontSize="9"
+                                                                   FontWeight="SemiBold"
+                                                                   Foreground="White"/>
+                                                    </Border>
+                                                    <Border Background="#7C2D12"
+                                                            BorderBrush="#FB923C"
+                                                            BorderThickness="1"
+                                                            CornerRadius="3"
+                                                            Padding="4,1"
+                                                            HorizontalAlignment="Right"
+                                                            IsVisible="{Binding IsDockPanelChild}">
+                                                        <TextBlock Text="{Binding DockPanelItemLabel}"
                                                                    FontSize="9"
                                                                    FontWeight="SemiBold"
                                                                    Foreground="White"/>

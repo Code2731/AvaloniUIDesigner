@@ -316,6 +316,9 @@ public partial class CanvasViewModel : ViewModelBase
             element.StackPanelIndex = snapshot.StackPanelIndex;
             element.StackPanelItemSize = Math.Max(10, snapshot.StackPanelItemSize);
             element.ParentLayout = snapshot.ParentLayout;
+            element.DockPanelIndex = snapshot.DockPanelIndex;
+            element.DockPanelDock = snapshot.DockPanelDock;
+            element.DockPanelItemSize = Math.Max(10, snapshot.DockPanelItemSize);
             element.ParentName = snapshot.ParentName;
         }
         finally
@@ -470,6 +473,9 @@ public partial class CanvasViewModel : ViewModelBase
             child.StackPanelIndex = -1;
             child.StackPanelItemSize = 40;
             child.ParentLayout = DesignerParentLayoutKind.None;
+            child.DockPanelIndex = -1;
+            child.DockPanelDock = DesignerDockSide.Left;
+            child.DockPanelItemSize = 40;
         }
 
         element.PropertyChanged -= OnDesignElementPropertyChanged;
@@ -553,6 +559,19 @@ public partial class CanvasViewModel : ViewModelBase
 
                     element.StackPanelItemSize = Math.Max(10, element.StackPanelItemSize);
                 }
+                else if (parent.Visual is DockPanel)
+                {
+                    element.ParentLayout = DesignerParentLayoutKind.DockPanel;
+                    element.StackPanelIndex = -1;
+                    if (element.DockPanelIndex < 0)
+                    {
+                        element.DockPanelIndex = GetDirectChildren(parent).Count(child =>
+                            child.ParentLayout == DesignerParentLayoutKind.DockPanel
+                            && child.DockPanelIndex >= 0);
+                    }
+
+                    element.DockPanelItemSize = Math.Max(10, element.DockPanelItemSize);
+                }
                 else
                 {
                     element.ParentLayout = DesignerParentLayoutKind.Content;
@@ -603,6 +622,9 @@ public partial class CanvasViewModel : ViewModelBase
                 child.GridRowSpan = 1;
                 child.GridColumnSpan = 1;
                 child.StackPanelIndex = index;
+                child.DockPanelIndex = -1;
+                child.DockPanelDock = DesignerDockSide.Left;
+                child.DockPanelItemSize = 40;
                 child.ParentLayout = DesignerParentLayoutKind.StackPanel;
                 child.ParentName = parent.DisplayName;
             }
@@ -636,6 +658,9 @@ public partial class CanvasViewModel : ViewModelBase
             child.GridRowSpan = 1;
             child.GridColumnSpan = 1;
             child.StackPanelIndex = -1;
+            child.DockPanelIndex = -1;
+            child.DockPanelDock = DesignerDockSide.Left;
+            child.DockPanelItemSize = 40;
             child.ParentLayout = DesignerParentLayoutKind.Content;
             child.ParentName = parent.DisplayName;
             ClearBuiltInContent(parent.Visual);
@@ -649,10 +674,75 @@ public partial class CanvasViewModel : ViewModelBase
         return replaced;
     }
 
+    public void SetDockPanelChildOrder(
+        DesignElement parent,
+        IReadOnlyList<DesignElement> orderedChildren)
+    {
+        if (parent.Visual is not DockPanel)
+        {
+            return;
+        }
+
+        _isReflowingContainerChildren = true;
+        try
+        {
+            for (var index = 0; index < orderedChildren.Count; index++)
+            {
+                var child = orderedChildren[index];
+                child.GridRow = 0;
+                child.GridColumn = 0;
+                child.GridRowSpan = 1;
+                child.GridColumnSpan = 1;
+                child.StackPanelIndex = -1;
+                child.StackPanelItemSize = 40;
+                child.DockPanelIndex = index;
+                child.ParentLayout = DesignerParentLayoutKind.DockPanel;
+                child.ParentName = parent.DisplayName;
+            }
+
+            ReflowContainerTreeCore(parent);
+        }
+        finally
+        {
+            _isReflowingContainerChildren = false;
+        }
+    }
+
     public bool MoveElementsToFront(IEnumerable<DesignElement> elements)
     {
         var moving = Elements.Where(elements.Contains).ToList();
         if (moving.Count == 0 || Elements.Skip(Elements.Count - moving.Count).SequenceEqual(moving))
+        {
+            return false;
+        }
+
+        foreach (var element in moving)
+        {
+            Elements.Remove(element);
+        }
+
+        foreach (var element in moving)
+        {
+            Elements.Add(element);
+        }
+
+        return true;
+    }
+
+    public bool MoveElementsToFrontInOrder(IEnumerable<DesignElement> elements)
+    {
+        var moving = elements
+            .Where(Elements.Contains)
+            .Distinct()
+            .ToList();
+        if (moving.Count == 0)
+        {
+            return false;
+        }
+
+        var current = Elements.Where(moving.Contains).ToList();
+        var alreadyAtFront = Elements.Skip(Elements.Count - moving.Count).SequenceEqual(moving);
+        if (alreadyAtFront && current.SequenceEqual(moving))
         {
             return false;
         }
@@ -877,6 +967,10 @@ public partial class CanvasViewModel : ViewModelBase
         {
             ReflowStackPanelChildrenCore(parent, stackPanel);
         }
+        else if (parent.Visual is DockPanel dockPanel)
+        {
+            ReflowDockPanelChildrenCore(parent, dockPanel);
+        }
         else if (parent.Visual is Grid)
         {
             foreach (var child in GetDirectChildren(parent))
@@ -968,6 +1062,89 @@ public partial class CanvasViewModel : ViewModelBase
         child.Height = Math.Max(10, parent.Height - top - bottom);
     }
 
+    private void ReflowDockPanelChildrenCore(DesignElement parent, DockPanel dockPanel)
+    {
+        var children = GetDirectChildren(parent)
+            .Where(child => child.IsDockPanelChild)
+            .OrderBy(child => child.DockPanelIndex)
+            .ThenBy(Elements.IndexOf)
+            .ToList();
+        if (children.Count == 0)
+        {
+            return;
+        }
+
+        dockPanel.Children.Clear();
+        var remaining = new Rect(parent.X, parent.Y, parent.Width, parent.Height);
+        for (var index = 0; index < children.Count; index++)
+        {
+            var child = children[index];
+            child.DockPanelIndex = index;
+            child.DockPanelItemSize = Math.Max(10, child.DockPanelItemSize);
+            if (dockPanel.LastChildFill && index == children.Count - 1)
+            {
+                SetElementBounds(child, remaining);
+                continue;
+            }
+
+            switch (child.DockPanelDock)
+            {
+                case DesignerDockSide.Top:
+                    var topHeight = Math.Min(child.DockPanelItemSize, Math.Max(10, remaining.Height));
+                    SetElementBounds(child, new Rect(remaining.X, remaining.Y, remaining.Width, topHeight));
+                    remaining = new Rect(
+                        remaining.X,
+                        remaining.Y + topHeight,
+                        remaining.Width,
+                        Math.Max(0, remaining.Height - topHeight));
+                    break;
+                case DesignerDockSide.Right:
+                    var rightWidth = Math.Min(child.DockPanelItemSize, Math.Max(10, remaining.Width));
+                    SetElementBounds(child, new Rect(
+                        remaining.Right - rightWidth,
+                        remaining.Y,
+                        rightWidth,
+                        remaining.Height));
+                    remaining = new Rect(
+                        remaining.X,
+                        remaining.Y,
+                        Math.Max(0, remaining.Width - rightWidth),
+                        remaining.Height);
+                    break;
+                case DesignerDockSide.Bottom:
+                    var bottomHeight = Math.Min(child.DockPanelItemSize, Math.Max(10, remaining.Height));
+                    SetElementBounds(child, new Rect(
+                        remaining.X,
+                        remaining.Bottom - bottomHeight,
+                        remaining.Width,
+                        bottomHeight));
+                    remaining = new Rect(
+                        remaining.X,
+                        remaining.Y,
+                        remaining.Width,
+                        Math.Max(0, remaining.Height - bottomHeight));
+                    break;
+                default:
+                    var leftWidth = Math.Min(child.DockPanelItemSize, Math.Max(10, remaining.Width));
+                    SetElementBounds(child, new Rect(remaining.X, remaining.Y, leftWidth, remaining.Height));
+                    remaining = new Rect(
+                        remaining.X + leftWidth,
+                        remaining.Y,
+                        Math.Max(0, remaining.Width - leftWidth),
+                        remaining.Height);
+                    break;
+            }
+        }
+    }
+
+    private static void SetElementBounds(DesignElement element, Rect bounds)
+    {
+        element.X = bounds.X;
+        element.Y = bounds.Y;
+        element.Width = Math.Max(10, bounds.Width);
+        element.Height = Math.Max(10, bounds.Height);
+    }
+
     private List<DesignElement> GetDirectChildren(DesignElement parent)
         => Elements.Where(element => string.Equals(
                 element.ParentName,
@@ -993,6 +1170,9 @@ public partial class CanvasViewModel : ViewModelBase
         child.StackPanelIndex = -1;
         child.StackPanelItemSize = 40;
         child.ParentLayout = DesignerParentLayoutKind.None;
+        child.DockPanelIndex = -1;
+        child.DockPanelDock = DesignerDockSide.Left;
+        child.DockPanelItemSize = 40;
     }
 
     private void OnDesignElementPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
@@ -1009,6 +1189,9 @@ public partial class CanvasViewModel : ViewModelBase
             or nameof(DesignElement.GridColumnSpan)
             or nameof(DesignElement.StackPanelIndex)
             or nameof(DesignElement.StackPanelItemSize)
+            or nameof(DesignElement.DockPanelIndex)
+            or nameof(DesignElement.DockPanelDock)
+            or nameof(DesignElement.DockPanelItemSize)
             or nameof(DesignElement.ParentLayout))
         {
             ReflowContainerChild(element);
@@ -1032,7 +1215,7 @@ public partial class CanvasViewModel : ViewModelBase
     }
 
     private static bool IsDesignerContainer(Control visual)
-        => visual is Grid or StackPanel or Border or ScrollViewer or Expander;
+        => visual is Grid or StackPanel or DockPanel or Border or ScrollViewer or Expander;
 
     private static bool IsContentContainer(Control visual)
         => visual is Border or ScrollViewer or Expander;
@@ -1564,6 +1747,17 @@ public partial class CanvasViewModel : ViewModelBase
             if (properties.TryGetValue("__children", out var childrenJson))
             {
                 RestoreStackPanelChildren(stackPanel, childrenJson);
+            }
+
+            return;
+        }
+
+        if (visual is DockPanel dockPanel)
+        {
+            if (properties.TryGetValue("LastChildFill", out var lastChildFill)
+                && bool.TryParse(lastChildFill, out var parsedLastChildFill))
+            {
+                dockPanel.LastChildFill = parsedLastChildFill;
             }
 
             return;
