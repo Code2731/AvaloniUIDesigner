@@ -1057,6 +1057,19 @@ public partial class MainWindow : Window
         Vm.StatusText = "Opened runtime preview.";
     }
 
+    private async void OnEditAxamlSourceMenuClicked(
+        object? sender,
+        Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        FlushPendingPropertyHistory();
+        if (Vm is null)
+        {
+            return;
+        }
+
+        await ShowAxamlSourceEditorDialogAsync(Vm.ExportFullAxaml());
+    }
+
     private void OnZoomInMenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
         Vm?.Canvas.ZoomIn();
@@ -2713,6 +2726,108 @@ public partial class MainWindow : Window
         dialog.Content = content;
 
         return await dialog.ShowDialog<IReadOnlyList<string>?>(this);
+    }
+
+    private async Task ShowAxamlSourceEditorDialogAsync(string source)
+    {
+        if (Vm is null)
+        {
+            return;
+        }
+
+        var editor = new TextBox
+        {
+            Text = source,
+            AcceptsReturn = true,
+            AcceptsTab = true,
+            FontFamily = new Avalonia.Media.FontFamily("Consolas"),
+            FontSize = 13,
+            TextWrapping = Avalonia.Media.TextWrapping.NoWrap,
+        };
+        ScrollViewer.SetHorizontalScrollBarVisibility(editor, ScrollBarVisibility.Auto);
+        ScrollViewer.SetVerticalScrollBarVisibility(editor, ScrollBarVisibility.Auto);
+        var resultText = new TextBlock
+        {
+            Text = "Edit the complete Window or UserControl AXAML, then validate or preview before applying.",
+            Foreground = Avalonia.Media.Brushes.SlateGray,
+            TextWrapping = Avalonia.Media.TextWrapping.Wrap,
+        };
+        var dialog = new Window
+        {
+            Title = "Edit AXAML Source",
+            Width = 960,
+            Height = 720,
+            MinWidth = 640,
+            MinHeight = 440,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner,
+        };
+        var validateButton = new Button { Content = "Validate", MinWidth = 84 };
+        validateButton.Click += (_, _) =>
+        {
+            var isValid = Vm.TryValidateAxamlSource(editor.Text ?? string.Empty, out var result);
+            resultText.Foreground = isValid
+                ? Avalonia.Media.Brushes.SeaGreen
+                : Avalonia.Media.Brushes.IndianRed;
+            resultText.Text = result;
+        };
+        var previewButton = new Button { Content = "Preview", MinWidth = 84 };
+        previewButton.Click += (_, _) =>
+        {
+            if (!Vm.TryCreatePreviewDocumentFromAxaml(
+                    editor.Text ?? string.Empty,
+                    out var document,
+                    out var result))
+            {
+                resultText.Foreground = Avalonia.Media.Brushes.IndianRed;
+                resultText.Text = result;
+                return;
+            }
+
+            resultText.Foreground = Avalonia.Media.Brushes.SeaGreen;
+            resultText.Text = result;
+            try
+            {
+                var preview = new PreviewWindow(document);
+                preview.Show(dialog);
+            }
+            catch (Exception ex)
+            {
+                resultText.Foreground = Avalonia.Media.Brushes.IndianRed;
+                resultText.Text = $"AXAML preview failed: {ex.Message}";
+            }
+        };
+        var applyButton = new Button { Content = "Apply", MinWidth = 84 };
+        applyButton.Click += (_, _) =>
+        {
+            if (!Vm.TryApplyAxamlSource(editor.Text ?? string.Empty, out var result))
+            {
+                resultText.Foreground = Avalonia.Media.Brushes.IndianRed;
+                resultText.Text = result;
+                return;
+            }
+
+            dialog.Close();
+        };
+        var cancelButton = new Button { Content = "Cancel", MinWidth = 84 };
+        cancelButton.Click += (_, _) => dialog.Close();
+        var buttons = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            Spacing = 8,
+            HorizontalAlignment = HorizontalAlignment.Right,
+            Children = { cancelButton, validateButton, previewButton, applyButton },
+        };
+        var content = new Grid
+        {
+            Margin = new Thickness(16),
+            RowDefinitions = new RowDefinitions("Auto,*,Auto"),
+            RowSpacing = 10,
+            Children = { resultText, editor, buttons },
+        };
+        Grid.SetRow(editor, 1);
+        Grid.SetRow(buttons, 2);
+        dialog.Content = content;
+        await dialog.ShowDialog(this);
     }
 
     private async Task<IReadOnlyList<string>?> ShowBindingEditorDialogAsync(BindingEditorState state)

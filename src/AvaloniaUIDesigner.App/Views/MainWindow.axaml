@@ -57,6 +57,9 @@
                 <MenuItem Header="Duplicate" Click="OnDuplicateMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
                 <MenuItem Header="Rename Selected Control..." Click="OnRenameSelectedControlMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
                 <MenuItem Header="Delete" Click="OnDeleteMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
+                <Separator/>
+                <MenuItem Header="Edit AXAML Source..." Click="OnEditAxamlSourceMenuClicked"/>
+                <Separator/>
                 <MenuItem Header="Edit Items / Columns..." Click="OnEditItemsMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
                 <MenuItem Header="Edit Bindings..." Click="OnEditBindingsMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
                 <MenuItem Header="Edit Grid Definitions..." Click="OnEditGridDefinitionsMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>

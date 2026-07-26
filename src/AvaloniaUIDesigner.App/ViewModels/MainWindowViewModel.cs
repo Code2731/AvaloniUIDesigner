@@ -3687,6 +3687,78 @@ public partial class MainWindowViewModel : ViewModelBase
 
     public DesignerCanvasDocument CreatePreviewDocument() => CaptureDocument();
 
+    public bool TryValidateAxamlSource(string axaml, out string result)
+    {
+        if (!TryParseAxamlSource(axaml, out var document, out result))
+        {
+            return false;
+        }
+
+        var controlCount = document.Elements.Count;
+        result = string.IsNullOrEmpty(result)
+            ? $"AXAML source is valid ({controlCount} control(s))."
+            : $"AXAML source is valid ({controlCount} control(s)). {result}";
+        return true;
+    }
+
+    public bool TryCreatePreviewDocumentFromAxaml(
+        string axaml,
+        out DesignerCanvasDocument document,
+        out string result)
+    {
+        if (!TryParseAxamlSource(axaml, out var parsed, out result))
+        {
+            document = new DesignerCanvasDocument(Array.Empty<DesignerElementSnapshot>());
+            return false;
+        }
+
+        document = parsed;
+        result = string.IsNullOrEmpty(result)
+            ? $"Previewing AXAML source ({document.Elements.Count} control(s))."
+            : $"Previewing AXAML source ({document.Elements.Count} control(s)). {result}";
+        return true;
+    }
+
+    public bool TryApplyAxamlSource(string axaml, out string result)
+    {
+        if (!TryParseAxamlSource(axaml, out var document, out result))
+        {
+            return false;
+        }
+
+        var before = CaptureDocument();
+        if (string.Equals(axaml, ExportFullAxaml(), StringComparison.Ordinal)
+            || AreSameDocument(before, document))
+        {
+            result = string.IsNullOrEmpty(result)
+                ? "AXAML source is valid; there are no design changes to apply."
+                : $"AXAML source is valid; there are no design changes to apply. {result}";
+            StatusText = result;
+            return true;
+        }
+
+        BeginCanvasMutation(HistoryActionType.EditAxamlSource, "Applied AXAML source.");
+        try
+        {
+            ApplyDocument(document);
+            CommitCanvasMutation();
+        }
+        catch (Exception ex)
+        {
+            _pendingMutation = null;
+            ApplyDocument(before);
+            RefreshDirtyState();
+            result = $"AXAML source could not be applied: {ex.Message}";
+            return false;
+        }
+
+        result = string.IsNullOrEmpty(result)
+            ? $"Applied AXAML source ({document.Elements.Count} control(s))."
+            : $"Applied AXAML source ({document.Elements.Count} control(s)). {result}";
+        StatusText = result;
+        return true;
+    }
+
     public string ExportFullAxaml() => ExportAxamlDocument("Window");
 
     public string ExportUserControlAxaml() => ExportAxamlDocument("UserControl");
@@ -3747,6 +3819,34 @@ public partial class MainWindowViewModel : ViewModelBase
         AcceptCurrentAsSaved();
         StatusText = "Loaded AXAML document.";
         warning = FormatWarnings(warnings);
+        return true;
+    }
+
+    private bool TryParseAxamlSource(
+        string axaml,
+        out DesignerCanvasDocument document,
+        out string result)
+    {
+        document = new DesignerCanvasDocument(Array.Empty<DesignerElementSnapshot>());
+        result = string.Empty;
+        if (string.IsNullOrWhiteSpace(axaml))
+        {
+            result = "AXAML source cannot be empty.";
+            return false;
+        }
+
+        var warnings = new List<string>();
+        try
+        {
+            document = ParseDraftDocument(axaml, warnings);
+        }
+        catch (Exception ex)
+        {
+            result = $"AXAML source is invalid: {ex.Message}";
+            return false;
+        }
+
+        result = FormatWarnings(warnings);
         return true;
     }
 
@@ -5907,6 +6007,7 @@ public partial class MainWindowViewModel : ViewModelBase
             HistoryActionType.RemoveElement => "remove element",
             HistoryActionType.TransformElement => "move/resize element",
             HistoryActionType.EditProperty => "edit properties",
+            HistoryActionType.EditAxamlSource => "edit AXAML source",
             HistoryActionType.LoadDocument => "load document",
             HistoryActionType.NewDocument => "new document",
             _ => "change",
@@ -8336,6 +8437,7 @@ public partial class MainWindowViewModel : ViewModelBase
         RemoveElement,
         TransformElement,
         EditProperty,
+        EditAxamlSource,
         LoadDocument,
         NewDocument,
     }
