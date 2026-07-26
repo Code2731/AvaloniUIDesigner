@@ -4,7 +4,8 @@ namespace AvaloniaUIDesigner.App.Designer.Core;
 
 public sealed record DesignerCanvasDocument(
     IReadOnlyList<DesignerElementSnapshot> Elements,
-    DesignerCanvasSettings? Settings = null);
+    DesignerCanvasSettings? Settings = null,
+    IReadOnlyDictionary<string, string>? ColorResources = null);
 
 public sealed record DesignerCanvasSettings(
     double Width = 1280,

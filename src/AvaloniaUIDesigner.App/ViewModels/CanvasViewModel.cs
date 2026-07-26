@@ -23,6 +23,7 @@ public partial class CanvasViewModel : ViewModelBase
 {
     private readonly IComponentCatalog _componentCatalog;
     private readonly IControlRenderer _renderer;
+    private readonly Dictionary<string, string> _colorResources = new(StringComparer.Ordinal);
 
     public CanvasViewModel()
         : this(new BuiltInComponentCatalog(), new DefaultControlRenderer())
@@ -87,6 +88,20 @@ public partial class CanvasViewModel : ViewModelBase
         => Math.Max(minimum, SnapPosition(value));
 
     public void SetGridSize(double gridSize) => GridSize = Math.Clamp(gridSize, 4, 32);
+
+    public void SetColorResources(IReadOnlyDictionary<string, string>? resources)
+    {
+        _colorResources.Clear();
+        if (resources is null)
+        {
+            return;
+        }
+
+        foreach (var pair in resources)
+        {
+            _colorResources[pair.Key] = pair.Value;
+        }
+    }
 
     public void SetArtboard(double width, double height, string? background = null)
     {
@@ -431,7 +446,7 @@ public partial class CanvasViewModel : ViewModelBase
             24);
     }
 
-    private static void ApplyVisualProperties(Control visual, IReadOnlyDictionary<string, string>? properties)
+    private void ApplyVisualProperties(Control visual, IReadOnlyDictionary<string, string>? properties)
     {
         if (properties is null)
         {
@@ -932,19 +947,12 @@ public partial class CanvasViewModel : ViewModelBase
         }
     }
 
-    private static void TrySetTextForeground(TextBlock textBlock, string foreground)
+    private void TrySetTextForeground(TextBlock textBlock, string foreground)
     {
-        try
-        {
-            textBlock.Foreground = Brush.Parse(foreground);
-        }
-        catch (FormatException)
-        {
-            // Ignore malformed imported colors while keeping the control usable.
-        }
+        TrySetAppearanceBrush(textBlock, "Foreground", brush => textBlock.Foreground = brush, foreground);
     }
 
-    private static void ApplyTemplatedAppearanceProperties(
+    private void ApplyTemplatedAppearanceProperties(
         Control visual,
         IReadOnlyDictionary<string, string> properties)
     {
@@ -955,17 +963,17 @@ public partial class CanvasViewModel : ViewModelBase
 
         if (properties.TryGetValue("Background", out var background))
         {
-            TrySetBrush(value => templated.Background = value, background);
+            TrySetAppearanceBrush(visual, "Background", value => templated.Background = value, background);
         }
 
         if (properties.TryGetValue("Foreground", out var foreground))
         {
-            TrySetBrush(value => templated.Foreground = value, foreground);
+            TrySetAppearanceBrush(visual, "Foreground", value => templated.Foreground = value, foreground);
         }
 
         if (properties.TryGetValue("BorderBrush", out var borderBrush))
         {
-            TrySetBrush(value => templated.BorderBrush = value, borderBrush);
+            TrySetAppearanceBrush(visual, "BorderBrush", value => templated.BorderBrush = value, borderBrush);
         }
 
         if (properties.TryGetValue("BorderThickness", out var borderThickness)
@@ -1128,14 +1136,35 @@ public partial class CanvasViewModel : ViewModelBase
             VerticalAlignment = VerticalAlignment.Center,
         };
 
-    private static void TrySetBorderBackground(Border border, string value)
+    private void TrySetBorderBackground(Border border, string value)
     {
-        TrySetBrush(brush => border.Background = brush, value);
+        TrySetAppearanceBrush(border, "Background", brush => border.Background = brush, value);
     }
 
-    private static void TrySetBorderBrush(Border border, string value)
+    private void TrySetBorderBrush(Border border, string value)
     {
-        TrySetBrush(brush => border.BorderBrush = brush, value);
+        TrySetAppearanceBrush(border, "BorderBrush", brush => border.BorderBrush = brush, value);
+    }
+
+    private void TrySetAppearanceBrush(
+        Control visual,
+        string propertyName,
+        Action<IBrush?> applyBrush,
+        string value)
+    {
+        if (DesignerResourceReferenceMetadata.TryParseExpression(value, out var resourceKey))
+        {
+            DesignerResourceReferenceMetadata.SetReference(visual, propertyName, resourceKey);
+            if (_colorResources.TryGetValue(resourceKey, out var resourceValue))
+            {
+                TrySetBrush(applyBrush, resourceValue);
+            }
+
+            return;
+        }
+
+        DesignerResourceReferenceMetadata.SetReference(visual, propertyName, null);
+        TrySetBrush(applyBrush, value);
     }
 
     private static void TrySetBrush(Action<IBrush?> applyBrush, string value)

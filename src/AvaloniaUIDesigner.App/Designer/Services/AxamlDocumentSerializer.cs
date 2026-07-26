@@ -13,13 +13,28 @@ public sealed class AxamlDocumentSerializer : IDesignerSerializer
     {
         var sb = new StringBuilder();
         var settings = document.Settings ?? new DesignerCanvasSettings();
-        sb.Append("<Canvas xmlns=\"https://github.com/avaloniaui\" Width=\"");
+        sb.Append("<Canvas xmlns=\"https://github.com/avaloniaui\" xmlns:x=\"http://schemas.microsoft.com/winfx/2006/xaml\" Width=\"");
         sb.Append(ToInvariantString(settings.Width));
         sb.Append("\" Height=\"");
         sb.Append(ToInvariantString(settings.Height));
         sb.Append("\" Background=\"");
         sb.Append(EscapeXmlAttribute(settings.Background));
         sb.AppendLine("\">");
+
+        if (document.ColorResources is { Count: > 0 })
+        {
+            sb.AppendLine("  <Canvas.Resources>");
+            foreach (var pair in document.ColorResources)
+            {
+                sb.Append("    <SolidColorBrush x:Key=\"");
+                sb.Append(EscapeXmlAttribute(pair.Key));
+                sb.Append("\" Color=\"");
+                sb.Append(EscapeXmlAttribute(pair.Value));
+                sb.AppendLine("\" />");
+            }
+
+            sb.AppendLine("  </Canvas.Resources>");
+        }
 
         foreach (var element in document.Elements)
         {

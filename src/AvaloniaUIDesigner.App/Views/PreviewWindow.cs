@@ -10,6 +10,7 @@ using Avalonia.Layout;
 using Avalonia.Media;
 using Avalonia.Media.Imaging;
 using AvaloniaUIDesigner.App.Designer.Core;
+using AvaloniaUIDesigner.App.Models;
 
 namespace AvaloniaUIDesigner.App.Views;
 
@@ -25,6 +26,7 @@ public sealed class PreviewWindow : Window
         WindowStartupLocation = WindowStartupLocation.CenterOwner;
 
         var settings = document.Settings ?? new DesignerCanvasSettings();
+        var colorResources = document.ColorResources ?? new Dictionary<string, string>(StringComparer.Ordinal);
         Width = Math.Clamp(settings.Width + 32, MinWidth, 1280);
         Height = Math.Clamp(settings.Height + 72, MinHeight, 960);
 
@@ -34,11 +36,15 @@ public sealed class PreviewWindow : Window
             Width = Math.Max(settings.Width, document.Elements.Count == 0 ? 0 : document.Elements.Max(element => element.X + element.Width + 32)),
             Height = Math.Max(settings.Height, document.Elements.Count == 0 ? 0 : document.Elements.Max(element => element.Y + element.Height + 32)),
         };
+        foreach (var pair in colorResources)
+        {
+            canvas.Resources[pair.Key] = Brush.Parse(pair.Value);
+        }
 
         var controlsByName = new Dictionary<string, Control>(StringComparer.OrdinalIgnoreCase);
         foreach (var element in document.Elements)
         {
-            var control = CreateControl(element);
+            var control = CreateControl(element, colorResources);
             control.Width = element.Width;
             control.Height = element.Height;
             Canvas.SetLeft(control, element.X);
@@ -68,7 +74,9 @@ public sealed class PreviewWindow : Window
         };
     }
 
-    private static Control CreateControl(DesignerElementSnapshot snapshot)
+    private static Control CreateControl(
+        DesignerElementSnapshot snapshot,
+        IReadOnlyDictionary<string, string> colorResources)
     {
         Control control = snapshot.TypeName switch
         {
@@ -145,11 +153,14 @@ public sealed class PreviewWindow : Window
             _ => new TextBlock { Text = $"[Unsupported: {snapshot.DisplayName}]" },
         };
 
-        ApplyProperties(control, snapshot.VisualProperties);
+        ApplyProperties(control, snapshot.VisualProperties, colorResources);
         return control;
     }
 
-    private static void ApplyProperties(Control control, IReadOnlyDictionary<string, string>? properties)
+    private static void ApplyProperties(
+        Control control,
+        IReadOnlyDictionary<string, string>? properties,
+        IReadOnlyDictionary<string, string> colorResources)
     {
         if (properties is null)
         {
@@ -162,7 +173,7 @@ public sealed class PreviewWindow : Window
             control.Opacity = Math.Clamp(parsedOpacity, 0, 1);
         }
 
-        ApplyTemplatedAppearanceProperties(control, properties);
+        ApplyTemplatedAppearanceProperties(control, properties, colorResources);
 
         if (properties.TryGetValue("__toolTip", out var toolTip))
         {
@@ -257,7 +268,7 @@ public sealed class PreviewWindow : Window
 
                 if (properties.TryGetValue("Foreground", out var foreground))
                 {
-                    TrySetTextForeground(textBlock, foreground);
+                    TrySetTextForeground(textBlock, foreground, colorResources);
                 }
                 break;
             case Label label:
@@ -361,7 +372,7 @@ public sealed class PreviewWindow : Window
                 ApplyScrollViewerProperties(scrollViewer, properties);
                 break;
             case Border border:
-                ApplyBorderProperties(border, properties);
+                ApplyBorderProperties(border, properties, colorResources);
                 break;
             case Grid grid when properties.TryGetValue("ShowGridLines", out var showGrid)
                 && bool.TryParse(showGrid, out var parsedShowGrid):
@@ -373,16 +384,12 @@ public sealed class PreviewWindow : Window
         }
     }
 
-    private static void TrySetTextForeground(TextBlock textBlock, string foreground)
+    private static void TrySetTextForeground(
+        TextBlock textBlock,
+        string foreground,
+        IReadOnlyDictionary<string, string> colorResources)
     {
-        try
-        {
-            textBlock.Foreground = Brush.Parse(foreground);
-        }
-        catch (FormatException)
-        {
-            // Ignore malformed imported colors while keeping the preview available.
-        }
+        TrySetBorderBrush(value => textBlock.Foreground = value, foreground, colorResources);
     }
 
     private static bool TryParseTextWeight(string value, out FontWeight fontWeight)
@@ -702,16 +709,19 @@ public sealed class PreviewWindow : Window
         }
     }
 
-    private static void ApplyBorderProperties(Border border, IReadOnlyDictionary<string, string> properties)
+    private static void ApplyBorderProperties(
+        Border border,
+        IReadOnlyDictionary<string, string> properties,
+        IReadOnlyDictionary<string, string> colorResources)
     {
         if (properties.TryGetValue("Background", out var background))
         {
-            TrySetBorderBrush(value => border.Background = value, background);
+            TrySetBorderBrush(value => border.Background = value, background, colorResources);
         }
 
         if (properties.TryGetValue("BorderBrush", out var borderBrush))
         {
-            TrySetBorderBrush(value => border.BorderBrush = value, borderBrush);
+            TrySetBorderBrush(value => border.BorderBrush = value, borderBrush, colorResources);
         }
 
         if (properties.TryGetValue("BorderThickness", out var borderThickness))
@@ -755,7 +765,8 @@ public sealed class PreviewWindow : Window
 
     private static void ApplyTemplatedAppearanceProperties(
         Control control,
-        IReadOnlyDictionary<string, string> properties)
+        IReadOnlyDictionary<string, string> properties,
+        IReadOnlyDictionary<string, string> colorResources)
     {
         if (control is not Avalonia.Controls.Primitives.TemplatedControl templated)
         {
@@ -764,17 +775,17 @@ public sealed class PreviewWindow : Window
 
         if (properties.TryGetValue("Background", out var background))
         {
-            TrySetBorderBrush(value => templated.Background = value, background);
+            TrySetBorderBrush(value => templated.Background = value, background, colorResources);
         }
 
         if (properties.TryGetValue("Foreground", out var foreground))
         {
-            TrySetBorderBrush(value => templated.Foreground = value, foreground);
+            TrySetBorderBrush(value => templated.Foreground = value, foreground, colorResources);
         }
 
         if (properties.TryGetValue("BorderBrush", out var borderBrush))
         {
-            TrySetBorderBrush(value => templated.BorderBrush = value, borderBrush);
+            TrySetBorderBrush(value => templated.BorderBrush = value, borderBrush, colorResources);
         }
 
         if (properties.TryGetValue("BorderThickness", out var borderThickness))
@@ -802,8 +813,22 @@ public sealed class PreviewWindow : Window
         }
     }
 
-    private static void TrySetBorderBrush(Action<IBrush?> applyBrush, string value)
+    private static void TrySetBorderBrush(
+        Action<IBrush?> applyBrush,
+        string value,
+        IReadOnlyDictionary<string, string> colorResources)
     {
+        if (DesignerResourceReferenceMetadata.TryParseExpression(value, out var resourceKey))
+        {
+            if (!colorResources.TryGetValue(resourceKey, out var resourceValue)
+                || string.IsNullOrWhiteSpace(resourceValue))
+            {
+                return;
+            }
+
+            value = resourceValue;
+        }
+
         if (string.IsNullOrWhiteSpace(value))
         {
             applyBrush(null);

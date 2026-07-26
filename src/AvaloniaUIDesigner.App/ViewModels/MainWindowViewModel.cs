@@ -30,6 +30,7 @@ public partial class MainWindowViewModel : ViewModelBase
     private readonly ComponentPackLoader _componentPackLoader = new();
     private readonly Stack<HistoryEntry> _undoStack = new();
     private readonly Stack<HistoryEntry> _redoStack = new();
+    private readonly Dictionary<string, string> _colorResources = new(StringComparer.Ordinal);
 
     private PendingMutation? _pendingMutation;
     private bool _isSyncingSelection;
@@ -205,7 +206,13 @@ public partial class MainWindowViewModel : ViewModelBase
         var properties = CaptureVisualProperties(target.Visual)
             ?.Where(pair => !pair.Key.StartsWith("__", StringComparison.Ordinal)
                 && !(target.Visual is Label && string.Equals(pair.Key, "Target", StringComparison.Ordinal)))
-            .ToDictionary(pair => pair.Key, pair => (string?)pair.Value, StringComparer.Ordinal);
+            .ToDictionary(
+                pair => pair.Key,
+                pair => (string?)(DesignerResourceReferenceMetadata.TryParseExpression(pair.Value, out var resourceKey)
+                    && _colorResources.TryGetValue(resourceKey, out var resourceValue)
+                        ? resourceValue
+                        : pair.Value),
+                StringComparer.Ordinal);
         var document = new ComponentPackDocument
         {
             Name = packName,
@@ -382,6 +389,14 @@ public partial class MainWindowViewModel : ViewModelBase
                 return false;
         }
 
+        foreach (var pair in DesignerResourceReferenceMetadata.GetReferences(target.Visual))
+        {
+            if (values.ContainsKey(pair.Key))
+            {
+                values[pair.Key] = DesignerResourceReferenceMetadata.FormatExpression(pair.Value);
+            }
+        }
+
         controlName = target.DisplayName;
         appearance = values;
         return true;
@@ -401,9 +416,10 @@ public partial class MainWindowViewModel : ViewModelBase
             return false;
         }
 
-        if (!TryReadOptionalBrush(appearance, "Background", out var hasBackground, out var background, out var error)
-            || !TryReadOptionalBrush(appearance, "Foreground", out var hasForeground, out var foreground, out error)
-            || !TryReadOptionalBrush(appearance, "BorderBrush", out var hasBorderBrush, out var borderBrush, out error)
+        if (!TryResolveAppearanceResources(appearance, out var resolvedAppearance, out var resourceReferences, out var error)
+            || !TryReadOptionalBrush(resolvedAppearance, "Background", out var hasBackground, out var background, out error)
+            || !TryReadOptionalBrush(resolvedAppearance, "Foreground", out var hasForeground, out var foreground, out error)
+            || !TryReadOptionalBrush(resolvedAppearance, "BorderBrush", out var hasBorderBrush, out var borderBrush, out error)
             || !TryReadThickness(appearance, "BorderThickness", out var hasBorderThickness, out var borderThickness, out error)
             || !TryReadCornerRadius(appearance, "CornerRadius", out var hasCornerRadius, out var cornerRadius, out error))
         {
@@ -434,8 +450,156 @@ public partial class MainWindowViewModel : ViewModelBase
                 break;
         }
 
+        foreach (var propertyName in new[] { "Background", "Foreground", "BorderBrush" })
+        {
+            if (appearance.ContainsKey(propertyName))
+            {
+                DesignerResourceReferenceMetadata.SetReference(
+                    target.Visual,
+                    propertyName,
+                    resourceReferences.TryGetValue(propertyName, out var resourceKey) ? resourceKey : null);
+            }
+        }
+
         CommitCanvasMutation();
         StatusText = $"Updated appearance for {target.DisplayName}.";
+        return true;
+    }
+
+    public string GetColorResourceEditorText()
+        => string.Join(
+            Environment.NewLine,
+            _colorResources.OrderBy(pair => pair.Key, StringComparer.Ordinal)
+                .Select(pair => $"{pair.Key} = {pair.Value}"));
+
+    public bool SetColorResourcesFromText(string text)
+    {
+        var parsedResources = new Dictionary<string, string>(StringComparer.Ordinal);
+        var lines = text.Replace("\r\n", "\n", StringComparison.Ordinal).Split('\n');
+        for (var index = 0; index < lines.Length; index++)
+        {
+            var line = lines[index].Trim();
+            if (string.IsNullOrWhiteSpace(line))
+            {
+                continue;
+            }
+
+            var separator = line.IndexOf('=');
+            if (separator <= 0 || separator == line.Length - 1)
+            {
+                StatusText = $"Resource line {index + 1} must use Key = Brush format.";
+                return false;
+            }
+
+            var key = line[..separator].Trim();
+            var value = line[(separator + 1)..].Trim();
+            if (!IsValidControlName(key))
+            {
+                StatusText = $"Resource key '{key}' must be a valid AXAML identifier.";
+                return false;
+            }
+
+            if (parsedResources.ContainsKey(key))
+            {
+                StatusText = $"Resource key '{key}' is duplicated.";
+                return false;
+            }
+
+            try
+            {
+                parsedResources[key] = FormatBrushValue(Brush.Parse(value));
+            }
+            catch (FormatException)
+            {
+                StatusText = $"Resource '{key}' must contain a valid Avalonia brush.";
+                return false;
+            }
+        }
+
+        var missingReference = Canvas.Elements
+            .SelectMany(element => DesignerResourceReferenceMetadata.GetReferences(element.Visual).Values)
+            .FirstOrDefault(resourceKey => !parsedResources.ContainsKey(resourceKey));
+        if (!string.IsNullOrWhiteSpace(missingReference))
+        {
+            StatusText = $"Resource '{missingReference}' is still used by a control and cannot be removed.";
+            return false;
+        }
+
+        BeginCanvasMutation(HistoryActionType.EditProperty, "Updated color resources.");
+        _colorResources.Clear();
+        foreach (var pair in parsedResources)
+        {
+            _colorResources[pair.Key] = pair.Value;
+        }
+
+        Canvas.SetColorResources(_colorResources);
+        RefreshResourceBackedAppearance();
+        CommitCanvasMutation();
+        StatusText = $"Updated {_colorResources.Count} color resource(s).";
+        return true;
+    }
+
+    public bool TryGetColorResourceApplicationOptions(
+        out string controlName,
+        out IReadOnlyList<string> resourceNames,
+        out IReadOnlyList<string> propertyNames)
+    {
+        resourceNames = _colorResources.Keys.OrderBy(key => key, StringComparer.Ordinal).ToList();
+        if (resourceNames.Count == 0)
+        {
+            controlName = string.Empty;
+            propertyNames = Array.Empty<string>();
+            StatusText = "Create at least one color resource before applying it.";
+            return false;
+        }
+
+        if (Canvas.SelectedElement is not { IsLocked: false } target)
+        {
+            controlName = string.Empty;
+            propertyNames = Array.Empty<string>();
+            StatusText = "Select an unlocked control to apply a color resource.";
+            return false;
+        }
+
+        propertyNames = target.Visual switch
+        {
+            Avalonia.Controls.Primitives.TemplatedControl => new[] { "Background", "Foreground", "BorderBrush" },
+            Border => new[] { "Background", "BorderBrush" },
+            TextBlock => new[] { "Foreground" },
+            _ => Array.Empty<string>(),
+        };
+        if (propertyNames.Count == 0)
+        {
+            controlName = string.Empty;
+            StatusText = "The selected control does not expose a brush property.";
+            return false;
+        }
+
+        controlName = target.DisplayName;
+        return true;
+    }
+
+    public bool ApplyColorResource(string resourceName, string propertyName)
+    {
+        if (Canvas.SelectedElement is not { IsLocked: false } target
+            || !_colorResources.TryGetValue(resourceName, out var brushValue))
+        {
+            StatusText = "The selected control or color resource is no longer available.";
+            return false;
+        }
+
+        var brush = Brush.Parse(brushValue);
+        if (!SupportsAppearanceBrush(target.Visual, propertyName))
+        {
+            StatusText = $"{target.DisplayName} does not support {propertyName}.";
+            return false;
+        }
+
+        BeginCanvasMutation(HistoryActionType.EditProperty, "Applied color resource.");
+        TryApplyAppearanceBrush(target.Visual, propertyName, brush);
+        DesignerResourceReferenceMetadata.SetReference(target.Visual, propertyName, resourceName);
+        CommitCanvasMutation();
+        StatusText = $"Applied {resourceName} to {target.DisplayName}.{propertyName}.";
         return true;
     }
 
@@ -472,6 +636,7 @@ public partial class MainWindowViewModel : ViewModelBase
         foreach (var target in targets)
         {
             ((TextBlock)target.Visual).Foreground = brush;
+            DesignerResourceReferenceMetadata.SetReference(target.Visual, "Foreground", null);
         }
 
         CommitCanvasMutation();
@@ -1504,6 +1669,8 @@ public partial class MainWindowViewModel : ViewModelBase
             sb.AppendLine("  <!-- Add x:Class when pairing this layout with a code-behind file. -->");
         }
 
+        AppendColorResourcesAxaml(sb, rootElementName, "  ");
+
         sb.AppendLine($"  <Canvas Width=\"{settings.Width:0.###}\" Height=\"{settings.Height:0.###}\" Background=\"{EscapeXmlAttribute(settings.Background)}\">");
         sb.AppendLine($"    <!-- {DesignerMetadataPrefix} GridSize={settings.GridSize.ToString("0.###", CultureInfo.InvariantCulture)}; IsGridVisible={settings.IsGridVisible}; SnapToGrid={settings.SnapToGrid} -->");
 
@@ -1584,6 +1751,12 @@ public partial class MainWindowViewModel : ViewModelBase
             }
 
             var current = CaptureDocument();
+            if (!DictionaryEquals(current.ColorResources, parsed.ColorResources))
+            {
+                result = "Validation failed: color resources do not round-trip.";
+                return false;
+            }
+
             for (var index = 0; index < current.Elements.Count; index++)
             {
                 if (!HaveSameAppearance(current.Elements[index], parsed.Elements[index]))
@@ -1613,6 +1786,13 @@ public partial class MainWindowViewModel : ViewModelBase
             if (userControl.Settings != settings)
             {
                 result = "Validation failed: UserControl export does not preserve canvas settings.";
+                return false;
+            }
+
+
+            if (!DictionaryEquals(userControl.ColorResources, current.ColorResources))
+            {
+                result = "Validation failed: UserControl export does not preserve color resources.";
                 return false;
             }
         }
@@ -1756,6 +1936,16 @@ public partial class MainWindowViewModel : ViewModelBase
             Canvas.SetGridSize(settings.GridSize);
             Canvas.IsGridVisible = settings.IsGridVisible;
             Canvas.SnapToGrid = settings.SnapToGrid;
+            _colorResources.Clear();
+            if (document.ColorResources is not null)
+            {
+                foreach (var pair in document.ColorResources)
+                {
+                    _colorResources[pair.Key] = FormatBrushValue(Brush.Parse(pair.Value));
+                }
+            }
+
+            Canvas.SetColorResources(_colorResources);
             Canvas.Clear();
             foreach (var snapshot in document.Elements)
             {
@@ -1785,7 +1975,10 @@ public partial class MainWindowViewModel : ViewModelBase
                 e.IsLocked))
             .ToList();
 
-        return new DesignerCanvasDocument(snapshots, CaptureCanvasSettings());
+        return new DesignerCanvasDocument(
+            snapshots,
+            CaptureCanvasSettings(),
+            new Dictionary<string, string>(_colorResources, StringComparer.Ordinal));
     }
 
     private DesignerCanvasSettings CaptureCanvasSettings()
@@ -1819,14 +2012,15 @@ public partial class MainWindowViewModel : ViewModelBase
 
     private static DesignerCanvasDocument CreateDashboardTemplate() => new(
         [
-            new("Title", "Avalonia.Controls.TextBlock", 48, 40, 520, 36, Props("Text", "Project dashboard")),
+            new("Title", "Avalonia.Controls.TextBlock", 48, 40, 520, 36, Props("Text", "Project dashboard", "Foreground", "{DynamicResource AccentBrush}")),
             new("Summary", "Avalonia.Controls.TextBlock", 48, 96, 520, 24, Props("Text", "A quick overview of this week's progress")),
             new("ProgressLabel", "Avalonia.Controls.TextBlock", 48, 158, 240, 24, Props("Text", "Completion")),
             new("Progress", "Avalonia.Controls.Slider", 48, 186, 360, 32, Props("Minimum", "0", "Maximum", "100", "Value", "72")),
-            new("Refresh", "Avalonia.Controls.Button", 48, 252, 140, 36, Props("Content", "Refresh")),
+            new("Refresh", "Avalonia.Controls.Button", 48, 252, 140, 36, Props("Content", "Refresh", "Background", "{DynamicResource AccentBrush}", "Foreground", "#FFFFFF")),
             new("AutoRefresh", "Avalonia.Controls.CheckBox", 214, 254, 240, 32, Props("Content", "Refresh automatically")),
         ],
-        new DesignerCanvasSettings(720, 440, "#F7F9FC"));
+        new DesignerCanvasSettings(720, 440, "#F7F9FC"),
+        Props("AccentBrush", "#2563EB", "SurfaceBrush", "#F1F5F9"));
 
     private static IReadOnlyDictionary<string, string> Props(params string[] values)
     {
@@ -1865,6 +2059,11 @@ public partial class MainWindowViewModel : ViewModelBase
             ? new Dictionary<string, string>(StringComparer.Ordinal)
             : new Dictionary<string, string>(properties, StringComparer.Ordinal);
         CaptureCommonAppearanceProperties(result, visual);
+        foreach (var pair in DesignerResourceReferenceMetadata.GetReferences(visual))
+        {
+            result[pair.Key] = DesignerResourceReferenceMetadata.FormatExpression(pair.Value);
+        }
+
         if (!string.IsNullOrWhiteSpace(toolTip))
         {
             result["__toolTip"] = toolTip;
@@ -1907,19 +2106,19 @@ public partial class MainWindowViewModel : ViewModelBase
         if (templated.IsSet(Avalonia.Controls.Primitives.TemplatedControl.BackgroundProperty)
             && templated.Background is { } background)
         {
-            properties["Background"] = background.ToString() ?? string.Empty;
+            properties["Background"] = FormatBrushValue(background);
         }
 
         if (templated.IsSet(Avalonia.Controls.Primitives.TemplatedControl.ForegroundProperty)
             && templated.Foreground is { } foreground)
         {
-            properties["Foreground"] = foreground.ToString() ?? string.Empty;
+            properties["Foreground"] = FormatBrushValue(foreground);
         }
 
         if (templated.IsSet(Avalonia.Controls.Primitives.TemplatedControl.BorderBrushProperty)
             && templated.BorderBrush is { } borderBrush)
         {
-            properties["BorderBrush"] = borderBrush.ToString() ?? string.Empty;
+            properties["BorderBrush"] = FormatBrushValue(borderBrush);
         }
 
         if (templated.IsSet(Avalonia.Controls.Primitives.TemplatedControl.BorderThicknessProperty))
@@ -1968,9 +2167,10 @@ public partial class MainWindowViewModel : ViewModelBase
                 ["Opacity"] = textBlock.Opacity.ToString("0.###", CultureInfo.InvariantCulture),
             };
 
-            if (textBlock.Foreground is SolidColorBrush foreground)
+            if (textBlock.IsSet(TextBlock.ForegroundProperty)
+                && textBlock.Foreground is { } foreground)
             {
-                properties["Foreground"] = foreground.Color.ToString();
+                properties["Foreground"] = FormatBrushValue(foreground);
             }
 
             return properties;
@@ -2163,14 +2363,16 @@ public partial class MainWindowViewModel : ViewModelBase
                 properties["__contentText"] = ReadBorderContent(border);
             }
 
-            if (border.Background is SolidColorBrush background)
+            if (border.IsSet(Border.BackgroundProperty)
+                && border.Background is { } background)
             {
-                properties["Background"] = background.Color.ToString();
+                properties["Background"] = FormatBrushValue(background);
             }
 
-            if (border.BorderBrush is SolidColorBrush borderBrush)
+            if (border.IsSet(Border.BorderBrushProperty)
+                && border.BorderBrush is { } borderBrush)
             {
-                properties["BorderBrush"] = borderBrush.Color.ToString();
+                properties["BorderBrush"] = FormatBrushValue(borderBrush);
             }
 
             return properties;
@@ -2275,6 +2477,11 @@ public partial class MainWindowViewModel : ViewModelBase
         }
 
         if (left.Elements.Count != right.Elements.Count)
+        {
+            return false;
+        }
+
+        if (!DictionaryEquals(left.ColorResources, right.ColorResources))
         {
             return false;
         }
@@ -2385,7 +2592,59 @@ public partial class MainWindowViewModel : ViewModelBase
             nextIsLocked = false;
         }
 
-        return new DesignerCanvasDocument(snapshots, ReadCanvasSettings(parseRoot, warnings));
+        return new DesignerCanvasDocument(
+            snapshots,
+            ReadCanvasSettings(parseRoot, warnings),
+            ReadColorResources(root, parseRoot, warnings));
+    }
+
+    private static IReadOnlyDictionary<string, string> ReadColorResources(
+        XElement root,
+        XElement parseRoot,
+        ICollection<string> warnings)
+    {
+        var resources = new Dictionary<string, string>(StringComparer.Ordinal);
+        var hosts = new List<XElement> { root };
+        if (!ReferenceEquals(root, parseRoot))
+        {
+            hosts.Add(parseRoot);
+        }
+
+        var resourceElements = hosts
+            .SelectMany(host => host.Elements()
+                .Where(element => element.Name.LocalName.EndsWith(".Resources", StringComparison.Ordinal)
+                    || string.Equals(element.Name.LocalName, "Resources", StringComparison.Ordinal)))
+            .SelectMany(container => container.Descendants()
+                .Where(element => string.Equals(element.Name.LocalName, "SolidColorBrush", StringComparison.Ordinal)));
+
+        foreach (var resourceElement in resourceElements)
+        {
+            var key = resourceElement.Attributes()
+                .FirstOrDefault(attribute => string.Equals(attribute.Name.LocalName, "Key", StringComparison.Ordinal))?
+                .Value.Trim();
+            var value = resourceElement.Attribute("Color")?.Value.Trim();
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                value = resourceElement.Value.Trim();
+            }
+
+            if (string.IsNullOrWhiteSpace(key) || !IsValidControlName(key) || resources.ContainsKey(key))
+            {
+                warnings.Add("Ignored a color resource with a missing, invalid, or duplicate key.");
+                continue;
+            }
+
+            try
+            {
+                resources[key] = FormatBrushValue(Brush.Parse(value));
+            }
+            catch (FormatException)
+            {
+                warnings.Add($"Ignored color resource '{key}' because its brush value is invalid.");
+            }
+        }
+
+        return resources;
     }
 
     private static DesignerCanvasSettings ReadCanvasSettings(XElement canvas, ICollection<string> warnings)
@@ -2908,6 +3167,90 @@ public partial class MainWindowViewModel : ViewModelBase
         return candidate;
     }
 
+    private bool TryResolveAppearanceResources(
+        IReadOnlyDictionary<string, string> appearance,
+        out IReadOnlyDictionary<string, string> resolvedAppearance,
+        out IReadOnlyDictionary<string, string> resourceReferences,
+        out string error)
+    {
+        var resolved = appearance.ToDictionary(pair => pair.Key, pair => pair.Value, StringComparer.Ordinal);
+        var references = new Dictionary<string, string>(StringComparer.Ordinal);
+        foreach (var propertyName in new[] { "Background", "Foreground", "BorderBrush" })
+        {
+            if (!appearance.TryGetValue(propertyName, out var value)
+                || !DesignerResourceReferenceMetadata.TryParseExpression(value, out var resourceKey))
+            {
+                continue;
+            }
+
+            if (!_colorResources.TryGetValue(resourceKey, out var resourceValue))
+            {
+                resolvedAppearance = resolved;
+                resourceReferences = references;
+                error = $"Color resource '{resourceKey}' does not exist.";
+                return false;
+            }
+
+            resolved[propertyName] = resourceValue;
+            references[propertyName] = resourceKey;
+        }
+
+        resolvedAppearance = resolved;
+        resourceReferences = references;
+        error = string.Empty;
+        return true;
+    }
+
+    private void RefreshResourceBackedAppearance()
+    {
+        foreach (var element in Canvas.Elements)
+        {
+            foreach (var pair in DesignerResourceReferenceMetadata.GetReferences(element.Visual))
+            {
+                if (_colorResources.TryGetValue(pair.Value, out var brushValue))
+                {
+                    TryApplyAppearanceBrush(element.Visual, pair.Key, Brush.Parse(brushValue));
+                }
+            }
+        }
+    }
+
+    private static bool SupportsAppearanceBrush(Control visual, string propertyName)
+        => propertyName switch
+        {
+            "Background" => visual is Avalonia.Controls.Primitives.TemplatedControl or Border,
+            "Foreground" => visual is Avalonia.Controls.Primitives.TemplatedControl or TextBlock,
+            "BorderBrush" => visual is Avalonia.Controls.Primitives.TemplatedControl or Border,
+            _ => false,
+        };
+
+    private static bool TryApplyAppearanceBrush(Control visual, string propertyName, IBrush? brush)
+    {
+        switch (propertyName)
+        {
+            case "Background" when visual is Avalonia.Controls.Primitives.TemplatedControl templated:
+                templated.Background = brush;
+                return true;
+            case "Background" when visual is Border border:
+                border.Background = brush;
+                return true;
+            case "Foreground" when visual is Avalonia.Controls.Primitives.TemplatedControl templated:
+                templated.Foreground = brush;
+                return true;
+            case "Foreground" when visual is TextBlock textBlock:
+                textBlock.Foreground = brush;
+                return true;
+            case "BorderBrush" when visual is Avalonia.Controls.Primitives.TemplatedControl templated:
+                templated.BorderBrush = brush;
+                return true;
+            case "BorderBrush" when visual is Border border:
+                border.BorderBrush = brush;
+                return true;
+            default:
+                return false;
+        }
+    }
+
     private static bool TryReadOptionalBrush(
         IReadOnlyDictionary<string, string> values,
         string propertyName,
@@ -3209,7 +3552,6 @@ public partial class MainWindowViewModel : ViewModelBase
                 AppendAttribute(sb, "Text", textBlock.Text ?? string.Empty);
                 AppendAttribute(sb, "FontSize", textBlock.FontSize.ToString("0.###", CultureInfo.InvariantCulture));
                 AppendAttribute(sb, "FontWeight", textBlock.FontWeight.ToString());
-                AppendTextForegroundAttribute(sb, textBlock);
                 sb.AppendLine(" />");
                 break;
 
@@ -3452,18 +3794,6 @@ public partial class MainWindowViewModel : ViewModelBase
                 sb.Append(indent);
                 sb.Append("<Border");
                 AppendCanvasLayoutAttributes(sb, element);
-                if (border.Background is SolidColorBrush background)
-                {
-                    AppendAttribute(sb, "Background", background.Color.ToString());
-                }
-
-                if (border.BorderBrush is SolidColorBrush borderBrush)
-                {
-                    AppendAttribute(sb, "BorderBrush", borderBrush.Color.ToString());
-                }
-
-                AppendAttribute(sb, "BorderThickness", border.BorderThickness.ToString());
-                AppendAttribute(sb, "CornerRadius", border.CornerRadius.ToString());
                 if (border.Child is not TextBlock)
                 {
                     sb.AppendLine(" />");
@@ -3609,49 +3939,118 @@ public partial class MainWindowViewModel : ViewModelBase
         AppendAttribute(sb, "IsTabStop", element.Visual.IsTabStop.ToString());
     }
 
-    private static void AppendCommonAppearanceAttributes(StringBuilder sb, Control visual)
+    private void AppendColorResourcesAxaml(StringBuilder sb, string rootElementName, string indent)
     {
-        if (visual is not Avalonia.Controls.Primitives.TemplatedControl templated)
+        if (_colorResources.Count == 0)
         {
             return;
         }
 
-        if (templated.IsSet(Avalonia.Controls.Primitives.TemplatedControl.BackgroundProperty)
-            && templated.Background is { } background)
+        sb.Append(indent);
+        sb.Append('<');
+        sb.Append(rootElementName);
+        sb.AppendLine(".Resources>");
+        foreach (var pair in _colorResources.OrderBy(resource => resource.Key, StringComparer.Ordinal))
         {
-            AppendAttribute(sb, "Background", background.ToString() ?? string.Empty);
+            sb.Append(indent);
+            sb.Append("  <SolidColorBrush");
+            AppendAttribute(sb, "x:Key", pair.Key);
+            AppendAttribute(sb, "Color", pair.Value);
+            sb.AppendLine(" />");
         }
 
-        if (templated.IsSet(Avalonia.Controls.Primitives.TemplatedControl.ForegroundProperty)
-            && templated.Foreground is { } foreground)
-        {
-            AppendAttribute(sb, "Foreground", foreground.ToString() ?? string.Empty);
-        }
-
-        if (templated.IsSet(Avalonia.Controls.Primitives.TemplatedControl.BorderBrushProperty)
-            && templated.BorderBrush is { } borderBrush)
-        {
-            AppendAttribute(sb, "BorderBrush", borderBrush.ToString() ?? string.Empty);
-        }
-
-        if (templated.IsSet(Avalonia.Controls.Primitives.TemplatedControl.BorderThicknessProperty))
-        {
-            AppendAttribute(sb, "BorderThickness", templated.BorderThickness.ToString());
-        }
-
-        if (templated.IsSet(Avalonia.Controls.Primitives.TemplatedControl.CornerRadiusProperty))
-        {
-            AppendAttribute(sb, "CornerRadius", templated.CornerRadius.ToString());
-        }
+        sb.Append(indent);
+        sb.Append("</");
+        sb.Append(rootElementName);
+        sb.AppendLine(".Resources>");
     }
 
-    private static void AppendTextForegroundAttribute(StringBuilder sb, TextBlock textBlock)
+    private static void AppendCommonAppearanceAttributes(StringBuilder sb, Control visual)
     {
-        if (textBlock.Foreground is SolidColorBrush foreground)
+        switch (visual)
         {
-            AppendAttribute(sb, "Foreground", foreground.Color.ToString());
+            case Avalonia.Controls.Primitives.TemplatedControl templated:
+                AppendBrushAppearanceAttribute(
+                    sb,
+                    visual,
+                    "Background",
+                    templated.Background,
+                    templated.IsSet(Avalonia.Controls.Primitives.TemplatedControl.BackgroundProperty));
+                AppendBrushAppearanceAttribute(
+                    sb,
+                    visual,
+                    "Foreground",
+                    templated.Foreground,
+                    templated.IsSet(Avalonia.Controls.Primitives.TemplatedControl.ForegroundProperty));
+                AppendBrushAppearanceAttribute(
+                    sb,
+                    visual,
+                    "BorderBrush",
+                    templated.BorderBrush,
+                    templated.IsSet(Avalonia.Controls.Primitives.TemplatedControl.BorderBrushProperty));
+                if (templated.IsSet(Avalonia.Controls.Primitives.TemplatedControl.BorderThicknessProperty))
+                {
+                    AppendAttribute(sb, "BorderThickness", templated.BorderThickness.ToString());
+                }
+
+                if (templated.IsSet(Avalonia.Controls.Primitives.TemplatedControl.CornerRadiusProperty))
+                {
+                    AppendAttribute(sb, "CornerRadius", templated.CornerRadius.ToString());
+                }
+
+                break;
+
+            case Border border:
+                AppendBrushAppearanceAttribute(
+                    sb,
+                    visual,
+                    "Background",
+                    border.Background,
+                    border.IsSet(Border.BackgroundProperty));
+                AppendBrushAppearanceAttribute(
+                    sb,
+                    visual,
+                    "BorderBrush",
+                    border.BorderBrush,
+                    border.IsSet(Border.BorderBrushProperty));
+                AppendAttribute(sb, "BorderThickness", border.BorderThickness.ToString());
+                AppendAttribute(sb, "CornerRadius", border.CornerRadius.ToString());
+                break;
+
+            case TextBlock textBlock:
+                AppendBrushAppearanceAttribute(
+                    sb,
+                    visual,
+                    "Foreground",
+                    textBlock.Foreground,
+                    textBlock.IsSet(TextBlock.ForegroundProperty));
+                break;
         }
     }
+
+    private static void AppendBrushAppearanceAttribute(
+        StringBuilder sb,
+        Control visual,
+        string propertyName,
+        IBrush? brush,
+        bool isExplicit)
+    {
+        if (DesignerResourceReferenceMetadata.TryGetReference(visual, propertyName, out var resourceKey))
+        {
+            AppendAttribute(sb, propertyName, DesignerResourceReferenceMetadata.FormatExpression(resourceKey));
+            return;
+        }
+
+        if (isExplicit && brush is not null)
+        {
+            AppendAttribute(sb, propertyName, FormatBrushValue(brush));
+        }
+    }
+
+    private static string FormatBrushValue(IBrush brush)
+        => brush is SolidColorBrush solidColorBrush
+            ? solidColorBrush.Color.ToString()
+            : brush.ToString() ?? string.Empty;
 
     private static void AppendAttribute(StringBuilder sb, string name, string value)
     {

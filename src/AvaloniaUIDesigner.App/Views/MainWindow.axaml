@@ -70,24 +70,26 @@
                 <MenuItem Header="Include / Exclude from Tab Navigation" Click="OnToggleTabStopMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
                 <MenuItem Header="Choose Image..." Click="OnChooseImageMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
                 <Separator/>
-                <MenuItem Header="Style" IsEnabled="{Binding Canvas.IsSelectionActive}">
-                    <MenuItem Header="Edit Appearance..." Click="OnEditAppearanceMenuClicked"/>
+                <MenuItem Header="Style">
+                    <MenuItem Header="Edit Appearance..." Click="OnEditAppearanceMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
+                    <MenuItem Header="Edit Color Resources..." Click="OnEditColorResourcesMenuClicked"/>
+                    <MenuItem Header="Apply Color Resource..." Click="OnApplyColorResourceMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
                     <Separator/>
-                    <MenuItem Header="Opacity 100%" Click="OnOpacity100MenuClicked"/>
-                    <MenuItem Header="Opacity 75%" Click="OnOpacity75MenuClicked"/>
-                    <MenuItem Header="Opacity 50%" Click="OnOpacity50MenuClicked"/>
+                    <MenuItem Header="Opacity 100%" Click="OnOpacity100MenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
+                    <MenuItem Header="Opacity 75%" Click="OnOpacity75MenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
+                    <MenuItem Header="Opacity 50%" Click="OnOpacity50MenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
                     <Separator/>
-                    <MenuItem Header="Text Size">
+                    <MenuItem Header="Text Size" IsEnabled="{Binding Canvas.IsSelectionActive}">
                         <MenuItem Header="14px" Click="OnTextSize14MenuClicked"/>
                         <MenuItem Header="18px" Click="OnTextSize18MenuClicked"/>
                         <MenuItem Header="24px" Click="OnTextSize24MenuClicked"/>
                     </MenuItem>
-                    <MenuItem Header="Text Color">
+                    <MenuItem Header="Text Color" IsEnabled="{Binding Canvas.IsSelectionActive}">
                         <MenuItem Header="Ink" Click="OnTextColorInkMenuClicked"/>
                         <MenuItem Header="Blue" Click="OnTextColorBlueMenuClicked"/>
                         <MenuItem Header="Red" Click="OnTextColorRedMenuClicked"/>
                     </MenuItem>
-                    <MenuItem Header="Text Weight">
+                    <MenuItem Header="Text Weight" IsEnabled="{Binding Canvas.IsSelectionActive}">
                         <MenuItem Header="Regular" Click="OnTextWeightRegularMenuClicked"/>
                         <MenuItem Header="Semibold" Click="OnTextWeightSemiboldMenuClicked"/>
                         <MenuItem Header="Bold" Click="OnTextWeightBoldMenuClicked"/>

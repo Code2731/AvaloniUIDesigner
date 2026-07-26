@@ -24,6 +24,7 @@ public partial class MainWindow : Window
     private enum DragMode { None, Move, N, S, E, W, NE, NW, SE, SW }
     private enum UnsavedChoice { Save, Discard, Cancel }
     private sealed record ComponentPackExportOptions(string PackName, string DisplayName, string NamePrefix);
+    private sealed record ColorResourceApplicationOptions(string ResourceName, string PropertyName);
 
     private const double HandleHalf = 5;
     private const double MinSize = 10;
@@ -399,6 +400,42 @@ public partial class MainWindow : Window
         if (updatedAppearance is not null)
         {
             Vm.SetSelectedAppearance(updatedAppearance);
+        }
+    }
+
+    private async void OnEditColorResourcesMenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        FlushPendingPropertyHistory();
+        if (Vm is null)
+        {
+            return;
+        }
+
+        var updatedResources = await ShowTextEditorDialogAsync(
+            "Edit Color Resources",
+            Vm.GetColorResourceEditorText(),
+            "Enter one SolidColorBrush per line using Key = Brush, for example PrimaryBrush = #2563EB.");
+        if (updatedResources is not null)
+        {
+            Vm.SetColorResourcesFromText(updatedResources);
+        }
+    }
+
+    private async void OnApplyColorResourceMenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        FlushPendingPropertyHistory();
+        if (Vm is null || !Vm.TryGetColorResourceApplicationOptions(
+                out var controlName,
+                out var resourceNames,
+                out var propertyNames))
+        {
+            return;
+        }
+
+        var options = await ShowColorResourceApplicationDialogAsync(controlName, resourceNames, propertyNames);
+        if (options is not null)
+        {
+            Vm.ApplyColorResource(options.ResourceName, options.PropertyName);
         }
     }
 
@@ -2283,6 +2320,69 @@ public partial class MainWindow : Window
         dialog.Content = content;
 
         return await dialog.ShowDialog<IReadOnlyDictionary<string, string>?>(this);
+    }
+
+    private async Task<ColorResourceApplicationOptions?> ShowColorResourceApplicationDialogAsync(
+        string controlName,
+        IReadOnlyList<string> resourceNames,
+        IReadOnlyList<string> propertyNames)
+    {
+        var resourceSelector = new ComboBox
+        {
+            ItemsSource = resourceNames,
+            SelectedIndex = 0,
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+        };
+        var propertySelector = new ComboBox
+        {
+            ItemsSource = propertyNames,
+            SelectedIndex = 0,
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+        };
+        var dialog = new Window
+        {
+            Title = $"Apply Color Resource - {controlName}",
+            Width = 460,
+            Height = 260,
+            MinWidth = 380,
+            MinHeight = 230,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner,
+        };
+        var applyButton = new Button { Content = "Apply", MinWidth = 84 };
+        applyButton.Click += (_, _) => dialog.Close(new ColorResourceApplicationOptions(
+            resourceSelector.SelectedItem?.ToString() ?? string.Empty,
+            propertySelector.SelectedItem?.ToString() ?? string.Empty));
+        var cancelButton = new Button { Content = "Cancel", MinWidth = 84 };
+        cancelButton.Click += (_, _) => dialog.Close(null);
+        var buttons = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            Spacing = 8,
+            HorizontalAlignment = HorizontalAlignment.Right,
+            Children = { cancelButton, applyButton },
+        };
+        var fields = new StackPanel
+        {
+            Spacing = 6,
+            Children =
+            {
+                new TextBlock { Text = "Color resource" },
+                resourceSelector,
+                new TextBlock { Text = "Target property" },
+                propertySelector,
+            },
+        };
+        var content = new Grid
+        {
+            Margin = new Thickness(16),
+            RowDefinitions = new RowDefinitions("*,Auto"),
+            RowSpacing = 12,
+            Children = { fields, buttons },
+        };
+        Grid.SetRow(buttons, 1);
+        dialog.Content = content;
+
+        return await dialog.ShowDialog<ColorResourceApplicationOptions?>(this);
     }
 
     private async Task<string?> ShowTextEditorDialogAsync(string title, string content, string helpText, bool multiline = true)
