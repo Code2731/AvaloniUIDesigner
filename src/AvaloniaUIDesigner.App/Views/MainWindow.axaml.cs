@@ -8,6 +8,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Controls.Primitives;
 using Avalonia.Controls.Shapes;
 using Avalonia.Input;
 using Avalonia.Layout;
@@ -44,6 +45,7 @@ public partial class MainWindow : Window
         double ItemSize,
         bool LastChildFill);
     private sealed record WrapPanelAssignmentOptions(string ParentName, int ItemIndex);
+    private sealed record UniformGridAssignmentOptions(string ParentName, int ItemIndex);
     private sealed record ContentAssignmentOptions(string ParentName);
 
     private const double HandleHalf = 5;
@@ -704,6 +706,27 @@ public partial class MainWindow : Window
 
     private void OnMoveWrapPanelItemLaterMenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
         => Vm?.MoveSelectedWrapPanelItem(1);
+
+    private async void OnAssignToUniformGridMenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        FlushPendingPropertyHistory();
+        if (Vm is null || !Vm.TryGetSelectedUniformGridAssignment(out var state))
+        {
+            return;
+        }
+
+        var updated = await ShowUniformGridAssignmentDialogAsync(state);
+        if (updated is not null)
+        {
+            Vm.SetSelectedUniformGridAssignment(updated.ParentName, updated.ItemIndex);
+        }
+    }
+
+    private void OnMoveUniformGridItemEarlierMenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+        => Vm?.MoveSelectedUniformGridItem(-1);
+
+    private void OnMoveUniformGridItemLaterMenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+        => Vm?.MoveSelectedUniformGridItem(1);
 
     private void OnRemoveFromContainerMenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
@@ -1436,6 +1459,13 @@ public partial class MainWindow : Window
             Vm?.Canvas.ReflowContainerChildren(_boundElement);
         }
 
+        if (control is UniformGrid
+            && e.Property.Name is "Rows" or "Columns" or "FirstColumn" or "RowSpacing" or "ColumnSpacing"
+            && _boundElement is not null)
+        {
+            Vm?.Canvas.ReflowContainerChildren(_boundElement);
+        }
+
         if (control is Border
             && e.Property.Name == "BorderThickness"
             && _boundElement is not null)
@@ -1583,6 +1613,11 @@ public partial class MainWindow : Window
         {
             return propertyName is "Orientation" or "ItemWidth" or "ItemHeight"
                 or "ItemSpacing" or "LineSpacing" or "ItemsAlignment";
+        }
+
+        if (control is UniformGrid)
+        {
+            return propertyName is "Rows" or "Columns" or "FirstColumn" or "RowSpacing" or "ColumnSpacing";
         }
 
         if (control is Grid)
@@ -3021,6 +3056,96 @@ public partial class MainWindow : Window
         dialog.Content = content;
 
         return await dialog.ShowDialog<WrapPanelAssignmentOptions?>(this);
+    }
+
+    private async Task<UniformGridAssignmentOptions?> ShowUniformGridAssignmentDialogAsync(
+        UniformGridAssignmentEditorState state)
+    {
+        var parentSelector = new ComboBox
+        {
+            ItemsSource = state.Parents,
+            SelectedItem = state.Parents.First(parent => string.Equals(
+                parent.DisplayName,
+                state.SelectedParentName,
+                StringComparison.OrdinalIgnoreCase)),
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+        };
+        var positionEditor = new NumericUpDown
+        {
+            Minimum = 1,
+            Value = state.ItemIndex + 1,
+        };
+        var layoutHint = new TextBlock
+        {
+            Foreground = Avalonia.Media.Brushes.Gray,
+            TextWrapping = Avalonia.Media.TextWrapping.Wrap,
+            Text = "Rows, columns, first column, and spacing are edited on the parent UniformGrid in the Property Inspector.",
+        };
+        var dialog = new Window
+        {
+            Title = $"Assign to UniformGrid - {state.ControlName}",
+            Width = 460,
+            Height = 320,
+            MinWidth = 400,
+            MinHeight = 290,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner,
+        };
+
+        void UpdateParentState()
+        {
+            if (parentSelector.SelectedItem is UniformGridParentOption parent)
+            {
+                positionEditor.Maximum = parent.ChildCount + 1;
+            }
+        }
+
+        parentSelector.SelectionChanged += (_, _) => UpdateParentState();
+        UpdateParentState();
+
+        var assignButton = new Button { Content = "Assign", MinWidth = 84 };
+        assignButton.Click += (_, _) =>
+        {
+            if (parentSelector.SelectedItem is not UniformGridParentOption parent)
+            {
+                return;
+            }
+
+            dialog.Close(new UniformGridAssignmentOptions(
+                parent.DisplayName,
+                (int)(positionEditor.Value ?? 1) - 1));
+        };
+        var cancelButton = new Button { Content = "Cancel", MinWidth = 84 };
+        cancelButton.Click += (_, _) => dialog.Close(null);
+        var buttons = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            Spacing = 8,
+            HorizontalAlignment = HorizontalAlignment.Right,
+            Children = { cancelButton, assignButton },
+        };
+        var fields = new StackPanel
+        {
+            Spacing = 6,
+            Children =
+            {
+                new TextBlock { Text = "Parent UniformGrid" },
+                parentSelector,
+                new TextBlock { Text = "Position (1-based)" },
+                positionEditor,
+                layoutHint,
+            },
+        };
+        var content = new Grid
+        {
+            Margin = new Thickness(16),
+            RowDefinitions = new RowDefinitions("*,Auto"),
+            RowSpacing = 12,
+            Children = { fields, buttons },
+        };
+        Grid.SetRow(buttons, 1);
+        dialog.Content = content;
+
+        return await dialog.ShowDialog<UniformGridAssignmentOptions?>(this);
     }
 
     private async Task<ContentAssignmentOptions?> ShowContentAssignmentDialogAsync(

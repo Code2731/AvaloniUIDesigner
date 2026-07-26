@@ -6,6 +6,7 @@ using System.Text.Json;
 using Avalonia;
 using Avalonia.Automation;
 using Avalonia.Controls;
+using Avalonia.Controls.Primitives;
 using Avalonia.Layout;
 using Avalonia.Media;
 using Avalonia.Media.Imaging;
@@ -66,6 +67,10 @@ public sealed class PreviewWindow : Window
                 || string.Equals(element.TypeName, "Avalonia.Controls.StackPanel", StringComparison.Ordinal)
                 || string.Equals(element.TypeName, "Avalonia.Controls.DockPanel", StringComparison.Ordinal)
                 || string.Equals(element.TypeName, "Avalonia.Controls.WrapPanel", StringComparison.Ordinal)
+                || string.Equals(
+                    element.TypeName,
+                    "Avalonia.Controls.Primitives.UniformGrid",
+                    StringComparison.Ordinal)
                 || string.Equals(element.TypeName, "Avalonia.Controls.Border", StringComparison.Ordinal)
                 || string.Equals(element.TypeName, "Avalonia.Controls.ScrollViewer", StringComparison.Ordinal)
                 || string.Equals(element.TypeName, "Avalonia.Controls.Expander", StringComparison.Ordinal))
@@ -110,6 +115,8 @@ public sealed class PreviewWindow : Window
                     ? children.OrderBy(child => child.DockPanelIndex).ToList()
                     : parent is WrapPanel
                         ? children.OrderBy(child => child.WrapPanelIndex).ToList()
+                        : parent is UniformGrid
+                            ? children.OrderBy(child => child.UniformGridIndex).ToList()
                 : children;
             if (parent is Panel panel)
             {
@@ -165,6 +172,9 @@ public sealed class PreviewWindow : Window
                         break;
                     case WrapPanel wrap:
                         wrap.Children.Add(child);
+                        break;
+                    case UniformGrid uniformGrid:
+                        uniformGrid.Children.Add(child);
                         break;
                     case Border border:
                         border.Child = child;
@@ -274,6 +284,14 @@ public sealed class PreviewWindow : Window
                 ItemSpacing = 8,
                 LineSpacing = 8,
                 ItemsAlignment = WrapPanelItemsAlignment.Start,
+            },
+            "Avalonia.Controls.Primitives.UniformGrid" => new UniformGrid
+            {
+                Rows = 2,
+                Columns = 3,
+                FirstColumn = 0,
+                RowSpacing = 8,
+                ColumnSpacing = 8,
             },
             _ => new TextBlock { Text = $"[Unsupported: {snapshot.DisplayName}]" },
         };
@@ -597,6 +615,37 @@ public sealed class PreviewWindow : Window
                         out var parsedItemsAlignment))
                 {
                     wrapPanel.ItemsAlignment = parsedItemsAlignment;
+                }
+                break;
+            case UniformGrid uniformGrid:
+                if (properties.TryGetValue("Rows", out var rows)
+                    && int.TryParse(rows, NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsedRows))
+                {
+                    uniformGrid.Rows = Math.Max(0, parsedRows);
+                }
+
+                if (properties.TryGetValue("Columns", out var columns)
+                    && int.TryParse(columns, NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsedColumns))
+                {
+                    uniformGrid.Columns = Math.Max(0, parsedColumns);
+                }
+
+                if (properties.TryGetValue("FirstColumn", out var firstColumn)
+                    && int.TryParse(firstColumn, NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsedFirstColumn))
+                {
+                    uniformGrid.FirstColumn = Math.Max(0, parsedFirstColumn);
+                }
+
+                if (properties.TryGetValue("RowSpacing", out var rowSpacing)
+                    && double.TryParse(rowSpacing, NumberStyles.Float, CultureInfo.InvariantCulture, out var parsedRowSpacing))
+                {
+                    uniformGrid.RowSpacing = Math.Max(0, parsedRowSpacing);
+                }
+
+                if (properties.TryGetValue("ColumnSpacing", out var columnSpacing)
+                    && double.TryParse(columnSpacing, NumberStyles.Float, CultureInfo.InvariantCulture, out var parsedColumnSpacing))
+                {
+                    uniformGrid.ColumnSpacing = Math.Max(0, parsedColumnSpacing);
                 }
                 break;
         }

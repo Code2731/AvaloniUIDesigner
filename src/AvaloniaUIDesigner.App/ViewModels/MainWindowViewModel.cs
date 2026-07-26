@@ -11,6 +11,7 @@ using System.Xml.Linq;
 using Avalonia;
 using Avalonia.Automation;
 using Avalonia.Controls;
+using Avalonia.Controls.Primitives;
 using Avalonia.Layout;
 using Avalonia.Media;
 using AvaloniaUIDesigner.App.Designer.Contracts;
@@ -86,6 +87,21 @@ public sealed record WrapPanelParentOption(
 public sealed record WrapPanelAssignmentEditorState(
     string ControlName,
     IReadOnlyList<WrapPanelParentOption> Parents,
+    string SelectedParentName,
+    int ItemIndex);
+
+public sealed record UniformGridParentOption(
+    string DisplayName,
+    int Rows,
+    int Columns,
+    int ChildCount)
+{
+    public override string ToString() => $"{DisplayName} ({Rows}x{Columns})";
+}
+
+public sealed record UniformGridAssignmentEditorState(
+    string ControlName,
+    IReadOnlyList<UniformGridParentOption> Parents,
     string SelectedParentName,
     int ItemIndex);
 
@@ -1152,6 +1168,7 @@ public partial class MainWindowViewModel : ViewModelBase
         target.DockPanelDock = DesignerDockSide.Left;
         target.DockPanelItemSize = 40;
         target.WrapPanelIndex = -1;
+        target.UniformGridIndex = -1;
         target.ParentLayout = DesignerParentLayoutKind.Grid;
         target.ParentName = parent.DisplayName;
         Canvas.MoveElementsToFront([target]);
@@ -1185,6 +1202,7 @@ public partial class MainWindowViewModel : ViewModelBase
         target.DockPanelDock = DesignerDockSide.Left;
         target.DockPanelItemSize = 40;
         target.WrapPanelIndex = -1;
+        target.UniformGridIndex = -1;
         target.ParentLayout = DesignerParentLayoutKind.None;
         Canvas.NormalizeContainerRelationships();
         ObjectTree.RebuildFrom(Canvas.Elements);
@@ -1624,6 +1642,142 @@ public partial class MainWindowViewModel : ViewModelBase
 
     private static WrapPanelAssignmentEditorState EmptyWrapPanelAssignmentState()
         => new(string.Empty, Array.Empty<WrapPanelParentOption>(), string.Empty, 0);
+
+    public bool TryGetSelectedUniformGridAssignment(out UniformGridAssignmentEditorState state)
+    {
+        if (Canvas.SelectedElement is not { IsLocked: false } target
+            || target.Visual is UniformGrid)
+        {
+            state = EmptyUniformGridAssignmentState();
+            StatusText = "Select an unlocked non-UniformGrid control to assign it to a UniformGrid.";
+            return false;
+        }
+
+        var parents = Canvas.Elements
+            .Where(element => element.Visual is UniformGrid && !element.IsContainerChild && !element.IsLocked)
+            .Select(element =>
+            {
+                var uniformGrid = (UniformGrid)element.Visual;
+                var childCount = Canvas.Elements.Count(child =>
+                    !ReferenceEquals(child, target)
+                    && child.IsUniformGridChild
+                    && string.Equals(child.ParentName, element.DisplayName, StringComparison.OrdinalIgnoreCase));
+                return new UniformGridParentOption(
+                    element.DisplayName,
+                    uniformGrid.Rows,
+                    uniformGrid.Columns,
+                    childCount);
+            })
+            .ToList();
+        if (parents.Count == 0)
+        {
+            state = EmptyUniformGridAssignmentState();
+            StatusText = "Place an unlocked root UniformGrid before assigning a control.";
+            return false;
+        }
+
+        var selectedParent = parents.FirstOrDefault(parent => string.Equals(
+                parent.DisplayName,
+                target.ParentName,
+                StringComparison.OrdinalIgnoreCase))
+            ?? parents[0];
+        state = new UniformGridAssignmentEditorState(
+            target.DisplayName,
+            parents,
+            selectedParent.DisplayName,
+            target.IsUniformGridChild
+                ? Math.Clamp(target.UniformGridIndex, 0, selectedParent.ChildCount)
+                : selectedParent.ChildCount);
+        return true;
+    }
+
+    public bool SetSelectedUniformGridAssignment(string parentName, int itemIndex)
+    {
+        if (Canvas.SelectedElement is not { IsLocked: false } target
+            || target.Visual is UniformGrid)
+        {
+            StatusText = "Select an unlocked non-UniformGrid control to assign it to a UniformGrid.";
+            return false;
+        }
+
+        var parent = Canvas.Elements.FirstOrDefault(element =>
+            !element.IsContainerChild
+            && !element.IsLocked
+            && element.Visual is UniformGrid
+            && string.Equals(element.DisplayName, parentName, StringComparison.OrdinalIgnoreCase));
+        if (parent is null)
+        {
+            StatusText = $"UniformGrid '{parentName}' is not available.";
+            return false;
+        }
+
+        var siblings = Canvas.Elements
+            .Where(element => !ReferenceEquals(element, target)
+                && element.IsUniformGridChild
+                && string.Equals(element.ParentName, parent.DisplayName, StringComparison.OrdinalIgnoreCase))
+            .OrderBy(element => element.UniformGridIndex)
+            .ThenBy(element => Canvas.Elements.IndexOf(element))
+            .ToList();
+        if (itemIndex < 0 || itemIndex > siblings.Count)
+        {
+            StatusText = $"UniformGrid position must be between 1 and {siblings.Count + 1}.";
+            return false;
+        }
+
+        BeginCanvasMutation(HistoryActionType.EditProperty, "Assigned control to UniformGrid.");
+        siblings.Insert(itemIndex, target);
+        Canvas.SetUniformGridChildOrder(parent, siblings);
+        Canvas.MoveElementsToFrontInOrder(siblings);
+        Canvas.NormalizeContainerRelationships();
+        ObjectTree.RebuildFrom(Canvas.Elements);
+        ObjectTree.SelectByElement(target);
+        CommitCanvasMutation();
+        StatusText = $"Assigned {target.DisplayName} to {parent.DisplayName} at position {itemIndex + 1}.";
+        return true;
+    }
+
+    public bool MoveSelectedUniformGridItem(int offset)
+    {
+        if (Canvas.SelectedElement is not { IsLocked: false, IsUniformGridChild: true } target)
+        {
+            StatusText = "Select an unlocked UniformGrid child to change its order.";
+            return false;
+        }
+
+        var siblings = Canvas.Elements
+            .Where(element => element.IsUniformGridChild
+                && string.Equals(element.ParentName, target.ParentName, StringComparison.OrdinalIgnoreCase))
+            .OrderBy(element => element.UniformGridIndex)
+            .ThenBy(element => Canvas.Elements.IndexOf(element))
+            .ToList();
+        var currentIndex = siblings.IndexOf(target);
+        var nextIndex = currentIndex + offset;
+        if (currentIndex < 0 || nextIndex < 0 || nextIndex >= siblings.Count)
+        {
+            StatusText = offset < 0
+                ? $"{target.DisplayName} is already the first UniformGrid item."
+                : $"{target.DisplayName} is already the last UniformGrid item.";
+            return false;
+        }
+
+        var parent = Canvas.Elements.First(element => string.Equals(
+            element.DisplayName,
+            target.ParentName,
+            StringComparison.OrdinalIgnoreCase));
+        BeginCanvasMutation(HistoryActionType.EditProperty, "Reordered UniformGrid item.");
+        (siblings[currentIndex], siblings[nextIndex]) = (siblings[nextIndex], siblings[currentIndex]);
+        Canvas.SetUniformGridChildOrder(parent, siblings);
+        Canvas.MoveElementsToFrontInOrder(siblings);
+        Canvas.NormalizeContainerRelationships();
+        ObjectTree.RebuildFrom(Canvas.Elements);
+        ObjectTree.SelectByElement(target);
+        CommitCanvasMutation();
+        StatusText = $"Moved {target.DisplayName} to UniformGrid position {nextIndex + 1}.";
+        return true;
+    }
+
+    private static UniformGridAssignmentEditorState EmptyUniformGridAssignmentState()
+        => new(string.Empty, Array.Empty<UniformGridParentOption>(), string.Empty, 0);
 
     public bool TryGetSelectedContentAssignment(out ContentAssignmentEditorState state)
     {
@@ -3162,7 +3316,8 @@ public partial class MainWindowViewModel : ViewModelBase
                 e.DockPanelIndex,
                 e.DockPanelDock,
                 e.DockPanelItemSize,
-                e.WrapPanelIndex))
+                e.WrapPanelIndex,
+                e.UniformGridIndex))
             .ToList();
 
         return new DesignerCanvasDocument(
@@ -3281,7 +3436,8 @@ public partial class MainWindowViewModel : ViewModelBase
             element.DockPanelIndex,
             element.DockPanelDock,
             element.DockPanelItemSize,
-            element.WrapPanelIndex);
+            element.WrapPanelIndex,
+            element.UniformGridIndex);
     }
 
     private IReadOnlyDictionary<string, string>? CaptureVisualProperties(Control visual)
@@ -3690,6 +3846,19 @@ public partial class MainWindowViewModel : ViewModelBase
             };
         }
 
+        if (visual is UniformGrid uniformGrid)
+        {
+            return new Dictionary<string, string>
+            {
+                ["Rows"] = uniformGrid.Rows.ToString(CultureInfo.InvariantCulture),
+                ["Columns"] = uniformGrid.Columns.ToString(CultureInfo.InvariantCulture),
+                ["FirstColumn"] = uniformGrid.FirstColumn.ToString(CultureInfo.InvariantCulture),
+                ["RowSpacing"] = uniformGrid.RowSpacing.ToString("0.###", CultureInfo.InvariantCulture),
+                ["ColumnSpacing"] = uniformGrid.ColumnSpacing.ToString("0.###", CultureInfo.InvariantCulture),
+                ["Opacity"] = uniformGrid.Opacity.ToString("0.###", CultureInfo.InvariantCulture),
+            };
+        }
+
         if (visual is Grid grid)
         {
             return new Dictionary<string, string>
@@ -3818,6 +3987,7 @@ public partial class MainWindowViewModel : ViewModelBase
                 || a.DockPanelDock != b.DockPanelDock
                 || a.DockPanelItemSize != b.DockPanelItemSize
                 || a.WrapPanelIndex != b.WrapPanelIndex
+                || a.UniformGridIndex != b.UniformGridIndex
                 || !DictionaryEquals(a.VisualProperties, b.VisualProperties))
             {
                 return false;
@@ -3880,6 +4050,7 @@ public partial class MainWindowViewModel : ViewModelBase
             var stackPanelIndex = 0;
             var dockPanelIndex = 0;
             var wrapPanelIndex = 0;
+            var uniformGridIndex = 0;
             foreach (var node in container.Nodes())
             {
                 if (node is XComment comment)
@@ -3943,6 +4114,10 @@ public partial class MainWindowViewModel : ViewModelBase
                     parent?.TypeName,
                     "Avalonia.Controls.WrapPanel",
                     StringComparison.Ordinal);
+                var isUniformGridChild = string.Equals(
+                    parent?.TypeName,
+                    "Avalonia.Controls.Primitives.UniformGrid",
+                    StringComparison.Ordinal);
                 var dockSide = Enum.TryParse<DesignerDockSide>(
                     child.Attribute("DockPanel.Dock")?.Value,
                     ignoreCase: true,
@@ -3959,6 +4134,7 @@ public partial class MainWindowViewModel : ViewModelBase
                     "Avalonia.Controls.StackPanel" => DesignerParentLayoutKind.StackPanel,
                     "Avalonia.Controls.DockPanel" => DesignerParentLayoutKind.DockPanel,
                     "Avalonia.Controls.WrapPanel" => DesignerParentLayoutKind.WrapPanel,
+                    "Avalonia.Controls.Primitives.UniformGrid" => DesignerParentLayoutKind.UniformGrid,
                     "Avalonia.Controls.Border"
                         or "Avalonia.Controls.ScrollViewer"
                         or "Avalonia.Controls.Expander" => DesignerParentLayoutKind.Content,
@@ -3992,7 +4168,8 @@ public partial class MainWindowViewModel : ViewModelBase
                             ? height
                             : width
                         : 40,
-                    isWrapPanelChild ? wrapPanelIndex++ : -1);
+                    isWrapPanelChild ? wrapPanelIndex++ : -1,
+                    isUniformGridChild ? uniformGridIndex++ : -1);
                 snapshots.Add(snapshot);
                 nextIsLocked = false;
 
@@ -4000,6 +4177,7 @@ public partial class MainWindowViewModel : ViewModelBase
                     || string.Equals(typeName, "Avalonia.Controls.StackPanel", StringComparison.Ordinal)
                     || string.Equals(typeName, "Avalonia.Controls.DockPanel", StringComparison.Ordinal)
                     || string.Equals(typeName, "Avalonia.Controls.WrapPanel", StringComparison.Ordinal)
+                    || string.Equals(typeName, "Avalonia.Controls.Primitives.UniformGrid", StringComparison.Ordinal)
                     || string.Equals(typeName, "Avalonia.Controls.Border", StringComparison.Ordinal)
                     || string.Equals(typeName, "Avalonia.Controls.ScrollViewer", StringComparison.Ordinal)
                     || string.Equals(typeName, "Avalonia.Controls.Expander", StringComparison.Ordinal))
@@ -4425,6 +4603,8 @@ public partial class MainWindowViewModel : ViewModelBase
             "DockPanel" => propertyName == "LastChildFill",
             "WrapPanel" => propertyName is "Orientation" or "ItemWidth" or "ItemHeight"
                 or "ItemSpacing" or "LineSpacing" or "ItemsAlignment",
+            "UniformGrid" => propertyName is "Rows" or "Columns" or "FirstColumn"
+                or "RowSpacing" or "ColumnSpacing",
             _ => false,
         };
     }
@@ -5883,6 +6063,40 @@ public partial class MainWindowViewModel : ViewModelBase
                 sb.AppendLine("</WrapPanel>");
                 break;
 
+            case UniformGrid uniformGrid:
+                sb.Append(indent);
+                sb.Append("<UniformGrid");
+                AppendCanvasLayoutAttributes(sb, element);
+                AppendAttribute(sb, "Rows", uniformGrid.Rows.ToString(CultureInfo.InvariantCulture));
+                AppendAttribute(sb, "Columns", uniformGrid.Columns.ToString(CultureInfo.InvariantCulture));
+                AppendAttribute(sb, "FirstColumn", uniformGrid.FirstColumn.ToString(CultureInfo.InvariantCulture));
+                AppendAttribute(sb, "RowSpacing", uniformGrid.RowSpacing.ToString("0.###", CultureInfo.InvariantCulture));
+                AppendAttribute(sb, "ColumnSpacing", uniformGrid.ColumnSpacing.ToString("0.###", CultureInfo.InvariantCulture));
+                var uniformGridChildren = Canvas.Elements
+                    .Where(child => child.IsUniformGridChild
+                        && string.Equals(
+                            child.ParentName,
+                            element.DisplayName,
+                            StringComparison.OrdinalIgnoreCase))
+                    .OrderBy(child => child.UniformGridIndex)
+                    .ThenBy(child => Canvas.Elements.IndexOf(child))
+                    .ToList();
+                if (uniformGridChildren.Count == 0)
+                {
+                    sb.AppendLine(" />");
+                    break;
+                }
+
+                sb.AppendLine(">");
+                foreach (var child in uniformGridChildren)
+                {
+                    WriteDesignerChildAxaml(sb, child, indent + "  ");
+                }
+
+                sb.Append(indent);
+                sb.AppendLine("</UniformGrid>");
+                break;
+
             default:
                 sb.Append(indent);
                 sb.Append("<TextBlock");
@@ -6012,6 +6226,10 @@ public partial class MainWindowViewModel : ViewModelBase
         {
             // WrapPanel owns item size, spacing, and placement.
         }
+        else if (TryGetUniformGridParent(element, out _))
+        {
+            // UniformGrid owns cell size and placement.
+        }
         else
         {
             AppendAttribute(sb, "Canvas.Left", element.X.ToString("0.###", CultureInfo.InvariantCulture));
@@ -6068,6 +6286,7 @@ public partial class MainWindowViewModel : ViewModelBase
             || TryGetStackPanelParent(element, out _)
             || TryGetDockPanelParent(element, out _, out _)
             || TryGetWrapPanelParent(element, out _)
+            || TryGetUniformGridParent(element, out _)
             || TryGetContentParent(element, out _);
 
     private bool TryGetStackPanelParent(DesignElement element, out StackPanel stackPanel)
@@ -6126,6 +6345,20 @@ public partial class MainWindowViewModel : ViewModelBase
                     StringComparison.OrdinalIgnoreCase));
         wrapPanel = parent?.Visual as WrapPanel ?? null!;
         return wrapPanel is not null;
+    }
+
+    private bool TryGetUniformGridParent(DesignElement element, out UniformGrid uniformGrid)
+    {
+        var parent = element.ParentName is null
+            ? null
+            : Canvas.Elements.FirstOrDefault(candidate =>
+                candidate.Visual is UniformGrid
+                && string.Equals(
+                    candidate.DisplayName,
+                    element.ParentName,
+                    StringComparison.OrdinalIgnoreCase));
+        uniformGrid = parent?.Visual as UniformGrid ?? null!;
+        return uniformGrid is not null;
     }
 
     private DesignElement? GetDesignerContentChild(DesignElement parent)

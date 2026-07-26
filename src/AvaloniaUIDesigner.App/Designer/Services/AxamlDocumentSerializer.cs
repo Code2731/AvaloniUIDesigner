@@ -147,6 +147,11 @@ public sealed class AxamlDocumentSerializer : IDesignerSerializer
                 ? children.OrderBy(child => child.DockPanelIndex).ToList()
                 : string.Equals(element.TypeName, "Avalonia.Controls.WrapPanel", StringComparison.Ordinal)
                     ? children.OrderBy(child => child.WrapPanelIndex).ToList()
+                    : string.Equals(
+                        element.TypeName,
+                        "Avalonia.Controls.Primitives.UniformGrid",
+                        StringComparison.Ordinal)
+                        ? children.OrderBy(child => child.UniformGridIndex).ToList()
             : children;
         foreach (var child in orderedChildren)
         {
@@ -208,6 +213,10 @@ public sealed class AxamlDocumentSerializer : IDesignerSerializer
             || string.Equals(element.TypeName, "Avalonia.Controls.StackPanel", StringComparison.Ordinal)
             || string.Equals(element.TypeName, "Avalonia.Controls.DockPanel", StringComparison.Ordinal)
             || string.Equals(element.TypeName, "Avalonia.Controls.WrapPanel", StringComparison.Ordinal)
+            || string.Equals(
+                element.TypeName,
+                "Avalonia.Controls.Primitives.UniformGrid",
+                StringComparison.Ordinal)
             || string.Equals(element.TypeName, "Avalonia.Controls.Border", StringComparison.Ordinal)
             || string.Equals(element.TypeName, "Avalonia.Controls.ScrollViewer", StringComparison.Ordinal)
             || string.Equals(element.TypeName, "Avalonia.Controls.Expander", StringComparison.Ordinal);

@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Controls.Primitives;
 using Avalonia.Layout;
 using Avalonia.Media;
 using AvaloniaUIDesigner.App.Designer.Contracts;
@@ -229,6 +230,19 @@ public sealed class BuiltInComponentCatalog : IComponentCatalog
                 ItemSpacing = 8,
                 LineSpacing = 8,
                 ItemsAlignment = WrapPanelItemsAlignment.Start,
+            }),
+        new(
+            DisplayName: "UniformGrid",
+            AvaloniaTypeName: "Avalonia.Controls.Primitives.UniformGrid",
+            DefaultWidth: 300,
+            DefaultHeight: 180,
+            VisualFactory: static () => new UniformGrid
+            {
+                Rows = 2,
+                Columns = 3,
+                FirstColumn = 0,
+                RowSpacing = 8,
+                ColumnSpacing = 8,
             })
     };
 

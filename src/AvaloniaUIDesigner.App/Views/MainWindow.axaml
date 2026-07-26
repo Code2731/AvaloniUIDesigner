@@ -63,6 +63,7 @@
                 <MenuItem Header="Assign to StackPanel..." Click="OnAssignToStackPanelMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
                 <MenuItem Header="Assign to DockPanel..." Click="OnAssignToDockPanelMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
                 <MenuItem Header="Assign to WrapPanel..." Click="OnAssignToWrapPanelMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
+                <MenuItem Header="Assign to UniformGrid..." Click="OnAssignToUniformGridMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
                 <MenuItem Header="Assign as Container Content..." Click="OnAssignAsContainerContentMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
                 <MenuItem Header="Move StackPanel Item Earlier" Click="OnMoveStackPanelItemEarlierMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
                 <MenuItem Header="Move StackPanel Item Later" Click="OnMoveStackPanelItemLaterMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
@@ -70,6 +71,8 @@
                 <MenuItem Header="Move DockPanel Item Later" Click="OnMoveDockPanelItemLaterMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
                 <MenuItem Header="Move WrapPanel Item Earlier" Click="OnMoveWrapPanelItemEarlierMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
                 <MenuItem Header="Move WrapPanel Item Later" Click="OnMoveWrapPanelItemLaterMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
+                <MenuItem Header="Move UniformGrid Item Earlier" Click="OnMoveUniformGridItemEarlierMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
+                <MenuItem Header="Move UniformGrid Item Later" Click="OnMoveUniformGridItemLaterMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
                 <MenuItem Header="Remove from Container" Click="OnRemoveFromContainerMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
                 <MenuItem Header="Edit Content..." Click="OnEditExpanderContentMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
                 <MenuItem Header="Edit Click Handler..." Click="OnEditButtonClickHandlerMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
@@ -327,6 +330,7 @@
                                                     <MenuItem Header="Assign to StackPanel..." Click="OnAssignToStackPanelMenuClicked"/>
                                                     <MenuItem Header="Assign to DockPanel..." Click="OnAssignToDockPanelMenuClicked"/>
                                                     <MenuItem Header="Assign to WrapPanel..." Click="OnAssignToWrapPanelMenuClicked"/>
+                                                    <MenuItem Header="Assign to UniformGrid..." Click="OnAssignToUniformGridMenuClicked"/>
                                                     <MenuItem Header="Assign as Container Content..." Click="OnAssignAsContainerContentMenuClicked"/>
                                                     <MenuItem Header="Move StackPanel Item Earlier" Click="OnMoveStackPanelItemEarlierMenuClicked"/>
                                                     <MenuItem Header="Move StackPanel Item Later" Click="OnMoveStackPanelItemLaterMenuClicked"/>
@@ -334,6 +338,8 @@
                                                     <MenuItem Header="Move DockPanel Item Later" Click="OnMoveDockPanelItemLaterMenuClicked"/>
                                                     <MenuItem Header="Move WrapPanel Item Earlier" Click="OnMoveWrapPanelItemEarlierMenuClicked"/>
                                                     <MenuItem Header="Move WrapPanel Item Later" Click="OnMoveWrapPanelItemLaterMenuClicked"/>
+                                                    <MenuItem Header="Move UniformGrid Item Earlier" Click="OnMoveUniformGridItemEarlierMenuClicked"/>
+                                                    <MenuItem Header="Move UniformGrid Item Later" Click="OnMoveUniformGridItemLaterMenuClicked"/>
                                                     <MenuItem Header="Remove from Container" Click="OnRemoveFromContainerMenuClicked"/>
                                                     <MenuItem Header="Delete" Click="OnDeleteMenuClicked"/>
                                                     <Separator/>
@@ -442,6 +448,18 @@
                                                             HorizontalAlignment="Right"
                                                             IsVisible="{Binding IsWrapPanelChild}">
                                                         <TextBlock Text="{Binding WrapPanelItemLabel}"
+                                                                   FontSize="9"
+                                                                   FontWeight="SemiBold"
+                                                                   Foreground="White"/>
+                                                    </Border>
+                                                    <Border Background="#365314"
+                                                            BorderBrush="#A3E635"
+                                                            BorderThickness="1"
+                                                            CornerRadius="3"
+                                                            Padding="4,1"
+                                                            HorizontalAlignment="Right"
+                                                            IsVisible="{Binding IsUniformGridChild}">
+                                                        <TextBlock Text="{Binding UniformGridItemLabel}"
                                                                    FontSize="9"
                                                                    FontWeight="SemiBold"
                                                                    Foreground="White"/>

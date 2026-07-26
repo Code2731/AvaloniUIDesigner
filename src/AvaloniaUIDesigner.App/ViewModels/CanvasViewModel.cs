@@ -8,6 +8,7 @@ using System.Text.Json;
 using Avalonia;
 using Avalonia.Automation;
 using Avalonia.Controls;
+using Avalonia.Controls.Primitives;
 using Avalonia.Layout;
 using Avalonia.Media;
 using Avalonia.Media.Imaging;
@@ -320,6 +321,7 @@ public partial class CanvasViewModel : ViewModelBase
             element.DockPanelDock = snapshot.DockPanelDock;
             element.DockPanelItemSize = Math.Max(10, snapshot.DockPanelItemSize);
             element.WrapPanelIndex = snapshot.WrapPanelIndex;
+            element.UniformGridIndex = snapshot.UniformGridIndex;
             element.ParentName = snapshot.ParentName;
         }
         finally
@@ -478,6 +480,7 @@ public partial class CanvasViewModel : ViewModelBase
             child.DockPanelDock = DesignerDockSide.Left;
             child.DockPanelItemSize = 40;
             child.WrapPanelIndex = -1;
+            child.UniformGridIndex = -1;
         }
 
         element.PropertyChanged -= OnDesignElementPropertyChanged;
@@ -550,12 +553,14 @@ public partial class CanvasViewModel : ViewModelBase
                     element.StackPanelIndex = -1;
                     element.DockPanelIndex = -1;
                     element.WrapPanelIndex = -1;
+                    element.UniformGridIndex = -1;
                 }
                 else if (parent.Visual is StackPanel)
                 {
                     element.ParentLayout = DesignerParentLayoutKind.StackPanel;
                     element.DockPanelIndex = -1;
                     element.WrapPanelIndex = -1;
+                    element.UniformGridIndex = -1;
                     if (element.StackPanelIndex < 0)
                     {
                         element.StackPanelIndex = GetDirectChildren(parent).Count(child =>
@@ -570,6 +575,7 @@ public partial class CanvasViewModel : ViewModelBase
                     element.ParentLayout = DesignerParentLayoutKind.DockPanel;
                     element.StackPanelIndex = -1;
                     element.WrapPanelIndex = -1;
+                    element.UniformGridIndex = -1;
                     if (element.DockPanelIndex < 0)
                     {
                         element.DockPanelIndex = GetDirectChildren(parent).Count(child =>
@@ -584,11 +590,25 @@ public partial class CanvasViewModel : ViewModelBase
                     element.ParentLayout = DesignerParentLayoutKind.WrapPanel;
                     element.StackPanelIndex = -1;
                     element.DockPanelIndex = -1;
+                    element.UniformGridIndex = -1;
                     if (element.WrapPanelIndex < 0)
                     {
                         element.WrapPanelIndex = GetDirectChildren(parent).Count(child =>
                             child.ParentLayout == DesignerParentLayoutKind.WrapPanel
                             && child.WrapPanelIndex >= 0);
+                    }
+                }
+                else if (parent.Visual is UniformGrid)
+                {
+                    element.ParentLayout = DesignerParentLayoutKind.UniformGrid;
+                    element.StackPanelIndex = -1;
+                    element.DockPanelIndex = -1;
+                    element.WrapPanelIndex = -1;
+                    if (element.UniformGridIndex < 0)
+                    {
+                        element.UniformGridIndex = GetDirectChildren(parent).Count(child =>
+                            child.ParentLayout == DesignerParentLayoutKind.UniformGrid
+                            && child.UniformGridIndex >= 0);
                     }
                 }
                 else
@@ -597,6 +617,7 @@ public partial class CanvasViewModel : ViewModelBase
                     element.StackPanelIndex = -1;
                     element.DockPanelIndex = -1;
                     element.WrapPanelIndex = -1;
+                    element.UniformGridIndex = -1;
                 }
             }
 
@@ -647,6 +668,7 @@ public partial class CanvasViewModel : ViewModelBase
                 child.DockPanelDock = DesignerDockSide.Left;
                 child.DockPanelItemSize = 40;
                 child.WrapPanelIndex = -1;
+                child.UniformGridIndex = -1;
                 child.ParentLayout = DesignerParentLayoutKind.StackPanel;
                 child.ParentName = parent.DisplayName;
             }
@@ -684,6 +706,7 @@ public partial class CanvasViewModel : ViewModelBase
             child.DockPanelDock = DesignerDockSide.Left;
             child.DockPanelItemSize = 40;
             child.WrapPanelIndex = -1;
+            child.UniformGridIndex = -1;
             child.ParentLayout = DesignerParentLayoutKind.Content;
             child.ParentName = parent.DisplayName;
             ClearBuiltInContent(parent.Visual);
@@ -720,6 +743,7 @@ public partial class CanvasViewModel : ViewModelBase
                 child.StackPanelItemSize = 40;
                 child.DockPanelIndex = index;
                 child.WrapPanelIndex = -1;
+                child.UniformGridIndex = -1;
                 child.ParentLayout = DesignerParentLayoutKind.DockPanel;
                 child.ParentName = parent.DisplayName;
             }
@@ -757,7 +781,46 @@ public partial class CanvasViewModel : ViewModelBase
                 child.DockPanelDock = DesignerDockSide.Left;
                 child.DockPanelItemSize = 40;
                 child.WrapPanelIndex = index;
+                child.UniformGridIndex = -1;
                 child.ParentLayout = DesignerParentLayoutKind.WrapPanel;
+                child.ParentName = parent.DisplayName;
+            }
+
+            ReflowContainerTreeCore(parent);
+        }
+        finally
+        {
+            _isReflowingContainerChildren = false;
+        }
+    }
+
+    public void SetUniformGridChildOrder(
+        DesignElement parent,
+        IReadOnlyList<DesignElement> orderedChildren)
+    {
+        if (parent.Visual is not UniformGrid)
+        {
+            return;
+        }
+
+        _isReflowingContainerChildren = true;
+        try
+        {
+            for (var index = 0; index < orderedChildren.Count; index++)
+            {
+                var child = orderedChildren[index];
+                child.GridRow = 0;
+                child.GridColumn = 0;
+                child.GridRowSpan = 1;
+                child.GridColumnSpan = 1;
+                child.StackPanelIndex = -1;
+                child.StackPanelItemSize = 40;
+                child.DockPanelIndex = -1;
+                child.DockPanelDock = DesignerDockSide.Left;
+                child.DockPanelItemSize = 40;
+                child.WrapPanelIndex = -1;
+                child.UniformGridIndex = index;
+                child.ParentLayout = DesignerParentLayoutKind.UniformGrid;
                 child.ParentName = parent.DisplayName;
             }
 
@@ -1036,6 +1099,10 @@ public partial class CanvasViewModel : ViewModelBase
         {
             ReflowWrapPanelChildrenCore(parent, wrapPanel);
         }
+        else if (parent.Visual is UniformGrid uniformGrid)
+        {
+            ReflowUniformGridChildrenCore(parent, uniformGrid);
+        }
         else if (parent.Visual is Grid)
         {
             foreach (var child in GetDirectChildren(parent))
@@ -1287,6 +1354,64 @@ public partial class CanvasViewModel : ViewModelBase
             _ => 0,
         };
 
+    private void ReflowUniformGridChildrenCore(DesignElement parent, UniformGrid uniformGrid)
+    {
+        var children = GetDirectChildren(parent)
+            .Where(child => child.IsUniformGridChild)
+            .OrderBy(child => child.UniformGridIndex)
+            .ThenBy(Elements.IndexOf)
+            .ToList();
+        if (children.Count == 0)
+        {
+            return;
+        }
+
+        uniformGrid.Children.Clear();
+        var rows = Math.Max(0, uniformGrid.Rows);
+        var columns = Math.Max(0, uniformGrid.Columns);
+        var firstColumn = Math.Max(0, uniformGrid.FirstColumn);
+        if (rows == 0 && columns == 0)
+        {
+            columns = Math.Max(1, (int)Math.Ceiling(Math.Sqrt(children.Count + firstColumn)));
+            firstColumn = Math.Min(firstColumn, columns - 1);
+            rows = Math.Max(1, (int)Math.Ceiling((children.Count + firstColumn) / (double)columns));
+        }
+        else if (columns == 0)
+        {
+            rows = Math.Max(1, rows);
+            columns = Math.Max(1, (int)Math.Ceiling((children.Count + firstColumn) / (double)rows));
+            firstColumn = Math.Min(firstColumn, columns - 1);
+        }
+        else
+        {
+            columns = Math.Max(1, columns);
+            firstColumn = Math.Min(firstColumn, columns - 1);
+            rows = rows == 0
+                ? Math.Max(1, (int)Math.Ceiling((children.Count + firstColumn) / (double)columns))
+                : Math.Max(rows, (int)Math.Ceiling((children.Count + firstColumn) / (double)columns));
+        }
+
+        var rowSpacing = Math.Max(0, uniformGrid.RowSpacing);
+        var columnSpacing = Math.Max(0, uniformGrid.ColumnSpacing);
+        var cellWidth = Math.Max(10, (parent.Width - ((columns - 1) * columnSpacing)) / columns);
+        var cellHeight = Math.Max(10, (parent.Height - ((rows - 1) * rowSpacing)) / rows);
+        for (var index = 0; index < children.Count; index++)
+        {
+            var cellIndex = firstColumn + index;
+            var row = cellIndex / columns;
+            var column = cellIndex % columns;
+            var child = children[index];
+            child.UniformGridIndex = index;
+            SetElementBounds(
+                child,
+                new Rect(
+                    parent.X + (column * (cellWidth + columnSpacing)),
+                    parent.Y + (row * (cellHeight + rowSpacing)),
+                    cellWidth,
+                    cellHeight));
+        }
+    }
+
     private static void SetElementBounds(DesignElement element, Rect bounds)
     {
         element.X = bounds.X;
@@ -1324,6 +1449,7 @@ public partial class CanvasViewModel : ViewModelBase
         child.DockPanelDock = DesignerDockSide.Left;
         child.DockPanelItemSize = 40;
         child.WrapPanelIndex = -1;
+        child.UniformGridIndex = -1;
     }
 
     private void OnDesignElementPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
@@ -1344,6 +1470,7 @@ public partial class CanvasViewModel : ViewModelBase
             or nameof(DesignElement.DockPanelDock)
             or nameof(DesignElement.DockPanelItemSize)
             or nameof(DesignElement.WrapPanelIndex)
+            or nameof(DesignElement.UniformGridIndex)
             or nameof(DesignElement.ParentLayout))
         {
             ReflowContainerChild(element);
@@ -1367,7 +1494,8 @@ public partial class CanvasViewModel : ViewModelBase
     }
 
     private static bool IsDesignerContainer(Control visual)
-        => visual is Grid or StackPanel or DockPanel or WrapPanel or Border or ScrollViewer or Expander;
+        => visual is Grid or StackPanel or DockPanel or WrapPanel or UniformGrid
+            or Border or ScrollViewer or Expander;
 
     private static bool IsContentContainer(Control visual)
         => visual is Border or ScrollViewer or Expander;
@@ -1954,6 +2082,41 @@ public partial class CanvasViewModel : ViewModelBase
                     out var parsedItemsAlignment))
             {
                 wrapPanel.ItemsAlignment = parsedItemsAlignment;
+            }
+
+            return;
+        }
+
+        if (visual is UniformGrid uniformGrid)
+        {
+            if (properties.TryGetValue("Rows", out var rows)
+                && int.TryParse(rows, NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsedRows))
+            {
+                uniformGrid.Rows = Math.Max(0, parsedRows);
+            }
+
+            if (properties.TryGetValue("Columns", out var columns)
+                && int.TryParse(columns, NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsedColumns))
+            {
+                uniformGrid.Columns = Math.Max(0, parsedColumns);
+            }
+
+            if (properties.TryGetValue("FirstColumn", out var firstColumn)
+                && int.TryParse(firstColumn, NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsedFirstColumn))
+            {
+                uniformGrid.FirstColumn = Math.Max(0, parsedFirstColumn);
+            }
+
+            if (properties.TryGetValue("RowSpacing", out var rowSpacing)
+                && double.TryParse(rowSpacing, NumberStyles.Float, CultureInfo.InvariantCulture, out var parsedRowSpacing))
+            {
+                uniformGrid.RowSpacing = Math.Max(0, parsedRowSpacing);
+            }
+
+            if (properties.TryGetValue("ColumnSpacing", out var columnSpacing)
+                && double.TryParse(columnSpacing, NumberStyles.Float, CultureInfo.InvariantCulture, out var parsedColumnSpacing))
+            {
+                uniformGrid.ColumnSpacing = Math.Max(0, parsedColumnSpacing);
             }
 
             return;

@@ -39,11 +39,13 @@ public partial class DesignElement : ViewModelBase
     [NotifyPropertyChangedFor(nameof(IsStackPanelChild))]
     [NotifyPropertyChangedFor(nameof(IsDockPanelChild))]
     [NotifyPropertyChangedFor(nameof(IsWrapPanelChild))]
+    [NotifyPropertyChangedFor(nameof(IsUniformGridChild))]
     [NotifyPropertyChangedFor(nameof(IsContentChild))]
     [NotifyPropertyChangedFor(nameof(GridCellLabel))]
     [NotifyPropertyChangedFor(nameof(StackPanelItemLabel))]
     [NotifyPropertyChangedFor(nameof(DockPanelItemLabel))]
     [NotifyPropertyChangedFor(nameof(WrapPanelItemLabel))]
+    [NotifyPropertyChangedFor(nameof(UniformGridItemLabel))]
     [NotifyPropertyChangedFor(nameof(ContainerLayoutLabel))]
     private string? _parentName;
 
@@ -78,11 +80,13 @@ public partial class DesignElement : ViewModelBase
     [NotifyPropertyChangedFor(nameof(IsStackPanelChild))]
     [NotifyPropertyChangedFor(nameof(IsDockPanelChild))]
     [NotifyPropertyChangedFor(nameof(IsWrapPanelChild))]
+    [NotifyPropertyChangedFor(nameof(IsUniformGridChild))]
     [NotifyPropertyChangedFor(nameof(IsContentChild))]
     [NotifyPropertyChangedFor(nameof(GridCellLabel))]
     [NotifyPropertyChangedFor(nameof(StackPanelItemLabel))]
     [NotifyPropertyChangedFor(nameof(DockPanelItemLabel))]
     [NotifyPropertyChangedFor(nameof(WrapPanelItemLabel))]
+    [NotifyPropertyChangedFor(nameof(UniformGridItemLabel))]
     [NotifyPropertyChangedFor(nameof(ContainerLayoutLabel))]
     private DesignerParentLayoutKind _parentLayout;
 
@@ -102,6 +106,10 @@ public partial class DesignElement : ViewModelBase
     private int _wrapPanelIndex = -1;
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(UniformGridItemLabel))]
+    private int _uniformGridIndex = -1;
+
+    [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(HasStylePreviewState))]
     private string? _stylePreviewStateLabel;
 
@@ -118,6 +126,8 @@ public partial class DesignElement : ViewModelBase
     public bool IsDockPanelChild => IsContainerChild && ParentLayout == DesignerParentLayoutKind.DockPanel;
 
     public bool IsWrapPanelChild => IsContainerChild && ParentLayout == DesignerParentLayoutKind.WrapPanel;
+
+    public bool IsUniformGridChild => IsContainerChild && ParentLayout == DesignerParentLayoutKind.UniformGrid;
 
     public bool IsContentChild => IsContainerChild && ParentLayout == DesignerParentLayoutKind.Content;
 
@@ -147,6 +157,9 @@ public partial class DesignElement : ViewModelBase
 
     public string WrapPanelItemLabel
         => IsWrapPanelChild ? $"WRAP #{WrapPanelIndex + 1}" : string.Empty;
+
+    public string UniformGridItemLabel
+        => IsUniformGridChild ? $"UNIFORM #{UniformGridIndex + 1}" : string.Empty;
 
     public string ContainerLayoutLabel
         => IsContentChild ? "CONTENT" : string.Empty;
