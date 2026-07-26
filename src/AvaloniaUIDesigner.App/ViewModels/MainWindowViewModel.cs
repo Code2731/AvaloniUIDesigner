@@ -249,6 +249,15 @@ public sealed record ContainerBehaviorEditorState(
     string HorizontalSnapPointsAlignment,
     string VerticalSnapPointsAlignment);
 
+public sealed record ImageEditorState(
+    string ControlName,
+    string Source,
+    string Stretch,
+    string StretchDirection,
+    string BitmapInterpolationMode,
+    string EdgeMode,
+    string BitmapBlendingMode);
+
 public sealed record GridDefinitionEditorState(
     string ControlName,
     string RowDefinitions,
@@ -3370,24 +3379,18 @@ public partial class MainWindowViewModel : ViewModelBase
 
     public bool TrySetSelectedImageSource(string source)
     {
-        var target = Canvas.SelectedElement;
-        if (target is null || target.IsLocked || target.Visual is not Image)
+        if (!TryGetSelectedImageProperties(out var state))
         {
-            StatusText = "Select an unlocked Image control before choosing an image file.";
             return false;
         }
 
-        BeginCanvasMutation(HistoryActionType.EditProperty, "Updated image source.");
-        if (!Canvas.TrySetSelectedImageSource(source))
-        {
-            _pendingMutation = null;
-            StatusText = "The selected file could not be loaded as an image.";
-            return false;
-        }
-
-        CommitCanvasMutation();
-        StatusText = $"Set image source for {target.DisplayName}.";
-        return true;
+        return SetSelectedImageProperties(new DesignerImageEditorInput(
+            source,
+            state.Stretch,
+            state.StretchDirection,
+            state.BitmapInterpolationMode,
+            state.EdgeMode,
+            state.BitmapBlendingMode));
     }
 
     public bool TryGetSelectedPathData(out string controlName, out string data)
@@ -4465,6 +4468,108 @@ public partial class MainWindowViewModel : ViewModelBase
             values.VerticalSnapPointsType.ToString(),
             values.HorizontalSnapPointsAlignment.ToString(),
             values.VerticalSnapPointsAlignment.ToString());
+
+    public bool TryGetSelectedImageProperties(out ImageEditorState state)
+    {
+        var target = Canvas.SelectedElement;
+        if (target is null || target.IsLocked || target.Visual is not Image)
+        {
+            state = default!;
+            StatusText = target switch
+            {
+                null => "Select an Image control before editing image source and rendering.",
+                { IsLocked: true } => "Unlock the selected Image control before editing image source and rendering.",
+                _ => "Image source and rendering editing is available for Image controls.",
+            };
+            return false;
+        }
+
+        if (!DesignerImageRuntime.TryRead(target.Visual, out var values, out var error))
+        {
+            state = default!;
+            StatusText = $"Image source and rendering cannot be edited. {error}";
+            return false;
+        }
+
+        state = CreateImageEditorState(target.DisplayName, values);
+        return true;
+    }
+
+    public bool SetSelectedImageProperties(DesignerImageEditorInput input)
+    {
+        var target = Canvas.SelectedElement;
+        if (target is null || target.IsLocked || target.Visual is not Image image)
+        {
+            StatusText = "Select an unlocked Image control before editing image source and rendering.";
+            return false;
+        }
+
+        if (!DesignerImageRuntime.TryParseValues(
+                image,
+                input,
+                out var values,
+                out var error))
+        {
+            StatusText = $"Image source and rendering were not changed. {error}";
+            return false;
+        }
+
+        if (!DesignerImageRuntime.TryRead(image, out var current, out error))
+        {
+            StatusText = $"Image source and rendering were not changed. {error}";
+            return false;
+        }
+
+        if (current == values)
+        {
+            StatusText = "Image source and rendering are unchanged.";
+            return true;
+        }
+
+        BeginCanvasMutation(
+            HistoryActionType.EditProperty,
+            "Updated image source and rendering.");
+        if (!DesignerImageRuntime.TryApply(
+                image,
+                values,
+                retainSourceOnFailure: false,
+                out error))
+        {
+            _pendingMutation = null;
+            StatusText = $"Image source and rendering were not changed. {error}";
+            return false;
+        }
+
+        foreach (var propertyName in new[]
+                 {
+                     "Source",
+                     "Stretch",
+                     "StretchDirection",
+                     "RenderOptions.BitmapInterpolationMode",
+                     "RenderOptions.EdgeMode",
+                     "RenderOptions.BitmapBlendingMode",
+                 })
+        {
+            DesignerStyleApplicationMetadata.ClearApplied(image, propertyName);
+        }
+
+        Canvas.RefreshDocumentStyles(image);
+        CommitCanvasMutation();
+        StatusText = $"Updated image source and rendering for {target.DisplayName}.";
+        return true;
+    }
+
+    private static ImageEditorState CreateImageEditorState(
+        string controlName,
+        DesignerImageValues values)
+        => new(
+            controlName,
+            values.Source,
+            values.Stretch.ToString(),
+            values.StretchDirection.ToString(),
+            values.BitmapInterpolationMode.ToString(),
+            values.EdgeMode.ToString(),
+            values.BitmapBlendingMode.ToString());
 
     public bool TryGetSelectedToolTip(out string controlName, out string toolTip)
     {
@@ -6092,6 +6197,7 @@ public partial class MainWindowViewModel : ViewModelBase
         DesignerDateTimeRuntime.Capture(visual, result);
         DesignerToggleRuntime.Capture(visual, result);
         DesignerContainerBehaviorRuntime.Capture(visual, result);
+        DesignerImageRuntime.Capture(visual, result);
         foreach (var pair in DesignerResourceReferenceMetadata.GetReferences(visual))
         {
             result[pair.Key] = DesignerResourceReferenceMetadata.FormatExpression(pair.Value);
@@ -7872,6 +7978,26 @@ public partial class MainWindowViewModel : ViewModelBase
                 continue;
             }
 
+            if (DesignerImageRuntime.IsSupportedProperty(tagName, name))
+            {
+                if (DesignerImageRuntime.TryNormalizeProperty(
+                        tagName,
+                        name,
+                        attr.Value,
+                        out var canonicalName,
+                        out var normalizedValue,
+                        out var imageError))
+                {
+                    map[canonicalName] = normalizedValue;
+                }
+                else
+                {
+                    warnings.Add($"Ignored {tagName}.{name}: {imageError}");
+                }
+
+                continue;
+            }
+
             if (DesignerTypographyRuntime.IsSupportedProperty(tagName, name))
             {
                 if (DesignerTypographyRuntime.TryNormalizeProperty(
@@ -8098,6 +8224,11 @@ public partial class MainWindowViewModel : ViewModelBase
             return true;
         }
 
+        if (DesignerImageRuntime.IsSupportedProperty(tagName, propertyName))
+        {
+            return true;
+        }
+
         if (propertyName is "Opacity" or "Classes")
         {
             return true;
@@ -8119,7 +8250,7 @@ public partial class MainWindowViewModel : ViewModelBase
                 or "ClearSelectionOnLostFocus" or "IsInactiveSelectionHighlightEnabled",
             "TextBlock" => propertyName is "Text" or "FontSize" or "FontWeight" or "Background" or "Foreground",
             "Label" => propertyName is "Content" or "Target",
-            "Image" => propertyName is "Source" or "Stretch",
+            "Image" => false,
             "Rectangle" => IsSupportedShapeProperty(propertyName)
                 || propertyName is "RadiusX" or "RadiusY",
             "Ellipse" => IsSupportedShapeProperty(propertyName),
@@ -9316,12 +9447,7 @@ public partial class MainWindowViewModel : ViewModelBase
                 sb.Append(indent);
                 sb.Append("<Image");
                 AppendCanvasLayoutAttributes(sb, element);
-                if (!string.IsNullOrWhiteSpace(image.Tag?.ToString()))
-                {
-                    AppendAttribute(sb, "Source", image.Tag?.ToString() ?? string.Empty);
-                }
-
-                AppendAttribute(sb, "Stretch", image.Stretch.ToString());
+                AppendImageAttributes(sb, image);
                 sb.AppendLine(" />");
                 break;
 
@@ -10716,6 +10842,20 @@ public partial class MainWindowViewModel : ViewModelBase
             .Select(binding => binding.PropertyName)
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
         foreach (var attribute in DesignerContainerBehaviorRuntime.GetAxamlAttributes(visual))
+        {
+            if (!boundProperties.Contains(attribute.Name))
+            {
+                AppendAttribute(sb, attribute.Name, attribute.Value);
+            }
+        }
+    }
+
+    private static void AppendImageAttributes(StringBuilder sb, Control visual)
+    {
+        var boundProperties = DesignerBindingRuntime.ReadBindings(visual)
+            .Select(binding => binding.PropertyName)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        foreach (var attribute in DesignerImageRuntime.GetAxamlAttributes(visual))
         {
             if (!boundProperties.Contains(attribute.Name))
             {

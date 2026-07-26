@@ -782,6 +782,19 @@ public partial class MainWindow : Window
         await ShowContainerBehaviorPropertiesDialogAsync(state);
     }
 
+    private async void OnEditImagePropertiesMenuClicked(
+        object? sender,
+        Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        FlushPendingPropertyHistory();
+        if (Vm is null || !Vm.TryGetSelectedImageProperties(out var state))
+        {
+            return;
+        }
+
+        await ShowImagePropertiesDialogAsync(state);
+    }
+
     private async void OnEditGridDefinitionsMenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
         FlushPendingPropertyHistory();
@@ -1819,6 +1832,13 @@ public partial class MainWindow : Window
 
     private static bool IsUndoTrackedVisualProperty(Control control, string propertyName)
     {
+        if (DesignerImageRuntime.IsSupportedProperty(
+                control.GetType().Name,
+                propertyName))
+        {
+            return true;
+        }
+
         if (DesignerContainerBehaviorRuntime.IsSupportedProperty(
                 control.GetType().Name,
                 propertyName))
@@ -1866,11 +1886,6 @@ public partial class MainWindow : Window
         if (control is Label)
         {
             return propertyName == "Content";
-        }
-
-        if (control is Image)
-        {
-            return propertyName == "Stretch";
         }
 
         if (control is CheckBox or ToggleSwitch)
@@ -5109,6 +5124,181 @@ public partial class MainWindow : Window
             };
             Grid.SetRow(field, row);
             Grid.SetColumn(field, column);
+            owner.Children.Add(field);
+        }
+    }
+
+    private async Task ShowImagePropertiesDialogAsync(ImageEditorState state)
+    {
+        if (Vm is null)
+        {
+            return;
+        }
+
+        var sourceEditor = new TextBox
+        {
+            Text = state.Source,
+            Watermark = "Local file path or file URI",
+        };
+        var browseButton = new Button { Content = "Browse...", MinWidth = 88 };
+        browseButton.Click += async (_, _) =>
+        {
+            var files = await StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
+            {
+                Title = "Choose image",
+                AllowMultiple = false,
+                FileTypeFilter =
+                [
+                    new FilePickerFileType("Image files")
+                    {
+                        Patterns = ["*.png", "*.jpg", "*.jpeg", "*.gif", "*.bmp", "*.webp"]
+                    }
+                ]
+            });
+            if (files.Count > 0 && files[0].Path.IsFile)
+            {
+                sourceEditor.Text = files[0].Path.AbsoluteUri;
+            }
+        };
+        var clearButton = new Button { Content = "Clear", MinWidth = 72 };
+        clearButton.Click += (_, _) => sourceEditor.Text = string.Empty;
+        var sourceButtons = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            Spacing = 8,
+            Children = { browseButton, clearButton },
+        };
+        var sourceField = new Grid
+        {
+            ColumnDefinitions = new ColumnDefinitions("*,Auto"),
+            ColumnSpacing = 8,
+            Children = { sourceEditor, sourceButtons },
+        };
+        Grid.SetColumn(sourceButtons, 1);
+
+        var stretchEditor = CreateComboBox(
+            DesignerImageRuntime.StretchNames,
+            state.Stretch);
+        var stretchDirectionEditor = CreateComboBox(
+            DesignerImageRuntime.StretchDirectionNames,
+            state.StretchDirection);
+        var interpolationEditor = CreateComboBox(
+            DesignerImageRuntime.BitmapInterpolationModeNames,
+            state.BitmapInterpolationMode);
+        var edgeModeEditor = CreateComboBox(
+            DesignerImageRuntime.EdgeModeNames,
+            state.EdgeMode);
+        var blendingEditor = CreateComboBox(
+            DesignerImageRuntime.BitmapBlendingModeNames,
+            state.BitmapBlendingMode);
+        var fields = new Grid
+        {
+            ColumnDefinitions = new ColumnDefinitions("*,*"),
+            RowDefinitions = new RowDefinitions("Auto,Auto,Auto,Auto"),
+            ColumnSpacing = 12,
+            RowSpacing = 10,
+        };
+        AddField(fields, "Source", sourceField, 0, 0, 2);
+        AddField(fields, "Stretch", stretchEditor, 1, 0);
+        AddField(fields, "Stretch direction", stretchDirectionEditor, 1, 1);
+        AddField(fields, "Bitmap interpolation", interpolationEditor, 2, 0);
+        AddField(fields, "Edge mode", edgeModeEditor, 2, 1);
+        AddField(fields, "Bitmap blending", blendingEditor, 3, 0, 2);
+
+        var errorText = new TextBlock
+        {
+            Foreground = Avalonia.Media.Brushes.IndianRed,
+            TextWrapping = Avalonia.Media.TextWrapping.Wrap,
+        };
+        var dialog = new Window
+        {
+            Title = $"Edit Image Source & Rendering - {state.ControlName}",
+            Width = 740,
+            Height = 520,
+            MinWidth = 640,
+            MinHeight = 460,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner,
+        };
+        var applyButton = new Button { Content = "Apply", MinWidth = 84 };
+        applyButton.Click += (_, _) =>
+        {
+            var input = new DesignerImageEditorInput(
+                sourceEditor.Text ?? string.Empty,
+                stretchEditor.SelectedItem?.ToString() ?? string.Empty,
+                stretchDirectionEditor.SelectedItem?.ToString() ?? string.Empty,
+                interpolationEditor.SelectedItem?.ToString() ?? string.Empty,
+                edgeModeEditor.SelectedItem?.ToString() ?? string.Empty,
+                blendingEditor.SelectedItem?.ToString() ?? string.Empty);
+            if (!Vm.SetSelectedImageProperties(input))
+            {
+                errorText.Text = Vm.StatusText;
+                return;
+            }
+
+            dialog.Close();
+        };
+        var cancelButton = new Button { Content = "Cancel", MinWidth = 84 };
+        cancelButton.Click += (_, _) => dialog.Close();
+        var buttons = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            Spacing = 8,
+            HorizontalAlignment = HorizontalAlignment.Right,
+            Children = { cancelButton, applyButton },
+        };
+        var content = new Grid
+        {
+            Margin = new Thickness(16),
+            RowDefinitions = new RowDefinitions("Auto,Auto,*,Auto,Auto"),
+            RowSpacing = 12,
+            Children =
+            {
+                new TextBlock
+                {
+                    Text = "Choose a local image and configure scaling, interpolation, edge, and blending behavior.",
+                    TextWrapping = Avalonia.Media.TextWrapping.Wrap,
+                },
+                fields,
+                errorText,
+                buttons,
+            },
+        };
+        Grid.SetRow(fields, 1);
+        Grid.SetRow(errorText, 3);
+        Grid.SetRow(buttons, 4);
+        dialog.Content = content;
+        await dialog.ShowDialog(this);
+
+        static ComboBox CreateComboBox(
+            IReadOnlyList<string> items,
+            string selected)
+            => new()
+            {
+                ItemsSource = items,
+                SelectedItem = selected,
+                HorizontalAlignment = HorizontalAlignment.Stretch,
+            };
+
+        static void AddField(
+            Grid owner,
+            string label,
+            Control editor,
+            int row,
+            int column,
+            int columnSpan = 1)
+        {
+            var field = new StackPanel
+            {
+                Spacing = 4,
+                Children =
+                {
+                    new TextBlock { Text = label },
+                    editor,
+                },
+            };
+            Grid.SetRow(field, row);
+            Grid.SetColumn(field, column);
+            Grid.SetColumnSpan(field, columnSpan);
             owner.Children.Add(field);
         }
     }

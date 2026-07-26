@@ -284,7 +284,11 @@ public partial class CanvasViewModel : ViewModelBase
             return false;
         }
 
-        return TryLoadImageSource(image, source, retainSourceOnFailure: false);
+        return DesignerImageRuntime.TrySetSource(
+            image,
+            source,
+            retainSourceOnFailure: false,
+            out _);
     }
 
     public DesignElement AddElementFromSnapshot(
@@ -2236,17 +2240,7 @@ public partial class CanvasViewModel : ViewModelBase
 
         if (visual is Image image)
         {
-            if (properties.TryGetValue("Source", out var source))
-            {
-                TryLoadImageSource(image, source, retainSourceOnFailure: true);
-            }
-
-            if (properties.TryGetValue("Stretch", out var stretch)
-                && Enum.TryParse<Stretch>(stretch, ignoreCase: true, out var parsedStretch))
-            {
-                image.Stretch = parsedStretch;
-            }
-
+            DesignerImageRuntime.Apply(image, properties);
             return;
         }
 
@@ -2803,60 +2797,6 @@ public partial class CanvasViewModel : ViewModelBase
         catch (FormatException)
         {
             return false;
-        }
-    }
-
-    private static bool TryLoadImageSource(Image image, string source, bool retainSourceOnFailure)
-    {
-        var path = ResolveImagePath(source);
-        if (string.IsNullOrWhiteSpace(path) || !System.IO.File.Exists(path))
-        {
-            if (retainSourceOnFailure)
-            {
-                DisposeImageSource(image);
-                image.Source = null;
-                image.Tag = source;
-            }
-
-            return false;
-        }
-
-        try
-        {
-            var bitmap = new Bitmap(path);
-            DisposeImageSource(image);
-            image.Source = bitmap;
-            image.Tag = source;
-            return true;
-        }
-        catch
-        {
-            if (retainSourceOnFailure)
-            {
-                DisposeImageSource(image);
-                image.Source = null;
-                image.Tag = source;
-            }
-
-            return false;
-        }
-    }
-
-    private static string? ResolveImagePath(string source)
-    {
-        if (Uri.TryCreate(source, UriKind.Absolute, out var uri))
-        {
-            return uri.IsFile ? uri.LocalPath : null;
-        }
-
-        return System.IO.Path.GetFullPath(source);
-    }
-
-    private static void DisposeImageSource(Image image)
-    {
-        if (image.Source is IDisposable disposable)
-        {
-            disposable.Dispose();
         }
     }
 
