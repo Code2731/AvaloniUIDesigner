@@ -188,6 +188,35 @@ public sealed record SelectionEditorState(
     string HorizontalContentAlignment,
     string VerticalContentAlignment);
 
+public sealed record DateTimeEditorState(
+    string ControlName,
+    string ControlKind,
+    string SelectedDate,
+    string MinYear,
+    string MaxYear,
+    bool DayVisible,
+    bool MonthVisible,
+    bool YearVisible,
+    string DayFormat,
+    string MonthFormat,
+    string YearFormat,
+    string DisplayDate,
+    string DisplayDateStart,
+    string DisplayDateEnd,
+    string FirstDayOfWeek,
+    bool IsTodayHighlighted,
+    string SelectedDateFormat,
+    string CustomDateFormatString,
+    string Watermark,
+    bool UseFloatingWatermark,
+    string HorizontalContentAlignment,
+    string VerticalContentAlignment,
+    string SelectedTime,
+    string MinuteIncrement,
+    string SecondIncrement,
+    string ClockIdentifier,
+    bool UseSeconds);
+
 public sealed record GridDefinitionEditorState(
     string ControlName,
     string RowDefinitions,
@@ -4053,6 +4082,139 @@ public partial class MainWindowViewModel : ViewModelBase
             values.HorizontalContentAlignment.ToString(),
             values.VerticalContentAlignment.ToString());
 
+    public bool TryGetSelectedDateTimeProperties(out DateTimeEditorState state)
+    {
+        var target = Canvas.SelectedElement;
+        if (target is null || target.IsLocked || !DesignerDateTimeRuntime.IsSupportedControl(target.Visual))
+        {
+            state = default!;
+            StatusText = target switch
+            {
+                null => "Select a DatePicker, CalendarDatePicker, or TimePicker before editing date and time input.",
+                { IsLocked: true } => "Unlock the selected control before editing date and time input.",
+                _ => "Date and time editing is available for DatePicker, CalendarDatePicker, and TimePicker controls.",
+            };
+            return false;
+        }
+
+        if (!DesignerDateTimeRuntime.TryRead(target.Visual, out var values, out var error))
+        {
+            state = default!;
+            StatusText = $"Date and time input cannot be edited. {error}";
+            return false;
+        }
+
+        state = CreateDateTimeEditorState(target.DisplayName, values);
+        return true;
+    }
+
+    public bool SetSelectedDateTimeProperties(DesignerDateTimeEditorInput input)
+    {
+        var target = Canvas.SelectedElement;
+        if (target is null || target.IsLocked || !DesignerDateTimeRuntime.IsSupportedControl(target.Visual))
+        {
+            StatusText = "Select an unlocked DatePicker, CalendarDatePicker, or TimePicker before editing date and time input.";
+            return false;
+        }
+
+        if (!DesignerDateTimeRuntime.TryParseValues(target.Visual, input, out var values, out var error))
+        {
+            StatusText = $"Date and time input was not changed. {error}";
+            return false;
+        }
+
+        if (!DesignerDateTimeRuntime.TryRead(target.Visual, out var current, out error))
+        {
+            StatusText = $"Date and time input was not changed. {error}";
+            return false;
+        }
+
+        if (current == values)
+        {
+            StatusText = "Date and time input is unchanged.";
+            return true;
+        }
+
+        BeginCanvasMutation(HistoryActionType.EditProperty, "Updated date and time input.");
+        DesignerDateTimeRuntime.Apply(target.Visual, values);
+        foreach (var propertyName in new[]
+                 {
+                     "SelectedDate",
+                     "MinYear",
+                     "MaxYear",
+                     "DayVisible",
+                     "MonthVisible",
+                     "YearVisible",
+                     "DayFormat",
+                     "MonthFormat",
+                     "YearFormat",
+                     "DisplayDate",
+                     "DisplayDateStart",
+                     "DisplayDateEnd",
+                     "FirstDayOfWeek",
+                     "IsTodayHighlighted",
+                     "SelectedDateFormat",
+                     "CustomDateFormatString",
+                     "Watermark",
+                     "UseFloatingWatermark",
+                     "HorizontalContentAlignment",
+                     "VerticalContentAlignment",
+                     "SelectedTime",
+                     "MinuteIncrement",
+                     "SecondIncrement",
+                     "ClockIdentifier",
+                     "UseSeconds",
+                 })
+        {
+            DesignerStyleApplicationMetadata.ClearApplied(target.Visual, propertyName);
+        }
+
+        Canvas.RefreshDocumentStyles(target.Visual);
+        CommitCanvasMutation();
+        StatusText = $"Updated date and time input for {target.DisplayName}.";
+        return true;
+    }
+
+    private static DateTimeEditorState CreateDateTimeEditorState(
+        string controlName,
+        DesignerDateTimeValues values)
+        => new(
+            controlName,
+            values.Kind.ToString(),
+            FormatDate(values.Kind == DesignerDateTimeControlKind.CalendarDatePicker
+                ? values.CalendarSelectedDate
+                : values.SelectedDate),
+            FormatDate(values.MinYear),
+            FormatDate(values.MaxYear),
+            values.DayVisible,
+            values.MonthVisible,
+            values.YearVisible,
+            values.DayFormat,
+            values.MonthFormat,
+            values.YearFormat,
+            FormatDate(values.DisplayDate),
+            FormatDate(values.DisplayDateStart),
+            FormatDate(values.DisplayDateEnd),
+            values.FirstDayOfWeek.ToString(),
+            values.IsTodayHighlighted,
+            values.SelectedDateFormat.ToString(),
+            values.CustomDateFormatString,
+            values.Watermark,
+            values.UseFloatingWatermark,
+            values.HorizontalContentAlignment.ToString(),
+            values.VerticalContentAlignment.ToString(),
+            values.SelectedTime?.ToString(@"hh\:mm\:ss", CultureInfo.InvariantCulture) ?? string.Empty,
+            values.MinuteIncrement.ToString(CultureInfo.InvariantCulture),
+            values.SecondIncrement.ToString(CultureInfo.InvariantCulture),
+            values.ClockIdentifier,
+            values.UseSeconds);
+
+    private static string FormatDate(DateTimeOffset? value)
+        => value?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) ?? string.Empty;
+
+    private static string FormatDate(DateTime? value)
+        => value?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) ?? string.Empty;
+
     public bool TryGetSelectedToolTip(out string controlName, out string toolTip)
     {
         var target = Canvas.SelectedElement;
@@ -5676,6 +5838,7 @@ public partial class MainWindowViewModel : ViewModelBase
         DesignerRangeRuntime.Capture(visual, result);
         DesignerTextInputRuntime.Capture(visual, result);
         DesignerSelectionRuntime.Capture(visual, result);
+        DesignerDateTimeRuntime.Capture(visual, result);
         foreach (var pair in DesignerResourceReferenceMetadata.GetReferences(visual))
         {
             result[pair.Key] = DesignerResourceReferenceMetadata.FormatExpression(pair.Value);
@@ -7424,6 +7587,26 @@ public partial class MainWindowViewModel : ViewModelBase
                 continue;
             }
 
+            if (DesignerDateTimeRuntime.IsSupportedProperty(tagName, name))
+            {
+                if (DesignerDateTimeRuntime.TryNormalizeProperty(
+                        tagName,
+                        name,
+                        attr.Value,
+                        out var canonicalName,
+                        out var normalizedValue,
+                        out var dateTimeError))
+                {
+                    map[canonicalName] = normalizedValue;
+                }
+                else
+                {
+                    warnings.Add($"Ignored {tagName}.{name}: {dateTimeError}");
+                }
+
+                continue;
+            }
+
             if (DesignerTypographyRuntime.IsSupportedProperty(tagName, name))
             {
                 if (DesignerTypographyRuntime.TryNormalizeProperty(
@@ -7531,6 +7714,15 @@ public partial class MainWindowViewModel : ViewModelBase
             DesignerSelectionRuntime.RemoveSelectedIndex(map);
         }
 
+        if (!DesignerDateTimeRuntime.TryValidateProperties(
+                tagName,
+                map,
+                out var dateTimeConstraintError))
+        {
+            warnings.Add($"Ignored {tagName} date/time constraints: {dateTimeConstraintError}");
+            DesignerDateTimeRuntime.RemoveConstraintProperties(tagName, map);
+        }
+
         if (string.Equals(element.Name.LocalName, "Grid", StringComparison.OrdinalIgnoreCase))
         {
             map.TryAdd("RowDefinitions", string.Empty);
@@ -7617,6 +7809,11 @@ public partial class MainWindowViewModel : ViewModelBase
             return true;
         }
 
+        if (DesignerDateTimeRuntime.IsSupportedProperty(tagName, propertyName))
+        {
+            return true;
+        }
+
         if (propertyName is "Opacity" or "Classes")
         {
             return true;
@@ -7657,9 +7854,7 @@ public partial class MainWindowViewModel : ViewModelBase
                 or "TickPlacement" or "IsSnapToTickEnabled",
             "ProgressBar" => propertyName is "Minimum" or "Maximum" or "Value" or "Orientation"
                 or "IsIndeterminate" or "ShowProgressText" or "ProgressTextFormat",
-            "DatePicker" => propertyName == "SelectedDate",
-            "CalendarDatePicker" => propertyName is "SelectedDate" or "Watermark",
-            "TimePicker" => propertyName == "SelectedTime",
+            "DatePicker" or "CalendarDatePicker" or "TimePicker" => false,
             "NumericUpDown" => propertyName is "Minimum" or "Maximum" or "Increment" or "Value"
                 or "FormatString" or "ClipValueToMinMax" or "AllowSpin"
                 or "ShowButtonSpinner" or "ButtonSpinnerLocation",
@@ -9014,11 +9209,7 @@ public partial class MainWindowViewModel : ViewModelBase
                 sb.Append(indent);
                 sb.Append("<DatePicker");
                 AppendCanvasLayoutAttributes(sb, element);
-                if (datePicker.SelectedDate is { } selectedDate)
-                {
-                    AppendAttribute(sb, "SelectedDate", selectedDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture));
-                }
-
+                AppendDateTimeAttributes(sb, datePicker);
                 sb.AppendLine(" />");
                 break;
 
@@ -9026,16 +9217,7 @@ public partial class MainWindowViewModel : ViewModelBase
                 sb.Append(indent);
                 sb.Append("<CalendarDatePicker");
                 AppendCanvasLayoutAttributes(sb, element);
-                if (calendarDatePicker.SelectedDate is { } calendarSelectedDate)
-                {
-                    AppendAttribute(sb, "SelectedDate", calendarSelectedDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture));
-                }
-
-                if (!string.IsNullOrWhiteSpace(calendarDatePicker.Watermark))
-                {
-                    AppendAttribute(sb, "Watermark", calendarDatePicker.Watermark);
-                }
-
+                AppendDateTimeAttributes(sb, calendarDatePicker);
                 sb.AppendLine(" />");
                 break;
 
@@ -9043,11 +9225,7 @@ public partial class MainWindowViewModel : ViewModelBase
                 sb.Append(indent);
                 sb.Append("<TimePicker");
                 AppendCanvasLayoutAttributes(sb, element);
-                if (timePicker.SelectedTime is { } selectedTime)
-                {
-                    AppendAttribute(sb, "SelectedTime", selectedTime.ToString("hh\\:mm", CultureInfo.InvariantCulture));
-                }
-
+                AppendDateTimeAttributes(sb, timePicker);
                 sb.AppendLine(" />");
                 break;
 
@@ -10222,6 +10400,20 @@ public partial class MainWindowViewModel : ViewModelBase
             .Select(binding => binding.PropertyName)
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
         foreach (var attribute in DesignerSelectionRuntime.GetAxamlAttributes(visual))
+        {
+            if (!boundProperties.Contains(attribute.Name))
+            {
+                AppendAttribute(sb, attribute.Name, attribute.Value);
+            }
+        }
+    }
+
+    private static void AppendDateTimeAttributes(StringBuilder sb, Control visual)
+    {
+        var boundProperties = DesignerBindingRuntime.ReadBindings(visual)
+            .Select(binding => binding.PropertyName)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        foreach (var attribute in DesignerDateTimeRuntime.GetAxamlAttributes(visual))
         {
             if (!boundProperties.Contains(attribute.Name))
             {

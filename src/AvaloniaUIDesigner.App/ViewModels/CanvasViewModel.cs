@@ -2363,53 +2363,19 @@ public partial class CanvasViewModel : ViewModelBase
 
         if (visual is DatePicker datePicker)
         {
-            if (properties.TryGetValue("SelectedDate", out var selectedDate)
-                && DateTimeOffset.TryParseExact(
-                    selectedDate,
-                    "yyyy-MM-dd",
-                    CultureInfo.InvariantCulture,
-                    DateTimeStyles.AssumeLocal,
-                    out var parsedSelectedDate))
-            {
-                datePicker.SelectedDate = parsedSelectedDate;
-            }
-
+            DesignerDateTimeRuntime.Apply(datePicker, properties);
             return;
         }
 
         if (visual is CalendarDatePicker calendarDatePicker)
         {
-            if (properties.TryGetValue("SelectedDate", out var selectedDate)
-                && DateTime.TryParseExact(
-                    selectedDate,
-                    "yyyy-MM-dd",
-                    CultureInfo.InvariantCulture,
-                    DateTimeStyles.None,
-                    out var parsedSelectedDate))
-            {
-                calendarDatePicker.SelectedDate = parsedSelectedDate;
-            }
-
-            if (properties.TryGetValue("Watermark", out var watermark))
-            {
-                calendarDatePicker.Watermark = watermark;
-            }
-
+            DesignerDateTimeRuntime.Apply(calendarDatePicker, properties);
             return;
         }
 
         if (visual is TimePicker timePicker)
         {
-            if (properties.TryGetValue("SelectedTime", out var selectedTime)
-                && TimeSpan.TryParseExact(
-                    selectedTime,
-                    "hh\\:mm",
-                    CultureInfo.InvariantCulture,
-                    out var parsedSelectedTime))
-            {
-                timePicker.SelectedTime = parsedSelectedTime;
-            }
-
+            DesignerDateTimeRuntime.Apply(timePicker, properties);
             return;
         }
 

@@ -73,6 +73,7 @@
                 <MenuItem Header="Edit Range &amp; Value..." Click="OnEditRangePropertiesMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
                 <MenuItem Header="Edit Text Input..." Click="OnEditTextInputPropertiesMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
                 <MenuItem Header="Edit Selection Behavior..." Click="OnEditSelectionPropertiesMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
+                <MenuItem Header="Edit Date &amp; Time Input..." Click="OnEditDateTimePropertiesMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
                 <MenuItem Header="Edit Grid Definitions..." Click="OnEditGridDefinitionsMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
                 <MenuItem Header="Assign to Grid Cell..." Click="OnAssignToGridCellMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
                 <MenuItem Header="Assign to StackPanel..." Click="OnAssignToStackPanelMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
@@ -382,6 +383,7 @@
                                                     <MenuItem Header="Edit Range &amp; Value..." Click="OnEditRangePropertiesMenuClicked"/>
                                                     <MenuItem Header="Edit Text Input..." Click="OnEditTextInputPropertiesMenuClicked"/>
                                                     <MenuItem Header="Edit Selection Behavior..." Click="OnEditSelectionPropertiesMenuClicked"/>
+                                                    <MenuItem Header="Edit Date &amp; Time Input..." Click="OnEditDateTimePropertiesMenuClicked"/>
                                                     <MenuItem Header="Edit Path Data..." Click="OnEditPathDataMenuClicked"/>
                                                     <MenuItem Header="Edit Grid Definitions..." Click="OnEditGridDefinitionsMenuClicked"/>
                                                     <MenuItem Header="Assign to Grid Cell..." Click="OnAssignToGridCellMenuClicked"/>

@@ -679,7 +679,9 @@ public sealed class AxamlDocumentSerializer : IDesignerSerializer
             sb.Append(pair.Key);
             sb.Append("=\"");
             sb.Append(EscapeXmlAttribute(
-                DesignerRangeRuntime.FormatAxamlAttributeValue(pair.Key, pair.Value)));
+                DesignerDateTimeRuntime.FormatAxamlAttributeValue(
+                    pair.Key,
+                    DesignerRangeRuntime.FormatAxamlAttributeValue(pair.Key, pair.Value))));
             sb.Append("\"");
         }
     }

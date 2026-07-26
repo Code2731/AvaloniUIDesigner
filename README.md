@@ -36,6 +36,7 @@ dotnet run --project src/AvaloniaUIDesigner.App/AvaloniaUIDesigner.App.csproj
 - **Range & Value 속성**: Slider의 step·tick·방향, ProgressBar의 indeterminate·진행 텍스트, NumericUpDown의 increment·format·spinner 정책을 검증된 범위/값과 함께 편집하고 Undo/Redo, 복제, Preview, Draft·Full·UserControl AXAML 왕복에 보존
 - **Text Input 속성**: TextBox의 디자인 텍스트·watermark·multiline/tab·wrapping/alignment·read-only·길이/줄 제한·password·floating watermark·undo/selection 정책을 통합 편집하고 Undo/Redo, 복제, Preview, Binding, Draft·Full·UserControl AXAML 왕복에 보존
 - **Selection Behavior 속성**: ComboBox·ListBox·TreeView의 선택·검색·자동 스크롤 정책과 ComboBox editable/placeholder/drop-down 표현, ListBox·TreeView 다중 선택 모드를 편집하고 Undo/Redo, 복제, Preview, Binding, Draft·Full·UserControl AXAML 왕복에 보존
+- **Date & Time Input 속성**: DatePicker의 날짜 범위·구성 요소·표시 형식, CalendarDatePicker의 표시 범위·선택 형식·watermark, TimePicker의 시간·증분·12/24시간·초 표시를 원자적으로 편집하고 Undo/Redo, 복제, Preview, Binding, Draft·Full·UserControl AXAML 왕복에 보존
 - **문서 루트 속성**: Window/UserControl 루트 종류와 Window 제목·리사이즈·시작 위치, 루트 Min/Max 크기를 편집하고 Undo/Redo, Preview, Draft·Full AXAML 왕복에 보존
 - **벡터 Shape 편집**: Rectangle, Ellipse, Line, Path의 Fill·Stroke·대시·끝점·결합 스타일과 반지름·점 좌표를 편집하고, 검증된 Path geometry를 리소스·Undo/Redo·복제·미리보기·AXAML 왕복에 보존
 - **요소 선택**: 배치된 요소 클릭 시 파란 외곽선
@@ -72,6 +73,7 @@ dotnet run --project src/AvaloniaUIDesigner.App/AvaloniaUIDesigner.App.csproj
 18. `Edit > Edit Range & Value...`에서 Slider·ProgressBar·NumericUpDown의 범위와 타입별 동작 편집
 19. `Edit > Edit Text Input...`에서 TextBox의 입력·multiline·password·undo 정책 편집
 20. `Edit > Edit Selection Behavior...`에서 ComboBox·ListBox·TreeView의 선택·검색·다중 선택 정책 편집
+21. `Edit > Edit Date & Time Input...`에서 DatePicker·CalendarDatePicker·TimePicker의 값·범위·표시 형식 편집
 
 DataGrid가 포함된 생성 AXAML을 다른 프로젝트에서 사용할 때는 같은 Avalonia 버전의 `Avalonia.Controls.DataGrid` 패키지와 `avares://Avalonia.Controls.DataGrid/Themes/Fluent.xaml` 스타일 include가 필요합니다.
 
@@ -96,6 +98,8 @@ Range & Value 편집기는 `Minimum < Maximum`과 범위 안의 `Value`를 원�
 Text Input 편집기에서 MaxLength·MinLines·MaxLines의 `0`은 제한 없음 또는 자동 크기를 의미하며, MinLines와 MaxLines가 모두 양수이면 최소 줄 수가 최대 줄 수를 넘을 수 없습니다. `Toggle Multiline TextBox` 명령과 Typography의 TextWrapping·TextAlignment는 같은 TextBox 값에 동기화됩니다. PasswordChar를 설정하면 디자이너는 입력된 디자인 텍스트를 즉시 비우고 스냅샷·Preview·AXAML에 정적 Text를 기록하지 않으며, 런타임 Text Binding은 그대로 보존할 수 있습니다.
 
 Selection Behavior 편집기의 SelectedIndex `-1`은 선택 없음을 의미하며 정적 항목 범위를 벗어날 수 없습니다. ListBox와 TreeView의 SelectionMode는 Multiple·Toggle·AlwaysSelected를 독립적으로 조합하고, 항목이 있는 ListBox에서 AlwaysSelected를 켜면 유효한 선택 인덱스가 필요합니다. Editable ComboBox는 선택된 항목이 있으면 Text를 해당 항목에서 파생하고, 자유 입력 Text를 설정하면 SelectedIndex를 `-1`로 사용합니다. 소스의 ItemsSource가 Binding이면 디자인 시점에 항목 수를 알 수 없으므로 상한 검증을 런타임 데이터에 맡깁니다.
+
+Date & Time Input 편집기는 날짜를 `yyyy-MM-dd`, 시간을 `HH:mm` 또는 `HH:mm:ss`로 입력합니다. DatePicker는 MinYear·MaxYear와 SelectedDate를 함께 검증하고 날짜 구성 요소를 모두 숨기는 설정을 거부합니다. CalendarDatePicker는 선택·표시 날짜가 DisplayDateStart·DisplayDateEnd 범위 안에 있는지 확인하며 Custom 형식일 때 유효한 .NET 날짜 format을 요구합니다. TimePicker의 분·초 증분은 1~59이고 시계는 `12HourClock` 또는 `24HourClock`을 사용합니다. `{`로 시작하는 날짜 format은 AXAML 출력에서 `{}` 접두사로 이스케이프되고 가져올 때 원문으로 복원됩니다.
 
 문서 루트 편집기에서 선택한 종류는 일반 저장과 Full AXAML 복사에 반영됩니다. UserControl은 Window 전용 속성을 사용하지 않으며, `File > Export UserControl AXAML...`은 현재 문서 종류와 관계없이 재사용 가능한 UserControl을 생성합니다.
 

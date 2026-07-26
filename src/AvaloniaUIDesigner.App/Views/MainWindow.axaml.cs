@@ -742,6 +742,19 @@ public partial class MainWindow : Window
         await ShowSelectionPropertiesDialogAsync(state);
     }
 
+    private async void OnEditDateTimePropertiesMenuClicked(
+        object? sender,
+        Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        FlushPendingPropertyHistory();
+        if (Vm is null || !Vm.TryGetSelectedDateTimeProperties(out var state))
+        {
+            return;
+        }
+
+        await ShowDateTimePropertiesDialogAsync(state);
+    }
+
     private async void OnEditGridDefinitionsMenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
         FlushPendingPropertyHistory();
@@ -1779,6 +1792,11 @@ public partial class MainWindow : Window
 
     private static bool IsUndoTrackedVisualProperty(Control control, string propertyName)
     {
+        if (DesignerDateTimeRuntime.IsSupportedProperty(control.GetType().Name, propertyName))
+        {
+            return true;
+        }
+
         if (propertyName is "Opacity" or "IsEnabled" or "IsVisible" or "TabIndex" or "IsTabStop")
         {
             return true;
@@ -4312,6 +4330,294 @@ public partial class MainWindow : Window
         Grid.SetRow(buttons, 5);
         dialog.Content = content;
         await dialog.ShowDialog(this);
+
+        static void AddField(Grid owner, string label, Control editor, int row, int column)
+        {
+            var field = new StackPanel
+            {
+                Spacing = 4,
+                Children =
+                {
+                    new TextBlock { Text = label },
+                    editor,
+                },
+            };
+            Grid.SetRow(field, row);
+            Grid.SetColumn(field, column);
+            owner.Children.Add(field);
+        }
+    }
+
+    private async Task ShowDateTimePropertiesDialogAsync(DateTimeEditorState state)
+    {
+        if (Vm is null)
+        {
+            return;
+        }
+
+        var isDatePicker = state.ControlKind == nameof(DesignerDateTimeControlKind.DatePicker);
+        var isCalendar = state.ControlKind == nameof(DesignerDateTimeControlKind.CalendarDatePicker);
+        var selectedDateEditor = new TextBox
+        {
+            Text = state.SelectedDate,
+            Watermark = "Optional: yyyy-MM-dd",
+        };
+        var minYearEditor = new TextBox { Text = state.MinYear, Watermark = "yyyy-MM-dd" };
+        var maxYearEditor = new TextBox { Text = state.MaxYear, Watermark = "yyyy-MM-dd" };
+        var dayVisibleEditor = new CheckBox { Content = "Show day", IsChecked = state.DayVisible };
+        var monthVisibleEditor = new CheckBox { Content = "Show month", IsChecked = state.MonthVisible };
+        var yearVisibleEditor = new CheckBox { Content = "Show year", IsChecked = state.YearVisible };
+        var dayFormatEditor = new TextBox { Text = state.DayFormat };
+        var monthFormatEditor = new TextBox { Text = state.MonthFormat };
+        var yearFormatEditor = new TextBox { Text = state.YearFormat };
+
+        var displayDateEditor = new TextBox { Text = state.DisplayDate, Watermark = "yyyy-MM-dd" };
+        var displayDateStartEditor = new TextBox
+        {
+            Text = state.DisplayDateStart,
+            Watermark = "Optional: yyyy-MM-dd",
+        };
+        var displayDateEndEditor = new TextBox
+        {
+            Text = state.DisplayDateEnd,
+            Watermark = "Optional: yyyy-MM-dd",
+        };
+        var firstDayEditor = new ComboBox
+        {
+            ItemsSource = DesignerDateTimeRuntime.DayOfWeekNames,
+            SelectedItem = state.FirstDayOfWeek,
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+        };
+        var selectedDateFormatEditor = new ComboBox
+        {
+            ItemsSource = DesignerDateTimeRuntime.CalendarDateFormatNames,
+            SelectedItem = state.SelectedDateFormat,
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+        };
+        var customDateFormatEditor = new TextBox { Text = state.CustomDateFormatString };
+        var todayHighlightedEditor = new CheckBox
+        {
+            Content = "Highlight today",
+            IsChecked = state.IsTodayHighlighted,
+        };
+        var watermarkEditor = new TextBox { Text = state.Watermark };
+        var floatingWatermarkEditor = new CheckBox
+        {
+            Content = "Use floating watermark",
+            IsChecked = state.UseFloatingWatermark,
+        };
+        var horizontalAlignmentEditor = new ComboBox
+        {
+            ItemsSource = DesignerDateTimeRuntime.HorizontalAlignmentNames,
+            SelectedItem = state.HorizontalContentAlignment,
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+        };
+        var verticalAlignmentEditor = new ComboBox
+        {
+            ItemsSource = DesignerDateTimeRuntime.VerticalAlignmentNames,
+            SelectedItem = state.VerticalContentAlignment,
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+        };
+
+        var selectedTimeEditor = new TextBox
+        {
+            Text = state.SelectedTime,
+            Watermark = "Optional: HH:mm or HH:mm:ss",
+        };
+        var minuteIncrementEditor = new TextBox
+        {
+            Text = state.MinuteIncrement,
+            Watermark = "1-59",
+        };
+        var secondIncrementEditor = new TextBox
+        {
+            Text = state.SecondIncrement,
+            Watermark = "1-59",
+        };
+        var clockIdentifierEditor = new ComboBox
+        {
+            ItemsSource = DesignerDateTimeRuntime.ClockIdentifiers,
+            SelectedItem = state.ClockIdentifier,
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+        };
+        var useSecondsEditor = new CheckBox
+        {
+            Content = "Show seconds",
+            IsChecked = state.UseSeconds,
+        };
+
+        void RefreshCustomFormat()
+            => customDateFormatEditor.IsEnabled =
+                selectedDateFormatEditor.SelectedItem?.ToString() ==
+                nameof(CalendarDatePickerFormat.Custom);
+
+        selectedDateFormatEditor.SelectionChanged += (_, _) => RefreshCustomFormat();
+        RefreshCustomFormat();
+
+        var datePickerFields = CreateFieldGrid(3);
+        if (isDatePicker)
+        {
+            AddField(datePickerFields, "Selected date", selectedDateEditor, 0, 0);
+        }
+
+        AddField(datePickerFields, "Minimum year", minYearEditor, 0, 1);
+        AddField(datePickerFields, "Maximum year", maxYearEditor, 1, 0);
+        AddField(datePickerFields, "Day format", dayFormatEditor, 1, 1);
+        AddField(datePickerFields, "Month format", monthFormatEditor, 2, 0);
+        AddField(datePickerFields, "Year format", yearFormatEditor, 2, 1);
+        var datePickerSwitches = new WrapPanel
+        {
+            Orientation = Orientation.Horizontal,
+            ItemSpacing = 18,
+            LineSpacing = 8,
+            Children = { dayVisibleEditor, monthVisibleEditor, yearVisibleEditor },
+        };
+
+        var calendarFields = CreateFieldGrid(6);
+        if (isCalendar)
+        {
+            AddField(calendarFields, "Selected date", selectedDateEditor, 0, 0);
+        }
+
+        AddField(calendarFields, "Displayed month", displayDateEditor, 0, 1);
+        AddField(calendarFields, "Display range start", displayDateStartEditor, 1, 0);
+        AddField(calendarFields, "Display range end", displayDateEndEditor, 1, 1);
+        AddField(calendarFields, "First day of week", firstDayEditor, 2, 0);
+        AddField(calendarFields, "Selected date format", selectedDateFormatEditor, 2, 1);
+        AddField(calendarFields, "Custom date format", customDateFormatEditor, 3, 0);
+        AddField(calendarFields, "Watermark", watermarkEditor, 3, 1);
+        AddField(calendarFields, "Horizontal content alignment", horizontalAlignmentEditor, 4, 0);
+        AddField(calendarFields, "Vertical content alignment", verticalAlignmentEditor, 4, 1);
+        var calendarSwitches = new WrapPanel
+        {
+            Orientation = Orientation.Horizontal,
+            ItemSpacing = 18,
+            LineSpacing = 8,
+            Children = { todayHighlightedEditor, floatingWatermarkEditor },
+        };
+        Grid.SetRow(calendarSwitches, 5);
+        Grid.SetColumnSpan(calendarSwitches, 2);
+        calendarFields.Children.Add(calendarSwitches);
+
+        var timePickerFields = CreateFieldGrid(3);
+        AddField(timePickerFields, "Selected time", selectedTimeEditor, 0, 0);
+        AddField(timePickerFields, "Clock", clockIdentifierEditor, 0, 1);
+        AddField(timePickerFields, "Minute increment", minuteIncrementEditor, 1, 0);
+        AddField(timePickerFields, "Second increment", secondIncrementEditor, 1, 1);
+        Grid.SetRow(useSecondsEditor, 2);
+        Grid.SetColumnSpan(useSecondsEditor, 2);
+        timePickerFields.Children.Add(useSecondsEditor);
+
+        Control editorContent;
+        if (isDatePicker)
+        {
+            editorContent = new StackPanel
+            {
+                Spacing = 12,
+                Children = { datePickerFields, datePickerSwitches },
+            };
+        }
+        else if (isCalendar)
+        {
+            editorContent = calendarFields;
+        }
+        else
+        {
+            editorContent = timePickerFields;
+        }
+
+        var errorText = new TextBlock
+        {
+            Foreground = Avalonia.Media.Brushes.IndianRed,
+            TextWrapping = Avalonia.Media.TextWrapping.Wrap,
+        };
+        var dialog = new Window
+        {
+            Title = $"Edit Date & Time Input - {state.ControlName}",
+            Width = 760,
+            Height = isCalendar ? 690 : 520,
+            MinWidth = 640,
+            MinHeight = 460,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner,
+        };
+        var applyButton = new Button { Content = "Apply", MinWidth = 84 };
+        applyButton.Click += (_, _) =>
+        {
+            var input = new DesignerDateTimeEditorInput(
+                selectedDateEditor.Text ?? string.Empty,
+                minYearEditor.Text ?? string.Empty,
+                maxYearEditor.Text ?? string.Empty,
+                dayVisibleEditor.IsChecked == true,
+                monthVisibleEditor.IsChecked == true,
+                yearVisibleEditor.IsChecked == true,
+                dayFormatEditor.Text ?? string.Empty,
+                monthFormatEditor.Text ?? string.Empty,
+                yearFormatEditor.Text ?? string.Empty,
+                displayDateEditor.Text ?? string.Empty,
+                displayDateStartEditor.Text ?? string.Empty,
+                displayDateEndEditor.Text ?? string.Empty,
+                firstDayEditor.SelectedItem?.ToString() ?? string.Empty,
+                todayHighlightedEditor.IsChecked == true,
+                selectedDateFormatEditor.SelectedItem?.ToString() ?? string.Empty,
+                customDateFormatEditor.Text ?? string.Empty,
+                watermarkEditor.Text ?? string.Empty,
+                floatingWatermarkEditor.IsChecked == true,
+                horizontalAlignmentEditor.SelectedItem?.ToString() ?? string.Empty,
+                verticalAlignmentEditor.SelectedItem?.ToString() ?? string.Empty,
+                selectedTimeEditor.Text ?? string.Empty,
+                minuteIncrementEditor.Text ?? string.Empty,
+                secondIncrementEditor.Text ?? string.Empty,
+                clockIdentifierEditor.SelectedItem?.ToString() ?? string.Empty,
+                useSecondsEditor.IsChecked == true);
+            if (!Vm.SetSelectedDateTimeProperties(input))
+            {
+                errorText.Text = Vm.StatusText;
+                return;
+            }
+
+            dialog.Close();
+        };
+        var cancelButton = new Button { Content = "Cancel", MinWidth = 84 };
+        cancelButton.Click += (_, _) => dialog.Close();
+        var buttons = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            Spacing = 8,
+            HorizontalAlignment = HorizontalAlignment.Right,
+            Children = { cancelButton, applyButton },
+        };
+        var content = new Grid
+        {
+            Margin = new Thickness(16),
+            RowDefinitions = new RowDefinitions("Auto,*,Auto,Auto"),
+            RowSpacing = 12,
+            Children =
+            {
+                new TextBlock
+                {
+                    Text = $"Configure {state.ControlKind} values, limits, and presentation behavior.",
+                    TextWrapping = Avalonia.Media.TextWrapping.Wrap,
+                },
+                new ScrollViewer { Content = editorContent },
+                errorText,
+                buttons,
+            },
+        };
+        Grid.SetRow(content.Children[1], 1);
+        Grid.SetRow(errorText, 2);
+        Grid.SetRow(buttons, 3);
+        dialog.Content = content;
+        await dialog.ShowDialog(this);
+
+        static Grid CreateFieldGrid(int rowCount)
+            => new()
+            {
+                ColumnDefinitions = new ColumnDefinitions("*,*"),
+                RowDefinitions = new RowDefinitions(
+                    string.Join(",", Enumerable.Repeat("Auto", rowCount))),
+                ColumnSpacing = 12,
+                RowSpacing = 10,
+            };
 
         static void AddField(Grid owner, string label, Control editor, int row, int column)
         {
