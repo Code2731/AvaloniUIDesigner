@@ -46,6 +46,11 @@ public partial class MainWindow : Window
         bool LastChildFill);
     private sealed record WrapPanelAssignmentOptions(string ParentName, int ItemIndex);
     private sealed record UniformGridAssignmentOptions(string ParentName, int ItemIndex);
+    private sealed record CanvasAssignmentOptions(
+        string ParentName,
+        int ItemIndex,
+        double Left,
+        double Top);
     private sealed record ContentAssignmentOptions(string ParentName);
 
     private const double HandleHalf = 5;
@@ -727,6 +732,31 @@ public partial class MainWindow : Window
 
     private void OnMoveUniformGridItemLaterMenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
         => Vm?.MoveSelectedUniformGridItem(1);
+
+    private async void OnAssignToCanvasMenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        FlushPendingPropertyHistory();
+        if (Vm is null || !Vm.TryGetSelectedCanvasAssignment(out var state))
+        {
+            return;
+        }
+
+        var updated = await ShowCanvasAssignmentDialogAsync(state);
+        if (updated is not null)
+        {
+            Vm.SetSelectedCanvasAssignment(
+                updated.ParentName,
+                updated.ItemIndex,
+                updated.Left,
+                updated.Top);
+        }
+    }
+
+    private void OnMoveCanvasItemEarlierMenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+        => Vm?.MoveSelectedCanvasItem(-1);
+
+    private void OnMoveCanvasItemLaterMenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+        => Vm?.MoveSelectedCanvasItem(1);
 
     private void OnRemoveFromContainerMenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
@@ -1618,6 +1648,11 @@ public partial class MainWindow : Window
         if (control is UniformGrid)
         {
             return propertyName is "Rows" or "Columns" or "FirstColumn" or "RowSpacing" or "ColumnSpacing";
+        }
+
+        if (control is Canvas)
+        {
+            return propertyName == "Background";
         }
 
         if (control is Grid)
@@ -3146,6 +3181,111 @@ public partial class MainWindow : Window
         dialog.Content = content;
 
         return await dialog.ShowDialog<UniformGridAssignmentOptions?>(this);
+    }
+
+    private async Task<CanvasAssignmentOptions?> ShowCanvasAssignmentDialogAsync(
+        CanvasAssignmentEditorState state)
+    {
+        var parentSelector = new ComboBox
+        {
+            ItemsSource = state.Parents,
+            SelectedItem = state.Parents.First(parent => string.Equals(
+                parent.DisplayName,
+                state.SelectedParentName,
+                StringComparison.OrdinalIgnoreCase)),
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+        };
+        var positionEditor = new NumericUpDown { Minimum = 1, Value = state.ItemIndex + 1 };
+        var leftEditor = new NumericUpDown
+        {
+            Minimum = -5000,
+            Maximum = 5000,
+            Increment = 4,
+            Value = (decimal)state.Left,
+        };
+        var topEditor = new NumericUpDown
+        {
+            Minimum = -5000,
+            Maximum = 5000,
+            Increment = 4,
+            Value = (decimal)state.Top,
+        };
+        var dialog = new Window
+        {
+            Title = $"Assign to Canvas - {state.ControlName}",
+            Width = 460,
+            Height = 390,
+            MinWidth = 400,
+            MinHeight = 350,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner,
+        };
+
+        void UpdateParentState()
+        {
+            if (parentSelector.SelectedItem is CanvasParentOption parent)
+            {
+                positionEditor.Maximum = parent.ChildCount + 1;
+            }
+        }
+
+        parentSelector.SelectionChanged += (_, _) => UpdateParentState();
+        UpdateParentState();
+
+        var assignButton = new Button { Content = "Assign", MinWidth = 84 };
+        assignButton.Click += (_, _) =>
+        {
+            if (parentSelector.SelectedItem is not CanvasParentOption parent)
+            {
+                return;
+            }
+
+            dialog.Close(new CanvasAssignmentOptions(
+                parent.DisplayName,
+                (int)(positionEditor.Value ?? 1) - 1,
+                (double)(leftEditor.Value ?? 0),
+                (double)(topEditor.Value ?? 0)));
+        };
+        var cancelButton = new Button { Content = "Cancel", MinWidth = 84 };
+        cancelButton.Click += (_, _) => dialog.Close(null);
+        var buttons = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            Spacing = 8,
+            HorizontalAlignment = HorizontalAlignment.Right,
+            Children = { cancelButton, assignButton },
+        };
+        var fields = new StackPanel
+        {
+            Spacing = 6,
+            Children =
+            {
+                new TextBlock { Text = "Parent Canvas" },
+                parentSelector,
+                new TextBlock { Text = "Z-order position (1-based)" },
+                positionEditor,
+                new TextBlock { Text = "Local left" },
+                leftEditor,
+                new TextBlock { Text = "Local top" },
+                topEditor,
+                new TextBlock
+                {
+                    Text = "After assignment, drag or resize the child directly inside the Canvas.",
+                    Foreground = Avalonia.Media.Brushes.Gray,
+                    TextWrapping = Avalonia.Media.TextWrapping.Wrap,
+                },
+            },
+        };
+        var content = new Grid
+        {
+            Margin = new Thickness(16),
+            RowDefinitions = new RowDefinitions("*,Auto"),
+            RowSpacing = 12,
+            Children = { fields, buttons },
+        };
+        Grid.SetRow(buttons, 1);
+        dialog.Content = content;
+
+        return await dialog.ShowDialog<CanvasAssignmentOptions?>(this);
     }
 
     private async Task<ContentAssignmentOptions?> ShowContentAssignmentDialogAsync(

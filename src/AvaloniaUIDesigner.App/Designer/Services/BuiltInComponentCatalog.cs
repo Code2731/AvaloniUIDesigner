@@ -243,6 +243,15 @@ public sealed class BuiltInComponentCatalog : IComponentCatalog
                 FirstColumn = 0,
                 RowSpacing = 8,
                 ColumnSpacing = 8,
+            }),
+        new(
+            DisplayName: "Canvas",
+            AvaloniaTypeName: "Avalonia.Controls.Canvas",
+            DefaultWidth: 300,
+            DefaultHeight: 200,
+            VisualFactory: static () => new Canvas
+            {
+                Background = Brush.Parse("#F8FAFC"),
             })
     };
 

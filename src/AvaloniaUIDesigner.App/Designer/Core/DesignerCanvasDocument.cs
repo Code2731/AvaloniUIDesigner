@@ -10,6 +10,7 @@ public enum DesignerParentLayoutKind
     DockPanel,
     WrapPanel,
     UniformGrid,
+    Canvas,
     Content,
 }
 
@@ -65,4 +66,7 @@ public sealed record DesignerElementSnapshot(
     DesignerDockSide DockPanelDock = DesignerDockSide.Left,
     double DockPanelItemSize = 40,
     int WrapPanelIndex = -1,
-    int UniformGridIndex = -1);
+    int UniformGridIndex = -1,
+    int CanvasChildIndex = -1,
+    double CanvasChildLeft = 0,
+    double CanvasChildTop = 0);

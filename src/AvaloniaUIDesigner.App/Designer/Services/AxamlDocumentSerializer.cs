@@ -129,6 +129,21 @@ public sealed class AxamlDocumentSerializer : IDesignerSerializer
         {
             AppendDockPanelAttributes(sb, element, parent, childrenByParent);
         }
+        else if (string.Equals(
+                     parent.TypeName,
+                     "Avalonia.Controls.Canvas",
+                     StringComparison.Ordinal))
+        {
+            sb.Append(" Canvas.Left=\"");
+            sb.Append(ToInvariantString(element.CanvasChildLeft));
+            sb.Append("\" Canvas.Top=\"");
+            sb.Append(ToInvariantString(element.CanvasChildTop));
+            sb.Append("\" Width=\"");
+            sb.Append(ToInvariantString(element.Width));
+            sb.Append("\" Height=\"");
+            sb.Append(ToInvariantString(element.Height));
+            sb.Append('"');
+        }
 
         AppendVisualAttributes(sb, element.VisualProperties);
         if (!childrenByParent.TryGetValue(element.DisplayName, out var children) || children.Count == 0)
@@ -152,6 +167,8 @@ public sealed class AxamlDocumentSerializer : IDesignerSerializer
                         "Avalonia.Controls.Primitives.UniformGrid",
                         StringComparison.Ordinal)
                         ? children.OrderBy(child => child.UniformGridIndex).ToList()
+                        : string.Equals(element.TypeName, "Avalonia.Controls.Canvas", StringComparison.Ordinal)
+                            ? children.OrderBy(child => child.CanvasChildIndex).ToList()
             : children;
         foreach (var child in orderedChildren)
         {
@@ -217,6 +234,7 @@ public sealed class AxamlDocumentSerializer : IDesignerSerializer
                 element.TypeName,
                 "Avalonia.Controls.Primitives.UniformGrid",
                 StringComparison.Ordinal)
+            || string.Equals(element.TypeName, "Avalonia.Controls.Canvas", StringComparison.Ordinal)
             || string.Equals(element.TypeName, "Avalonia.Controls.Border", StringComparison.Ordinal)
             || string.Equals(element.TypeName, "Avalonia.Controls.ScrollViewer", StringComparison.Ordinal)
             || string.Equals(element.TypeName, "Avalonia.Controls.Expander", StringComparison.Ordinal);

@@ -40,12 +40,14 @@ public partial class DesignElement : ViewModelBase
     [NotifyPropertyChangedFor(nameof(IsDockPanelChild))]
     [NotifyPropertyChangedFor(nameof(IsWrapPanelChild))]
     [NotifyPropertyChangedFor(nameof(IsUniformGridChild))]
+    [NotifyPropertyChangedFor(nameof(IsCanvasChild))]
     [NotifyPropertyChangedFor(nameof(IsContentChild))]
     [NotifyPropertyChangedFor(nameof(GridCellLabel))]
     [NotifyPropertyChangedFor(nameof(StackPanelItemLabel))]
     [NotifyPropertyChangedFor(nameof(DockPanelItemLabel))]
     [NotifyPropertyChangedFor(nameof(WrapPanelItemLabel))]
     [NotifyPropertyChangedFor(nameof(UniformGridItemLabel))]
+    [NotifyPropertyChangedFor(nameof(CanvasItemLabel))]
     [NotifyPropertyChangedFor(nameof(ContainerLayoutLabel))]
     private string? _parentName;
 
@@ -81,12 +83,14 @@ public partial class DesignElement : ViewModelBase
     [NotifyPropertyChangedFor(nameof(IsDockPanelChild))]
     [NotifyPropertyChangedFor(nameof(IsWrapPanelChild))]
     [NotifyPropertyChangedFor(nameof(IsUniformGridChild))]
+    [NotifyPropertyChangedFor(nameof(IsCanvasChild))]
     [NotifyPropertyChangedFor(nameof(IsContentChild))]
     [NotifyPropertyChangedFor(nameof(GridCellLabel))]
     [NotifyPropertyChangedFor(nameof(StackPanelItemLabel))]
     [NotifyPropertyChangedFor(nameof(DockPanelItemLabel))]
     [NotifyPropertyChangedFor(nameof(WrapPanelItemLabel))]
     [NotifyPropertyChangedFor(nameof(UniformGridItemLabel))]
+    [NotifyPropertyChangedFor(nameof(CanvasItemLabel))]
     [NotifyPropertyChangedFor(nameof(ContainerLayoutLabel))]
     private DesignerParentLayoutKind _parentLayout;
 
@@ -110,6 +114,18 @@ public partial class DesignElement : ViewModelBase
     private int _uniformGridIndex = -1;
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(CanvasItemLabel))]
+    private int _canvasChildIndex = -1;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(CanvasItemLabel))]
+    private double _canvasChildLeft;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(CanvasItemLabel))]
+    private double _canvasChildTop;
+
+    [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(HasStylePreviewState))]
     private string? _stylePreviewStateLabel;
 
@@ -128,6 +144,8 @@ public partial class DesignElement : ViewModelBase
     public bool IsWrapPanelChild => IsContainerChild && ParentLayout == DesignerParentLayoutKind.WrapPanel;
 
     public bool IsUniformGridChild => IsContainerChild && ParentLayout == DesignerParentLayoutKind.UniformGrid;
+
+    public bool IsCanvasChild => IsContainerChild && ParentLayout == DesignerParentLayoutKind.Canvas;
 
     public bool IsContentChild => IsContainerChild && ParentLayout == DesignerParentLayoutKind.Content;
 
@@ -160,6 +178,11 @@ public partial class DesignElement : ViewModelBase
 
     public string UniformGridItemLabel
         => IsUniformGridChild ? $"UNIFORM #{UniformGridIndex + 1}" : string.Empty;
+
+    public string CanvasItemLabel
+        => IsCanvasChild
+            ? $"CANVAS #{CanvasChildIndex + 1} ({CanvasChildLeft:0.#}, {CanvasChildTop:0.#})"
+            : string.Empty;
 
     public string ContainerLayoutLabel
         => IsContentChild ? "CONTENT" : string.Empty;

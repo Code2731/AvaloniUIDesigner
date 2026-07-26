@@ -105,6 +105,19 @@ public sealed record UniformGridAssignmentEditorState(
     string SelectedParentName,
     int ItemIndex);
 
+public sealed record CanvasParentOption(string DisplayName, int ChildCount)
+{
+    public override string ToString() => DisplayName;
+}
+
+public sealed record CanvasAssignmentEditorState(
+    string ControlName,
+    IReadOnlyList<CanvasParentOption> Parents,
+    string SelectedParentName,
+    int ItemIndex,
+    double Left,
+    double Top);
+
 public sealed record ContentParentOption(string DisplayName, string ContainerType)
 {
     public override string ToString() => $"{DisplayName} ({ContainerType})";
@@ -1169,6 +1182,9 @@ public partial class MainWindowViewModel : ViewModelBase
         target.DockPanelItemSize = 40;
         target.WrapPanelIndex = -1;
         target.UniformGridIndex = -1;
+        target.CanvasChildIndex = -1;
+        target.CanvasChildLeft = 0;
+        target.CanvasChildTop = 0;
         target.ParentLayout = DesignerParentLayoutKind.Grid;
         target.ParentName = parent.DisplayName;
         Canvas.MoveElementsToFront([target]);
@@ -1203,6 +1219,9 @@ public partial class MainWindowViewModel : ViewModelBase
         target.DockPanelItemSize = 40;
         target.WrapPanelIndex = -1;
         target.UniformGridIndex = -1;
+        target.CanvasChildIndex = -1;
+        target.CanvasChildLeft = 0;
+        target.CanvasChildTop = 0;
         target.ParentLayout = DesignerParentLayoutKind.None;
         Canvas.NormalizeContainerRelationships();
         ObjectTree.RebuildFrom(Canvas.Elements);
@@ -1778,6 +1797,149 @@ public partial class MainWindowViewModel : ViewModelBase
 
     private static UniformGridAssignmentEditorState EmptyUniformGridAssignmentState()
         => new(string.Empty, Array.Empty<UniformGridParentOption>(), string.Empty, 0);
+
+    public bool TryGetSelectedCanvasAssignment(out CanvasAssignmentEditorState state)
+    {
+        if (Canvas.SelectedElement is not { IsLocked: false } target
+            || target.Visual is Canvas)
+        {
+            state = EmptyCanvasAssignmentState();
+            StatusText = "Select an unlocked non-Canvas control to assign it to a Canvas.";
+            return false;
+        }
+
+        var parents = Canvas.Elements
+            .Where(element => element.Visual is Canvas && !element.IsContainerChild && !element.IsLocked)
+            .Select(element => new CanvasParentOption(
+                element.DisplayName,
+                Canvas.Elements.Count(child =>
+                    !ReferenceEquals(child, target)
+                    && child.IsCanvasChild
+                    && string.Equals(child.ParentName, element.DisplayName, StringComparison.OrdinalIgnoreCase))))
+            .ToList();
+        if (parents.Count == 0)
+        {
+            state = EmptyCanvasAssignmentState();
+            StatusText = "Place an unlocked root Canvas before assigning a control.";
+            return false;
+        }
+
+        var selectedParent = parents.FirstOrDefault(parent => string.Equals(
+                parent.DisplayName,
+                target.ParentName,
+                StringComparison.OrdinalIgnoreCase))
+            ?? parents[0];
+        var parentElement = Canvas.Elements.First(element => string.Equals(
+            element.DisplayName,
+            selectedParent.DisplayName,
+            StringComparison.OrdinalIgnoreCase));
+        state = new CanvasAssignmentEditorState(
+            target.DisplayName,
+            parents,
+            selectedParent.DisplayName,
+            target.IsCanvasChild
+                ? Math.Clamp(target.CanvasChildIndex, 0, selectedParent.ChildCount)
+                : selectedParent.ChildCount,
+            target.IsCanvasChild ? target.CanvasChildLeft : target.X - parentElement.X,
+            target.IsCanvasChild ? target.CanvasChildTop : target.Y - parentElement.Y);
+        return true;
+    }
+
+    public bool SetSelectedCanvasAssignment(
+        string parentName,
+        int itemIndex,
+        double left,
+        double top)
+    {
+        if (Canvas.SelectedElement is not { IsLocked: false } target
+            || target.Visual is Canvas
+            || !double.IsFinite(left)
+            || !double.IsFinite(top))
+        {
+            StatusText = "Select an unlocked non-Canvas control and enter finite local coordinates.";
+            return false;
+        }
+
+        var parent = Canvas.Elements.FirstOrDefault(element =>
+            !element.IsContainerChild
+            && !element.IsLocked
+            && element.Visual is Canvas
+            && string.Equals(element.DisplayName, parentName, StringComparison.OrdinalIgnoreCase));
+        if (parent is null)
+        {
+            StatusText = $"Canvas '{parentName}' is not available.";
+            return false;
+        }
+
+        var siblings = Canvas.Elements
+            .Where(element => !ReferenceEquals(element, target)
+                && element.IsCanvasChild
+                && string.Equals(element.ParentName, parent.DisplayName, StringComparison.OrdinalIgnoreCase))
+            .OrderBy(element => element.CanvasChildIndex)
+            .ThenBy(element => Canvas.Elements.IndexOf(element))
+            .ToList();
+        if (itemIndex < 0 || itemIndex > siblings.Count)
+        {
+            StatusText = $"Canvas z-order position must be between 1 and {siblings.Count + 1}.";
+            return false;
+        }
+
+        BeginCanvasMutation(HistoryActionType.EditProperty, "Assigned control to Canvas.");
+        target.CanvasChildLeft = left;
+        target.CanvasChildTop = top;
+        siblings.Insert(itemIndex, target);
+        Canvas.SetCanvasChildOrder(parent, siblings);
+        Canvas.MoveElementsToFrontInOrder(siblings);
+        Canvas.NormalizeContainerRelationships();
+        ObjectTree.RebuildFrom(Canvas.Elements);
+        ObjectTree.SelectByElement(target);
+        CommitCanvasMutation();
+        StatusText = $"Assigned {target.DisplayName} to {parent.DisplayName} at z-order {itemIndex + 1}.";
+        return true;
+    }
+
+    public bool MoveSelectedCanvasItem(int offset)
+    {
+        if (Canvas.SelectedElement is not { IsLocked: false, IsCanvasChild: true } target)
+        {
+            StatusText = "Select an unlocked Canvas child to change its z-order.";
+            return false;
+        }
+
+        var siblings = Canvas.Elements
+            .Where(element => element.IsCanvasChild
+                && string.Equals(element.ParentName, target.ParentName, StringComparison.OrdinalIgnoreCase))
+            .OrderBy(element => element.CanvasChildIndex)
+            .ThenBy(element => Canvas.Elements.IndexOf(element))
+            .ToList();
+        var currentIndex = siblings.IndexOf(target);
+        var nextIndex = currentIndex + offset;
+        if (currentIndex < 0 || nextIndex < 0 || nextIndex >= siblings.Count)
+        {
+            StatusText = offset < 0
+                ? $"{target.DisplayName} is already the first Canvas item."
+                : $"{target.DisplayName} is already the last Canvas item.";
+            return false;
+        }
+
+        var parent = Canvas.Elements.First(element => string.Equals(
+            element.DisplayName,
+            target.ParentName,
+            StringComparison.OrdinalIgnoreCase));
+        BeginCanvasMutation(HistoryActionType.TransformElement, "Reordered Canvas child.");
+        (siblings[currentIndex], siblings[nextIndex]) = (siblings[nextIndex], siblings[currentIndex]);
+        Canvas.SetCanvasChildOrder(parent, siblings);
+        Canvas.MoveElementsToFrontInOrder(siblings);
+        Canvas.NormalizeContainerRelationships();
+        ObjectTree.RebuildFrom(Canvas.Elements);
+        ObjectTree.SelectByElement(target);
+        CommitCanvasMutation();
+        StatusText = $"Moved {target.DisplayName} to Canvas z-order {nextIndex + 1}.";
+        return true;
+    }
+
+    private static CanvasAssignmentEditorState EmptyCanvasAssignmentState()
+        => new(string.Empty, Array.Empty<CanvasParentOption>(), string.Empty, 0, 0, 0);
 
     public bool TryGetSelectedContentAssignment(out ContentAssignmentEditorState state)
     {
@@ -3317,7 +3479,10 @@ public partial class MainWindowViewModel : ViewModelBase
                 e.DockPanelDock,
                 e.DockPanelItemSize,
                 e.WrapPanelIndex,
-                e.UniformGridIndex))
+                e.UniformGridIndex,
+                e.CanvasChildIndex,
+                e.CanvasChildLeft,
+                e.CanvasChildTop))
             .ToList();
 
         return new DesignerCanvasDocument(
@@ -3437,7 +3602,10 @@ public partial class MainWindowViewModel : ViewModelBase
             element.DockPanelDock,
             element.DockPanelItemSize,
             element.WrapPanelIndex,
-            element.UniformGridIndex);
+            element.UniformGridIndex,
+            element.CanvasChildIndex,
+            element.CanvasChildLeft,
+            element.CanvasChildTop);
     }
 
     private IReadOnlyDictionary<string, string>? CaptureVisualProperties(Control visual)
@@ -3859,6 +4027,17 @@ public partial class MainWindowViewModel : ViewModelBase
             };
         }
 
+        if (visual is Canvas canvas)
+        {
+            return new Dictionary<string, string>
+            {
+                ["Background"] = canvas.Background is null
+                    ? "#00000000"
+                    : FormatBrushValue(canvas.Background),
+                ["Opacity"] = canvas.Opacity.ToString("0.###", CultureInfo.InvariantCulture),
+            };
+        }
+
         if (visual is Grid grid)
         {
             return new Dictionary<string, string>
@@ -3988,6 +4167,9 @@ public partial class MainWindowViewModel : ViewModelBase
                 || a.DockPanelItemSize != b.DockPanelItemSize
                 || a.WrapPanelIndex != b.WrapPanelIndex
                 || a.UniformGridIndex != b.UniformGridIndex
+                || a.CanvasChildIndex != b.CanvasChildIndex
+                || a.CanvasChildLeft != b.CanvasChildLeft
+                || a.CanvasChildTop != b.CanvasChildTop
                 || !DictionaryEquals(a.VisualProperties, b.VisualProperties))
             {
                 return false;
@@ -4051,6 +4233,7 @@ public partial class MainWindowViewModel : ViewModelBase
             var dockPanelIndex = 0;
             var wrapPanelIndex = 0;
             var uniformGridIndex = 0;
+            var canvasChildIndex = 0;
             foreach (var node in container.Nodes())
             {
                 if (node is XComment comment)
@@ -4118,6 +4301,10 @@ public partial class MainWindowViewModel : ViewModelBase
                     parent?.TypeName,
                     "Avalonia.Controls.Primitives.UniformGrid",
                     StringComparison.Ordinal);
+                var isCanvasChild = string.Equals(
+                    parent?.TypeName,
+                    "Avalonia.Controls.Canvas",
+                    StringComparison.Ordinal);
                 var dockSide = Enum.TryParse<DesignerDockSide>(
                     child.Attribute("DockPanel.Dock")?.Value,
                     ignoreCase: true,
@@ -4135,6 +4322,7 @@ public partial class MainWindowViewModel : ViewModelBase
                     "Avalonia.Controls.DockPanel" => DesignerParentLayoutKind.DockPanel,
                     "Avalonia.Controls.WrapPanel" => DesignerParentLayoutKind.WrapPanel,
                     "Avalonia.Controls.Primitives.UniformGrid" => DesignerParentLayoutKind.UniformGrid,
+                    "Avalonia.Controls.Canvas" => DesignerParentLayoutKind.Canvas,
                     "Avalonia.Controls.Border"
                         or "Avalonia.Controls.ScrollViewer"
                         or "Avalonia.Controls.Expander" => DesignerParentLayoutKind.Content,
@@ -4169,7 +4357,10 @@ public partial class MainWindowViewModel : ViewModelBase
                             : width
                         : 40,
                     isWrapPanelChild ? wrapPanelIndex++ : -1,
-                    isUniformGridChild ? uniformGridIndex++ : -1);
+                    isUniformGridChild ? uniformGridIndex++ : -1,
+                    isCanvasChild ? canvasChildIndex++ : -1,
+                    isCanvasChild ? ReadDouble(child, "Canvas.Left", 0) : 0,
+                    isCanvasChild ? ReadDouble(child, "Canvas.Top", 0) : 0);
                 snapshots.Add(snapshot);
                 nextIsLocked = false;
 
@@ -4178,6 +4369,7 @@ public partial class MainWindowViewModel : ViewModelBase
                     || string.Equals(typeName, "Avalonia.Controls.DockPanel", StringComparison.Ordinal)
                     || string.Equals(typeName, "Avalonia.Controls.WrapPanel", StringComparison.Ordinal)
                     || string.Equals(typeName, "Avalonia.Controls.Primitives.UniformGrid", StringComparison.Ordinal)
+                    || string.Equals(typeName, "Avalonia.Controls.Canvas", StringComparison.Ordinal)
                     || string.Equals(typeName, "Avalonia.Controls.Border", StringComparison.Ordinal)
                     || string.Equals(typeName, "Avalonia.Controls.ScrollViewer", StringComparison.Ordinal)
                     || string.Equals(typeName, "Avalonia.Controls.Expander", StringComparison.Ordinal))
@@ -4605,6 +4797,7 @@ public partial class MainWindowViewModel : ViewModelBase
                 or "ItemSpacing" or "LineSpacing" or "ItemsAlignment",
             "UniformGrid" => propertyName is "Rows" or "Columns" or "FirstColumn"
                 or "RowSpacing" or "ColumnSpacing",
+            "Canvas" => propertyName == "Background",
             _ => false,
         };
     }
@@ -6097,6 +6290,40 @@ public partial class MainWindowViewModel : ViewModelBase
                 sb.AppendLine("</UniformGrid>");
                 break;
 
+            case Canvas canvas:
+                sb.Append(indent);
+                sb.Append("<Canvas");
+                AppendCanvasLayoutAttributes(sb, element);
+                if (canvas.Background is not null)
+                {
+                    AppendAttribute(sb, "Background", FormatBrushValue(canvas.Background));
+                }
+
+                var canvasChildren = Canvas.Elements
+                    .Where(child => child.IsCanvasChild
+                        && string.Equals(
+                            child.ParentName,
+                            element.DisplayName,
+                            StringComparison.OrdinalIgnoreCase))
+                    .OrderBy(child => child.CanvasChildIndex)
+                    .ThenBy(child => Canvas.Elements.IndexOf(child))
+                    .ToList();
+                if (canvasChildren.Count == 0)
+                {
+                    sb.AppendLine(" />");
+                    break;
+                }
+
+                sb.AppendLine(">");
+                foreach (var child in canvasChildren)
+                {
+                    WriteDesignerChildAxaml(sb, child, indent + "  ");
+                }
+
+                sb.Append(indent);
+                sb.AppendLine("</Canvas>");
+                break;
+
             default:
                 sb.Append(indent);
                 sb.Append("<TextBlock");
@@ -6230,6 +6457,13 @@ public partial class MainWindowViewModel : ViewModelBase
         {
             // UniformGrid owns cell size and placement.
         }
+        else if (TryGetCanvasParent(element, out _))
+        {
+            AppendAttribute(sb, "Canvas.Left", element.CanvasChildLeft.ToString("0.###", CultureInfo.InvariantCulture));
+            AppendAttribute(sb, "Canvas.Top", element.CanvasChildTop.ToString("0.###", CultureInfo.InvariantCulture));
+            AppendAttribute(sb, "Width", element.Width.ToString("0.###", CultureInfo.InvariantCulture));
+            AppendAttribute(sb, "Height", element.Height.ToString("0.###", CultureInfo.InvariantCulture));
+        }
         else
         {
             AppendAttribute(sb, "Canvas.Left", element.X.ToString("0.###", CultureInfo.InvariantCulture));
@@ -6287,6 +6521,7 @@ public partial class MainWindowViewModel : ViewModelBase
             || TryGetDockPanelParent(element, out _, out _)
             || TryGetWrapPanelParent(element, out _)
             || TryGetUniformGridParent(element, out _)
+            || TryGetCanvasParent(element, out _)
             || TryGetContentParent(element, out _);
 
     private bool TryGetStackPanelParent(DesignElement element, out StackPanel stackPanel)
@@ -6359,6 +6594,20 @@ public partial class MainWindowViewModel : ViewModelBase
                     StringComparison.OrdinalIgnoreCase));
         uniformGrid = parent?.Visual as UniformGrid ?? null!;
         return uniformGrid is not null;
+    }
+
+    private bool TryGetCanvasParent(DesignElement element, out Canvas canvas)
+    {
+        var parent = element.ParentName is null
+            ? null
+            : Canvas.Elements.FirstOrDefault(candidate =>
+                candidate.Visual is Canvas
+                && string.Equals(
+                    candidate.DisplayName,
+                    element.ParentName,
+                    StringComparison.OrdinalIgnoreCase));
+        canvas = parent?.Visual as Canvas ?? null!;
+        return canvas is not null;
     }
 
     private DesignElement? GetDesignerContentChild(DesignElement parent)

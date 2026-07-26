@@ -322,6 +322,9 @@ public partial class CanvasViewModel : ViewModelBase
             element.DockPanelItemSize = Math.Max(10, snapshot.DockPanelItemSize);
             element.WrapPanelIndex = snapshot.WrapPanelIndex;
             element.UniformGridIndex = snapshot.UniformGridIndex;
+            element.CanvasChildIndex = snapshot.CanvasChildIndex;
+            element.CanvasChildLeft = snapshot.CanvasChildLeft;
+            element.CanvasChildTop = snapshot.CanvasChildTop;
             element.ParentName = snapshot.ParentName;
         }
         finally
@@ -481,6 +484,9 @@ public partial class CanvasViewModel : ViewModelBase
             child.DockPanelItemSize = 40;
             child.WrapPanelIndex = -1;
             child.UniformGridIndex = -1;
+            child.CanvasChildIndex = -1;
+            child.CanvasChildLeft = 0;
+            child.CanvasChildTop = 0;
         }
 
         element.PropertyChanged -= OnDesignElementPropertyChanged;
@@ -554,6 +560,7 @@ public partial class CanvasViewModel : ViewModelBase
                     element.DockPanelIndex = -1;
                     element.WrapPanelIndex = -1;
                     element.UniformGridIndex = -1;
+                    element.CanvasChildIndex = -1;
                 }
                 else if (parent.Visual is StackPanel)
                 {
@@ -561,6 +568,7 @@ public partial class CanvasViewModel : ViewModelBase
                     element.DockPanelIndex = -1;
                     element.WrapPanelIndex = -1;
                     element.UniformGridIndex = -1;
+                    element.CanvasChildIndex = -1;
                     if (element.StackPanelIndex < 0)
                     {
                         element.StackPanelIndex = GetDirectChildren(parent).Count(child =>
@@ -576,6 +584,7 @@ public partial class CanvasViewModel : ViewModelBase
                     element.StackPanelIndex = -1;
                     element.WrapPanelIndex = -1;
                     element.UniformGridIndex = -1;
+                    element.CanvasChildIndex = -1;
                     if (element.DockPanelIndex < 0)
                     {
                         element.DockPanelIndex = GetDirectChildren(parent).Count(child =>
@@ -591,6 +600,7 @@ public partial class CanvasViewModel : ViewModelBase
                     element.StackPanelIndex = -1;
                     element.DockPanelIndex = -1;
                     element.UniformGridIndex = -1;
+                    element.CanvasChildIndex = -1;
                     if (element.WrapPanelIndex < 0)
                     {
                         element.WrapPanelIndex = GetDirectChildren(parent).Count(child =>
@@ -604,11 +614,26 @@ public partial class CanvasViewModel : ViewModelBase
                     element.StackPanelIndex = -1;
                     element.DockPanelIndex = -1;
                     element.WrapPanelIndex = -1;
+                    element.CanvasChildIndex = -1;
                     if (element.UniformGridIndex < 0)
                     {
                         element.UniformGridIndex = GetDirectChildren(parent).Count(child =>
                             child.ParentLayout == DesignerParentLayoutKind.UniformGrid
                             && child.UniformGridIndex >= 0);
+                    }
+                }
+                else if (parent.Visual is Canvas)
+                {
+                    element.ParentLayout = DesignerParentLayoutKind.Canvas;
+                    element.StackPanelIndex = -1;
+                    element.DockPanelIndex = -1;
+                    element.WrapPanelIndex = -1;
+                    element.UniformGridIndex = -1;
+                    if (element.CanvasChildIndex < 0)
+                    {
+                        element.CanvasChildIndex = GetDirectChildren(parent).Count(child =>
+                            child.ParentLayout == DesignerParentLayoutKind.Canvas
+                            && child.CanvasChildIndex >= 0);
                     }
                 }
                 else
@@ -618,6 +643,7 @@ public partial class CanvasViewModel : ViewModelBase
                     element.DockPanelIndex = -1;
                     element.WrapPanelIndex = -1;
                     element.UniformGridIndex = -1;
+                    element.CanvasChildIndex = -1;
                 }
             }
 
@@ -669,6 +695,9 @@ public partial class CanvasViewModel : ViewModelBase
                 child.DockPanelItemSize = 40;
                 child.WrapPanelIndex = -1;
                 child.UniformGridIndex = -1;
+                child.CanvasChildIndex = -1;
+                child.CanvasChildLeft = 0;
+                child.CanvasChildTop = 0;
                 child.ParentLayout = DesignerParentLayoutKind.StackPanel;
                 child.ParentName = parent.DisplayName;
             }
@@ -707,6 +736,9 @@ public partial class CanvasViewModel : ViewModelBase
             child.DockPanelItemSize = 40;
             child.WrapPanelIndex = -1;
             child.UniformGridIndex = -1;
+            child.CanvasChildIndex = -1;
+            child.CanvasChildLeft = 0;
+            child.CanvasChildTop = 0;
             child.ParentLayout = DesignerParentLayoutKind.Content;
             child.ParentName = parent.DisplayName;
             ClearBuiltInContent(parent.Visual);
@@ -744,6 +776,9 @@ public partial class CanvasViewModel : ViewModelBase
                 child.DockPanelIndex = index;
                 child.WrapPanelIndex = -1;
                 child.UniformGridIndex = -1;
+                child.CanvasChildIndex = -1;
+                child.CanvasChildLeft = 0;
+                child.CanvasChildTop = 0;
                 child.ParentLayout = DesignerParentLayoutKind.DockPanel;
                 child.ParentName = parent.DisplayName;
             }
@@ -782,6 +817,9 @@ public partial class CanvasViewModel : ViewModelBase
                 child.DockPanelItemSize = 40;
                 child.WrapPanelIndex = index;
                 child.UniformGridIndex = -1;
+                child.CanvasChildIndex = -1;
+                child.CanvasChildLeft = 0;
+                child.CanvasChildTop = 0;
                 child.ParentLayout = DesignerParentLayoutKind.WrapPanel;
                 child.ParentName = parent.DisplayName;
             }
@@ -820,7 +858,49 @@ public partial class CanvasViewModel : ViewModelBase
                 child.DockPanelItemSize = 40;
                 child.WrapPanelIndex = -1;
                 child.UniformGridIndex = index;
+                child.CanvasChildIndex = -1;
+                child.CanvasChildLeft = 0;
+                child.CanvasChildTop = 0;
                 child.ParentLayout = DesignerParentLayoutKind.UniformGrid;
+                child.ParentName = parent.DisplayName;
+            }
+
+            ReflowContainerTreeCore(parent);
+        }
+        finally
+        {
+            _isReflowingContainerChildren = false;
+        }
+    }
+
+    public void SetCanvasChildOrder(
+        DesignElement parent,
+        IReadOnlyList<DesignElement> orderedChildren)
+    {
+        if (parent.Visual is not Canvas)
+        {
+            return;
+        }
+
+        _isReflowingContainerChildren = true;
+        try
+        {
+            for (var index = 0; index < orderedChildren.Count; index++)
+            {
+                var child = orderedChildren[index];
+                child.GridRow = 0;
+                child.GridColumn = 0;
+                child.GridRowSpan = 1;
+                child.GridColumnSpan = 1;
+                child.StackPanelIndex = -1;
+                child.StackPanelItemSize = 40;
+                child.DockPanelIndex = -1;
+                child.DockPanelDock = DesignerDockSide.Left;
+                child.DockPanelItemSize = 40;
+                child.WrapPanelIndex = -1;
+                child.UniformGridIndex = -1;
+                child.CanvasChildIndex = index;
+                child.ParentLayout = DesignerParentLayoutKind.Canvas;
                 child.ParentName = parent.DisplayName;
             }
 
@@ -1102,6 +1182,10 @@ public partial class CanvasViewModel : ViewModelBase
         else if (parent.Visual is UniformGrid uniformGrid)
         {
             ReflowUniformGridChildrenCore(parent, uniformGrid);
+        }
+        else if (parent.Visual is Canvas canvas)
+        {
+            ReflowCanvasChildrenCore(parent, canvas);
         }
         else if (parent.Visual is Grid)
         {
@@ -1412,6 +1496,23 @@ public partial class CanvasViewModel : ViewModelBase
         }
     }
 
+    private void ReflowCanvasChildrenCore(DesignElement parent, Canvas canvas)
+    {
+        var children = GetDirectChildren(parent)
+            .Where(child => child.IsCanvasChild)
+            .OrderBy(child => child.CanvasChildIndex)
+            .ThenBy(Elements.IndexOf)
+            .ToList();
+        canvas.Children.Clear();
+        for (var index = 0; index < children.Count; index++)
+        {
+            var child = children[index];
+            child.CanvasChildIndex = index;
+            child.X = parent.X + child.CanvasChildLeft;
+            child.Y = parent.Y + child.CanvasChildTop;
+        }
+    }
+
     private static void SetElementBounds(DesignElement element, Rect bounds)
     {
         element.X = bounds.X;
@@ -1450,6 +1551,9 @@ public partial class CanvasViewModel : ViewModelBase
         child.DockPanelItemSize = 40;
         child.WrapPanelIndex = -1;
         child.UniformGridIndex = -1;
+        child.CanvasChildIndex = -1;
+        child.CanvasChildLeft = 0;
+        child.CanvasChildTop = 0;
     }
 
     private void OnDesignElementPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
@@ -1471,6 +1575,9 @@ public partial class CanvasViewModel : ViewModelBase
             or nameof(DesignElement.DockPanelItemSize)
             or nameof(DesignElement.WrapPanelIndex)
             or nameof(DesignElement.UniformGridIndex)
+            or nameof(DesignElement.CanvasChildIndex)
+            or nameof(DesignElement.CanvasChildLeft)
+            or nameof(DesignElement.CanvasChildTop)
             or nameof(DesignElement.ParentLayout))
         {
             ReflowContainerChild(element);
@@ -1482,6 +1589,29 @@ public partial class CanvasViewModel : ViewModelBase
             or nameof(DesignElement.Width)
             or nameof(DesignElement.Height))
         {
+            if (element.IsCanvasChild
+                && e.PropertyName is nameof(DesignElement.X) or nameof(DesignElement.Y)
+                && FindParent(element) is { } canvasParent)
+            {
+                _isReflowingContainerChildren = true;
+                try
+                {
+                    element.CanvasChildLeft = element.X - canvasParent.X;
+                    element.CanvasChildTop = element.Y - canvasParent.Y;
+                }
+                finally
+                {
+                    _isReflowingContainerChildren = false;
+                }
+
+                if (IsDesignerContainer(element.Visual))
+                {
+                    ReflowContainerChildren(element);
+                }
+
+                return;
+            }
+
             if (element.IsContainerChild)
             {
                 ReflowContainerChild(element);
@@ -1494,7 +1624,7 @@ public partial class CanvasViewModel : ViewModelBase
     }
 
     private static bool IsDesignerContainer(Control visual)
-        => visual is Grid or StackPanel or DockPanel or WrapPanel or UniformGrid
+        => visual is Grid or StackPanel or DockPanel or WrapPanel or UniformGrid or Canvas
             or Border or ScrollViewer or Expander;
 
     private static bool IsContentContainer(Control visual)
@@ -2117,6 +2247,16 @@ public partial class CanvasViewModel : ViewModelBase
                 && double.TryParse(columnSpacing, NumberStyles.Float, CultureInfo.InvariantCulture, out var parsedColumnSpacing))
             {
                 uniformGrid.ColumnSpacing = Math.Max(0, parsedColumnSpacing);
+            }
+
+            return;
+        }
+
+        if (visual is Canvas canvas)
+        {
+            if (properties.TryGetValue("Background", out var background))
+            {
+                TrySetAppearanceBrush(canvas, "Background", value => canvas.Background = value, background);
             }
 
             return;

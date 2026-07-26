@@ -71,6 +71,7 @@ public sealed class PreviewWindow : Window
                     element.TypeName,
                     "Avalonia.Controls.Primitives.UniformGrid",
                     StringComparison.Ordinal)
+                || string.Equals(element.TypeName, "Avalonia.Controls.Canvas", StringComparison.Ordinal)
                 || string.Equals(element.TypeName, "Avalonia.Controls.Border", StringComparison.Ordinal)
                 || string.Equals(element.TypeName, "Avalonia.Controls.ScrollViewer", StringComparison.Ordinal)
                 || string.Equals(element.TypeName, "Avalonia.Controls.Expander", StringComparison.Ordinal))
@@ -117,6 +118,8 @@ public sealed class PreviewWindow : Window
                         ? children.OrderBy(child => child.WrapPanelIndex).ToList()
                         : parent is UniformGrid
                             ? children.OrderBy(child => child.UniformGridIndex).ToList()
+                            : parent is Canvas
+                                ? children.OrderBy(child => child.CanvasChildIndex).ToList()
                 : children;
             if (parent is Panel panel)
             {
@@ -175,6 +178,13 @@ public sealed class PreviewWindow : Window
                         break;
                     case UniformGrid uniformGrid:
                         uniformGrid.Children.Add(child);
+                        break;
+                    case Canvas nestedCanvas:
+                        child.Width = Math.Max(10, childSnapshot.Width);
+                        child.Height = Math.Max(10, childSnapshot.Height);
+                        Canvas.SetLeft(child, childSnapshot.CanvasChildLeft);
+                        Canvas.SetTop(child, childSnapshot.CanvasChildTop);
+                        nestedCanvas.Children.Add(child);
                         break;
                     case Border border:
                         border.Child = child;
@@ -292,6 +302,10 @@ public sealed class PreviewWindow : Window
                 FirstColumn = 0,
                 RowSpacing = 8,
                 ColumnSpacing = 8,
+            },
+            "Avalonia.Controls.Canvas" => new Canvas
+            {
+                Background = Brush.Parse("#F8FAFC"),
             },
             _ => new TextBlock { Text = $"[Unsupported: {snapshot.DisplayName}]" },
         };
@@ -646,6 +660,12 @@ public sealed class PreviewWindow : Window
                     && double.TryParse(columnSpacing, NumberStyles.Float, CultureInfo.InvariantCulture, out var parsedColumnSpacing))
                 {
                     uniformGrid.ColumnSpacing = Math.Max(0, parsedColumnSpacing);
+                }
+                break;
+            case Canvas canvas:
+                if (properties.TryGetValue("Background", out var canvasBackground))
+                {
+                    TrySetBorderBrush(value => canvas.Background = value, canvasBackground, colorResources);
                 }
                 break;
         }
