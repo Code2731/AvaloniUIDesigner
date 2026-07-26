@@ -23,6 +23,7 @@ public partial class MainWindow : Window
 {
     private enum DragMode { None, Move, N, S, E, W, NE, NW, SE, SW }
     private enum UnsavedChoice { Save, Discard, Cancel }
+    private sealed record ComponentPackExportOptions(string PackName, string DisplayName, string NamePrefix);
 
     private const double HandleHalf = 5;
     private const double MinSize = 10;
@@ -99,6 +100,71 @@ public partial class MainWindow : Window
         if (!Vm.TryLoadComponentPack(json, out var result))
         {
             Vm.StatusText = $"Could not load component pack: {result}";
+        }
+    }
+
+    private async void OnExportSelectedComponentPackMenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        FlushPendingPropertyHistory();
+        if (Vm is null || !Vm.TryGetSelectedComponentPackDefaults(out var packName, out var displayName, out var namePrefix))
+        {
+            return;
+        }
+
+        var options = await ShowComponentPackExportDialogAsync(packName, displayName, namePrefix);
+        if (options is null)
+        {
+            return;
+        }
+
+        if (!Vm.TryExportSelectedComponentPack(
+                options.PackName,
+                options.DisplayName,
+                options.NamePrefix,
+                out var json,
+                out var error))
+        {
+            Vm.StatusText = $"Could not export component pack: {error}";
+            return;
+        }
+
+        var file = await StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
+        {
+            Title = "Export Component Pack",
+            SuggestedFileName = $"{options.NamePrefix}.component-pack.json",
+            DefaultExtension = "json",
+            FileTypeChoices =
+            [
+                new FilePickerFileType("Component Pack JSON") { Patterns = ["*.json"] }
+            ]
+        });
+
+        if (file is null)
+        {
+            return;
+        }
+
+        try
+        {
+            var localPath = file.TryGetLocalPath();
+            if (!string.IsNullOrWhiteSpace(localPath))
+            {
+                await AtomicFileWriter.WriteAllTextAsync(localPath, json);
+            }
+            else
+            {
+                await using var stream = await file.OpenWriteAsync();
+                stream.SetLength(0);
+                using var writer = new StreamWriter(stream);
+                await writer.WriteAsync(json);
+                await writer.FlushAsync();
+            }
+
+            Vm.StatusText = $"Exported {options.DisplayName} component pack to {file.Name}.";
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        {
+            Vm.StatusText = $"Could not export {file.Name}: {exception.Message}";
         }
     }
 
@@ -2078,6 +2144,65 @@ public partial class MainWindow : Window
         dialog.Content = content;
 
         return await dialog.ShowDialog<IReadOnlyList<string>?>(this);
+    }
+
+    private async Task<ComponentPackExportOptions?> ShowComponentPackExportDialogAsync(
+        string packName,
+        string displayName,
+        string namePrefix)
+    {
+        var packNameEditor = new TextBox { Text = packName };
+        var displayNameEditor = new TextBox { Text = displayName };
+        var namePrefixEditor = new TextBox { Text = namePrefix };
+        var dialog = new Window
+        {
+            Title = "Export Component Pack",
+            Width = 480,
+            Height = 340,
+            MinWidth = 400,
+            MinHeight = 280,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner,
+        };
+
+        var applyButton = new Button { Content = "Export", MinWidth = 84 };
+        applyButton.Click += (_, _) => dialog.Close<ComponentPackExportOptions?>(new(
+            packNameEditor.Text ?? string.Empty,
+            displayNameEditor.Text ?? string.Empty,
+            namePrefixEditor.Text ?? string.Empty));
+        var cancelButton = new Button { Content = "Cancel", MinWidth = 84 };
+        cancelButton.Click += (_, _) => dialog.Close<ComponentPackExportOptions?>(null);
+
+        var fields = new StackPanel
+        {
+            Spacing = 6,
+            Children =
+            {
+                new TextBlock { Text = "Pack name" },
+                packNameEditor,
+                new TextBlock { Text = "Toolbox display name" },
+                displayNameEditor,
+                new TextBlock { Text = "Name prefix (letters, numbers, underscores)" },
+                namePrefixEditor,
+            },
+        };
+        var buttons = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            Spacing = 8,
+            HorizontalAlignment = HorizontalAlignment.Right,
+            Children = { cancelButton, applyButton },
+        };
+        var layout = new Grid
+        {
+            Margin = new Thickness(16),
+            RowDefinitions = new RowDefinitions("*,Auto"),
+            RowSpacing = 16,
+            Children = { fields, buttons },
+        };
+        Grid.SetRow(buttons, 1);
+        dialog.Content = layout;
+
+        return await dialog.ShowDialog<ComponentPackExportOptions?>(this);
     }
 
     private async Task<string?> ShowTextEditorDialogAsync(string title, string content, string helpText, bool multiline = true)

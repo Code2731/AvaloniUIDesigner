@@ -145,6 +145,105 @@ public partial class MainWindowViewModel : ViewModelBase
         return true;
     }
 
+    public bool TryGetSelectedComponentPackDefaults(
+        out string packName,
+        out string displayName,
+        out string namePrefix)
+    {
+        if (Canvas.SelectedElement is not { } target)
+        {
+            packName = string.Empty;
+            displayName = string.Empty;
+            namePrefix = string.Empty;
+            StatusText = "Select a control to export as a component pack.";
+            return false;
+        }
+
+        displayName = target.DisplayName;
+        packName = $"{displayName} Components";
+        namePrefix = target.DisplayName;
+        return true;
+    }
+
+    public bool TryExportSelectedComponentPack(
+        string proposedPackName,
+        string proposedDisplayName,
+        string proposedNamePrefix,
+        out string json,
+        out string error)
+    {
+        json = string.Empty;
+        error = string.Empty;
+
+        if (Canvas.SelectedElement is not { } target)
+        {
+            error = "Select a control to export as a component pack.";
+            return false;
+        }
+
+        var packName = proposedPackName.Trim();
+        var displayName = proposedDisplayName.Trim();
+        var namePrefix = proposedNamePrefix.Trim();
+        if (string.IsNullOrWhiteSpace(packName) || string.IsNullOrWhiteSpace(displayName))
+        {
+            error = "Pack name and Toolbox display name are required.";
+            return false;
+        }
+
+        if (!IsValidControlName(namePrefix))
+        {
+            error = "Name prefix must start with a letter or underscore and contain only letters, numbers, or underscores.";
+            return false;
+        }
+
+        if (!_componentCatalog.TryGet(target.TypeName, out _))
+        {
+            error = $"Unsupported Avalonia type: {target.TypeName}";
+            return false;
+        }
+
+        var properties = CaptureVisualProperties(target.Visual)
+            ?.Where(pair => !pair.Key.StartsWith("__", StringComparison.Ordinal)
+                && !(target.Visual is Label && string.Equals(pair.Key, "Target", StringComparison.Ordinal)))
+            .ToDictionary(pair => pair.Key, pair => pair.Value, StringComparer.Ordinal);
+        var document = new ComponentPackDocument
+        {
+            Name = packName,
+            Components =
+            [
+                new ComponentPackComponent
+                {
+                    DisplayName = displayName,
+                    AvaloniaTypeName = target.TypeName,
+                    NamePrefix = namePrefix,
+                    DefaultWidth = target.Width,
+                    DefaultHeight = target.Height,
+                    DefaultProperties = properties,
+                }
+            ]
+        };
+
+        json = JsonSerializer.Serialize(document, new JsonSerializerOptions
+        {
+            WriteIndented = true,
+            PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+        });
+
+        if (!_componentPackLoader.TryLoad(
+                json,
+                new BuiltInComponentCatalog(),
+                _ => true,
+                out _,
+                out var validationError))
+        {
+            json = string.Empty;
+            error = $"Generated component pack is invalid: {validationError}";
+            return false;
+        }
+
+        return true;
+    }
+
     public void SetCanvasGridSize(double gridSize)
     {
         if (Canvas.GridSize == Math.Clamp(gridSize, 4, 32))
