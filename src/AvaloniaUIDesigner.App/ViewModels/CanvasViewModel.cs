@@ -444,6 +444,8 @@ public partial class CanvasViewModel : ViewModelBase
             visual.Opacity = Math.Clamp(parsedOpacity, 0, 1);
         }
 
+        ApplyTemplatedAppearanceProperties(visual, properties);
+
         if (properties.TryGetValue("__toolTip", out var toolTip))
         {
             ToolTip.SetTip(visual, string.IsNullOrWhiteSpace(toolTip) ? null : toolTip);
@@ -942,6 +944,43 @@ public partial class CanvasViewModel : ViewModelBase
         }
     }
 
+    private static void ApplyTemplatedAppearanceProperties(
+        Control visual,
+        IReadOnlyDictionary<string, string> properties)
+    {
+        if (visual is not Avalonia.Controls.Primitives.TemplatedControl templated)
+        {
+            return;
+        }
+
+        if (properties.TryGetValue("Background", out var background))
+        {
+            TrySetBrush(value => templated.Background = value, background);
+        }
+
+        if (properties.TryGetValue("Foreground", out var foreground))
+        {
+            TrySetBrush(value => templated.Foreground = value, foreground);
+        }
+
+        if (properties.TryGetValue("BorderBrush", out var borderBrush))
+        {
+            TrySetBrush(value => templated.BorderBrush = value, borderBrush);
+        }
+
+        if (properties.TryGetValue("BorderThickness", out var borderThickness)
+            && TryParseThickness(borderThickness, out var parsedBorderThickness))
+        {
+            templated.BorderThickness = parsedBorderThickness;
+        }
+
+        if (properties.TryGetValue("CornerRadius", out var cornerRadius)
+            && TryParseCornerRadius(cornerRadius, out var parsedCornerRadius))
+        {
+            templated.CornerRadius = parsedCornerRadius;
+        }
+    }
+
     private static bool TryLoadImageSource(Image image, string source, bool retainSourceOnFailure)
     {
         var path = ResolveImagePath(source);
@@ -1091,21 +1130,25 @@ public partial class CanvasViewModel : ViewModelBase
 
     private static void TrySetBorderBackground(Border border, string value)
     {
-        try
-        {
-            border.Background = Brush.Parse(value);
-        }
-        catch (FormatException)
-        {
-            // Ignore malformed imported brushes while keeping the control usable.
-        }
+        TrySetBrush(brush => border.Background = brush, value);
     }
 
     private static void TrySetBorderBrush(Border border, string value)
     {
+        TrySetBrush(brush => border.BorderBrush = brush, value);
+    }
+
+    private static void TrySetBrush(Action<IBrush?> applyBrush, string value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            applyBrush(null);
+            return;
+        }
+
         try
         {
-            border.BorderBrush = Brush.Parse(value);
+            applyBrush(Brush.Parse(value));
         }
         catch (FormatException)
         {
@@ -1191,7 +1234,7 @@ public partial class CanvasViewModel : ViewModelBase
 
         foreach (var child in children)
         {
-            var control = child.TypeName switch
+            Control? control = child.TypeName switch
             {
                 "TextBlock" => new TextBlock
                 {

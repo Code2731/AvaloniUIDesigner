@@ -24,6 +24,7 @@ dotnet run --project src/AvaloniaUIDesigner.App/AvaloniaUIDesigner.App.csproj
 - **Object Tree 자동 동기화**: 배치된 요소가 루트(Window) 아래에 추가
 - **이동/리사이즈 기즈모**: 선택된 요소를 드래그로 이동, 8방향 핸들로 리사이즈 (최소 10px)
 - **PropertyGrid 연동**: 선택된 컨트롤의 속성을 bodong PropertyGrid로 실시간 편집
+- **Appearance 편집**: 배경·전경·테두리·두께·모서리를 편집하고 Undo/Redo, 미리보기, AXAML 왕복에 보존
 - **이벤트 선언**: Button Click 핸들러 이름 편집 및 AXAML 내보내기
 - **AXAML 워크플로**: Window 저장/열기, 유효성 확인, UserControl 내보내기, 복사, 미리보기
 - 상태바 피드백

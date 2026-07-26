@@ -387,6 +387,21 @@ public partial class MainWindow : Window
     private void OnTextWeightSemiboldMenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e) => Vm?.SetSelectedTextWeight("Semibold");
     private void OnTextWeightBoldMenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e) => Vm?.SetSelectedTextWeight("Bold");
 
+    private async void OnEditAppearanceMenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        FlushPendingPropertyHistory();
+        if (Vm is null || !Vm.TryGetSelectedAppearance(out var controlName, out var appearance))
+        {
+            return;
+        }
+
+        var updatedAppearance = await ShowAppearanceEditorDialogAsync(controlName, appearance);
+        if (updatedAppearance is not null)
+        {
+            Vm.SetSelectedAppearance(updatedAppearance);
+        }
+    }
+
     private void SetSelectionOpacity(double opacity)
     {
         FlushPendingPropertyHistory();
@@ -1067,7 +1082,7 @@ public partial class MainWindow : Window
         }
 
         Vm.MarkDocumentLoaded(path);
-        Vm.StatusText = BuildOpenStatus(Path.GetFileName(path), warning);
+        Vm.StatusText = BuildOpenStatus(System.IO.Path.GetFileName(path), warning);
     }
 
     private void OnCanvasPropertyChanged(object? sender, PropertyChangedEventArgs e)
@@ -1150,6 +1165,12 @@ public partial class MainWindow : Window
     private static bool IsUndoTrackedVisualProperty(Control control, string propertyName)
     {
         if (propertyName is "Opacity" or "IsEnabled" or "IsVisible" or "TabIndex" or "IsTabStop")
+        {
+            return true;
+        }
+
+        if (control is Avalonia.Controls.Primitives.TemplatedControl
+            && (propertyName is "Background" or "Foreground" or "BorderBrush" or "BorderThickness" or "CornerRadius"))
         {
             return true;
         }
@@ -1935,7 +1956,7 @@ public partial class MainWindow : Window
         if (!string.IsNullOrWhiteSpace(localPath))
         {
             Vm.MarkDocumentLoaded(localPath);
-            Vm.StatusText = BuildOpenStatus(Path.GetFileName(localPath), warning);
+            Vm.StatusText = BuildOpenStatus(System.IO.Path.GetFileName(localPath), warning);
         }
         else
         {
@@ -1983,7 +2004,7 @@ public partial class MainWindow : Window
                 {
                     await AtomicFileWriter.WriteAllTextAsync(pickedPath, axaml);
                     Vm.MarkDocumentSaved(pickedPath);
-                    Vm.StatusText = $"Saved {Path.GetFileName(pickedPath)}";
+                    Vm.StatusText = $"Saved {System.IO.Path.GetFileName(pickedPath)}";
                 }
                 else
                 {
@@ -2010,12 +2031,12 @@ public partial class MainWindow : Window
         {
             await AtomicFileWriter.WriteAllTextAsync(targetPath, axaml);
             Vm.MarkDocumentSaved(targetPath);
-            Vm.StatusText = $"Saved {Path.GetFileName(targetPath)}";
+            Vm.StatusText = $"Saved {System.IO.Path.GetFileName(targetPath)}";
             return true;
         }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
         {
-            Vm.StatusText = $"Could not save {Path.GetFileName(targetPath)}: {exception.Message}";
+            Vm.StatusText = $"Could not save {System.IO.Path.GetFileName(targetPath)}: {exception.Message}";
             return false;
         }
     }
@@ -2113,11 +2134,11 @@ public partial class MainWindow : Window
                 .Replace("\r\n", "\n", StringComparison.Ordinal)
                 .Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
                 .ToList();
-            dialog.Close<IReadOnlyList<string>?>(updatedItems);
+            dialog.Close(updatedItems);
         };
 
         var cancelButton = new Button { Content = "Cancel", MinWidth = 84 };
-        cancelButton.Click += (_, _) => dialog.Close<IReadOnlyList<string>?>(null);
+        cancelButton.Click += (_, _) => dialog.Close(null);
 
         var buttons = new StackPanel
         {
@@ -2165,12 +2186,12 @@ public partial class MainWindow : Window
         };
 
         var applyButton = new Button { Content = "Export", MinWidth = 84 };
-        applyButton.Click += (_, _) => dialog.Close<ComponentPackExportOptions?>(new(
+        applyButton.Click += (_, _) => dialog.Close(new ComponentPackExportOptions(
             packNameEditor.Text ?? string.Empty,
             displayNameEditor.Text ?? string.Empty,
             namePrefixEditor.Text ?? string.Empty));
         var cancelButton = new Button { Content = "Cancel", MinWidth = 84 };
-        cancelButton.Click += (_, _) => dialog.Close<ComponentPackExportOptions?>(null);
+        cancelButton.Click += (_, _) => dialog.Close(null);
 
         var fields = new StackPanel
         {
@@ -2205,6 +2226,65 @@ public partial class MainWindow : Window
         return await dialog.ShowDialog<ComponentPackExportOptions?>(this);
     }
 
+    private async Task<IReadOnlyDictionary<string, string>?> ShowAppearanceEditorDialogAsync(
+        string controlName,
+        IReadOnlyDictionary<string, string> appearance)
+    {
+        var editors = new Dictionary<string, TextBox>(StringComparer.Ordinal);
+        var fields = new StackPanel { Spacing = 6 };
+        foreach (var pair in appearance)
+        {
+            var editor = new TextBox { Text = pair.Value };
+            editors[pair.Key] = editor;
+            fields.Children.Add(new TextBlock { Text = pair.Key });
+            fields.Children.Add(editor);
+        }
+
+        var dialog = new Window
+        {
+            Title = $"Edit Appearance - {controlName}",
+            Width = 500,
+            Height = Math.Clamp(190 + appearance.Count * 58, 280, 560),
+            MinWidth = 400,
+            MinHeight = 280,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner,
+        };
+        var applyButton = new Button { Content = "Apply", MinWidth = 84 };
+        applyButton.Click += (_, _) => dialog.Close(
+            editors
+                .Where(pair => !string.Equals(
+                    pair.Value.Text ?? string.Empty,
+                    appearance[pair.Key],
+                    StringComparison.Ordinal))
+                .ToDictionary(pair => pair.Key, pair => pair.Value.Text ?? string.Empty, StringComparer.Ordinal));
+        var cancelButton = new Button { Content = "Cancel", MinWidth = 84 };
+        cancelButton.Click += (_, _) => dialog.Close(null);
+        var buttons = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            Spacing = 8,
+            HorizontalAlignment = HorizontalAlignment.Right,
+            Children = { cancelButton, applyButton },
+        };
+        var help = new TextBlock
+        {
+            Text = "Brushes accept Avalonia values such as #2563EB. Leave a brush blank to clear it.",
+            TextWrapping = Avalonia.Media.TextWrapping.Wrap,
+        };
+        var content = new Grid
+        {
+            Margin = new Thickness(16),
+            RowDefinitions = new RowDefinitions("Auto,*,Auto"),
+            RowSpacing = 12,
+            Children = { help, fields, buttons },
+        };
+        Grid.SetRow(fields, 1);
+        Grid.SetRow(buttons, 2);
+        dialog.Content = content;
+
+        return await dialog.ShowDialog<IReadOnlyDictionary<string, string>?>(this);
+    }
+
     private async Task<string?> ShowTextEditorDialogAsync(string title, string content, string helpText, bool multiline = true)
     {
         var editor = new TextBox
@@ -2225,10 +2305,10 @@ public partial class MainWindow : Window
         };
 
         var applyButton = new Button { Content = "Apply", MinWidth = 84 };
-        applyButton.Click += (_, _) => dialog.Close<string?>(editor.Text ?? string.Empty);
+        applyButton.Click += (_, _) => dialog.Close(editor.Text ?? string.Empty);
 
         var cancelButton = new Button { Content = "Cancel", MinWidth = 84 };
-        cancelButton.Click += (_, _) => dialog.Close<string?>(null);
+        cancelButton.Click += (_, _) => dialog.Close(null);
 
         var buttons = new StackPanel
         {

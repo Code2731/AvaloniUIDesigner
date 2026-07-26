@@ -71,6 +71,8 @@
                 <MenuItem Header="Choose Image..." Click="OnChooseImageMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
                 <Separator/>
                 <MenuItem Header="Style" IsEnabled="{Binding Canvas.IsSelectionActive}">
+                    <MenuItem Header="Edit Appearance..." Click="OnEditAppearanceMenuClicked"/>
+                    <Separator/>
                     <MenuItem Header="Opacity 100%" Click="OnOpacity100MenuClicked"/>
                     <MenuItem Header="Opacity 75%" Click="OnOpacity75MenuClicked"/>
                     <MenuItem Header="Opacity 50%" Click="OnOpacity50MenuClicked"/>
@@ -143,7 +145,7 @@
                 </MenuItem>
                 <Separator/>
                 <MenuItem Header="Show Grid"
-                          IsCheckable="True"
+                          ToggleType="CheckBox"
                           IsChecked="{Binding Canvas.IsGridVisible, Mode=OneWay}"
                           Click="OnShowGridMenuClicked"/>
                 <MenuItem Header="Grid Size">
@@ -152,7 +154,7 @@
                     <MenuItem Header="16px" Click="OnGridSize16MenuClicked"/>
                 </MenuItem>
                 <MenuItem Header="Snap to Grid"
-                          IsCheckable="True"
+                          ToggleType="CheckBox"
                           IsChecked="{Binding Canvas.SnapToGrid, Mode=OneWay}"
                           Click="OnSnapToGridMenuClicked"/>
             </MenuItem>
@@ -229,7 +231,7 @@
                                     Background="#243078D7"
                                     BorderBrush="DodgerBlue"
                                     BorderThickness="2"
-                                    Panel.ZIndex="50"
+                                    ZIndex="50"
                                     IsHitTestVisible="False"
                                     IsVisible="False"/>
                             <TextBlock Text="{Binding Canvas.PlaceholderText}"
@@ -269,6 +271,7 @@
                                                     <MenuItem Header="Cut" Click="OnCutMenuClicked"/>
                                                     <MenuItem Header="Duplicate" Click="OnDuplicateMenuClicked"/>
                                                     <MenuItem Header="Rename..." Click="OnRenameSelectedControlMenuClicked"/>
+                                                    <MenuItem Header="Edit Appearance..." Click="OnEditAppearanceMenuClicked"/>
                                                     <MenuItem Header="Delete" Click="OnDeleteMenuClicked"/>
                                                     <Separator/>
                                                     <MenuItem Header="Lock / Unlock Selection" Click="OnToggleLockMenuClicked"/>

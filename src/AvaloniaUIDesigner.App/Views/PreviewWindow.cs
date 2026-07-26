@@ -70,7 +70,7 @@ public sealed class PreviewWindow : Window
 
     private static Control CreateControl(DesignerElementSnapshot snapshot)
     {
-        var control = snapshot.TypeName switch
+        Control control = snapshot.TypeName switch
         {
             "Avalonia.Controls.Button" => new Button { Content = "Button" },
             "Avalonia.Controls.TextBox" => new TextBox { Watermark = "Type here" },
@@ -161,6 +161,8 @@ public sealed class PreviewWindow : Window
         {
             control.Opacity = Math.Clamp(parsedOpacity, 0, 1);
         }
+
+        ApplyTemplatedAppearanceProperties(control, properties);
 
         if (properties.TryGetValue("__toolTip", out var toolTip))
         {
@@ -751,8 +753,63 @@ public sealed class PreviewWindow : Window
         }
     }
 
+    private static void ApplyTemplatedAppearanceProperties(
+        Control control,
+        IReadOnlyDictionary<string, string> properties)
+    {
+        if (control is not Avalonia.Controls.Primitives.TemplatedControl templated)
+        {
+            return;
+        }
+
+        if (properties.TryGetValue("Background", out var background))
+        {
+            TrySetBorderBrush(value => templated.Background = value, background);
+        }
+
+        if (properties.TryGetValue("Foreground", out var foreground))
+        {
+            TrySetBorderBrush(value => templated.Foreground = value, foreground);
+        }
+
+        if (properties.TryGetValue("BorderBrush", out var borderBrush))
+        {
+            TrySetBorderBrush(value => templated.BorderBrush = value, borderBrush);
+        }
+
+        if (properties.TryGetValue("BorderThickness", out var borderThickness))
+        {
+            try
+            {
+                templated.BorderThickness = Thickness.Parse(borderThickness);
+            }
+            catch (FormatException)
+            {
+                // Ignore malformed imported thickness values.
+            }
+        }
+
+        if (properties.TryGetValue("CornerRadius", out var cornerRadius))
+        {
+            try
+            {
+                templated.CornerRadius = CornerRadius.Parse(cornerRadius);
+            }
+            catch (FormatException)
+            {
+                // Ignore malformed imported corner-radius values.
+            }
+        }
+    }
+
     private static void TrySetBorderBrush(Action<IBrush?> applyBrush, string value)
     {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            applyBrush(null);
+            return;
+        }
+
         try
         {
             applyBrush(Brush.Parse(value));
@@ -800,7 +857,7 @@ public sealed class PreviewWindow : Window
         stackPanel.Children.Clear();
         foreach (var child in children)
         {
-            var control = child.TypeName switch
+            Control? control = child.TypeName switch
             {
                 "TextBlock" => new TextBlock { Text = child.Text ?? string.Empty },
                 "Button" => new Button { Content = child.Content ?? string.Empty },

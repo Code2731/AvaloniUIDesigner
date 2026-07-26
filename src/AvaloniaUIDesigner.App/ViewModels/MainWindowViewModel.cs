@@ -107,9 +107,9 @@ public partial class MainWindowViewModel : ViewModelBase
         if (item.IsPreset)
         {
             var elements = Canvas.PlacePreset(item, snappedX, snappedY);
-            foreach (var element in elements)
+            foreach (var presetElement in elements)
             {
-                ObjectTree.Add(element);
+                ObjectTree.Add(presetElement);
             }
 
             ObjectTree.SelectByElement(Canvas.SelectedElement);
@@ -205,7 +205,7 @@ public partial class MainWindowViewModel : ViewModelBase
         var properties = CaptureVisualProperties(target.Visual)
             ?.Where(pair => !pair.Key.StartsWith("__", StringComparison.Ordinal)
                 && !(target.Visual is Label && string.Equals(pair.Key, "Target", StringComparison.Ordinal)))
-            .ToDictionary(pair => pair.Key, pair => pair.Value, StringComparer.Ordinal);
+            .ToDictionary(pair => pair.Key, pair => (string?)pair.Value, StringComparer.Ordinal);
         var document = new ComponentPackDocument
         {
             Name = packName,
@@ -339,6 +339,104 @@ public partial class MainWindowViewModel : ViewModelBase
 
         CommitCanvasMutation();
         StatusText = $"Set opacity to {normalizedOpacity * 100:0}% for {targets.Count} control(s)";
+    }
+
+    public bool TryGetSelectedAppearance(
+        out string controlName,
+        out IReadOnlyDictionary<string, string> appearance)
+    {
+        if (Canvas.SelectedElement is not { IsLocked: false } target)
+        {
+            controlName = string.Empty;
+            appearance = new Dictionary<string, string>();
+            StatusText = "Select an unlocked control to edit its appearance.";
+            return false;
+        }
+
+        var values = new Dictionary<string, string>(StringComparer.Ordinal);
+        switch (target.Visual)
+        {
+            case Avalonia.Controls.Primitives.TemplatedControl templated:
+                values["Background"] = templated.Background?.ToString() ?? string.Empty;
+                values["Foreground"] = templated.Foreground?.ToString() ?? string.Empty;
+                values["BorderBrush"] = templated.BorderBrush?.ToString() ?? string.Empty;
+                values["BorderThickness"] = templated.BorderThickness.ToString();
+                values["CornerRadius"] = templated.CornerRadius.ToString();
+                break;
+
+            case Border border:
+                values["Background"] = border.Background?.ToString() ?? string.Empty;
+                values["BorderBrush"] = border.BorderBrush?.ToString() ?? string.Empty;
+                values["BorderThickness"] = border.BorderThickness.ToString();
+                values["CornerRadius"] = border.CornerRadius.ToString();
+                break;
+
+            case TextBlock textBlock:
+                values["Foreground"] = textBlock.Foreground?.ToString() ?? string.Empty;
+                break;
+
+            default:
+                controlName = string.Empty;
+                appearance = new Dictionary<string, string>();
+                StatusText = "The selected control does not expose editable appearance properties.";
+                return false;
+        }
+
+        controlName = target.DisplayName;
+        appearance = values;
+        return true;
+    }
+
+    public bool SetSelectedAppearance(IReadOnlyDictionary<string, string> appearance)
+    {
+        if (Canvas.SelectedElement is not { IsLocked: false } target)
+        {
+            StatusText = "Select an unlocked control to edit its appearance.";
+            return false;
+        }
+
+        if (target.Visual is not (Avalonia.Controls.Primitives.TemplatedControl or Border or TextBlock))
+        {
+            StatusText = "The selected control does not expose editable appearance properties.";
+            return false;
+        }
+
+        if (!TryReadOptionalBrush(appearance, "Background", out var hasBackground, out var background, out var error)
+            || !TryReadOptionalBrush(appearance, "Foreground", out var hasForeground, out var foreground, out error)
+            || !TryReadOptionalBrush(appearance, "BorderBrush", out var hasBorderBrush, out var borderBrush, out error)
+            || !TryReadThickness(appearance, "BorderThickness", out var hasBorderThickness, out var borderThickness, out error)
+            || !TryReadCornerRadius(appearance, "CornerRadius", out var hasCornerRadius, out var cornerRadius, out error))
+        {
+            StatusText = error;
+            return false;
+        }
+
+        BeginCanvasMutation(HistoryActionType.EditProperty, "Updated control appearance.");
+        switch (target.Visual)
+        {
+            case Avalonia.Controls.Primitives.TemplatedControl templated:
+                if (hasBackground) templated.Background = background;
+                if (hasForeground) templated.Foreground = foreground;
+                if (hasBorderBrush) templated.BorderBrush = borderBrush;
+                if (hasBorderThickness) templated.BorderThickness = borderThickness;
+                if (hasCornerRadius) templated.CornerRadius = cornerRadius;
+                break;
+
+            case Border border:
+                if (hasBackground) border.Background = background;
+                if (hasBorderBrush) border.BorderBrush = borderBrush;
+                if (hasBorderThickness) border.BorderThickness = borderThickness;
+                if (hasCornerRadius) border.CornerRadius = cornerRadius;
+                break;
+
+            case TextBlock textBlock:
+                if (hasForeground) textBlock.Foreground = foreground;
+                break;
+        }
+
+        CommitCanvasMutation();
+        StatusText = $"Updated appearance for {target.DisplayName}.";
+        return true;
     }
 
     public void SetSelectedTextSize(double fontSize)
@@ -1407,7 +1505,7 @@ public partial class MainWindowViewModel : ViewModelBase
         }
 
         sb.AppendLine($"  <Canvas Width=\"{settings.Width:0.###}\" Height=\"{settings.Height:0.###}\" Background=\"{EscapeXmlAttribute(settings.Background)}\">");
-        sb.AppendLine($"    <!-- {DesignerMetadataPrefix} GridSize={settings.GridSize.ToString(\"0.###\", CultureInfo.InvariantCulture)}; IsGridVisible={settings.IsGridVisible}; SnapToGrid={settings.SnapToGrid} -->");
+        sb.AppendLine($"    <!-- {DesignerMetadataPrefix} GridSize={settings.GridSize.ToString("0.###", CultureInfo.InvariantCulture)}; IsGridVisible={settings.IsGridVisible}; SnapToGrid={settings.SnapToGrid} -->");
 
         foreach (var element in Canvas.Elements)
         {
@@ -1483,6 +1581,16 @@ public partial class MainWindowViewModel : ViewModelBase
             {
                 result = "Validation failed: exported control lock states do not match.";
                 return false;
+            }
+
+            var current = CaptureDocument();
+            for (var index = 0; index < current.Elements.Count; index++)
+            {
+                if (!HaveSameAppearance(current.Elements[index], parsed.Elements[index]))
+                {
+                    result = $"Validation failed: appearance properties do not round-trip for {current.Elements[index].DisplayName}.";
+                    return false;
+                }
             }
 
             var userControlWarnings = new List<string>();
@@ -1756,6 +1864,7 @@ public partial class MainWindowViewModel : ViewModelBase
         var result = properties is null
             ? new Dictionary<string, string>(StringComparer.Ordinal)
             : new Dictionary<string, string>(properties, StringComparer.Ordinal);
+        CaptureCommonAppearanceProperties(result, visual);
         if (!string.IsNullOrWhiteSpace(toolTip))
         {
             result["__toolTip"] = toolTip;
@@ -1786,6 +1895,42 @@ public partial class MainWindowViewModel : ViewModelBase
         }
 
         return result;
+    }
+
+    private static void CaptureCommonAppearanceProperties(IDictionary<string, string> properties, Control visual)
+    {
+        if (visual is not Avalonia.Controls.Primitives.TemplatedControl templated)
+        {
+            return;
+        }
+
+        if (templated.IsSet(Avalonia.Controls.Primitives.TemplatedControl.BackgroundProperty)
+            && templated.Background is { } background)
+        {
+            properties["Background"] = background.ToString() ?? string.Empty;
+        }
+
+        if (templated.IsSet(Avalonia.Controls.Primitives.TemplatedControl.ForegroundProperty)
+            && templated.Foreground is { } foreground)
+        {
+            properties["Foreground"] = foreground.ToString() ?? string.Empty;
+        }
+
+        if (templated.IsSet(Avalonia.Controls.Primitives.TemplatedControl.BorderBrushProperty)
+            && templated.BorderBrush is { } borderBrush)
+        {
+            properties["BorderBrush"] = borderBrush.ToString() ?? string.Empty;
+        }
+
+        if (templated.IsSet(Avalonia.Controls.Primitives.TemplatedControl.BorderThicknessProperty))
+        {
+            properties["BorderThickness"] = templated.BorderThickness.ToString();
+        }
+
+        if (templated.IsSet(Avalonia.Controls.Primitives.TemplatedControl.CornerRadiusProperty))
+        {
+            properties["CornerRadius"] = templated.CornerRadius.ToString();
+        }
     }
 
     private static IReadOnlyDictionary<string, string>? CaptureVisualPropertiesCore(Control visual)
@@ -2155,6 +2300,34 @@ public partial class MainWindowViewModel : ViewModelBase
         return true;
     }
 
+    private static bool HaveSameAppearance(DesignerElementSnapshot expected, DesignerElementSnapshot actual)
+    {
+        foreach (var propertyName in new[]
+        {
+            "Background",
+            "Foreground",
+            "BorderBrush",
+            "BorderThickness",
+            "CornerRadius",
+        })
+        {
+            var expectedValue = ReadSnapshotProperty(expected, propertyName);
+            var actualValue = ReadSnapshotProperty(actual, propertyName);
+            if (!string.Equals(expectedValue, actualValue, StringComparison.Ordinal))
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private static string? ReadSnapshotProperty(DesignerElementSnapshot snapshot, string propertyName)
+        => snapshot.VisualProperties is not null
+            && snapshot.VisualProperties.TryGetValue(propertyName, out var value)
+                ? value
+                : null;
+
     private DesignerCanvasDocument ParseDraftDocument(string axaml, ICollection<string> warnings)
     {
         var doc = XDocument.Parse(axaml);
@@ -2461,6 +2634,12 @@ public partial class MainWindowViewModel : ViewModelBase
             return true;
         }
 
+        if (propertyName is "Background" or "Foreground" or "BorderBrush" or "BorderThickness" or "CornerRadius"
+            && SupportsTemplatedAppearance(tagName))
+        {
+            return true;
+        }
+
         return tagName switch
         {
             "Button" => propertyName == "Content",
@@ -2486,6 +2665,12 @@ public partial class MainWindowViewModel : ViewModelBase
             _ => false,
         };
     }
+
+    private static bool SupportsTemplatedAppearance(string tagName)
+        => tagName is "Button" or "TextBox" or "Label" or "CheckBox" or "RadioButton"
+            or "ToggleSwitch" or "ToggleButton" or "ComboBox" or "ListBox" or "Slider"
+            or "ProgressBar" or "DatePicker" or "CalendarDatePicker" or "TimePicker"
+            or "NumericUpDown" or "TabControl" or "Expander" or "ScrollViewer";
 
     private static string FormatWarnings(IReadOnlyCollection<string> warnings)
     {
@@ -2723,6 +2908,87 @@ public partial class MainWindowViewModel : ViewModelBase
         return candidate;
     }
 
+    private static bool TryReadOptionalBrush(
+        IReadOnlyDictionary<string, string> values,
+        string propertyName,
+        out bool hasValue,
+        out IBrush? brush,
+        out string error)
+    {
+        hasValue = values.TryGetValue(propertyName, out var rawValue);
+        brush = null;
+        error = string.Empty;
+        if (!hasValue || string.IsNullOrWhiteSpace(rawValue))
+        {
+            return true;
+        }
+
+        try
+        {
+            brush = Brush.Parse(rawValue);
+            return true;
+        }
+        catch (FormatException)
+        {
+            error = $"{propertyName} must be a valid Avalonia brush, for example #2563EB.";
+            return false;
+        }
+    }
+
+    private static bool TryReadThickness(
+        IReadOnlyDictionary<string, string> values,
+        string propertyName,
+        out bool hasValue,
+        out Thickness thickness,
+        out string error)
+    {
+        hasValue = values.TryGetValue(propertyName, out var rawValue);
+        thickness = default;
+        error = string.Empty;
+        if (!hasValue || string.IsNullOrWhiteSpace(rawValue))
+        {
+            return true;
+        }
+
+        try
+        {
+            thickness = Thickness.Parse(rawValue);
+            return true;
+        }
+        catch (FormatException)
+        {
+            error = $"{propertyName} must use one, two, or four numeric values.";
+            return false;
+        }
+    }
+
+    private static bool TryReadCornerRadius(
+        IReadOnlyDictionary<string, string> values,
+        string propertyName,
+        out bool hasValue,
+        out CornerRadius cornerRadius,
+        out string error)
+    {
+        hasValue = values.TryGetValue(propertyName, out var rawValue);
+        cornerRadius = default;
+        error = string.Empty;
+        if (!hasValue || string.IsNullOrWhiteSpace(rawValue))
+        {
+            return true;
+        }
+
+        try
+        {
+            cornerRadius = CornerRadius.Parse(rawValue);
+            return true;
+        }
+        catch (FormatException)
+        {
+            error = $"{propertyName} must use one or four numeric values.";
+            return false;
+        }
+    }
+
     private static bool IsValidControlName(string name)
     {
         if (string.IsNullOrWhiteSpace(name) || !(char.IsLetter(name[0]) || name[0] == '_'))
@@ -2893,7 +3159,7 @@ public partial class MainWindowViewModel : ViewModelBase
     {
         switch (element.Visual)
         {
-            case Button button:
+            case Button button when button is not Avalonia.Controls.Primitives.ToggleButton:
                 sb.Append(indent);
                 sb.Append("<Button");
                 AppendCanvasLayoutAttributes(sb, element);
@@ -3090,9 +3356,9 @@ public partial class MainWindowViewModel : ViewModelBase
                 sb.Append(indent);
                 sb.Append("<CalendarDatePicker");
                 AppendCanvasLayoutAttributes(sb, element);
-                if (calendarDatePicker.SelectedDate is { } selectedDate)
+                if (calendarDatePicker.SelectedDate is { } calendarSelectedDate)
                 {
-                    AppendAttribute(sb, "SelectedDate", selectedDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture));
+                    AppendAttribute(sb, "SelectedDate", calendarSelectedDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture));
                 }
 
                 if (!string.IsNullOrWhiteSpace(calendarDatePicker.Watermark))
@@ -3317,6 +3583,7 @@ public partial class MainWindowViewModel : ViewModelBase
         AppendAttribute(sb, "Width", element.Width.ToString("0.###", CultureInfo.InvariantCulture));
         AppendAttribute(sb, "Height", element.Height.ToString("0.###", CultureInfo.InvariantCulture));
         AppendAttribute(sb, "Opacity", element.Visual.Opacity.ToString("0.###", CultureInfo.InvariantCulture));
+        AppendCommonAppearanceAttributes(sb, element.Visual);
         if (ToolTip.GetTip(element.Visual) is { } toolTip && !string.IsNullOrWhiteSpace(toolTip.ToString()))
         {
             AppendAttribute(sb, "ToolTip.Tip", toolTip.ToString() ?? string.Empty);
@@ -3340,6 +3607,42 @@ public partial class MainWindowViewModel : ViewModelBase
 
         AppendAttribute(sb, "TabIndex", element.Visual.TabIndex.ToString(CultureInfo.InvariantCulture));
         AppendAttribute(sb, "IsTabStop", element.Visual.IsTabStop.ToString());
+    }
+
+    private static void AppendCommonAppearanceAttributes(StringBuilder sb, Control visual)
+    {
+        if (visual is not Avalonia.Controls.Primitives.TemplatedControl templated)
+        {
+            return;
+        }
+
+        if (templated.IsSet(Avalonia.Controls.Primitives.TemplatedControl.BackgroundProperty)
+            && templated.Background is { } background)
+        {
+            AppendAttribute(sb, "Background", background.ToString() ?? string.Empty);
+        }
+
+        if (templated.IsSet(Avalonia.Controls.Primitives.TemplatedControl.ForegroundProperty)
+            && templated.Foreground is { } foreground)
+        {
+            AppendAttribute(sb, "Foreground", foreground.ToString() ?? string.Empty);
+        }
+
+        if (templated.IsSet(Avalonia.Controls.Primitives.TemplatedControl.BorderBrushProperty)
+            && templated.BorderBrush is { } borderBrush)
+        {
+            AppendAttribute(sb, "BorderBrush", borderBrush.ToString() ?? string.Empty);
+        }
+
+        if (templated.IsSet(Avalonia.Controls.Primitives.TemplatedControl.BorderThicknessProperty))
+        {
+            AppendAttribute(sb, "BorderThickness", templated.BorderThickness.ToString());
+        }
+
+        if (templated.IsSet(Avalonia.Controls.Primitives.TemplatedControl.CornerRadiusProperty))
+        {
+            AppendAttribute(sb, "CornerRadius", templated.CornerRadius.ToString());
+        }
     }
 
     private static void AppendTextForegroundAttribute(StringBuilder sb, TextBlock textBlock)
