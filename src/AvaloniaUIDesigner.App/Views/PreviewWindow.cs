@@ -452,6 +452,7 @@ public sealed class PreviewWindow : Window
         DesignerInteractionRuntime.Apply(control, properties);
         DesignerEffectRuntime.Apply(control, properties);
         DesignerRangeRuntime.Apply(control, properties);
+        DesignerTextInputRuntime.Apply(control, properties);
         ApplyTemplatedAppearanceProperties(control, properties, colorResources);
 
         switch (control)
@@ -461,40 +462,6 @@ public sealed class PreviewWindow : Window
                 break;
             case Button button when properties.TryGetValue("Content", out var content):
                 button.Content = content;
-                break;
-            case TextBox textBox:
-                if (properties.TryGetValue("PasswordChar", out var passwordChar))
-                {
-                    textBox.PasswordChar = string.IsNullOrEmpty(passwordChar) ? '\0' : passwordChar[0];
-                }
-
-                if (properties.TryGetValue("RevealPassword", out var revealPassword)
-                    && bool.TryParse(revealPassword, out var parsedRevealPassword))
-                {
-                    textBox.RevealPassword = parsedRevealPassword;
-                }
-
-                if (properties.TryGetValue("AcceptsReturn", out var acceptsReturn)
-                    && bool.TryParse(acceptsReturn, out var parsedAcceptsReturn))
-                {
-                    textBox.AcceptsReturn = parsedAcceptsReturn;
-                }
-
-                if (properties.TryGetValue("TextWrapping", out var textWrapping)
-                    && Enum.TryParse<TextWrapping>(textWrapping, ignoreCase: true, out var parsedTextWrapping))
-                {
-                    textBox.TextWrapping = parsedTextWrapping;
-                }
-
-                if (textBox.PasswordChar == '\0' && properties.TryGetValue("Text", out var text))
-                {
-                    textBox.Text = text;
-                }
-
-                if (properties.TryGetValue("Watermark", out var watermark))
-                {
-                    textBox.Watermark = watermark;
-                }
                 break;
             case TextBlock textBlock:
                 if (properties.TryGetValue("Text", out var textBlockText))

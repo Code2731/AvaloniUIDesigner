@@ -151,6 +151,26 @@ public sealed record RangeEditorState(
     bool ShowButtonSpinner,
     string ButtonSpinnerLocation);
 
+public sealed record TextInputEditorState(
+    string ControlName,
+    string Text,
+    string Watermark,
+    bool AcceptsReturn,
+    bool AcceptsTab,
+    string TextWrapping,
+    string TextAlignment,
+    bool IsReadOnly,
+    string MaxLength,
+    string MinLines,
+    string MaxLines,
+    string PasswordChar,
+    bool RevealPassword,
+    bool UseFloatingWatermark,
+    bool IsUndoEnabled,
+    string UndoLimit,
+    bool ClearSelectionOnLostFocus,
+    bool IsInactiveSelectionHighlightEnabled);
+
 public sealed record GridDefinitionEditorState(
     string ControlName,
     string RowDefinitions,
@@ -1279,6 +1299,9 @@ public partial class MainWindowViewModel : ViewModelBase
             var textBox = (TextBox)target.Visual;
             textBox.AcceptsReturn = enableMultiline;
             textBox.TextWrapping = enableMultiline ? TextWrapping.Wrap : TextWrapping.NoWrap;
+            DesignerStyleApplicationMetadata.ClearApplied(textBox, "AcceptsReturn");
+            DesignerStyleApplicationMetadata.ClearApplied(textBox, "TextWrapping");
+            Canvas.RefreshDocumentStyles(textBox);
         }
 
         CommitCanvasMutation();
@@ -3836,6 +3859,96 @@ public partial class MainWindowViewModel : ViewModelBase
     private static string FormatRangeValue(decimal value)
         => value.ToString(CultureInfo.InvariantCulture);
 
+    public bool TryGetSelectedTextInputProperties(out TextInputEditorState state)
+    {
+        var target = Canvas.SelectedElement;
+        if (target is null || target.IsLocked || target.Visual is not TextBox)
+        {
+            state = default!;
+            StatusText = target switch
+            {
+                null => "Select a TextBox before editing text input properties.",
+                { IsLocked: true } => "Unlock the selected TextBox before editing text input properties.",
+                _ => "Text input editing is available for TextBox controls.",
+            };
+            return false;
+        }
+
+        if (!DesignerTextInputRuntime.TryRead(target.Visual, out var values, out var error))
+        {
+            state = default!;
+            StatusText = $"Text input properties cannot be edited. {error}";
+            return false;
+        }
+
+        state = CreateTextInputEditorState(target.DisplayName, values);
+        return true;
+    }
+
+    public bool SetSelectedTextInputProperties(DesignerTextInputEditorInput input)
+    {
+        var target = Canvas.SelectedElement;
+        if (target is null || target.IsLocked || target.Visual is not TextBox)
+        {
+            StatusText = "Select an unlocked TextBox before editing text input properties.";
+            return false;
+        }
+
+        if (!DesignerTextInputRuntime.TryParseValues(input, out var values, out var error))
+        {
+            StatusText = $"Text input properties were not changed. {error}";
+            return false;
+        }
+
+        if (!DesignerTextInputRuntime.TryRead(target.Visual, out var current, out error))
+        {
+            StatusText = $"Text input properties were not changed. {error}";
+            return false;
+        }
+
+        if (current == values)
+        {
+            StatusText = "Text input properties are unchanged.";
+            return true;
+        }
+
+        BeginCanvasMutation(HistoryActionType.EditProperty, "Updated text input properties.");
+        DesignerTextInputRuntime.Apply(target.Visual, values);
+        DesignerStyleApplicationMetadata.ClearApplied(target.Visual, "Text");
+        foreach (var attribute in DesignerTextInputRuntime.GetAxamlAttributes(target.Visual))
+        {
+            DesignerStyleApplicationMetadata.ClearApplied(target.Visual, attribute.Name);
+        }
+
+        Canvas.RefreshDocumentStyles(target.Visual);
+        CommitCanvasMutation();
+        StatusText = $"Updated text input properties for {target.DisplayName}.";
+        return true;
+    }
+
+    private static TextInputEditorState CreateTextInputEditorState(
+        string controlName,
+        DesignerTextInputValues values)
+        => new(
+            controlName,
+            values.Text,
+            values.Watermark,
+            values.AcceptsReturn,
+            values.AcceptsTab,
+            values.TextWrapping.ToString(),
+            values.TextAlignment.ToString(),
+            values.IsReadOnly,
+            values.MaxLength.ToString(CultureInfo.InvariantCulture),
+            values.MinLines.ToString(CultureInfo.InvariantCulture),
+            values.MaxLines.ToString(CultureInfo.InvariantCulture),
+            values.PasswordChar,
+            values.RevealPassword,
+            values.UseFloatingWatermark,
+            values.IsUndoEnabled,
+            values.UndoLimit.ToString(CultureInfo.InvariantCulture),
+            values.ClearSelectionOnLostFocus,
+            values.IsInactiveSelectionHighlightEnabled);
+
     public bool TryGetSelectedToolTip(out string controlName, out string toolTip)
     {
         var target = Canvas.SelectedElement;
@@ -5457,6 +5570,7 @@ public partial class MainWindowViewModel : ViewModelBase
         DesignerInteractionRuntime.Capture(visual, result);
         DesignerEffectRuntime.Capture(visual, result);
         DesignerRangeRuntime.Capture(visual, result);
+        DesignerTextInputRuntime.Capture(visual, result);
         foreach (var pair in DesignerResourceReferenceMetadata.GetReferences(visual))
         {
             result[pair.Key] = DesignerResourceReferenceMetadata.FormatExpression(pair.Value);
@@ -7166,6 +7280,25 @@ public partial class MainWindowViewModel : ViewModelBase
                 continue;
             }
 
+            if (DesignerTextInputRuntime.IsSupportedProperty(tagName, name))
+            {
+                if (DesignerTextInputRuntime.TryNormalizeProperty(
+                        name,
+                        attr.Value,
+                        out var canonicalName,
+                        out var normalizedValue,
+                        out var textInputError))
+                {
+                    map[canonicalName] = normalizedValue;
+                }
+                else
+                {
+                    warnings.Add($"Ignored {tagName}.{name}: {textInputError}");
+                }
+
+                continue;
+            }
+
             if (DesignerTypographyRuntime.IsSupportedProperty(tagName, name))
             {
                 if (DesignerTypographyRuntime.TryNormalizeProperty(
@@ -7248,6 +7381,13 @@ public partial class MainWindowViewModel : ViewModelBase
         {
             warnings.Add($"Ignored {tagName} range properties: {rangeConstraintError}");
             DesignerRangeRuntime.RemoveProperties(tagName, map);
+        }
+
+        if (string.Equals(tagName, "TextBox", StringComparison.OrdinalIgnoreCase)
+            && !DesignerTextInputRuntime.TryValidateProperties(map, out var textInputConstraintError))
+        {
+            warnings.Add($"Ignored TextBox line constraints: {textInputConstraintError}");
+            DesignerTextInputRuntime.RemoveLineProperties(map);
         }
 
         if (string.Equals(element.Name.LocalName, "Grid", StringComparison.OrdinalIgnoreCase))
@@ -7347,7 +7487,11 @@ public partial class MainWindowViewModel : ViewModelBase
         return tagName switch
         {
             "Button" => propertyName == "Content",
-            "TextBox" => propertyName is "Text" or "Watermark" or "PasswordChar" or "RevealPassword" or "AcceptsReturn" or "TextWrapping",
+            "TextBox" => propertyName is "Text" or "Watermark" or "PasswordChar"
+                or "RevealPassword" or "AcceptsReturn" or "AcceptsTab" or "TextWrapping"
+                or "TextAlignment" or "IsReadOnly" or "MaxLength" or "MinLines"
+                or "MaxLines" or "UseFloatingWatermark" or "IsUndoEnabled" or "UndoLimit"
+                or "ClearSelectionOnLostFocus" or "IsInactiveSelectionHighlightEnabled",
             "TextBlock" => propertyName is "Text" or "FontSize" or "FontWeight" or "Background" or "Foreground",
             "Label" => propertyName is "Content" or "Target",
             "Image" => propertyName is "Source" or "Stretch",
@@ -8524,27 +8668,7 @@ public partial class MainWindowViewModel : ViewModelBase
                 sb.Append(indent);
                 sb.Append("<TextBox");
                 AppendCanvasLayoutAttributes(sb, element);
-                if (textBox.PasswordChar == '\0')
-                {
-                    AppendAttribute(sb, "Text", textBox.Text ?? string.Empty);
-                }
-
-                if (!string.IsNullOrWhiteSpace(textBox.Watermark?.ToString()))
-                {
-                    AppendAttribute(sb, "Watermark", textBox.Watermark?.ToString() ?? string.Empty);
-                }
-
-                if (textBox.PasswordChar != '\0')
-                {
-                    AppendAttribute(sb, "PasswordChar", textBox.PasswordChar.ToString());
-                }
-
-                if (textBox.RevealPassword)
-                {
-                    AppendAttribute(sb, "RevealPassword", bool.TrueString);
-                }
-
-                AppendAttribute(sb, "AcceptsReturn", textBox.AcceptsReturn.ToString());
+                AppendTextInputAttributes(sb, textBox, skipBoundProperties: true);
                 sb.AppendLine(" />");
                 break;
 
@@ -9208,29 +9332,7 @@ public partial class MainWindowViewModel : ViewModelBase
             case TextBox textBox:
                 sb.Append(indent);
                 sb.Append("<TextBox");
-                if (textBox.PasswordChar == '\0')
-                {
-                    AppendAttribute(sb, "Text", textBox.Text ?? string.Empty);
-                }
-
-                if (!string.IsNullOrWhiteSpace(textBox.Watermark?.ToString()))
-                {
-                    AppendAttribute(sb, "Watermark", textBox.Watermark?.ToString() ?? string.Empty);
-                }
-
-                if (textBox.PasswordChar != '\0')
-                {
-                    AppendAttribute(sb, "PasswordChar", textBox.PasswordChar.ToString());
-                }
-
-                if (textBox.RevealPassword)
-                {
-                    AppendAttribute(sb, "RevealPassword", bool.TrueString);
-                }
-
-                AppendAttribute(sb, "AcceptsReturn", textBox.AcceptsReturn.ToString());
-                AppendAttribute(sb, "TextWrapping", textBox.TextWrapping.ToString());
-
+                AppendTextInputAttributes(sb, textBox, skipBoundProperties: false);
                 sb.AppendLine(" />");
                 break;
 
@@ -9943,6 +10045,27 @@ public partial class MainWindowViewModel : ViewModelBase
         foreach (var attribute in DesignerRangeRuntime.GetAxamlAttributes(visual))
         {
             if (!boundProperties.Contains(attribute.Name))
+            {
+                AppendAttribute(sb, attribute.Name, attribute.Value);
+            }
+        }
+    }
+
+    private static void AppendTextInputAttributes(
+        StringBuilder sb,
+        TextBox textBox,
+        bool skipBoundProperties)
+    {
+        var boundProperties = skipBoundProperties
+            ? DesignerBindingRuntime.ReadBindings(textBox)
+                .Select(binding => binding.PropertyName)
+                .ToHashSet(StringComparer.OrdinalIgnoreCase)
+            : [];
+        foreach (var attribute in DesignerTextInputRuntime.GetAxamlAttributes(textBox))
+        {
+            var isWrittenByCommonTypography = skipBoundProperties
+                && attribute.Name is "TextWrapping" or "TextAlignment";
+            if (!boundProperties.Contains(attribute.Name) && !isWrittenByCommonTypography)
             {
                 AppendAttribute(sb, attribute.Name, attribute.Value);
             }

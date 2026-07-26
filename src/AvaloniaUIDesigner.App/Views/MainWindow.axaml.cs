@@ -716,6 +716,19 @@ public partial class MainWindow : Window
         await ShowRangePropertiesDialogAsync(state);
     }
 
+    private async void OnEditTextInputPropertiesMenuClicked(
+        object? sender,
+        Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        FlushPendingPropertyHistory();
+        if (Vm is null || !Vm.TryGetSelectedTextInputProperties(out var state))
+        {
+            return;
+        }
+
+        await ShowTextInputPropertiesDialogAsync(state);
+    }
+
     private async void OnEditGridDefinitionsMenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
         FlushPendingPropertyHistory();
@@ -3822,6 +3835,241 @@ public partial class MainWindow : Window
                 ColumnSpacing = 12,
                 RowSpacing = 10,
             };
+
+        static void AddField(Grid owner, string label, Control editor, int row, int column)
+        {
+            var field = new StackPanel
+            {
+                Spacing = 4,
+                Children =
+                {
+                    new TextBlock { Text = label },
+                    editor,
+                },
+            };
+            Grid.SetRow(field, row);
+            Grid.SetColumn(field, column);
+            owner.Children.Add(field);
+        }
+    }
+
+    private async Task ShowTextInputPropertiesDialogAsync(TextInputEditorState state)
+    {
+        if (Vm is null)
+        {
+            return;
+        }
+
+        var textEditor = new TextBox
+        {
+            Text = state.Text,
+            AcceptsReturn = true,
+            TextWrapping = Avalonia.Media.TextWrapping.Wrap,
+            MinHeight = 82,
+            Watermark = "Design-time text",
+        };
+        var watermarkEditor = new TextBox { Text = state.Watermark };
+        var wrappingEditor = new ComboBox
+        {
+            ItemsSource = DesignerTextInputRuntime.TextWrappingNames,
+            SelectedItem = state.TextWrapping,
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+        };
+        var alignmentEditor = new ComboBox
+        {
+            ItemsSource = DesignerTextInputRuntime.TextAlignmentNames,
+            SelectedItem = state.TextAlignment,
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+        };
+        var maxLengthEditor = new TextBox { Text = state.MaxLength, Watermark = "0 = unlimited" };
+        var minLinesEditor = new TextBox { Text = state.MinLines, Watermark = "0 = automatic" };
+        var maxLinesEditor = new TextBox { Text = state.MaxLines, Watermark = "0 = automatic" };
+        var passwordCharEditor = new TextBox
+        {
+            Text = state.PasswordChar,
+            MaxLength = 1,
+            Watermark = "Blank or one character",
+        };
+        var undoLimitEditor = new TextBox { Text = state.UndoLimit };
+        var acceptsReturnEditor = new CheckBox
+        {
+            Content = "Accept Return",
+            IsChecked = state.AcceptsReturn,
+        };
+        var acceptsTabEditor = new CheckBox
+        {
+            Content = "Accept Tab",
+            IsChecked = state.AcceptsTab,
+        };
+        var readOnlyEditor = new CheckBox
+        {
+            Content = "Read only",
+            IsChecked = state.IsReadOnly,
+        };
+        var revealPasswordEditor = new CheckBox
+        {
+            Content = "Reveal password",
+            IsChecked = state.RevealPassword,
+        };
+        var floatingWatermarkEditor = new CheckBox
+        {
+            Content = "Floating watermark",
+            IsChecked = state.UseFloatingWatermark,
+        };
+        var undoEnabledEditor = new CheckBox
+        {
+            Content = "Enable undo",
+            IsChecked = state.IsUndoEnabled,
+        };
+        var clearSelectionEditor = new CheckBox
+        {
+            Content = "Clear selection on lost focus",
+            IsChecked = state.ClearSelectionOnLostFocus,
+        };
+        var inactiveHighlightEditor = new CheckBox
+        {
+            Content = "Highlight inactive selection",
+            IsChecked = state.IsInactiveSelectionHighlightEnabled,
+        };
+
+        void RefreshPasswordMode()
+        {
+            var isPassword = !string.IsNullOrEmpty(passwordCharEditor.Text);
+            textEditor.IsEnabled = !isPassword;
+            revealPasswordEditor.IsEnabled = isPassword;
+            if (isPassword)
+            {
+                textEditor.Watermark = "Password text is not stored by the designer";
+            }
+            else
+            {
+                textEditor.Watermark = "Design-time text";
+            }
+        }
+
+        passwordCharEditor.TextChanged += (_, _) => RefreshPasswordMode();
+        RefreshPasswordMode();
+
+        var primaryFields = new Grid
+        {
+            ColumnDefinitions = new ColumnDefinitions("2*,*"),
+            RowDefinitions = new RowDefinitions("Auto,Auto"),
+            ColumnSpacing = 12,
+            RowSpacing = 10,
+        };
+        AddField(primaryFields, "Design text", textEditor, 0, 0);
+        AddField(primaryFields, "Watermark", watermarkEditor, 0, 1);
+        AddField(primaryFields, "Text wrapping", wrappingEditor, 1, 0);
+        AddField(primaryFields, "Text alignment", alignmentEditor, 1, 1);
+
+        var limitsFields = new Grid
+        {
+            ColumnDefinitions = new ColumnDefinitions("*,*,*"),
+            RowDefinitions = new RowDefinitions("Auto,Auto"),
+            ColumnSpacing = 12,
+            RowSpacing = 10,
+        };
+        AddField(limitsFields, "Max length", maxLengthEditor, 0, 0);
+        AddField(limitsFields, "Min lines", minLinesEditor, 0, 1);
+        AddField(limitsFields, "Max lines", maxLinesEditor, 0, 2);
+        AddField(limitsFields, "Password character", passwordCharEditor, 1, 0);
+        AddField(limitsFields, "Undo limit", undoLimitEditor, 1, 1);
+
+        var switches = new WrapPanel
+        {
+            Orientation = Orientation.Horizontal,
+            ItemSpacing = 16,
+            LineSpacing = 8,
+            Children =
+            {
+                acceptsReturnEditor,
+                acceptsTabEditor,
+                readOnlyEditor,
+                revealPasswordEditor,
+                floatingWatermarkEditor,
+                undoEnabledEditor,
+                clearSelectionEditor,
+                inactiveHighlightEditor,
+            },
+        };
+        var errorText = new TextBlock
+        {
+            Foreground = Avalonia.Media.Brushes.IndianRed,
+            TextWrapping = Avalonia.Media.TextWrapping.Wrap,
+        };
+        var dialog = new Window
+        {
+            Title = $"Edit Text Input - {state.ControlName}",
+            Width = 780,
+            Height = 690,
+            MinWidth = 640,
+            MinHeight = 580,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner,
+        };
+        var applyButton = new Button { Content = "Apply", MinWidth = 84 };
+        applyButton.Click += (_, _) =>
+        {
+            var input = new DesignerTextInputEditorInput(
+                textEditor.Text ?? string.Empty,
+                watermarkEditor.Text ?? string.Empty,
+                acceptsReturnEditor.IsChecked == true,
+                acceptsTabEditor.IsChecked == true,
+                wrappingEditor.SelectedItem?.ToString() ?? string.Empty,
+                alignmentEditor.SelectedItem?.ToString() ?? string.Empty,
+                readOnlyEditor.IsChecked == true,
+                maxLengthEditor.Text ?? string.Empty,
+                minLinesEditor.Text ?? string.Empty,
+                maxLinesEditor.Text ?? string.Empty,
+                passwordCharEditor.Text ?? string.Empty,
+                revealPasswordEditor.IsChecked == true,
+                floatingWatermarkEditor.IsChecked == true,
+                undoEnabledEditor.IsChecked == true,
+                undoLimitEditor.Text ?? string.Empty,
+                clearSelectionEditor.IsChecked == true,
+                inactiveHighlightEditor.IsChecked == true);
+            if (!Vm.SetSelectedTextInputProperties(input))
+            {
+                errorText.Text = Vm.StatusText;
+                return;
+            }
+
+            dialog.Close();
+        };
+        var cancelButton = new Button { Content = "Cancel", MinWidth = 84 };
+        cancelButton.Click += (_, _) => dialog.Close();
+        var buttons = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            Spacing = 8,
+            HorizontalAlignment = HorizontalAlignment.Right,
+            Children = { cancelButton, applyButton },
+        };
+        var content = new Grid
+        {
+            Margin = new Thickness(16),
+            RowDefinitions = new RowDefinitions("Auto,Auto,Auto,Auto,*,Auto,Auto"),
+            RowSpacing = 12,
+            Children =
+            {
+                new TextBlock
+                {
+                    Text = "Configure TextBox input, line limits, password behavior, undo, and selection policies. A password character suppresses design text from snapshots and AXAML.",
+                    TextWrapping = Avalonia.Media.TextWrapping.Wrap,
+                },
+                primaryFields,
+                limitsFields,
+                switches,
+                errorText,
+                buttons,
+            },
+        };
+        Grid.SetRow(primaryFields, 1);
+        Grid.SetRow(limitsFields, 2);
+        Grid.SetRow(switches, 3);
+        Grid.SetRow(errorText, 5);
+        Grid.SetRow(buttons, 6);
+        dialog.Content = content;
+        await dialog.ShowDialog(this);
 
         static void AddField(Grid owner, string label, Control editor, int row, int column)
         {

@@ -2134,6 +2134,7 @@ public partial class CanvasViewModel : ViewModelBase
         DesignerInteractionRuntime.Apply(visual, properties);
         DesignerEffectRuntime.Apply(visual, properties);
         DesignerRangeRuntime.Apply(visual, properties);
+        DesignerTextInputRuntime.Apply(visual, properties);
         ApplyTemplatedAppearanceProperties(visual, properties);
 
         if (visual is Shape shape)
@@ -2153,44 +2154,6 @@ public partial class CanvasViewModel : ViewModelBase
                 && !string.IsNullOrWhiteSpace(clickHandler))
             {
                 button.Tag = new ButtonClickHandlerMetadata(clickHandler);
-            }
-
-            return;
-        }
-
-        if (visual is TextBox textBox)
-        {
-            if (properties.TryGetValue("PasswordChar", out var passwordChar))
-            {
-                textBox.PasswordChar = string.IsNullOrEmpty(passwordChar) ? '\0' : passwordChar[0];
-            }
-
-            if (properties.TryGetValue("RevealPassword", out var revealPassword)
-                && bool.TryParse(revealPassword, out var parsedRevealPassword))
-            {
-                textBox.RevealPassword = parsedRevealPassword;
-            }
-
-            if (properties.TryGetValue("AcceptsReturn", out var acceptsReturn)
-                && bool.TryParse(acceptsReturn, out var parsedAcceptsReturn))
-            {
-                textBox.AcceptsReturn = parsedAcceptsReturn;
-            }
-
-            if (properties.TryGetValue("TextWrapping", out var textWrapping)
-                && Enum.TryParse<TextWrapping>(textWrapping, ignoreCase: true, out var parsedTextWrapping))
-            {
-                textBox.TextWrapping = parsedTextWrapping;
-            }
-
-            if (textBox.PasswordChar == '\0' && properties.TryGetValue("Text", out var text))
-            {
-                textBox.Text = text;
-            }
-
-            if (properties.TryGetValue("Watermark", out var watermark))
-            {
-                textBox.Watermark = watermark;
             }
 
             return;
