@@ -31,6 +31,7 @@ public partial class MainWindowViewModel : ViewModelBase
     private readonly Stack<HistoryEntry> _undoStack = new();
     private readonly Stack<HistoryEntry> _redoStack = new();
     private readonly Dictionary<string, string> _colorResources = new(StringComparer.Ordinal);
+    private readonly List<DesignerStyleDefinition> _documentStyles = new();
 
     private PendingMutation? _pendingMutation;
     private bool _isSyncingSelection;
@@ -205,6 +206,7 @@ public partial class MainWindowViewModel : ViewModelBase
 
         var properties = CaptureVisualProperties(target.Visual)
             ?.Where(pair => !pair.Key.StartsWith("__", StringComparison.Ordinal)
+                && !string.Equals(pair.Key, "Classes", StringComparison.Ordinal)
                 && !(target.Visual is Label && string.Equals(pair.Key, "Target", StringComparison.Ordinal)))
             .ToDictionary(
                 pair => pair.Key,
@@ -213,6 +215,15 @@ public partial class MainWindowViewModel : ViewModelBase
                         ? resourceValue
                         : pair.Value),
                 StringComparer.Ordinal);
+        properties ??= new Dictionary<string, string?>(StringComparer.Ordinal);
+        foreach (var propertyName in DesignerStyleApplicationMetadata.GetAppliedProperties(target.Visual))
+        {
+            if (DesignerStyleRuntime.TryReadCurrentValue(target.Visual, propertyName, out var value))
+            {
+                properties[propertyName] = value;
+            }
+        }
+
         var document = new ComponentPackDocument
         {
             Name = packName,
@@ -342,6 +353,7 @@ public partial class MainWindowViewModel : ViewModelBase
         foreach (var element in targets)
         {
             element.Visual.Opacity = normalizedOpacity;
+            DesignerStyleApplicationMetadata.ClearApplied(element.Visual, "Opacity");
         }
 
         CommitCanvasMutation();
@@ -379,6 +391,7 @@ public partial class MainWindowViewModel : ViewModelBase
                 break;
 
             case TextBlock textBlock:
+                values["Background"] = textBlock.Background?.ToString() ?? string.Empty;
                 values["Foreground"] = textBlock.Foreground?.ToString() ?? string.Empty;
                 break;
 
@@ -446,19 +459,36 @@ public partial class MainWindowViewModel : ViewModelBase
                 break;
 
             case TextBlock textBlock:
+                if (hasBackground) textBlock.Background = background;
                 if (hasForeground) textBlock.Foreground = foreground;
                 break;
         }
 
-        foreach (var propertyName in new[] { "Background", "Foreground", "BorderBrush" })
+        void PreserveBrushReference(string propertyName, bool hasValue)
         {
-            if (appearance.ContainsKey(propertyName))
+            if (!hasValue)
             {
-                DesignerResourceReferenceMetadata.SetReference(
-                    target.Visual,
-                    propertyName,
-                    resourceReferences.TryGetValue(propertyName, out var resourceKey) ? resourceKey : null);
+                return;
             }
+
+            DesignerStyleApplicationMetadata.ClearApplied(target.Visual, propertyName);
+            DesignerResourceReferenceMetadata.SetReference(
+                target.Visual,
+                propertyName,
+                resourceReferences.TryGetValue(propertyName, out var resourceKey) ? resourceKey : null);
+        }
+
+        PreserveBrushReference("Background", hasBackground);
+        PreserveBrushReference("Foreground", hasForeground);
+        PreserveBrushReference("BorderBrush", hasBorderBrush);
+        if (hasBorderThickness)
+        {
+            DesignerStyleApplicationMetadata.ClearApplied(target.Visual, "BorderThickness");
+        }
+
+        if (hasCornerRadius)
+        {
+            DesignerStyleApplicationMetadata.ClearApplied(target.Visual, "CornerRadius");
         }
 
         CommitCanvasMutation();
@@ -471,6 +501,80 @@ public partial class MainWindowViewModel : ViewModelBase
             Environment.NewLine,
             _colorResources.OrderBy(pair => pair.Key, StringComparer.Ordinal)
                 .Select(pair => $"{pair.Key} = {pair.Value}"));
+
+    public string GetDocumentStyleEditorText()
+    {
+        var sections = new List<string>();
+        foreach (var style in _documentStyles)
+        {
+            var lines = new List<string> { $"[{style.TargetType}.{style.ClassName}]" };
+            lines.AddRange(style.Setters.Select(setter => $"{setter.Key} = {setter.Value}"));
+            sections.Add(string.Join(Environment.NewLine, lines));
+        }
+
+        return string.Join(Environment.NewLine + Environment.NewLine, sections);
+    }
+
+    public bool SetDocumentStylesFromText(string text)
+    {
+        if (!TryParseDocumentStylesText(text, out var styles, out var error))
+        {
+            StatusText = error;
+            return false;
+        }
+
+        BeginCanvasMutation(HistoryActionType.EditProperty, "Updated document styles.");
+        _documentStyles.Clear();
+        _documentStyles.AddRange(styles);
+        Canvas.SetDocumentStyles(_documentStyles);
+        CommitCanvasMutation();
+        StatusText = $"Updated {_documentStyles.Count} document style(s).";
+        return true;
+    }
+
+    public bool TryGetSelectedStyleClasses(out string controlName, out string classes)
+    {
+        if (Canvas.SelectedElement is not { IsLocked: false } target)
+        {
+            controlName = string.Empty;
+            classes = string.Empty;
+            StatusText = "Select an unlocked control to edit its style classes.";
+            return false;
+        }
+
+        controlName = target.DisplayName;
+        classes = string.Join(" ", CanvasViewModel.GetUserStyleClasses(target.Visual));
+        return true;
+    }
+
+    public bool SetSelectedStyleClassesFromText(string text)
+    {
+        if (Canvas.SelectedElement is not { IsLocked: false } target)
+        {
+            StatusText = "Select an unlocked control to edit its style classes.";
+            return false;
+        }
+
+        var classes = text.Split(
+                [' ', '\t', '\r', '\n'],
+                StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Distinct(StringComparer.Ordinal)
+            .ToList();
+        var invalidClass = classes.FirstOrDefault(className => !IsValidStyleClassName(className));
+        if (invalidClass is not null)
+        {
+            StatusText = $"Style class '{invalidClass}' is invalid.";
+            return false;
+        }
+
+        BeginCanvasMutation(HistoryActionType.EditProperty, "Updated control style classes.");
+        Canvas.SetStyleClasses(target.Visual, classes, clearNewStyleConflicts: true);
+        CommitCanvasMutation();
+        StatusText = classes.Count == 0
+            ? $"Cleared style classes from {target.DisplayName}."
+            : $"Applied {classes.Count} style class(es) to {target.DisplayName}.";
+        return true;
+    }
 
     public bool SetColorResourcesFromText(string text)
     {
@@ -519,9 +623,15 @@ public partial class MainWindowViewModel : ViewModelBase
         var missingReference = Canvas.Elements
             .SelectMany(element => DesignerResourceReferenceMetadata.GetReferences(element.Visual).Values)
             .FirstOrDefault(resourceKey => !parsedResources.ContainsKey(resourceKey));
+        missingReference ??= _documentStyles
+            .SelectMany(style => style.Setters.Values)
+            .Select(value => DesignerResourceReferenceMetadata.TryParseExpression(value, out var resourceKey)
+                ? resourceKey
+                : null)
+            .FirstOrDefault(resourceKey => resourceKey is not null && !parsedResources.ContainsKey(resourceKey));
         if (!string.IsNullOrWhiteSpace(missingReference))
         {
-            StatusText = $"Resource '{missingReference}' is still used by a control and cannot be removed.";
+            StatusText = $"Resource '{missingReference}' is still used by the document and cannot be removed.";
             return false;
         }
 
@@ -565,7 +675,7 @@ public partial class MainWindowViewModel : ViewModelBase
         {
             Avalonia.Controls.Primitives.TemplatedControl => new[] { "Background", "Foreground", "BorderBrush" },
             Border => new[] { "Background", "BorderBrush" },
-            TextBlock => new[] { "Foreground" },
+            TextBlock => new[] { "Background", "Foreground" },
             _ => Array.Empty<string>(),
         };
         if (propertyNames.Count == 0)
@@ -597,6 +707,7 @@ public partial class MainWindowViewModel : ViewModelBase
 
         BeginCanvasMutation(HistoryActionType.EditProperty, "Applied color resource.");
         TryApplyAppearanceBrush(target.Visual, propertyName, brush);
+        DesignerStyleApplicationMetadata.ClearApplied(target.Visual, propertyName);
         DesignerResourceReferenceMetadata.SetReference(target.Visual, propertyName, resourceName);
         CommitCanvasMutation();
         StatusText = $"Applied {resourceName} to {target.DisplayName}.{propertyName}.";
@@ -616,6 +727,7 @@ public partial class MainWindowViewModel : ViewModelBase
         foreach (var target in targets)
         {
             ((TextBlock)target.Visual).FontSize = Math.Clamp(fontSize, 8, 96);
+            DesignerStyleApplicationMetadata.ClearApplied(target.Visual, "FontSize");
         }
 
         CommitCanvasMutation();
@@ -636,6 +748,7 @@ public partial class MainWindowViewModel : ViewModelBase
         foreach (var target in targets)
         {
             ((TextBlock)target.Visual).Foreground = brush;
+            DesignerStyleApplicationMetadata.ClearApplied(target.Visual, "Foreground");
             DesignerResourceReferenceMetadata.SetReference(target.Visual, "Foreground", null);
         }
 
@@ -662,6 +775,7 @@ public partial class MainWindowViewModel : ViewModelBase
         foreach (var target in targets)
         {
             ((TextBlock)target.Visual).FontWeight = fontWeight;
+            DesignerStyleApplicationMetadata.ClearApplied(target.Visual, "FontWeight");
         }
 
         CommitCanvasMutation();
@@ -1670,6 +1784,7 @@ public partial class MainWindowViewModel : ViewModelBase
         }
 
         AppendColorResourcesAxaml(sb, rootElementName, "  ");
+        AppendDocumentStylesAxaml(sb, rootElementName, "  ");
 
         sb.AppendLine($"  <Canvas Width=\"{settings.Width:0.###}\" Height=\"{settings.Height:0.###}\" Background=\"{EscapeXmlAttribute(settings.Background)}\">");
         sb.AppendLine($"    <!-- {DesignerMetadataPrefix} GridSize={settings.GridSize.ToString("0.###", CultureInfo.InvariantCulture)}; IsGridVisible={settings.IsGridVisible}; SnapToGrid={settings.SnapToGrid} -->");
@@ -1757,6 +1872,12 @@ public partial class MainWindowViewModel : ViewModelBase
                 return false;
             }
 
+            if (!StylesEqual(current.Styles, parsed.Styles))
+            {
+                result = "Validation failed: document styles do not round-trip.";
+                return false;
+            }
+
             for (var index = 0; index < current.Elements.Count; index++)
             {
                 if (!HaveSameAppearance(current.Elements[index], parsed.Elements[index]))
@@ -1793,6 +1914,12 @@ public partial class MainWindowViewModel : ViewModelBase
             if (!DictionaryEquals(userControl.ColorResources, current.ColorResources))
             {
                 result = "Validation failed: UserControl export does not preserve color resources.";
+                return false;
+            }
+
+            if (!StylesEqual(userControl.Styles, current.Styles))
+            {
+                result = "Validation failed: UserControl export does not preserve document styles.";
                 return false;
             }
         }
@@ -1936,6 +2063,7 @@ public partial class MainWindowViewModel : ViewModelBase
             Canvas.SetGridSize(settings.GridSize);
             Canvas.IsGridVisible = settings.IsGridVisible;
             Canvas.SnapToGrid = settings.SnapToGrid;
+            Canvas.Clear();
             _colorResources.Clear();
             if (document.ColorResources is not null)
             {
@@ -1945,8 +2073,14 @@ public partial class MainWindowViewModel : ViewModelBase
                 }
             }
 
+            _documentStyles.Clear();
+            if (document.Styles is not null)
+            {
+                _documentStyles.AddRange(CloneStyles(document.Styles));
+            }
+
             Canvas.SetColorResources(_colorResources);
-            Canvas.Clear();
+            Canvas.SetDocumentStyles(_documentStyles);
             foreach (var snapshot in document.Elements)
             {
                 Canvas.AddElementFromSnapshot(snapshot, select: false);
@@ -1978,7 +2112,8 @@ public partial class MainWindowViewModel : ViewModelBase
         return new DesignerCanvasDocument(
             snapshots,
             CaptureCanvasSettings(),
-            new Dictionary<string, string>(_colorResources, StringComparer.Ordinal));
+            new Dictionary<string, string>(_colorResources, StringComparer.Ordinal),
+            CloneStyles(_documentStyles));
     }
 
     private DesignerCanvasSettings CaptureCanvasSettings()
@@ -2012,15 +2147,31 @@ public partial class MainWindowViewModel : ViewModelBase
 
     private static DesignerCanvasDocument CreateDashboardTemplate() => new(
         [
-            new("Title", "Avalonia.Controls.TextBlock", 48, 40, 520, 36, Props("Text", "Project dashboard", "Foreground", "{DynamicResource AccentBrush}")),
+            new("Title", "Avalonia.Controls.TextBlock", 48, 40, 520, 36, Props("Text", "Project dashboard", "Classes", "heading")),
             new("Summary", "Avalonia.Controls.TextBlock", 48, 96, 520, 24, Props("Text", "A quick overview of this week's progress")),
             new("ProgressLabel", "Avalonia.Controls.TextBlock", 48, 158, 240, 24, Props("Text", "Completion")),
             new("Progress", "Avalonia.Controls.Slider", 48, 186, 360, 32, Props("Minimum", "0", "Maximum", "100", "Value", "72")),
-            new("Refresh", "Avalonia.Controls.Button", 48, 252, 140, 36, Props("Content", "Refresh", "Background", "{DynamicResource AccentBrush}", "Foreground", "#FFFFFF")),
+            new("Refresh", "Avalonia.Controls.Button", 48, 252, 140, 36, Props("Content", "Refresh", "Classes", "primary")),
             new("AutoRefresh", "Avalonia.Controls.CheckBox", 214, 254, 240, 32, Props("Content", "Refresh automatically")),
         ],
         new DesignerCanvasSettings(720, 440, "#F7F9FC"),
-        Props("AccentBrush", "#2563EB", "SurfaceBrush", "#F1F5F9"));
+        Props("AccentBrush", "#2563EB", "SurfaceBrush", "#F1F5F9"),
+        [
+            new DesignerStyleDefinition(
+                "TextBlock",
+                "heading",
+                Props(
+                    "Foreground", "{DynamicResource AccentBrush}",
+                    "FontSize", "26",
+                    "FontWeight", "SemiBold")),
+            new DesignerStyleDefinition(
+                "Button",
+                "primary",
+                Props(
+                    "Background", "{DynamicResource AccentBrush}",
+                    "Foreground", "#ffffffff",
+                    "CornerRadius", "6,6,6,6")),
+        ]);
 
     private static IReadOnlyDictionary<string, string> Props(params string[] values)
     {
@@ -2062,6 +2213,17 @@ public partial class MainWindowViewModel : ViewModelBase
         foreach (var pair in DesignerResourceReferenceMetadata.GetReferences(visual))
         {
             result[pair.Key] = DesignerResourceReferenceMetadata.FormatExpression(pair.Value);
+        }
+
+        foreach (var propertyName in DesignerStyleApplicationMetadata.GetAppliedProperties(visual))
+        {
+            result.Remove(propertyName);
+        }
+
+        var classes = CanvasViewModel.GetUserStyleClasses(visual);
+        if (classes.Count > 0)
+        {
+            result["Classes"] = string.Join(" ", classes);
         }
 
         if (!string.IsNullOrWhiteSpace(toolTip))
@@ -2171,6 +2333,12 @@ public partial class MainWindowViewModel : ViewModelBase
                 && textBlock.Foreground is { } foreground)
             {
                 properties["Foreground"] = FormatBrushValue(foreground);
+            }
+
+            if (textBlock.IsSet(TextBlock.BackgroundProperty)
+                && textBlock.Background is { } background)
+            {
+                properties["Background"] = FormatBrushValue(background);
             }
 
             return properties;
@@ -2486,6 +2654,11 @@ public partial class MainWindowViewModel : ViewModelBase
             return false;
         }
 
+        if (!StylesEqual(left.Styles, right.Styles))
+        {
+            return false;
+        }
+
         for (var i = 0; i < left.Elements.Count; i++)
         {
             var a = left.Elements[i];
@@ -2516,6 +2689,10 @@ public partial class MainWindowViewModel : ViewModelBase
             "BorderBrush",
             "BorderThickness",
             "CornerRadius",
+            "FontSize",
+            "FontWeight",
+            "Opacity",
+            "Classes",
         })
         {
             var expectedValue = ReadSnapshotProperty(expected, propertyName);
@@ -2592,10 +2769,12 @@ public partial class MainWindowViewModel : ViewModelBase
             nextIsLocked = false;
         }
 
+        var colorResources = ReadColorResources(root, parseRoot, warnings);
         return new DesignerCanvasDocument(
             snapshots,
             ReadCanvasSettings(parseRoot, warnings),
-            ReadColorResources(root, parseRoot, warnings));
+            colorResources,
+            ReadDocumentStyles(root, parseRoot, colorResources, warnings));
     }
 
     private static IReadOnlyDictionary<string, string> ReadColorResources(
@@ -2645,6 +2824,78 @@ public partial class MainWindowViewModel : ViewModelBase
         }
 
         return resources;
+    }
+
+    private IReadOnlyList<DesignerStyleDefinition> ReadDocumentStyles(
+        XElement root,
+        XElement parseRoot,
+        IReadOnlyDictionary<string, string> colorResources,
+        ICollection<string> warnings)
+    {
+        var styles = new List<DesignerStyleDefinition>();
+        var hosts = new List<XElement> { root };
+        if (!ReferenceEquals(root, parseRoot))
+        {
+            hosts.Add(parseRoot);
+        }
+
+        var styleElements = hosts
+            .SelectMany(host => host.Elements()
+                .Where(element => element.Name.LocalName.EndsWith(".Styles", StringComparison.Ordinal)
+                    || string.Equals(element.Name.LocalName, "Styles", StringComparison.Ordinal)))
+            .SelectMany(container => container.Elements()
+                .Where(element => string.Equals(element.Name.LocalName, "Style", StringComparison.Ordinal)));
+
+        foreach (var styleElement in styleElements)
+        {
+            var selector = styleElement.Attribute("Selector")?.Value.Trim() ?? string.Empty;
+            if (!TryParseSimpleStyleSelector(selector, out var proposedTargetType, out var className)
+                || !TryResolveStyleTargetType(proposedTargetType, out var targetType))
+            {
+                warnings.Add($"Ignored unsupported style selector '{selector}'.");
+                continue;
+            }
+
+            var setters = new Dictionary<string, string>(StringComparer.Ordinal);
+            foreach (var setterElement in styleElement.Elements()
+                         .Where(element => string.Equals(element.Name.LocalName, "Setter", StringComparison.Ordinal)))
+            {
+                var rawPropertyName = setterElement.Attribute("Property")?.Value.Trim() ?? string.Empty;
+                var rawValue = setterElement.Attribute("Value")?.Value.Trim() ?? string.Empty;
+                if (!TryGetCanonicalStylePropertyName(rawPropertyName, out var propertyName))
+                {
+                    warnings.Add($"Ignored unsupported setter {selector}.{rawPropertyName}.");
+                    continue;
+                }
+
+                if (!TryNormalizeStyleSetter(
+                        targetType,
+                        propertyName,
+                        rawValue,
+                        colorResources,
+                        out var normalizedValue,
+                        out var setterError))
+                {
+                    warnings.Add($"Ignored setter {selector}.{rawPropertyName}: {setterError}");
+                    continue;
+                }
+
+                if (!setters.TryAdd(propertyName, normalizedValue))
+                {
+                    warnings.Add($"Ignored duplicate setter {selector}.{propertyName}.");
+                }
+            }
+
+            if (setters.Count == 0)
+            {
+                warnings.Add($"Ignored style '{selector}' because it has no supported setters.");
+                continue;
+            }
+
+            styles.Add(new DesignerStyleDefinition(targetType, className, setters));
+        }
+
+        return styles;
     }
 
     private static DesignerCanvasSettings ReadCanvasSettings(XElement canvas, ICollection<string> warnings)
@@ -2888,7 +3139,7 @@ public partial class MainWindowViewModel : ViewModelBase
 
     private static bool IsSupportedVisualProperty(string tagName, string propertyName)
     {
-        if (propertyName == "Opacity")
+        if (propertyName is "Opacity" or "Classes")
         {
             return true;
         }
@@ -2903,7 +3154,7 @@ public partial class MainWindowViewModel : ViewModelBase
         {
             "Button" => propertyName == "Content",
             "TextBox" => propertyName is "Text" or "Watermark" or "PasswordChar" or "RevealPassword" or "AcceptsReturn" or "TextWrapping",
-            "TextBlock" => propertyName is "Text" or "FontSize" or "FontWeight" or "Foreground",
+            "TextBlock" => propertyName is "Text" or "FontSize" or "FontWeight" or "Background" or "Foreground",
             "Label" => propertyName is "Content" or "Target",
             "Image" => propertyName is "Source" or "Stretch",
             "CheckBox" or "ToggleSwitch" => propertyName is "Content" or "IsChecked",
@@ -2959,6 +3210,30 @@ public partial class MainWindowViewModel : ViewModelBase
         foreach (var pair in left)
         {
             if (!right.TryGetValue(pair.Key, out var value) || !string.Equals(value, pair.Value, StringComparison.Ordinal))
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private static bool StylesEqual(
+        IReadOnlyList<DesignerStyleDefinition>? left,
+        IReadOnlyList<DesignerStyleDefinition>? right)
+    {
+        var leftStyles = left ?? Array.Empty<DesignerStyleDefinition>();
+        var rightStyles = right ?? Array.Empty<DesignerStyleDefinition>();
+        if (leftStyles.Count != rightStyles.Count)
+        {
+            return false;
+        }
+
+        for (var index = 0; index < leftStyles.Count; index++)
+        {
+            if (!string.Equals(leftStyles[index].TargetType, rightStyles[index].TargetType, StringComparison.Ordinal)
+                || !string.Equals(leftStyles[index].ClassName, rightStyles[index].ClassName, StringComparison.Ordinal)
+                || !DictionaryEquals(leftStyles[index].Setters, rightStyles[index].Setters))
             {
                 return false;
             }
@@ -3167,6 +3442,288 @@ public partial class MainWindowViewModel : ViewModelBase
         return candidate;
     }
 
+    private bool TryParseDocumentStylesText(
+        string text,
+        out IReadOnlyList<DesignerStyleDefinition> styles,
+        out string error)
+    {
+        var parsedStyles = new List<DesignerStyleDefinition>();
+        string? currentTargetType = null;
+        string? currentClassName = null;
+        Dictionary<string, string>? currentSetters = null;
+        var parseError = string.Empty;
+
+        bool CommitCurrentStyle()
+        {
+            if (currentTargetType is null || currentClassName is null || currentSetters is null)
+            {
+                return true;
+            }
+
+            if (currentSetters.Count == 0)
+            {
+                parseError = $"Style {currentTargetType}.{currentClassName} must contain at least one setter.";
+                return false;
+            }
+
+            parsedStyles.Add(new DesignerStyleDefinition(
+                currentTargetType,
+                currentClassName,
+                new Dictionary<string, string>(currentSetters, StringComparer.Ordinal)));
+            return true;
+        }
+
+        error = string.Empty;
+        var lines = text.Replace("\r\n", "\n", StringComparison.Ordinal).Split('\n');
+        for (var index = 0; index < lines.Length; index++)
+        {
+            var line = lines[index].Trim();
+            if (string.IsNullOrWhiteSpace(line)
+                || line.StartsWith("//", StringComparison.Ordinal)
+                || line.StartsWith('#'))
+            {
+                continue;
+            }
+
+            if (line.StartsWith('[') && line.EndsWith(']'))
+            {
+                if (!CommitCurrentStyle())
+                {
+                    styles = parsedStyles;
+                    error = parseError;
+                    return false;
+                }
+
+                var selector = line[1..^1].Trim();
+                if (!TryParseSimpleStyleSelector(selector, out var targetType, out var className)
+                    || !TryResolveStyleTargetType(targetType, out currentTargetType))
+                {
+                    styles = parsedStyles;
+                    error = $"Style line {index + 1} must use a supported selector such as [Button.primary].";
+                    return false;
+                }
+
+                currentClassName = className;
+                currentSetters = new Dictionary<string, string>(StringComparer.Ordinal);
+                continue;
+            }
+
+            if (currentSetters is null || currentTargetType is null || currentClassName is null)
+            {
+                styles = parsedStyles;
+                error = $"Style line {index + 1} must follow a [Control.class] section.";
+                return false;
+            }
+
+            var separator = line.IndexOf('=');
+            if (separator <= 0 || separator == line.Length - 1)
+            {
+                styles = parsedStyles;
+                error = $"Style line {index + 1} must use Property = Value format.";
+                return false;
+            }
+
+            var rawPropertyName = line[..separator].Trim();
+            var rawValue = line[(separator + 1)..].Trim();
+            if (!TryGetCanonicalStylePropertyName(rawPropertyName, out var propertyName))
+            {
+                styles = parsedStyles;
+                error = $"Style line {index + 1}: setter '{rawPropertyName}' is not supported.";
+                return false;
+            }
+
+            if (!TryNormalizeStyleSetter(
+                    currentTargetType,
+                    propertyName,
+                    rawValue,
+                    _colorResources,
+                    out var normalizedValue,
+                    out error))
+            {
+                styles = parsedStyles;
+                error = $"Style line {index + 1}: {error}";
+                return false;
+            }
+
+            if (!currentSetters.TryAdd(propertyName, normalizedValue))
+            {
+                styles = parsedStyles;
+                error = $"Style line {index + 1} duplicates {propertyName}.";
+                return false;
+            }
+        }
+
+        if (!CommitCurrentStyle())
+        {
+            styles = parsedStyles;
+            error = parseError;
+            return false;
+        }
+
+        styles = parsedStyles;
+        error = string.Empty;
+        return true;
+    }
+
+    private bool TryResolveStyleTargetType(string proposedTargetType, out string targetType)
+    {
+        var normalized = proposedTargetType.Trim();
+        foreach (var definition in _componentCatalog.GetAll())
+        {
+            var shortName = definition.AvaloniaTypeName[(definition.AvaloniaTypeName.LastIndexOf('.') + 1)..];
+            if (string.Equals(shortName, normalized, StringComparison.OrdinalIgnoreCase)
+                || string.Equals(definition.AvaloniaTypeName, normalized, StringComparison.OrdinalIgnoreCase))
+            {
+                targetType = shortName;
+                return true;
+            }
+        }
+
+        targetType = string.Empty;
+        return false;
+    }
+
+    private static bool TryParseSimpleStyleSelector(
+        string selector,
+        out string targetType,
+        out string className)
+    {
+        var separator = selector.IndexOf('.');
+        if (separator <= 0
+            || separator == selector.Length - 1
+            || selector.IndexOf('.', separator + 1) >= 0
+            || selector.Contains(':', StringComparison.Ordinal)
+            || selector.Any(char.IsWhiteSpace))
+        {
+            targetType = string.Empty;
+            className = string.Empty;
+            return false;
+        }
+
+        targetType = selector[..separator].Trim();
+        className = selector[(separator + 1)..].Trim();
+        return IsValidStyleClassName(className);
+    }
+
+    private static bool TryGetCanonicalStylePropertyName(string proposedName, out string propertyName)
+    {
+        propertyName = proposedName.Trim().ToLowerInvariant() switch
+        {
+            "opacity" => "Opacity",
+            "background" => "Background",
+            "foreground" => "Foreground",
+            "borderbrush" => "BorderBrush",
+            "borderthickness" => "BorderThickness",
+            "cornerradius" => "CornerRadius",
+            "fontsize" => "FontSize",
+            "fontweight" => "FontWeight",
+            _ => string.Empty,
+        };
+        return propertyName.Length > 0;
+    }
+
+    private static bool TryNormalizeStyleSetter(
+        string targetType,
+        string propertyName,
+        string rawValue,
+        IReadOnlyDictionary<string, string> colorResources,
+        out string normalizedValue,
+        out string error)
+    {
+        normalizedValue = string.Empty;
+        if (!DesignerStyleRuntime.IsSupportedProperty(targetType, propertyName))
+        {
+            error = $"{targetType}.{propertyName} is not supported by the designer style editor.";
+            return false;
+        }
+
+        try
+        {
+            if (DesignerStyleRuntime.IsBrushProperty(propertyName))
+            {
+                if (DesignerResourceReferenceMetadata.TryParseExpression(rawValue, out var resourceKey))
+                {
+                    if (!colorResources.ContainsKey(resourceKey))
+                    {
+                        error = $"Color resource '{resourceKey}' does not exist.";
+                        return false;
+                    }
+
+                    normalizedValue = DesignerResourceReferenceMetadata.FormatExpression(resourceKey);
+                }
+                else
+                {
+                    normalizedValue = FormatBrushValue(Brush.Parse(rawValue));
+                }
+
+                error = string.Empty;
+                return true;
+            }
+
+            switch (propertyName)
+            {
+                case "Opacity":
+                    if (!double.TryParse(
+                            rawValue,
+                            NumberStyles.Float,
+                            CultureInfo.InvariantCulture,
+                            out var opacity)
+                        || opacity is < 0 or > 1)
+                    {
+                        error = "Opacity must be a number from 0 to 1.";
+                        return false;
+                    }
+
+                    normalizedValue = opacity.ToString("0.###", CultureInfo.InvariantCulture);
+                    break;
+                case "BorderThickness":
+                    normalizedValue = Thickness.Parse(rawValue).ToString();
+                    break;
+                case "CornerRadius":
+                    normalizedValue = CornerRadius.Parse(rawValue).ToString();
+                    break;
+                case "FontSize":
+                    if (!double.TryParse(
+                            rawValue,
+                            NumberStyles.Float,
+                            CultureInfo.InvariantCulture,
+                            out var fontSize)
+                        || fontSize is < 8 or > 96)
+                    {
+                        error = "FontSize must be a number from 8 to 96.";
+                        return false;
+                    }
+
+                    normalizedValue = fontSize.ToString("0.###", CultureInfo.InvariantCulture);
+                    break;
+                case "FontWeight":
+                    if (!TryParseTextWeight(rawValue, out var fontWeight))
+                    {
+                        error = "FontWeight must be Regular, SemiBold, or Bold.";
+                        return false;
+                    }
+
+                    normalizedValue = fontWeight == FontWeight.Bold
+                        ? "Bold"
+                        : fontWeight == FontWeight.SemiBold
+                            ? "SemiBold"
+                            : "Regular";
+                    break;
+                default:
+                    error = $"Setter {propertyName} is not supported.";
+                    return false;
+            }
+        }
+        catch (FormatException)
+        {
+            error = $"{propertyName} contains an invalid value.";
+            return false;
+        }
+
+        error = string.Empty;
+        return true;
+    }
+
     private bool TryResolveAppearanceResources(
         IReadOnlyDictionary<string, string> appearance,
         out IReadOnlyDictionary<string, string> resolvedAppearance,
@@ -3205,12 +3762,20 @@ public partial class MainWindowViewModel : ViewModelBase
     {
         foreach (var element in Canvas.Elements)
         {
-            foreach (var pair in DesignerResourceReferenceMetadata.GetReferences(element.Visual))
+            DesignerStyleApplicationMetadata.BeginProgrammaticUpdate(element.Visual);
+            try
             {
-                if (_colorResources.TryGetValue(pair.Value, out var brushValue))
+                foreach (var pair in DesignerResourceReferenceMetadata.GetReferences(element.Visual))
                 {
-                    TryApplyAppearanceBrush(element.Visual, pair.Key, Brush.Parse(brushValue));
+                    if (_colorResources.TryGetValue(pair.Value, out var brushValue))
+                    {
+                        TryApplyAppearanceBrush(element.Visual, pair.Key, Brush.Parse(brushValue));
+                    }
                 }
+            }
+            finally
+            {
+                DesignerStyleApplicationMetadata.EndProgrammaticUpdate(element.Visual);
             }
         }
     }
@@ -3218,7 +3783,7 @@ public partial class MainWindowViewModel : ViewModelBase
     private static bool SupportsAppearanceBrush(Control visual, string propertyName)
         => propertyName switch
         {
-            "Background" => visual is Avalonia.Controls.Primitives.TemplatedControl or Border,
+            "Background" => visual is Avalonia.Controls.Primitives.TemplatedControl or Border or TextBlock,
             "Foreground" => visual is Avalonia.Controls.Primitives.TemplatedControl or TextBlock,
             "BorderBrush" => visual is Avalonia.Controls.Primitives.TemplatedControl or Border,
             _ => false,
@@ -3233,6 +3798,9 @@ public partial class MainWindowViewModel : ViewModelBase
                 return true;
             case "Background" when visual is Border border:
                 border.Background = brush;
+                return true;
+            case "Background" when visual is TextBlock textBlock:
+                textBlock.Background = brush;
                 return true;
             case "Foreground" when visual is Avalonia.Controls.Primitives.TemplatedControl templated:
                 templated.Foreground = brush;
@@ -3342,6 +3910,17 @@ public partial class MainWindowViewModel : ViewModelBase
         return name.All(character => char.IsLetterOrDigit(character) || character == '_');
     }
 
+    private static bool IsValidStyleClassName(string name)
+    {
+        if (string.IsNullOrWhiteSpace(name)
+            || !(char.IsLetter(name[0]) || name[0] == '_'))
+        {
+            return false;
+        }
+
+        return name.All(character => char.IsLetterOrDigit(character) || character is '_' or '-');
+    }
+
     private static bool TryParseTextWeight(string value, out FontWeight fontWeight)
     {
         switch (value.Trim().ToLowerInvariant())
@@ -3375,6 +3954,13 @@ public partial class MainWindowViewModel : ViewModelBase
 
         return source.ToDictionary(pair => pair.Key, pair => pair.Value, StringComparer.Ordinal);
     }
+
+    private static IReadOnlyList<DesignerStyleDefinition> CloneStyles(
+        IEnumerable<DesignerStyleDefinition> styles)
+        => styles.Select(style => style with
+        {
+            Setters = new Dictionary<string, string>(style.Setters, StringComparer.Ordinal),
+        }).ToList();
 
     private string GetDisplayDocumentName()
     {
@@ -3550,8 +4136,16 @@ public partial class MainWindowViewModel : ViewModelBase
                 sb.Append("<TextBlock");
                 AppendCanvasLayoutAttributes(sb, element);
                 AppendAttribute(sb, "Text", textBlock.Text ?? string.Empty);
-                AppendAttribute(sb, "FontSize", textBlock.FontSize.ToString("0.###", CultureInfo.InvariantCulture));
-                AppendAttribute(sb, "FontWeight", textBlock.FontWeight.ToString());
+                if (!DesignerStyleApplicationMetadata.IsApplied(textBlock, "FontSize"))
+                {
+                    AppendAttribute(sb, "FontSize", textBlock.FontSize.ToString("0.###", CultureInfo.InvariantCulture));
+                }
+
+                if (!DesignerStyleApplicationMetadata.IsApplied(textBlock, "FontWeight"))
+                {
+                    AppendAttribute(sb, "FontWeight", textBlock.FontWeight.ToString());
+                }
+
                 sb.AppendLine(" />");
                 break;
 
@@ -3912,7 +4506,17 @@ public partial class MainWindowViewModel : ViewModelBase
         AppendAttribute(sb, "Canvas.Top", element.Y.ToString("0.###", CultureInfo.InvariantCulture));
         AppendAttribute(sb, "Width", element.Width.ToString("0.###", CultureInfo.InvariantCulture));
         AppendAttribute(sb, "Height", element.Height.ToString("0.###", CultureInfo.InvariantCulture));
-        AppendAttribute(sb, "Opacity", element.Visual.Opacity.ToString("0.###", CultureInfo.InvariantCulture));
+        var classes = CanvasViewModel.GetUserStyleClasses(element.Visual);
+        if (classes.Count > 0)
+        {
+            AppendAttribute(sb, "Classes", string.Join(" ", classes));
+        }
+
+        if (!DesignerStyleApplicationMetadata.IsApplied(element.Visual, "Opacity"))
+        {
+            AppendAttribute(sb, "Opacity", element.Visual.Opacity.ToString("0.###", CultureInfo.InvariantCulture));
+        }
+
         AppendCommonAppearanceAttributes(sb, element.Visual);
         if (ToolTip.GetTip(element.Visual) is { } toolTip && !string.IsNullOrWhiteSpace(toolTip.ToString()))
         {
@@ -3965,6 +4569,42 @@ public partial class MainWindowViewModel : ViewModelBase
         sb.AppendLine(".Resources>");
     }
 
+    private void AppendDocumentStylesAxaml(StringBuilder sb, string rootElementName, string indent)
+    {
+        if (_documentStyles.Count == 0)
+        {
+            return;
+        }
+
+        sb.Append(indent);
+        sb.Append('<');
+        sb.Append(rootElementName);
+        sb.AppendLine(".Styles>");
+        foreach (var style in _documentStyles)
+        {
+            sb.Append(indent);
+            sb.Append("  <Style");
+            AppendAttribute(sb, "Selector", $"{style.TargetType}.{style.ClassName}");
+            sb.AppendLine(">");
+            foreach (var setter in style.Setters)
+            {
+                sb.Append(indent);
+                sb.Append("    <Setter");
+                AppendAttribute(sb, "Property", setter.Key);
+                AppendAttribute(sb, "Value", setter.Value);
+                sb.AppendLine(" />");
+            }
+
+            sb.Append(indent);
+            sb.AppendLine("  </Style>");
+        }
+
+        sb.Append(indent);
+        sb.Append("</");
+        sb.Append(rootElementName);
+        sb.AppendLine(".Styles>");
+    }
+
     private static void AppendCommonAppearanceAttributes(StringBuilder sb, Control visual)
     {
         switch (visual)
@@ -3975,25 +4615,30 @@ public partial class MainWindowViewModel : ViewModelBase
                     visual,
                     "Background",
                     templated.Background,
-                    templated.IsSet(Avalonia.Controls.Primitives.TemplatedControl.BackgroundProperty));
+                    templated.IsSet(Avalonia.Controls.Primitives.TemplatedControl.BackgroundProperty)
+                        && !DesignerStyleApplicationMetadata.IsApplied(visual, "Background"));
                 AppendBrushAppearanceAttribute(
                     sb,
                     visual,
                     "Foreground",
                     templated.Foreground,
-                    templated.IsSet(Avalonia.Controls.Primitives.TemplatedControl.ForegroundProperty));
+                    templated.IsSet(Avalonia.Controls.Primitives.TemplatedControl.ForegroundProperty)
+                        && !DesignerStyleApplicationMetadata.IsApplied(visual, "Foreground"));
                 AppendBrushAppearanceAttribute(
                     sb,
                     visual,
                     "BorderBrush",
                     templated.BorderBrush,
-                    templated.IsSet(Avalonia.Controls.Primitives.TemplatedControl.BorderBrushProperty));
-                if (templated.IsSet(Avalonia.Controls.Primitives.TemplatedControl.BorderThicknessProperty))
+                    templated.IsSet(Avalonia.Controls.Primitives.TemplatedControl.BorderBrushProperty)
+                        && !DesignerStyleApplicationMetadata.IsApplied(visual, "BorderBrush"));
+                if (templated.IsSet(Avalonia.Controls.Primitives.TemplatedControl.BorderThicknessProperty)
+                    && !DesignerStyleApplicationMetadata.IsApplied(visual, "BorderThickness"))
                 {
                     AppendAttribute(sb, "BorderThickness", templated.BorderThickness.ToString());
                 }
 
-                if (templated.IsSet(Avalonia.Controls.Primitives.TemplatedControl.CornerRadiusProperty))
+                if (templated.IsSet(Avalonia.Controls.Primitives.TemplatedControl.CornerRadiusProperty)
+                    && !DesignerStyleApplicationMetadata.IsApplied(visual, "CornerRadius"))
                 {
                     AppendAttribute(sb, "CornerRadius", templated.CornerRadius.ToString());
                 }
@@ -4006,24 +4651,42 @@ public partial class MainWindowViewModel : ViewModelBase
                     visual,
                     "Background",
                     border.Background,
-                    border.IsSet(Border.BackgroundProperty));
+                    border.IsSet(Border.BackgroundProperty)
+                        && !DesignerStyleApplicationMetadata.IsApplied(visual, "Background"));
                 AppendBrushAppearanceAttribute(
                     sb,
                     visual,
                     "BorderBrush",
                     border.BorderBrush,
-                    border.IsSet(Border.BorderBrushProperty));
-                AppendAttribute(sb, "BorderThickness", border.BorderThickness.ToString());
-                AppendAttribute(sb, "CornerRadius", border.CornerRadius.ToString());
+                    border.IsSet(Border.BorderBrushProperty)
+                        && !DesignerStyleApplicationMetadata.IsApplied(visual, "BorderBrush"));
+                if (!DesignerStyleApplicationMetadata.IsApplied(visual, "BorderThickness"))
+                {
+                    AppendAttribute(sb, "BorderThickness", border.BorderThickness.ToString());
+                }
+
+                if (!DesignerStyleApplicationMetadata.IsApplied(visual, "CornerRadius"))
+                {
+                    AppendAttribute(sb, "CornerRadius", border.CornerRadius.ToString());
+                }
+
                 break;
 
             case TextBlock textBlock:
                 AppendBrushAppearanceAttribute(
                     sb,
                     visual,
+                    "Background",
+                    textBlock.Background,
+                    textBlock.IsSet(TextBlock.BackgroundProperty)
+                        && !DesignerStyleApplicationMetadata.IsApplied(visual, "Background"));
+                AppendBrushAppearanceAttribute(
+                    sb,
+                    visual,
                     "Foreground",
                     textBlock.Foreground,
-                    textBlock.IsSet(TextBlock.ForegroundProperty));
+                    textBlock.IsSet(TextBlock.ForegroundProperty)
+                        && !DesignerStyleApplicationMetadata.IsApplied(visual, "Foreground"));
                 break;
         }
     }
@@ -4048,9 +4711,12 @@ public partial class MainWindowViewModel : ViewModelBase
     }
 
     private static string FormatBrushValue(IBrush brush)
-        => brush is SolidColorBrush solidColorBrush
-            ? solidColorBrush.Color.ToString()
+        => brush is ISolidColorBrush solidColorBrush
+            ? FormatColorValue(solidColorBrush.Color)
             : brush.ToString() ?? string.Empty;
+
+    private static string FormatColorValue(Color color)
+        => $"#{color.A:x2}{color.R:x2}{color.G:x2}{color.B:x2}";
 
     private static void AppendAttribute(StringBuilder sb, string name, string value)
     {

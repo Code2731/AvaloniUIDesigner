@@ -421,6 +421,43 @@ public partial class MainWindow : Window
         }
     }
 
+    private async void OnEditDocumentStylesMenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        FlushPendingPropertyHistory();
+        if (Vm is null)
+        {
+            return;
+        }
+
+        var updatedStyles = await ShowTextEditorDialogAsync(
+            "Edit Document Styles",
+            Vm.GetDocumentStyleEditorText(),
+            "Use [Control.class] sections with Property = Value setters. Example: [Button.primary] then Background = {DynamicResource AccentBrush}.");
+        if (updatedStyles is not null)
+        {
+            Vm.SetDocumentStylesFromText(updatedStyles);
+        }
+    }
+
+    private async void OnEditSelectedClassesMenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        FlushPendingPropertyHistory();
+        if (Vm is null || !Vm.TryGetSelectedStyleClasses(out var controlName, out var classes))
+        {
+            return;
+        }
+
+        var updatedClasses = await ShowTextEditorDialogAsync(
+            $"Edit Style Classes - {controlName}",
+            classes,
+            "Enter space-separated Avalonia style classes. Remove all text to clear the classes.",
+            multiline: false);
+        if (updatedClasses is not null)
+        {
+            Vm.SetSelectedStyleClassesFromText(updatedClasses);
+        }
+    }
+
     private async void OnApplyColorResourceMenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
         FlushPendingPropertyHistory();
@@ -1167,9 +1204,20 @@ public partial class MainWindow : Window
 
     private void OnSelectedVisualPropertyChanged(object? sender, AvaloniaPropertyChangedEventArgs e)
     {
-        if (sender is not Control control || !IsUndoTrackedVisualProperty(control, e.Property.Name))
+        if (sender is not Control control
+            || DesignerStyleApplicationMetadata.IsProgrammaticUpdate(control)
+            || !IsUndoTrackedVisualProperty(control, e.Property.Name))
         {
             return;
+        }
+
+        if (DesignerStyleRuntime.IsSupportedProperty(control.GetType().Name, e.Property.Name))
+        {
+            DesignerStyleApplicationMetadata.ClearApplied(control, e.Property.Name);
+            if (DesignerStyleRuntime.IsBrushProperty(e.Property.Name))
+            {
+                DesignerResourceReferenceMetadata.SetReference(control, e.Property.Name, null);
+            }
         }
 
         if (!_hasPendingPropertyEdit)
@@ -1207,7 +1255,8 @@ public partial class MainWindow : Window
         }
 
         if (control is Avalonia.Controls.Primitives.TemplatedControl
-            && (propertyName is "Background" or "Foreground" or "BorderBrush" or "BorderThickness" or "CornerRadius"))
+            && (propertyName is "Background" or "Foreground" or "BorderBrush" or "BorderThickness"
+                or "CornerRadius" or "FontSize" or "FontWeight"))
         {
             return true;
         }
@@ -1224,7 +1273,7 @@ public partial class MainWindow : Window
 
         if (control is TextBlock)
         {
-            return propertyName is "Text" or "FontSize" or "FontWeight" or "Foreground";
+            return propertyName is "Text" or "FontSize" or "FontWeight" or "Background" or "Foreground";
         }
 
         if (control is Label)

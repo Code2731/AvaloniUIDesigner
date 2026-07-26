@@ -36,6 +36,29 @@ public sealed class AxamlDocumentSerializer : IDesignerSerializer
             sb.AppendLine("  </Canvas.Resources>");
         }
 
+        if (document.Styles is { Count: > 0 })
+        {
+            sb.AppendLine("  <Canvas.Styles>");
+            foreach (var style in document.Styles)
+            {
+                sb.Append("    <Style Selector=\"");
+                sb.Append(EscapeXmlAttribute($"{style.TargetType}.{style.ClassName}"));
+                sb.AppendLine("\">");
+                foreach (var setter in style.Setters)
+                {
+                    sb.Append("      <Setter Property=\"");
+                    sb.Append(EscapeXmlAttribute(setter.Key));
+                    sb.Append("\" Value=\"");
+                    sb.Append(EscapeXmlAttribute(setter.Value));
+                    sb.AppendLine("\" />");
+                }
+
+                sb.AppendLine("    </Style>");
+            }
+
+            sb.AppendLine("  </Canvas.Styles>");
+        }
+
         foreach (var element in document.Elements)
         {
             sb.Append("  <");

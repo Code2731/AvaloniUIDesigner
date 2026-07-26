@@ -72,6 +72,9 @@
                 <Separator/>
                 <MenuItem Header="Style">
                     <MenuItem Header="Edit Appearance..." Click="OnEditAppearanceMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
+                    <MenuItem Header="Edit Document Styles..." Click="OnEditDocumentStylesMenuClicked"/>
+                    <MenuItem Header="Edit Selected Classes..." Click="OnEditSelectedClassesMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
+                    <Separator/>
                     <MenuItem Header="Edit Color Resources..." Click="OnEditColorResourcesMenuClicked"/>
                     <MenuItem Header="Apply Color Resource..." Click="OnApplyColorResourceMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
                     <Separator/>

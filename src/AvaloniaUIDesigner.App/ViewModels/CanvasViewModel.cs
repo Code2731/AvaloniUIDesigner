@@ -24,6 +24,7 @@ public partial class CanvasViewModel : ViewModelBase
     private readonly IComponentCatalog _componentCatalog;
     private readonly IControlRenderer _renderer;
     private readonly Dictionary<string, string> _colorResources = new(StringComparer.Ordinal);
+    private readonly List<DesignerStyleDefinition> _documentStyles = new();
 
     public CanvasViewModel()
         : this(new BuiltInComponentCatalog(), new DefaultControlRenderer())
@@ -92,16 +93,80 @@ public partial class CanvasViewModel : ViewModelBase
     public void SetColorResources(IReadOnlyDictionary<string, string>? resources)
     {
         _colorResources.Clear();
-        if (resources is null)
+        if (resources is not null)
         {
-            return;
+            foreach (var pair in resources)
+            {
+                _colorResources[pair.Key] = pair.Value;
+            }
         }
 
-        foreach (var pair in resources)
+        RefreshDocumentStyles();
+    }
+
+    public void SetDocumentStyles(IReadOnlyList<DesignerStyleDefinition>? styles)
+    {
+        _documentStyles.Clear();
+        if (styles is not null)
         {
-            _colorResources[pair.Key] = pair.Value;
+            _documentStyles.AddRange(styles.Select(style => style with
+            {
+                Setters = new Dictionary<string, string>(style.Setters, StringComparer.Ordinal),
+            }));
+        }
+
+        RefreshDocumentStyles();
+    }
+
+    public void SetStyleClasses(Control visual, IEnumerable<string> classes, bool clearNewStyleConflicts)
+    {
+        var normalized = classes
+            .Where(className => !string.IsNullOrWhiteSpace(className))
+            .Distinct(StringComparer.Ordinal)
+            .ToList();
+        var existing = GetUserStyleClasses(visual);
+        if (clearNewStyleConflicts)
+        {
+            var addedClasses = normalized.Except(existing, StringComparer.Ordinal).ToHashSet(StringComparer.Ordinal);
+            foreach (var style in _documentStyles.Where(style =>
+                         addedClasses.Contains(style.ClassName)
+                         && string.Equals(style.TargetType, visual.GetType().Name, StringComparison.Ordinal)))
+            {
+                foreach (var propertyName in style.Setters.Keys)
+                {
+                    DesignerStyleRuntime.ClearLocalValue(visual, propertyName);
+                }
+            }
+        }
+
+        foreach (var className in existing)
+        {
+            visual.Classes.Remove(className);
+        }
+
+        foreach (var className in normalized)
+        {
+            visual.Classes.Add(className);
+        }
+
+        RefreshDocumentStyles(visual);
+    }
+
+    public void RefreshDocumentStyles()
+    {
+        foreach (var element in Elements)
+        {
+            RefreshDocumentStyles(element.Visual);
         }
     }
+
+    public void RefreshDocumentStyles(Control visual)
+        => DesignerStyleRuntime.ApplyStyles(visual, _documentStyles, _colorResources);
+
+    public static IReadOnlyList<string> GetUserStyleClasses(Control visual)
+        => visual.Classes
+            .Where(className => !className.StartsWith(':'))
+            .ToList();
 
     public void SetArtboard(double width, double height, string? background = null)
     {
@@ -139,6 +204,7 @@ public partial class CanvasViewModel : ViewModelBase
     {
         var (visual, width, height) = CreateVisualByType(item.AvaloniaTypeName, item.DisplayName);
         ApplyVisualProperties(visual, item.DefaultProperties);
+        RefreshDocumentStyles(visual);
         return AddElement(
             item.NamePrefix ?? item.DisplayName,
             item.AvaloniaTypeName,
@@ -167,6 +233,7 @@ public partial class CanvasViewModel : ViewModelBase
         var height = snapshot.Height > 0 ? snapshot.Height : defaultHeight;
 
         ApplyVisualProperties(visual, snapshot.VisualProperties);
+        RefreshDocumentStyles(visual);
 
         var element = AddElement(
             snapshot.DisplayName,
@@ -195,6 +262,7 @@ public partial class CanvasViewModel : ViewModelBase
         {
             var (visual, defaultWidth, defaultHeight) = CreateVisualByType(snapshot.TypeName, snapshot.DisplayName);
             ApplyVisualProperties(visual, snapshot.VisualProperties);
+            RefreshDocumentStyles(visual);
             placed.Add(AddElement(
                 snapshot.DisplayName,
                 snapshot.TypeName,
@@ -459,6 +527,11 @@ public partial class CanvasViewModel : ViewModelBase
             visual.Opacity = Math.Clamp(parsedOpacity, 0, 1);
         }
 
+        if (properties.TryGetValue("Classes", out var classes))
+        {
+            SetUserStyleClasses(visual, classes);
+        }
+
         ApplyTemplatedAppearanceProperties(visual, properties);
 
         if (properties.TryGetValue("__toolTip", out var toolTip))
@@ -571,6 +644,11 @@ public partial class CanvasViewModel : ViewModelBase
             if (properties.TryGetValue("Foreground", out var foreground))
             {
                 TrySetTextForeground(textBlock, foreground);
+            }
+
+            if (properties.TryGetValue("Background", out var background))
+            {
+                TrySetAppearanceBrush(textBlock, "Background", brush => textBlock.Background = brush, background);
             }
 
             return;
@@ -1182,6 +1260,22 @@ public partial class CanvasViewModel : ViewModelBase
         catch (FormatException)
         {
             // Ignore malformed imported brushes while keeping the control usable.
+        }
+    }
+
+    private static void SetUserStyleClasses(Control visual, string classes)
+    {
+        foreach (var className in GetUserStyleClasses(visual))
+        {
+            visual.Classes.Remove(className);
+        }
+
+        foreach (var className in classes.Split(
+                     [' ', '\t', '\r', '\n'],
+                     StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                 .Distinct(StringComparer.Ordinal))
+        {
+            visual.Classes.Add(className);
         }
     }
 

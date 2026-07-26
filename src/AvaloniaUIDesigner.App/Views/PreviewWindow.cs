@@ -10,6 +10,7 @@ using Avalonia.Layout;
 using Avalonia.Media;
 using Avalonia.Media.Imaging;
 using AvaloniaUIDesigner.App.Designer.Core;
+using AvaloniaUIDesigner.App.Designer.Services;
 using AvaloniaUIDesigner.App.Models;
 
 namespace AvaloniaUIDesigner.App.Views;
@@ -27,6 +28,7 @@ public sealed class PreviewWindow : Window
 
         var settings = document.Settings ?? new DesignerCanvasSettings();
         var colorResources = document.ColorResources ?? new Dictionary<string, string>(StringComparer.Ordinal);
+        var styles = document.Styles ?? Array.Empty<DesignerStyleDefinition>();
         Width = Math.Clamp(settings.Width + 32, MinWidth, 1280);
         Height = Math.Clamp(settings.Height + 72, MinHeight, 960);
 
@@ -44,7 +46,7 @@ public sealed class PreviewWindow : Window
         var controlsByName = new Dictionary<string, Control>(StringComparer.OrdinalIgnoreCase);
         foreach (var element in document.Elements)
         {
-            var control = CreateControl(element, colorResources);
+            var control = CreateControl(element, colorResources, styles);
             control.Width = element.Width;
             control.Height = element.Height;
             Canvas.SetLeft(control, element.X);
@@ -76,7 +78,8 @@ public sealed class PreviewWindow : Window
 
     private static Control CreateControl(
         DesignerElementSnapshot snapshot,
-        IReadOnlyDictionary<string, string> colorResources)
+        IReadOnlyDictionary<string, string> colorResources,
+        IReadOnlyList<DesignerStyleDefinition> styles)
     {
         Control control = snapshot.TypeName switch
         {
@@ -154,6 +157,7 @@ public sealed class PreviewWindow : Window
         };
 
         ApplyProperties(control, snapshot.VisualProperties, colorResources);
+        DesignerStyleRuntime.ApplyStyles(control, styles, colorResources);
         return control;
     }
 
@@ -171,6 +175,17 @@ public sealed class PreviewWindow : Window
             && double.TryParse(opacity, NumberStyles.Float, CultureInfo.InvariantCulture, out var parsedOpacity))
         {
             control.Opacity = Math.Clamp(parsedOpacity, 0, 1);
+        }
+
+        if (properties.TryGetValue("Classes", out var classes))
+        {
+            foreach (var className in classes.Split(
+                         [' ', '\t', '\r', '\n'],
+                         StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                     .Distinct(StringComparer.Ordinal))
+            {
+                control.Classes.Add(className);
+            }
         }
 
         ApplyTemplatedAppearanceProperties(control, properties, colorResources);
@@ -270,6 +285,12 @@ public sealed class PreviewWindow : Window
                 {
                     TrySetTextForeground(textBlock, foreground, colorResources);
                 }
+
+                if (properties.TryGetValue("Background", out var background))
+                {
+                    TrySetBorderBrush(value => textBlock.Background = value, background, colorResources);
+                }
+
                 break;
             case Label label:
                 if (properties.TryGetValue("Content", out var labelContent))
