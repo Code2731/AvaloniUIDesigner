@@ -729,6 +729,19 @@ public partial class MainWindow : Window
         await ShowTextInputPropertiesDialogAsync(state);
     }
 
+    private async void OnEditSelectionPropertiesMenuClicked(
+        object? sender,
+        Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        FlushPendingPropertyHistory();
+        if (Vm is null || !Vm.TryGetSelectedSelectionProperties(out var state))
+        {
+            return;
+        }
+
+        await ShowSelectionPropertiesDialogAsync(state);
+    }
+
     private async void OnEditGridDefinitionsMenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
         FlushPendingPropertyHistory();
@@ -4068,6 +4081,235 @@ public partial class MainWindow : Window
         Grid.SetRow(switches, 3);
         Grid.SetRow(errorText, 5);
         Grid.SetRow(buttons, 6);
+        dialog.Content = content;
+        await dialog.ShowDialog(this);
+
+        static void AddField(Grid owner, string label, Control editor, int row, int column)
+        {
+            var field = new StackPanel
+            {
+                Spacing = 4,
+                Children =
+                {
+                    new TextBlock { Text = label },
+                    editor,
+                },
+            };
+            Grid.SetRow(field, row);
+            Grid.SetColumn(field, column);
+            owner.Children.Add(field);
+        }
+    }
+
+    private async Task ShowSelectionPropertiesDialogAsync(SelectionEditorState state)
+    {
+        if (Vm is null)
+        {
+            return;
+        }
+
+        var isComboBox = state.ControlKind == nameof(DesignerSelectionControlKind.ComboBox);
+        var isListBox = state.ControlKind == nameof(DesignerSelectionControlKind.ListBox);
+        var supportsIndex = isComboBox || isListBox;
+        var supportsSelectionMode = !isComboBox;
+        var selectedIndexEditor = new TextBox
+        {
+            Text = state.SelectedIndex,
+            IsEnabled = supportsIndex,
+            Watermark = supportsIndex ? "-1 = no selection" : "Not used by TreeView",
+        };
+        var textEditor = new TextBox
+        {
+            Text = state.Text,
+            IsEnabled = isComboBox && state.IsEditable,
+            Watermark = "Editable ComboBox text",
+        };
+        var placeholderEditor = new TextBox
+        {
+            Text = state.PlaceholderText,
+            IsEnabled = isComboBox,
+        };
+        var maxDropDownHeightEditor = new TextBox
+        {
+            Text = state.MaxDropDownHeight,
+            IsEnabled = isComboBox,
+        };
+        var horizontalAlignmentEditor = new ComboBox
+        {
+            ItemsSource = DesignerSelectionRuntime.HorizontalAlignmentNames,
+            SelectedItem = state.HorizontalContentAlignment,
+            IsEnabled = isComboBox,
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+        };
+        var verticalAlignmentEditor = new ComboBox
+        {
+            ItemsSource = DesignerSelectionRuntime.VerticalAlignmentNames,
+            SelectedItem = state.VerticalContentAlignment,
+            IsEnabled = isComboBox,
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+        };
+        var textSearchEditor = new CheckBox
+        {
+            Content = "Type-to-search",
+            IsChecked = state.IsTextSearchEnabled,
+            IsEnabled = supportsIndex,
+        };
+        var autoScrollEditor = new CheckBox
+        {
+            Content = "Auto-scroll to selection",
+            IsChecked = state.AutoScrollToSelectedItem,
+        };
+        var wrapSelectionEditor = new CheckBox
+        {
+            Content = "Wrap keyboard selection",
+            IsChecked = state.WrapSelection,
+            IsEnabled = supportsIndex,
+        };
+        var multipleEditor = new CheckBox
+        {
+            Content = "Allow multiple selection",
+            IsChecked = state.AllowMultiple,
+            IsEnabled = supportsSelectionMode,
+        };
+        var toggleEditor = new CheckBox
+        {
+            Content = "Toggle selection on tap / Space",
+            IsChecked = state.ToggleSelection,
+            IsEnabled = supportsSelectionMode,
+        };
+        var alwaysSelectedEditor = new CheckBox
+        {
+            Content = "Always keep an item selected",
+            IsChecked = state.AlwaysSelected,
+            IsEnabled = supportsSelectionMode,
+        };
+        var editableEditor = new CheckBox
+        {
+            Content = "Editable ComboBox",
+            IsChecked = state.IsEditable,
+            IsEnabled = isComboBox,
+        };
+
+        void RefreshEditableText()
+        {
+            var hasSelection = int.TryParse(
+                    selectedIndexEditor.Text,
+                    NumberStyles.Integer,
+                    CultureInfo.InvariantCulture,
+                    out var selectedIndex)
+                && selectedIndex >= 0;
+            textEditor.IsEnabled = isComboBox
+                && editableEditor.IsChecked == true
+                && !hasSelection;
+            textEditor.Watermark = hasSelection
+                ? "Text is supplied by the selected item"
+                : "Editable ComboBox text";
+        }
+
+        editableEditor.IsCheckedChanged += (_, _) => RefreshEditableText();
+        selectedIndexEditor.TextChanged += (_, _) => RefreshEditableText();
+        RefreshEditableText();
+
+        var fields = new Grid
+        {
+            ColumnDefinitions = new ColumnDefinitions("*,*"),
+            RowDefinitions = new RowDefinitions("Auto,Auto,Auto"),
+            ColumnSpacing = 12,
+            RowSpacing = 10,
+        };
+        AddField(fields, "Selected index", selectedIndexEditor, 0, 0);
+        AddField(fields, "Editable text", textEditor, 0, 1);
+        AddField(fields, "Placeholder text", placeholderEditor, 1, 0);
+        AddField(fields, "Maximum drop-down height", maxDropDownHeightEditor, 1, 1);
+        AddField(fields, "Horizontal content alignment", horizontalAlignmentEditor, 2, 0);
+        AddField(fields, "Vertical content alignment", verticalAlignmentEditor, 2, 1);
+
+        var switches = new WrapPanel
+        {
+            Orientation = Orientation.Horizontal,
+            ItemSpacing = 16,
+            LineSpacing = 8,
+            Children =
+            {
+                textSearchEditor,
+                autoScrollEditor,
+                wrapSelectionEditor,
+                multipleEditor,
+                toggleEditor,
+                alwaysSelectedEditor,
+                editableEditor,
+            },
+        };
+        var errorText = new TextBlock
+        {
+            Foreground = Avalonia.Media.Brushes.IndianRed,
+            TextWrapping = Avalonia.Media.TextWrapping.Wrap,
+        };
+        var dialog = new Window
+        {
+            Title = $"Edit Selection Behavior - {state.ControlName}",
+            Width = 720,
+            Height = 530,
+            MinWidth = 620,
+            MinHeight = 470,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner,
+        };
+        var applyButton = new Button { Content = "Apply", MinWidth = 84 };
+        applyButton.Click += (_, _) =>
+        {
+            var input = new DesignerSelectionEditorInput(
+                selectedIndexEditor.Text ?? string.Empty,
+                textSearchEditor.IsChecked == true,
+                autoScrollEditor.IsChecked == true,
+                wrapSelectionEditor.IsChecked == true,
+                multipleEditor.IsChecked == true,
+                toggleEditor.IsChecked == true,
+                alwaysSelectedEditor.IsChecked == true,
+                editableEditor.IsChecked == true,
+                textEditor.Text ?? string.Empty,
+                placeholderEditor.Text ?? string.Empty,
+                maxDropDownHeightEditor.Text ?? string.Empty,
+                horizontalAlignmentEditor.SelectedItem?.ToString() ?? string.Empty,
+                verticalAlignmentEditor.SelectedItem?.ToString() ?? string.Empty);
+            if (!Vm.SetSelectedSelectionProperties(input))
+            {
+                errorText.Text = Vm.StatusText;
+                return;
+            }
+
+            dialog.Close();
+        };
+        var cancelButton = new Button { Content = "Cancel", MinWidth = 84 };
+        cancelButton.Click += (_, _) => dialog.Close();
+        var buttons = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            Spacing = 8,
+            HorizontalAlignment = HorizontalAlignment.Right,
+            Children = { cancelButton, applyButton },
+        };
+        var content = new Grid
+        {
+            Margin = new Thickness(16),
+            RowDefinitions = new RowDefinitions("Auto,Auto,Auto,*,Auto,Auto"),
+            RowSpacing = 12,
+            Children =
+            {
+                new TextBlock
+                {
+                    Text = $"Configure {state.ControlKind} selection, keyboard navigation, and type-specific presentation behavior.",
+                    TextWrapping = Avalonia.Media.TextWrapping.Wrap,
+                },
+                fields,
+                switches,
+                errorText,
+                buttons,
+            },
+        };
+        Grid.SetRow(fields, 1);
+        Grid.SetRow(switches, 2);
+        Grid.SetRow(errorText, 4);
+        Grid.SetRow(buttons, 5);
         dialog.Content = content;
         await dialog.ShowDialog(this);
 

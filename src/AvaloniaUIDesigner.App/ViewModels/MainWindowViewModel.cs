@@ -171,6 +171,23 @@ public sealed record TextInputEditorState(
     bool ClearSelectionOnLostFocus,
     bool IsInactiveSelectionHighlightEnabled);
 
+public sealed record SelectionEditorState(
+    string ControlName,
+    string ControlKind,
+    string SelectedIndex,
+    bool IsTextSearchEnabled,
+    bool AutoScrollToSelectedItem,
+    bool WrapSelection,
+    bool AllowMultiple,
+    bool ToggleSelection,
+    bool AlwaysSelected,
+    bool IsEditable,
+    string Text,
+    string PlaceholderText,
+    string MaxDropDownHeight,
+    string HorizontalContentAlignment,
+    string VerticalContentAlignment);
+
 public sealed record GridDefinitionEditorState(
     string ControlName,
     string RowDefinitions,
@@ -3949,6 +3966,93 @@ public partial class MainWindowViewModel : ViewModelBase
             values.ClearSelectionOnLostFocus,
             values.IsInactiveSelectionHighlightEnabled);
 
+    public bool TryGetSelectedSelectionProperties(out SelectionEditorState state)
+    {
+        var target = Canvas.SelectedElement;
+        if (target is null || target.IsLocked || !DesignerSelectionRuntime.IsSupportedControl(target.Visual))
+        {
+            state = default!;
+            StatusText = target switch
+            {
+                null => "Select a ComboBox, ListBox, or TreeView before editing selection behavior.",
+                { IsLocked: true } => "Unlock the selected control before editing selection behavior.",
+                _ => "Selection behavior editing is available for ComboBox, ListBox, and TreeView controls.",
+            };
+            return false;
+        }
+
+        if (!DesignerSelectionRuntime.TryRead(target.Visual, out var values, out var error))
+        {
+            state = default!;
+            StatusText = $"Selection behavior cannot be edited. {error}";
+            return false;
+        }
+
+        state = CreateSelectionEditorState(target.DisplayName, values);
+        return true;
+    }
+
+    public bool SetSelectedSelectionProperties(DesignerSelectionEditorInput input)
+    {
+        var target = Canvas.SelectedElement;
+        if (target is null || target.IsLocked || !DesignerSelectionRuntime.IsSupportedControl(target.Visual))
+        {
+            StatusText = "Select an unlocked ComboBox, ListBox, or TreeView before editing selection behavior.";
+            return false;
+        }
+
+        if (!DesignerSelectionRuntime.TryParseValues(target.Visual, input, out var values, out var error))
+        {
+            StatusText = $"Selection behavior was not changed. {error}";
+            return false;
+        }
+
+        if (!DesignerSelectionRuntime.TryRead(target.Visual, out var current, out error))
+        {
+            StatusText = $"Selection behavior was not changed. {error}";
+            return false;
+        }
+
+        if (current == values)
+        {
+            StatusText = "Selection behavior is unchanged.";
+            return true;
+        }
+
+        BeginCanvasMutation(HistoryActionType.EditProperty, "Updated selection behavior.");
+        DesignerSelectionRuntime.Apply(target.Visual, values);
+        DesignerStyleApplicationMetadata.ClearApplied(target.Visual, "Text");
+        foreach (var attribute in DesignerSelectionRuntime.GetAxamlAttributes(target.Visual))
+        {
+            DesignerStyleApplicationMetadata.ClearApplied(target.Visual, attribute.Name);
+        }
+
+        Canvas.RefreshDocumentStyles(target.Visual);
+        CommitCanvasMutation();
+        StatusText = $"Updated selection behavior for {target.DisplayName}.";
+        return true;
+    }
+
+    private static SelectionEditorState CreateSelectionEditorState(
+        string controlName,
+        DesignerSelectionValues values)
+        => new(
+            controlName,
+            values.Kind.ToString(),
+            values.SelectedIndex.ToString(CultureInfo.InvariantCulture),
+            values.IsTextSearchEnabled,
+            values.AutoScrollToSelectedItem,
+            values.WrapSelection,
+            DesignerSelectionRuntime.HasFlag(values.SelectionMode, SelectionMode.Multiple),
+            DesignerSelectionRuntime.HasFlag(values.SelectionMode, SelectionMode.Toggle),
+            DesignerSelectionRuntime.HasFlag(values.SelectionMode, SelectionMode.AlwaysSelected),
+            values.IsEditable,
+            values.Text,
+            values.PlaceholderText,
+            values.MaxDropDownHeight.ToString("0.###", CultureInfo.InvariantCulture),
+            values.HorizontalContentAlignment.ToString(),
+            values.VerticalContentAlignment.ToString());
+
     public bool TryGetSelectedToolTip(out string controlName, out string toolTip)
     {
         var target = Canvas.SelectedElement;
@@ -5571,6 +5675,7 @@ public partial class MainWindowViewModel : ViewModelBase
         DesignerEffectRuntime.Capture(visual, result);
         DesignerRangeRuntime.Capture(visual, result);
         DesignerTextInputRuntime.Capture(visual, result);
+        DesignerSelectionRuntime.Capture(visual, result);
         foreach (var pair in DesignerResourceReferenceMetadata.GetReferences(visual))
         {
             result[pair.Key] = DesignerResourceReferenceMetadata.FormatExpression(pair.Value);
@@ -7299,6 +7404,26 @@ public partial class MainWindowViewModel : ViewModelBase
                 continue;
             }
 
+            if (DesignerSelectionRuntime.IsSupportedProperty(tagName, name))
+            {
+                if (DesignerSelectionRuntime.TryNormalizeProperty(
+                        tagName,
+                        name,
+                        attr.Value,
+                        out var canonicalName,
+                        out var normalizedValue,
+                        out var selectionError))
+                {
+                    map[canonicalName] = normalizedValue;
+                }
+                else
+                {
+                    warnings.Add($"Ignored {tagName}.{name}: {selectionError}");
+                }
+
+                continue;
+            }
+
             if (DesignerTypographyRuntime.IsSupportedProperty(tagName, name))
             {
                 if (DesignerTypographyRuntime.TryNormalizeProperty(
@@ -7390,6 +7515,22 @@ public partial class MainWindowViewModel : ViewModelBase
             DesignerTextInputRuntime.RemoveLineProperties(map);
         }
 
+        var hasItemsSourceBinding = bindings.Any(binding =>
+            string.Equals(binding.PropertyName, "ItemsSource", StringComparison.Ordinal));
+        int? staticItemCount = hasItemsSourceBinding
+            ? null
+            : element.Elements().Count(child =>
+                !child.Name.LocalName.Contains('.', StringComparison.Ordinal));
+        if (!DesignerSelectionRuntime.TryValidateProperties(
+                tagName,
+                map,
+                staticItemCount,
+                out var selectionConstraintError))
+        {
+            warnings.Add($"Ignored {tagName}.SelectedIndex: {selectionConstraintError}");
+            DesignerSelectionRuntime.RemoveSelectedIndex(map);
+        }
+
         if (string.Equals(element.Name.LocalName, "Grid", StringComparison.OrdinalIgnoreCase))
         {
             map.TryAdd("RowDefinitions", string.Empty);
@@ -7397,14 +7538,12 @@ public partial class MainWindowViewModel : ViewModelBase
         }
         else if ((string.Equals(element.Name.LocalName, "ComboBox", StringComparison.OrdinalIgnoreCase)
                 || string.Equals(element.Name.LocalName, "ListBox", StringComparison.OrdinalIgnoreCase))
-            && !bindings.Any(binding =>
-                string.Equals(binding.PropertyName, "ItemsSource", StringComparison.Ordinal)))
+            && !hasItemsSourceBinding)
         {
             map["__items"] = SerializeItems(element);
         }
         else if (string.Equals(element.Name.LocalName, "TreeView", StringComparison.OrdinalIgnoreCase)
-            && !bindings.Any(binding =>
-                string.Equals(binding.PropertyName, "ItemsSource", StringComparison.Ordinal)))
+            && !hasItemsSourceBinding)
         {
             map["__treeItems"] = DesignerTreeItemRuntime.Serialize(element);
         }
@@ -7473,6 +7612,11 @@ public partial class MainWindowViewModel : ViewModelBase
             return true;
         }
 
+        if (DesignerSelectionRuntime.IsSupportedProperty(tagName, propertyName))
+        {
+            return true;
+        }
+
         if (propertyName is "Opacity" or "Classes")
         {
             return true;
@@ -7505,8 +7649,7 @@ public partial class MainWindowViewModel : ViewModelBase
             "CheckBox" or "ToggleSwitch" => propertyName is "Content" or "IsChecked",
             "ToggleButton" => propertyName is "Content" or "IsChecked",
             "RadioButton" => propertyName is "Content" or "IsChecked" or "GroupName",
-            "ComboBox" or "ListBox" => propertyName == "SelectedIndex",
-            "TreeView" => false,
+            "ComboBox" or "ListBox" or "TreeView" => false,
             "Menu" => false,
             "DataGrid" => propertyName is "AutoGenerateColumns" or "GridLinesVisibility" or "IsReadOnly",
             "Slider" => propertyName is "Minimum" or "Maximum" or "Value" or "SmallChange"
@@ -8760,7 +8903,7 @@ public partial class MainWindowViewModel : ViewModelBase
                 sb.Append(indent);
                 sb.Append("<ComboBox");
                 AppendCanvasLayoutAttributes(sb, element);
-                AppendAttribute(sb, "SelectedIndex", comboBox.SelectedIndex.ToString(CultureInfo.InvariantCulture));
+                AppendSelectionAttributes(sb, comboBox);
                 if (DesignerBindingRuntime.HasBinding(comboBox, "ItemsSource"))
                 {
                     sb.AppendLine(" />");
@@ -8786,7 +8929,7 @@ public partial class MainWindowViewModel : ViewModelBase
                 sb.Append(indent);
                 sb.Append("<ListBox");
                 AppendCanvasLayoutAttributes(sb, element);
-                AppendAttribute(sb, "SelectedIndex", listBox.SelectedIndex.ToString(CultureInfo.InvariantCulture));
+                AppendSelectionAttributes(sb, listBox);
                 if (DesignerBindingRuntime.HasBinding(listBox, "ItemsSource"))
                 {
                     sb.AppendLine(" />");
@@ -8812,6 +8955,7 @@ public partial class MainWindowViewModel : ViewModelBase
                 sb.Append(indent);
                 sb.Append("<TreeView");
                 AppendCanvasLayoutAttributes(sb, element);
+                AppendSelectionAttributes(sb, treeView);
                 if (DesignerBindingRuntime.HasBinding(treeView, "ItemsSource"))
                 {
                     sb.AppendLine(" />");
@@ -10066,6 +10210,20 @@ public partial class MainWindowViewModel : ViewModelBase
             var isWrittenByCommonTypography = skipBoundProperties
                 && attribute.Name is "TextWrapping" or "TextAlignment";
             if (!boundProperties.Contains(attribute.Name) && !isWrittenByCommonTypography)
+            {
+                AppendAttribute(sb, attribute.Name, attribute.Value);
+            }
+        }
+    }
+
+    private static void AppendSelectionAttributes(StringBuilder sb, Control visual)
+    {
+        var boundProperties = DesignerBindingRuntime.ReadBindings(visual)
+            .Select(binding => binding.PropertyName)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        foreach (var attribute in DesignerSelectionRuntime.GetAxamlAttributes(visual))
+        {
+            if (!boundProperties.Contains(attribute.Name))
             {
                 AppendAttribute(sb, attribute.Name, attribute.Value);
             }

@@ -792,11 +792,7 @@ public sealed class PreviewWindow : Window
             }
         }
 
-        if (properties.TryGetValue("SelectedIndex", out var selectedIndex)
-            && int.TryParse(selectedIndex, NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsedSelectedIndex))
-        {
-            comboBox.SelectedIndex = Math.Clamp(parsedSelectedIndex, -1, comboBox.Items.Count - 1);
-        }
+        DesignerSelectionRuntime.Apply(comboBox, properties);
     }
 
     private static void ApplyDatePickerProperties(DatePicker datePicker, IReadOnlyDictionary<string, string> properties)
@@ -1005,11 +1001,7 @@ public sealed class PreviewWindow : Window
             }
         }
 
-        if (properties.TryGetValue("SelectedIndex", out var selectedIndex)
-            && int.TryParse(selectedIndex, NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsedSelectedIndex))
-        {
-            listBox.SelectedIndex = Math.Clamp(parsedSelectedIndex, -1, listBox.Items.Count - 1);
-        }
+        DesignerSelectionRuntime.Apply(listBox, properties);
     }
 
     private static void ApplyTreeViewProperties(
@@ -1021,6 +1013,8 @@ public sealed class PreviewWindow : Window
         {
             DesignerTreeItemRuntime.ReplaceItems(treeView, definitions);
         }
+
+        DesignerSelectionRuntime.Apply(treeView, properties);
     }
 
     private static void ApplyMenuProperties(

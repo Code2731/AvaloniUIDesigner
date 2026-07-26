@@ -2297,12 +2297,7 @@ public partial class CanvasViewModel : ViewModelBase
                 RestoreComboBoxItems(comboBox, itemsJson);
             }
 
-            if (properties.TryGetValue("SelectedIndex", out var selectedIndex)
-                && int.TryParse(selectedIndex, NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsedSelectedIndex))
-            {
-                comboBox.SelectedIndex = Math.Clamp(parsedSelectedIndex, -1, comboBox.Items.Count - 1);
-            }
-
+            DesignerSelectionRuntime.Apply(comboBox, properties);
             return;
         }
 
@@ -2313,12 +2308,7 @@ public partial class CanvasViewModel : ViewModelBase
                 RestoreListBoxItems(listBox, itemsJson);
             }
 
-            if (properties.TryGetValue("SelectedIndex", out var selectedIndex)
-                && int.TryParse(selectedIndex, NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsedSelectedIndex))
-            {
-                listBox.SelectedIndex = Math.Clamp(parsedSelectedIndex, -1, listBox.Items.Count - 1);
-            }
-
+            DesignerSelectionRuntime.Apply(listBox, properties);
             return;
         }
 
@@ -2330,6 +2320,7 @@ public partial class CanvasViewModel : ViewModelBase
                 DesignerTreeItemRuntime.ReplaceItems(treeView, definitions);
             }
 
+            DesignerSelectionRuntime.Apply(treeView, properties);
             return;
         }
 
