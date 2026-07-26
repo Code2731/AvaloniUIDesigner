@@ -1,6 +1,7 @@
 ﻿using System.Collections.Generic;
 using System;
 using System.Globalization;
+using System.Linq;
 using System.Text;
 using AvaloniaUIDesigner.App.Designer.Contracts;
 using AvaloniaUIDesigner.App.Designer.Core;
@@ -59,21 +60,18 @@ public sealed class AxamlDocumentSerializer : IDesignerSerializer
             sb.AppendLine("  </Canvas.Styles>");
         }
 
-        foreach (var element in document.Elements)
+        var gridNames = document.Elements
+            .Where(element => string.Equals(element.TypeName, "Avalonia.Controls.Grid", StringComparison.Ordinal))
+            .Select(element => element.DisplayName)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var childrenByParent = document.Elements
+            .Where(element => element.ParentName is not null && gridNames.Contains(element.ParentName))
+            .GroupBy(element => element.ParentName!, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(group => group.Key, group => group.ToList(), StringComparer.OrdinalIgnoreCase);
+        foreach (var element in document.Elements.Where(element =>
+                     element.ParentName is null || !gridNames.Contains(element.ParentName)))
         {
-            sb.Append("  <");
-            sb.Append(MapToTagName(element.TypeName));
-            sb.Append(" Canvas.Left=\"");
-            sb.Append(ToInvariantString(element.X));
-            sb.Append("\" Canvas.Top=\"");
-            sb.Append(ToInvariantString(element.Y));
-            sb.Append("\" Width=\"");
-            sb.Append(ToInvariantString(element.Width));
-            sb.Append("\" Height=\"");
-            sb.Append(ToInvariantString(element.Height));
-            sb.Append("\"");
-            AppendVisualAttributes(sb, element.VisualProperties);
-            sb.AppendLine(" />");
+            AppendElement(sb, element, "  ", childrenByParent, isGridChild: false);
         }
 
         sb.AppendLine("</Canvas>");
@@ -87,6 +85,78 @@ public sealed class AxamlDocumentSerializer : IDesignerSerializer
     {
         var index = typeName.LastIndexOf('.');
         return index >= 0 ? typeName[(index + 1)..] : typeName;
+    }
+
+    private static void AppendElement(
+        StringBuilder sb,
+        DesignerElementSnapshot element,
+        string indent,
+        IReadOnlyDictionary<string, List<DesignerElementSnapshot>> childrenByParent,
+        bool isGridChild)
+    {
+        sb.Append(indent);
+        sb.Append('<');
+        sb.Append(MapToTagName(element.TypeName));
+        sb.Append(" x:Name=\"");
+        sb.Append(EscapeXmlAttribute(element.DisplayName));
+        sb.Append('"');
+        if (!isGridChild)
+        {
+            sb.Append(" Canvas.Left=\"");
+            sb.Append(ToInvariantString(element.X));
+            sb.Append("\" Canvas.Top=\"");
+            sb.Append(ToInvariantString(element.Y));
+            sb.Append("\" Width=\"");
+            sb.Append(ToInvariantString(element.Width));
+            sb.Append("\" Height=\"");
+            sb.Append(ToInvariantString(element.Height));
+            sb.Append('"');
+        }
+        else
+        {
+            AppendGridCellAttributes(sb, element);
+        }
+
+        AppendVisualAttributes(sb, element.VisualProperties);
+        if (!childrenByParent.TryGetValue(element.DisplayName, out var children) || children.Count == 0)
+        {
+            sb.AppendLine(" />");
+            return;
+        }
+
+        sb.AppendLine(">");
+        foreach (var child in children)
+        {
+            AppendElement(sb, child, indent + "  ", childrenByParent, isGridChild: true);
+        }
+
+        sb.Append(indent);
+        sb.Append("</");
+        sb.Append(MapToTagName(element.TypeName));
+        sb.AppendLine(">");
+    }
+
+    private static void AppendGridCellAttributes(StringBuilder sb, DesignerElementSnapshot element)
+    {
+        if (element.GridRow > 0)
+        {
+            sb.Append($" Grid.Row=\"{element.GridRow}\"");
+        }
+
+        if (element.GridColumn > 0)
+        {
+            sb.Append($" Grid.Column=\"{element.GridColumn}\"");
+        }
+
+        if (element.GridRowSpan > 1)
+        {
+            sb.Append($" Grid.RowSpan=\"{element.GridRowSpan}\"");
+        }
+
+        if (element.GridColumnSpan > 1)
+        {
+            sb.Append($" Grid.ColumnSpan=\"{element.GridColumnSpan}\"");
+        }
     }
 
     private static void AppendVisualAttributes(StringBuilder sb, IReadOnlyDictionary<string, string>? properties)

@@ -26,6 +26,12 @@ public partial class MainWindow : Window
     private sealed record ComponentPackExportOptions(string PackName, string DisplayName, string NamePrefix);
     private sealed record ColorResourceApplicationOptions(string ResourceName, string PropertyName);
     private sealed record GridDefinitionOptions(string RowDefinitions, string ColumnDefinitions, bool ShowGridLines);
+    private sealed record GridCellAssignmentOptions(
+        string ParentName,
+        int Row,
+        int Column,
+        int RowSpan,
+        int ColumnSpan);
 
     private const double HandleHalf = 5;
     private const double MinSize = 10;
@@ -593,6 +599,32 @@ public partial class MainWindow : Window
                 updated.ColumnDefinitions,
                 updated.ShowGridLines);
         }
+    }
+
+    private async void OnAssignToGridCellMenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        FlushPendingPropertyHistory();
+        if (Vm is null || !Vm.TryGetSelectedGridCellAssignment(out var state))
+        {
+            return;
+        }
+
+        var updated = await ShowGridCellAssignmentDialogAsync(state);
+        if (updated is not null)
+        {
+            Vm.SetSelectedGridCellAssignment(
+                updated.ParentName,
+                updated.Row,
+                updated.Column,
+                updated.RowSpan,
+                updated.ColumnSpan);
+        }
+    }
+
+    private void OnRemoveFromGridMenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        FlushPendingPropertyHistory();
+        Vm?.RemoveSelectedFromGrid();
     }
 
     private async void OnChooseImageMenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
@@ -1274,6 +1306,13 @@ public partial class MainWindow : Window
             Vm?.Canvas.RefreshDocumentStyles(control);
         }
 
+        if (control is Grid
+            && e.Property.Name is "RowDefinitions" or "ColumnDefinitions"
+            && _boundElement is not null)
+        {
+            Vm?.Canvas.ReflowGridChildren(_boundElement);
+        }
+
         if (!_hasPendingPropertyEdit)
         {
             Vm?.BeginCanvasMutation(MainWindowViewModel.HistoryActionType.EditProperty, "Updated control properties.");
@@ -1478,22 +1517,23 @@ public partial class MainWindow : Window
     private void UpdateSelectionEditability()
     {
         var canEdit = _boundElement is { IsLocked: false };
+        var canEditLayout = canEdit && _boundElement is not { IsGridChild: true };
 
         PropGrid.IsEnabled = canEdit;
         ElementNameEditor.IsEnabled = canEdit;
-        LayoutXEditor.IsEnabled = canEdit;
-        LayoutYEditor.IsEnabled = canEdit;
-        LayoutWidthEditor.IsEnabled = canEdit;
-        LayoutHeightEditor.IsEnabled = canEdit;
+        LayoutXEditor.IsEnabled = canEditLayout;
+        LayoutYEditor.IsEnabled = canEditLayout;
+        LayoutWidthEditor.IsEnabled = canEditLayout;
+        LayoutHeightEditor.IsEnabled = canEditLayout;
 
-        HandleNW.IsVisible = canEdit;
-        HandleN.IsVisible = canEdit;
-        HandleNE.IsVisible = canEdit;
-        HandleE.IsVisible = canEdit;
-        HandleSE.IsVisible = canEdit;
-        HandleS.IsVisible = canEdit;
-        HandleSW.IsVisible = canEdit;
-        HandleW.IsVisible = canEdit;
+        HandleNW.IsVisible = canEditLayout;
+        HandleN.IsVisible = canEditLayout;
+        HandleNE.IsVisible = canEditLayout;
+        HandleE.IsVisible = canEditLayout;
+        HandleSE.IsVisible = canEditLayout;
+        HandleS.IsVisible = canEditLayout;
+        HandleSW.IsVisible = canEditLayout;
+        HandleW.IsVisible = canEditLayout;
     }
 
     private void OnLayoutEditorLostFocus(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
@@ -1739,6 +1779,13 @@ public partial class MainWindow : Window
             return;
         }
 
+        if (element.IsGridChild)
+        {
+            Vm.StatusText = "Grid child position and size are managed by its assigned cell.";
+            e.Handled = true;
+            return;
+        }
+
         BeginDrag(DragMode.Move, element, e);
         e.Handled = true;
     }
@@ -1759,6 +1806,13 @@ public partial class MainWindow : Window
         if (target.IsLocked)
         {
             Vm?.StatusText = "Selected control is locked.";
+            e.Handled = true;
+            return;
+        }
+
+        if (target.IsGridChild)
+        {
+            Vm?.StatusText = "Grid child position and size are managed by its assigned cell.";
             e.Handled = true;
             return;
         }
@@ -2391,6 +2445,119 @@ public partial class MainWindow : Window
         dialog.Content = content;
 
         return await dialog.ShowDialog<GridDefinitionOptions?>(this);
+    }
+
+    private async Task<GridCellAssignmentOptions?> ShowGridCellAssignmentDialogAsync(
+        GridCellAssignmentEditorState state)
+    {
+        var parentSelector = new ComboBox
+        {
+            ItemsSource = state.Parents,
+            SelectedItem = state.Parents.First(parent => string.Equals(
+                parent.DisplayName,
+                state.SelectedParentName,
+                StringComparison.OrdinalIgnoreCase)),
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+        };
+        var rowEditor = new NumericUpDown { Minimum = 1, Value = state.GridRow + 1 };
+        var columnEditor = new NumericUpDown { Minimum = 1, Value = state.GridColumn + 1 };
+        var rowSpanEditor = new NumericUpDown { Minimum = 1, Value = state.GridRowSpan };
+        var columnSpanEditor = new NumericUpDown { Minimum = 1, Value = state.GridColumnSpan };
+        var errorText = new TextBlock
+        {
+            Foreground = Avalonia.Media.Brushes.IndianRed,
+            TextWrapping = Avalonia.Media.TextWrapping.Wrap,
+        };
+        var dialog = new Window
+        {
+            Title = $"Assign to Grid Cell - {state.ControlName}",
+            Width = 460,
+            Height = 440,
+            MinWidth = 380,
+            MinHeight = 380,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner,
+        };
+
+        void UpdateLimits()
+        {
+            if (parentSelector.SelectedItem is not GridCellParentOption parent)
+            {
+                return;
+            }
+
+            rowEditor.Maximum = parent.RowCount;
+            columnEditor.Maximum = parent.ColumnCount;
+            rowSpanEditor.Maximum = parent.RowCount;
+            columnSpanEditor.Maximum = parent.ColumnCount;
+        }
+
+        parentSelector.SelectionChanged += (_, _) => UpdateLimits();
+        UpdateLimits();
+
+        var applyButton = new Button { Content = "Assign", MinWidth = 84 };
+        applyButton.Click += (_, _) =>
+        {
+            if (parentSelector.SelectedItem is not GridCellParentOption parent)
+            {
+                errorText.Text = "Choose a Grid.";
+                return;
+            }
+
+            var row = (int)(rowEditor.Value ?? 1) - 1;
+            var column = (int)(columnEditor.Value ?? 1) - 1;
+            var rowSpan = (int)(rowSpanEditor.Value ?? 1);
+            var columnSpan = (int)(columnSpanEditor.Value ?? 1);
+            if (row + rowSpan > parent.RowCount || column + columnSpan > parent.ColumnCount)
+            {
+                errorText.Text = $"The cell span must fit within {parent.RowCount} row(s) and {parent.ColumnCount} column(s).";
+                return;
+            }
+
+            dialog.Close(new GridCellAssignmentOptions(
+                parent.DisplayName,
+                row,
+                column,
+                rowSpan,
+                columnSpan));
+        };
+        var cancelButton = new Button { Content = "Cancel", MinWidth = 84 };
+        cancelButton.Click += (_, _) => dialog.Close(null);
+        var buttons = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            Spacing = 8,
+            HorizontalAlignment = HorizontalAlignment.Right,
+            Children = { cancelButton, applyButton },
+        };
+        var fields = new StackPanel
+        {
+            Spacing = 6,
+            Children =
+            {
+                new TextBlock { Text = "Parent Grid" },
+                parentSelector,
+                new TextBlock { Text = "Row (1-based)" },
+                rowEditor,
+                new TextBlock { Text = "Column (1-based)" },
+                columnEditor,
+                new TextBlock { Text = "Row span" },
+                rowSpanEditor,
+                new TextBlock { Text = "Column span" },
+                columnSpanEditor,
+                errorText,
+            },
+        };
+        var content = new Grid
+        {
+            Margin = new Thickness(16),
+            RowDefinitions = new RowDefinitions("*,Auto"),
+            RowSpacing = 12,
+            Children = { fields, buttons },
+        };
+        Grid.SetRow(buttons, 1);
+        dialog.Content = content;
+
+        return await dialog.ShowDialog<GridCellAssignmentOptions?>(this);
     }
 
     private async Task<ComponentPackExportOptions?> ShowComponentPackExportDialogAsync(

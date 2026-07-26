@@ -74,6 +74,36 @@ public static class DesignerGridDefinitionRuntime
         return true;
     }
 
+    public static Rect GetCellBounds(
+        Grid grid,
+        Rect gridBounds,
+        int row,
+        int column,
+        int rowSpan,
+        int columnSpan)
+    {
+        var rowSizes = CalculateTrackSizes(
+            grid.RowDefinitions.Select(definition => definition.Height).ToList(),
+            gridBounds.Height);
+        var columnSizes = CalculateTrackSizes(
+            grid.ColumnDefinitions.Select(definition => definition.Width).ToList(),
+            gridBounds.Width);
+        var normalizedRow = Math.Clamp(row, 0, rowSizes.Count - 1);
+        var normalizedColumn = Math.Clamp(column, 0, columnSizes.Count - 1);
+        var normalizedRowSpan = Math.Clamp(rowSpan, 1, rowSizes.Count - normalizedRow);
+        var normalizedColumnSpan = Math.Clamp(columnSpan, 1, columnSizes.Count - normalizedColumn);
+
+        return new Rect(
+            gridBounds.X + columnSizes.Take(normalizedColumn).Sum(),
+            gridBounds.Y + rowSizes.Take(normalizedRow).Sum(),
+            columnSizes.Skip(normalizedColumn).Take(normalizedColumnSpan).Sum(),
+            rowSizes.Skip(normalizedRow).Take(normalizedRowSpan).Sum());
+    }
+
+    public static int GetRowCount(Grid grid) => Math.Max(1, grid.RowDefinitions.Count);
+
+    public static int GetColumnCount(Grid grid) => Math.Max(1, grid.ColumnDefinitions.Count);
+
     private static string Format(GridLength length)
     {
         if (length.IsAuto)
@@ -88,5 +118,30 @@ public static class DesignerGridDefinitionRuntime
         }
 
         return Math.Abs(length.Value - 1) < 0.0001 ? "*" : $"{value}*";
+    }
+
+    private static IReadOnlyList<double> CalculateTrackSizes(
+        IReadOnlyList<GridLength> definitions,
+        double available)
+    {
+        if (definitions.Count == 0)
+        {
+            return [Math.Max(0, available)];
+        }
+
+        var fixedSize = definitions.Where(length => !length.IsAuto && !length.IsStar).Sum(length => length.Value);
+        var flexibleUnits = definitions.Sum(length =>
+            length.IsAuto ? 1 : length.IsStar ? Math.Max(0, length.Value) : 0);
+        var flexibleSize = flexibleUnits <= 0
+            ? 0
+            : Math.Max(0, available - fixedSize) / flexibleUnits;
+
+        return definitions.Select(length =>
+                length.IsAuto
+                    ? flexibleSize
+                    : length.IsStar
+                        ? flexibleSize * Math.Max(0, length.Value)
+                        : Math.Max(0, length.Value))
+            .ToList();
     }
 }

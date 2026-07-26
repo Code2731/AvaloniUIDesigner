@@ -27,6 +27,7 @@ public partial class CanvasViewModel : ViewModelBase
     private readonly List<DesignerStyleDefinition> _documentStyles = new();
     private Control? _stylePreviewControl;
     private string? _stylePreviewPseudoClass;
+    private bool _isReflowingGridChildren;
 
     public CanvasViewModel()
         : this(new BuiltInComponentCatalog(), new DefaultControlRenderer())
@@ -302,6 +303,12 @@ public partial class CanvasViewModel : ViewModelBase
             select,
             preserveDisplayName: true);
         element.IsLocked = snapshot.IsLocked;
+        element.GridRow = Math.Max(0, snapshot.GridRow);
+        element.GridColumn = Math.Max(0, snapshot.GridColumn);
+        element.GridRowSpan = Math.Max(1, snapshot.GridRowSpan);
+        element.GridColumnSpan = Math.Max(1, snapshot.GridColumnSpan);
+        element.ParentName = snapshot.ParentName;
+        ReflowGridChild(element);
         ResolveLabelTargets();
         return element;
     }
@@ -424,7 +431,65 @@ public partial class CanvasViewModel : ViewModelBase
             SelectedElement = SelectedElements.LastOrDefault();
         }
 
+        foreach (var child in Elements.Where(candidate =>
+                     string.Equals(candidate.ParentName, element.DisplayName, StringComparison.OrdinalIgnoreCase)))
+        {
+            child.ParentName = null;
+            child.GridRow = 0;
+            child.GridColumn = 0;
+            child.GridRowSpan = 1;
+            child.GridColumnSpan = 1;
+        }
+
+        element.PropertyChanged -= OnDesignElementPropertyChanged;
+
         return true;
+    }
+
+    public void ReflowGridChildren(DesignElement? parent = null)
+    {
+        if (_isReflowingGridChildren)
+        {
+            return;
+        }
+
+        _isReflowingGridChildren = true;
+        try
+        {
+            var children = parent is null
+                ? Elements.Where(element => element.IsGridChild).ToList()
+                : Elements.Where(element => string.Equals(
+                    element.ParentName,
+                    parent.DisplayName,
+                    StringComparison.OrdinalIgnoreCase)).ToList();
+            foreach (var child in children)
+            {
+                ReflowGridChildCore(child);
+            }
+        }
+        finally
+        {
+            _isReflowingGridChildren = false;
+        }
+    }
+
+    public void NormalizeGridRelationships()
+    {
+        var gridNames = Elements
+            .Where(element => element.Visual is Grid)
+            .Select(element => element.DisplayName)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        foreach (var element in Elements.Where(element =>
+                     element.ParentName is not null && !gridNames.Contains(element.ParentName)))
+        {
+            element.ParentName = null;
+            element.GridRow = 0;
+            element.GridColumn = 0;
+            element.GridRowSpan = 1;
+            element.GridColumnSpan = 1;
+        }
+
+        ReflowGridChildren();
     }
 
     public bool MoveElementsToFront(IEnumerable<DesignElement> elements)
@@ -578,6 +643,7 @@ public partial class CanvasViewModel : ViewModelBase
             width: width,
             height: height);
 
+        element.PropertyChanged += OnDesignElementPropertyChanged;
         Elements.Add(element);
         if (select)
         {
@@ -585,6 +651,86 @@ public partial class CanvasViewModel : ViewModelBase
         }
 
         return element;
+    }
+
+    private void ReflowGridChild(DesignElement child)
+    {
+        if (_isReflowingGridChildren)
+        {
+            return;
+        }
+
+        _isReflowingGridChildren = true;
+        try
+        {
+            ReflowGridChildCore(child);
+        }
+        finally
+        {
+            _isReflowingGridChildren = false;
+        }
+    }
+
+    private void ReflowGridChildCore(DesignElement child)
+    {
+        if (!child.IsGridChild
+            || Elements.FirstOrDefault(element =>
+                string.Equals(element.DisplayName, child.ParentName, StringComparison.OrdinalIgnoreCase))
+                is not { Visual: Grid grid } parent)
+        {
+            return;
+        }
+
+        var rowCount = DesignerGridDefinitionRuntime.GetRowCount(grid);
+        var columnCount = DesignerGridDefinitionRuntime.GetColumnCount(grid);
+        child.GridRow = Math.Clamp(child.GridRow, 0, rowCount - 1);
+        child.GridColumn = Math.Clamp(child.GridColumn, 0, columnCount - 1);
+        child.GridRowSpan = Math.Clamp(child.GridRowSpan, 1, rowCount - child.GridRow);
+        child.GridColumnSpan = Math.Clamp(child.GridColumnSpan, 1, columnCount - child.GridColumn);
+        var bounds = DesignerGridDefinitionRuntime.GetCellBounds(
+            grid,
+            new Rect(parent.X, parent.Y, parent.Width, parent.Height),
+            child.GridRow,
+            child.GridColumn,
+            child.GridRowSpan,
+            child.GridColumnSpan);
+        child.X = bounds.X;
+        child.Y = bounds.Y;
+        child.Width = Math.Max(10, bounds.Width);
+        child.Height = Math.Max(10, bounds.Height);
+    }
+
+    private void OnDesignElementPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        if (_isReflowingGridChildren || sender is not DesignElement element)
+        {
+            return;
+        }
+
+        if (e.PropertyName is nameof(DesignElement.ParentName)
+            or nameof(DesignElement.GridRow)
+            or nameof(DesignElement.GridColumn)
+            or nameof(DesignElement.GridRowSpan)
+            or nameof(DesignElement.GridColumnSpan))
+        {
+            ReflowGridChild(element);
+            return;
+        }
+
+        if (e.PropertyName is nameof(DesignElement.X)
+            or nameof(DesignElement.Y)
+            or nameof(DesignElement.Width)
+            or nameof(DesignElement.Height))
+        {
+            if (element.IsGridChild)
+            {
+                ReflowGridChild(element);
+            }
+            else if (element.Visual is Grid)
+            {
+                ReflowGridChildren(element);
+            }
+        }
     }
 
     private (Control Visual, double Width, double Height) CreateVisualByType(string typeName, string displayName)

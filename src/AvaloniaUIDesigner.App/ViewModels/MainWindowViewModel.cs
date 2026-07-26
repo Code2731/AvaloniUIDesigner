@@ -29,6 +29,20 @@ public sealed record GridDefinitionEditorState(
     string ColumnDefinitions,
     bool ShowGridLines);
 
+public sealed record GridCellParentOption(string DisplayName, int RowCount, int ColumnCount)
+{
+    public override string ToString() => DisplayName;
+}
+
+public sealed record GridCellAssignmentEditorState(
+    string ControlName,
+    IReadOnlyList<GridCellParentOption> Parents,
+    string SelectedParentName,
+    int GridRow,
+    int GridColumn,
+    int GridRowSpan,
+    int GridColumnSpan);
+
 public partial class MainWindowViewModel : ViewModelBase
 {
     private const string DesignerMetadataPrefix = "AvaloniaUIDesigner:";
@@ -981,10 +995,130 @@ public partial class MainWindowViewModel : ViewModelBase
         grid.RowDefinitions = parsedRows;
         grid.ColumnDefinitions = parsedColumns;
         grid.ShowGridLines = showGridLines;
+        Canvas.ReflowGridChildren(target);
         CommitCanvasMutation();
         StatusText = $"Updated Grid definitions for {target.DisplayName}.";
         return true;
     }
+
+    public bool TryGetSelectedGridCellAssignment(out GridCellAssignmentEditorState state)
+    {
+        if (Canvas.SelectedElement is not { IsLocked: false } target
+            || target.Visual is Grid)
+        {
+            state = EmptyGridCellAssignmentState();
+            StatusText = "Select an unlocked non-Grid control to assign it to a Grid cell.";
+            return false;
+        }
+
+        var parents = Canvas.Elements
+            .Where(element => element.Visual is Grid && !element.IsGridChild && !element.IsLocked)
+            .Select(element =>
+            {
+                var grid = (Grid)element.Visual;
+                return new GridCellParentOption(
+                    element.DisplayName,
+                    DesignerGridDefinitionRuntime.GetRowCount(grid),
+                    DesignerGridDefinitionRuntime.GetColumnCount(grid));
+            })
+            .ToList();
+        if (parents.Count == 0)
+        {
+            state = EmptyGridCellAssignmentState();
+            StatusText = "Place an unlocked root Grid before assigning a control to a cell.";
+            return false;
+        }
+
+        var selectedParent = parents.FirstOrDefault(parent => string.Equals(
+                parent.DisplayName,
+                target.ParentName,
+                StringComparison.OrdinalIgnoreCase))
+            ?? parents[0];
+        state = new GridCellAssignmentEditorState(
+            target.DisplayName,
+            parents,
+            selectedParent.DisplayName,
+            target.GridRow,
+            target.GridColumn,
+            target.GridRowSpan,
+            target.GridColumnSpan);
+        return true;
+    }
+
+    public bool SetSelectedGridCellAssignment(
+        string parentName,
+        int row,
+        int column,
+        int rowSpan,
+        int columnSpan)
+    {
+        if (Canvas.SelectedElement is not { IsLocked: false } target
+            || target.Visual is Grid)
+        {
+            StatusText = "Select an unlocked non-Grid control to assign it to a Grid cell.";
+            return false;
+        }
+
+        var parent = Canvas.Elements.FirstOrDefault(element =>
+            !element.IsGridChild
+            && !element.IsLocked
+            && element.Visual is Grid
+            && string.Equals(element.DisplayName, parentName, StringComparison.OrdinalIgnoreCase));
+        if (parent?.Visual is not Grid grid)
+        {
+            StatusText = $"Grid '{parentName}' is not available.";
+            return false;
+        }
+
+        var rowCount = DesignerGridDefinitionRuntime.GetRowCount(grid);
+        var columnCount = DesignerGridDefinitionRuntime.GetColumnCount(grid);
+        if (row < 0 || row >= rowCount
+            || column < 0 || column >= columnCount
+            || rowSpan < 1 || row + rowSpan > rowCount
+            || columnSpan < 1 || column + columnSpan > columnCount)
+        {
+            StatusText = $"Cell assignment must fit within {rowCount} row(s) and {columnCount} column(s).";
+            return false;
+        }
+
+        BeginCanvasMutation(HistoryActionType.EditProperty, "Assigned control to Grid cell.");
+        target.GridRow = row;
+        target.GridColumn = column;
+        target.GridRowSpan = rowSpan;
+        target.GridColumnSpan = columnSpan;
+        target.ParentName = parent.DisplayName;
+        Canvas.MoveElementsToFront([target]);
+        Canvas.ReflowGridChildren(parent);
+        ObjectTree.RebuildFrom(Canvas.Elements);
+        ObjectTree.SelectByElement(target);
+        CommitCanvasMutation();
+        StatusText = $"Assigned {target.DisplayName} to {parent.DisplayName} row {row + 1}, column {column + 1}.";
+        return true;
+    }
+
+    public bool RemoveSelectedFromGrid()
+    {
+        if (Canvas.SelectedElement is not { IsLocked: false, IsGridChild: true } target)
+        {
+            StatusText = "Select an unlocked Grid child to move it back to the Canvas root.";
+            return false;
+        }
+
+        BeginCanvasMutation(HistoryActionType.EditProperty, "Removed control from Grid cell.");
+        target.ParentName = null;
+        target.GridRow = 0;
+        target.GridColumn = 0;
+        target.GridRowSpan = 1;
+        target.GridColumnSpan = 1;
+        ObjectTree.RebuildFrom(Canvas.Elements);
+        ObjectTree.SelectByElement(target);
+        CommitCanvasMutation();
+        StatusText = $"Moved {target.DisplayName} to the Canvas root.";
+        return true;
+    }
+
+    private static GridCellAssignmentEditorState EmptyGridCellAssignmentState()
+        => new(string.Empty, Array.Empty<GridCellParentOption>(), string.Empty, 0, 0, 1, 1);
 
     public bool TryGetSelectedItems(out string controlName, out IReadOnlyList<string> items)
     {
@@ -1530,6 +1664,12 @@ public partial class MainWindowViewModel : ViewModelBase
         BeginCanvasMutation(HistoryActionType.EditProperty, "Renamed control.");
         var oldName = element.DisplayName;
         element.DisplayName = name;
+        foreach (var child in Canvas.Elements.Where(candidate =>
+                     string.Equals(candidate.ParentName, oldName, StringComparison.OrdinalIgnoreCase)))
+        {
+            child.ParentName = name;
+        }
+
         foreach (var label in Canvas.Elements.Select(candidate => candidate.Visual).OfType<Label>())
         {
             if (ReferenceEquals(label.Target, element.Visual)
@@ -1558,10 +1698,14 @@ public partial class MainWindowViewModel : ViewModelBase
 
     public void MoveSelectedElement(double deltaX, double deltaY)
     {
-        var targets = Canvas.SelectedElements.Where(element => !element.IsLocked).ToList();
+        var targets = Canvas.SelectedElements
+            .Where(element => !element.IsLocked && !element.IsGridChild)
+            .ToList();
         if (targets.Count == 0)
         {
-            StatusText = "Selected controls are locked.";
+            StatusText = Canvas.SelectedElements.Any(element => element.IsGridChild)
+                ? "Grid child positions are managed by their assigned cells."
+                : "Selected controls are locked.";
             return;
         }
 
@@ -1784,21 +1928,41 @@ public partial class MainWindowViewModel : ViewModelBase
 
         BeginCanvasMutation(HistoryActionType.DuplicateElement, "Duplicated control.");
 
+        var nameMap = targets.ToDictionary(
+            target => target.DisplayName,
+            target => BuildDuplicateDisplayName(target.DisplayName),
+            StringComparer.OrdinalIgnoreCase);
         var duplicates = new List<DesignElement>();
         foreach (var target in targets)
         {
             var duplicatedSnapshot = CreateSnapshot(
                 target,
-                BuildDuplicateDisplayName(target.DisplayName),
+                nameMap[target.DisplayName],
                 target.X + 16,
-                target.Y + 16);
+                target.Y + 16) with
+            {
+                ParentName = target.ParentName is not null
+                    && nameMap.TryGetValue(target.ParentName, out var duplicateParentName)
+                        ? duplicateParentName
+                        : target.ParentName,
+            };
             var duplicated = Canvas.AddElementFromSnapshot(duplicatedSnapshot, select: false);
             duplicates.Add(duplicated);
-            ObjectTree.Add(duplicated);
         }
 
-        Canvas.SelectMany(duplicates);
-        ObjectTree.SelectByElement(Canvas.SelectedElement);
+        Canvas.NormalizeGridRelationships();
+        ObjectTree.RebuildFrom(Canvas.Elements);
+        _isSyncingSelection = true;
+        try
+        {
+            Canvas.SelectMany(duplicates);
+            ObjectTree.SelectByElement(Canvas.SelectedElement);
+        }
+        finally
+        {
+            _isSyncingSelection = false;
+        }
+
         CommitCanvasMutation();
 
         StatusText = $"Duplicated {targets.Count} control(s)";
@@ -1854,23 +2018,41 @@ public partial class MainWindowViewModel : ViewModelBase
 
         var pastedSnapshots = new List<DesignerElementSnapshot>();
         var pastedElements = new List<DesignElement>();
+        var nameMap = _clipboardSnapshots.ToDictionary(
+            snapshot => snapshot.DisplayName,
+            snapshot => BuildDuplicateDisplayName(snapshot.DisplayName),
+            StringComparer.OrdinalIgnoreCase);
         foreach (var snapshot in _clipboardSnapshots)
         {
             var pastedSnapshot = snapshot with
             {
-                DisplayName = BuildDuplicateDisplayName(snapshot.DisplayName),
+                DisplayName = nameMap[snapshot.DisplayName],
                 X = snapshot.X + 16,
                 Y = snapshot.Y + 16,
                 VisualProperties = CloneProperties(snapshot.VisualProperties),
+                ParentName = snapshot.ParentName is not null
+                    && nameMap.TryGetValue(snapshot.ParentName, out var pastedParentName)
+                        ? pastedParentName
+                        : snapshot.ParentName,
             };
             var pasted = Canvas.AddElementFromSnapshot(pastedSnapshot, select: false);
             pastedSnapshots.Add(pastedSnapshot);
             pastedElements.Add(pasted);
-            ObjectTree.Add(pasted);
         }
 
-        Canvas.SelectMany(pastedElements);
-        ObjectTree.SelectByElement(Canvas.SelectedElement);
+        Canvas.NormalizeGridRelationships();
+        ObjectTree.RebuildFrom(Canvas.Elements);
+        _isSyncingSelection = true;
+        try
+        {
+            Canvas.SelectMany(pastedElements);
+            ObjectTree.SelectByElement(Canvas.SelectedElement);
+        }
+        finally
+        {
+            _isSyncingSelection = false;
+        }
+
         CommitCanvasMutation();
 
         // Cascade subsequent pastes so they remain visible instead of stacking.
@@ -1968,7 +2150,7 @@ public partial class MainWindowViewModel : ViewModelBase
         sb.AppendLine($"  <Canvas Width=\"{settings.Width:0.###}\" Height=\"{settings.Height:0.###}\" Background=\"{EscapeXmlAttribute(settings.Background)}\">");
         sb.AppendLine($"    <!-- {DesignerMetadataPrefix} GridSize={settings.GridSize.ToString("0.###", CultureInfo.InvariantCulture)}; IsGridVisible={settings.IsGridVisible}; SnapToGrid={settings.SnapToGrid} -->");
 
-        foreach (var element in Canvas.Elements)
+        foreach (var element in Canvas.Elements.Where(element => !HasValidGridParent(element)))
         {
             if (element.IsLocked)
             {
@@ -2317,6 +2499,7 @@ public partial class MainWindowViewModel : ViewModelBase
                 Canvas.AddElementFromSnapshot(snapshot, select: false);
             }
 
+            Canvas.NormalizeGridRelationships();
             ObjectTree.RebuildFrom(Canvas.Elements);
             Canvas.Select(null);
         }
@@ -2339,7 +2522,12 @@ public partial class MainWindowViewModel : ViewModelBase
                 e.Width,
                 e.Height,
                 CaptureVisualProperties(e.Visual),
-                e.IsLocked))
+                e.IsLocked,
+                e.ParentName,
+                e.GridRow,
+                e.GridColumn,
+                e.GridRowSpan,
+                e.GridColumnSpan))
             .ToList();
 
         return new DesignerCanvasDocument(
@@ -2445,7 +2633,13 @@ public partial class MainWindowViewModel : ViewModelBase
             y,
             element.Width,
             element.Height,
-            CloneProperties(CaptureVisualProperties(element.Visual)));
+            CloneProperties(CaptureVisualProperties(element.Visual)),
+            element.IsLocked,
+            element.ParentName,
+            element.GridRow,
+            element.GridColumn,
+            element.GridRowSpan,
+            element.GridColumnSpan);
     }
 
     private IReadOnlyDictionary<string, string>? CaptureVisualProperties(Control visual)
@@ -2947,6 +3141,11 @@ public partial class MainWindowViewModel : ViewModelBase
                 || a.Width != b.Width
                 || a.Height != b.Height
                 || a.IsLocked != b.IsLocked
+                || !string.Equals(a.ParentName, b.ParentName, StringComparison.Ordinal)
+                || a.GridRow != b.GridRow
+                || a.GridColumn != b.GridColumn
+                || a.GridRowSpan != b.GridRowSpan
+                || a.GridColumnSpan != b.GridColumnSpan
                 || !DictionaryEquals(a.VisualProperties, b.VisualProperties))
             {
                 return false;
@@ -3001,48 +3200,69 @@ public partial class MainWindowViewModel : ViewModelBase
         }
 
         var snapshots = new List<DesignerElementSnapshot>();
-        var nextIsLocked = false;
+        ReadElementNodes(parseRoot, null);
 
-        foreach (var node in parseRoot.Nodes())
+        void ReadElementNodes(XElement container, string? parentName)
         {
-            if (node is XComment comment)
+            var nextIsLocked = false;
+            foreach (var node in container.Nodes())
             {
-                var metadata = ReadDesignerMetadata(comment);
-                if (metadata.TryGetValue("IsLocked", out var isLocked)
-                    && bool.TryParse(isLocked, out var parsedIsLocked))
+                if (node is XComment comment)
                 {
-                    nextIsLocked = parsedIsLocked;
+                    var metadata = ReadDesignerMetadata(comment);
+                    if (metadata.TryGetValue("IsLocked", out var isLocked)
+                        && bool.TryParse(isLocked, out var parsedIsLocked))
+                    {
+                        nextIsLocked = parsedIsLocked;
+                    }
+
+                    continue;
                 }
 
-                continue;
+                if (node is not XElement child)
+                {
+                    continue;
+                }
+
+                var tagName = child.Name.LocalName;
+                if (IsIgnoredContainerTag(tagName) || tagName.Contains('.', StringComparison.Ordinal))
+                {
+                    continue;
+                }
+
+                if (!TryResolveTypeName(tagName, out var typeName))
+                {
+                    warnings.Add($"Unsupported control <{tagName}> was imported as a placeholder.");
+                }
+
+                var displayName = ReadImportedDisplayName(
+                    child,
+                    tagName,
+                    snapshots.Count + 1,
+                    snapshots,
+                    warnings);
+                var snapshot = new DesignerElementSnapshot(
+                    displayName,
+                    typeName,
+                    ReadDouble(child, "Canvas.Left", 0),
+                    ReadDouble(child, "Canvas.Top", 0),
+                    ReadDouble(child, "Width", 120),
+                    ReadDouble(child, "Height", 40),
+                    ReadVisualProperties(child, warnings),
+                    nextIsLocked,
+                    parentName,
+                    ReadInt(child, "Grid.Row", 0),
+                    ReadInt(child, "Grid.Column", 0),
+                    Math.Max(1, ReadInt(child, "Grid.RowSpan", 1)),
+                    Math.Max(1, ReadInt(child, "Grid.ColumnSpan", 1)));
+                snapshots.Add(snapshot);
+                nextIsLocked = false;
+
+                if (string.Equals(typeName, "Avalonia.Controls.Grid", StringComparison.Ordinal))
+                {
+                    ReadElementNodes(child, displayName);
+                }
             }
-
-            if (node is not XElement child)
-            {
-                continue;
-            }
-
-            var tagName = child.Name.LocalName;
-            if (IsIgnoredContainerTag(tagName))
-            {
-                continue;
-            }
-
-            if (!TryResolveTypeName(tagName, out var typeName))
-            {
-                warnings.Add($"Unsupported control <{tagName}> was imported as a placeholder.");
-            }
-
-            var displayName = ReadImportedDisplayName(child, tagName, snapshots.Count + 1, snapshots, warnings);
-
-            var x = ReadDouble(child, "Canvas.Left", 0);
-            var y = ReadDouble(child, "Canvas.Top", 0);
-            var width = ReadDouble(child, "Width", 120);
-            var height = ReadDouble(child, "Height", 40);
-            var props = ReadVisualProperties(child, warnings);
-
-            snapshots.Add(new DesignerElementSnapshot(displayName, typeName, x, y, width, height, props, nextIsLocked));
-            nextIsLocked = false;
         }
 
         var colorResources = ReadColorResources(root, parseRoot, warnings);
@@ -3371,7 +3591,9 @@ public partial class MainWindowViewModel : ViewModelBase
                 continue;
             }
 
-            if (attr.IsNamespaceDeclaration || name is "Canvas.Left" or "Canvas.Top" or "Width" or "Height" or "Name")
+            if (attr.IsNamespaceDeclaration
+                || name is "Canvas.Left" or "Canvas.Top" or "Grid.Row" or "Grid.Column"
+                    or "Grid.RowSpan" or "Grid.ColumnSpan" or "Width" or "Height" or "Name")
             {
                 continue;
             }
@@ -3539,6 +3761,14 @@ public partial class MainWindowViewModel : ViewModelBase
         }
 
         return double.TryParse(raw, NumberStyles.Float, CultureInfo.InvariantCulture, out var value)
+            ? value
+            : fallback;
+    }
+
+    private static int ReadInt(XElement element, string attributeName, int fallback)
+    {
+        var raw = element.Attribute(attributeName)?.Value;
+        return int.TryParse(raw, NumberStyles.Integer, CultureInfo.InvariantCulture, out var value)
             ? value
             : fallback;
     }
@@ -4746,7 +4976,30 @@ public partial class MainWindowViewModel : ViewModelBase
                 }
 
                 AppendAttribute(sb, "ShowGridLines", grid.ShowGridLines.ToString());
-                sb.AppendLine(" />");
+                var designerChildren = Canvas.Elements.Where(child => string.Equals(
+                        child.ParentName,
+                        element.DisplayName,
+                        StringComparison.OrdinalIgnoreCase))
+                    .ToList();
+                if (designerChildren.Count == 0)
+                {
+                    sb.AppendLine(" />");
+                    break;
+                }
+
+                sb.AppendLine(">");
+                foreach (var child in designerChildren)
+                {
+                    if (child.IsLocked)
+                    {
+                        sb.AppendLine($"{indent}  <!-- {DesignerMetadataPrefix} IsLocked=true -->");
+                    }
+
+                    WriteTopLevelElementAxaml(sb, child, indent + "  ");
+                }
+
+                sb.Append(indent);
+                sb.AppendLine("</Grid>");
                 break;
 
             case StackPanel stackPanel:
@@ -4840,10 +5093,36 @@ public partial class MainWindowViewModel : ViewModelBase
     private void AppendCanvasLayoutAttributes(StringBuilder sb, DesignElement element)
     {
         AppendAttribute(sb, "x:Name", element.DisplayName);
-        AppendAttribute(sb, "Canvas.Left", element.X.ToString("0.###", CultureInfo.InvariantCulture));
-        AppendAttribute(sb, "Canvas.Top", element.Y.ToString("0.###", CultureInfo.InvariantCulture));
-        AppendAttribute(sb, "Width", element.Width.ToString("0.###", CultureInfo.InvariantCulture));
-        AppendAttribute(sb, "Height", element.Height.ToString("0.###", CultureInfo.InvariantCulture));
+        if (HasValidGridParent(element))
+        {
+            if (element.GridRow > 0)
+            {
+                AppendAttribute(sb, "Grid.Row", element.GridRow.ToString(CultureInfo.InvariantCulture));
+            }
+
+            if (element.GridColumn > 0)
+            {
+                AppendAttribute(sb, "Grid.Column", element.GridColumn.ToString(CultureInfo.InvariantCulture));
+            }
+
+            if (element.GridRowSpan > 1)
+            {
+                AppendAttribute(sb, "Grid.RowSpan", element.GridRowSpan.ToString(CultureInfo.InvariantCulture));
+            }
+
+            if (element.GridColumnSpan > 1)
+            {
+                AppendAttribute(sb, "Grid.ColumnSpan", element.GridColumnSpan.ToString(CultureInfo.InvariantCulture));
+            }
+        }
+        else
+        {
+            AppendAttribute(sb, "Canvas.Left", element.X.ToString("0.###", CultureInfo.InvariantCulture));
+            AppendAttribute(sb, "Canvas.Top", element.Y.ToString("0.###", CultureInfo.InvariantCulture));
+            AppendAttribute(sb, "Width", element.Width.ToString("0.###", CultureInfo.InvariantCulture));
+            AppendAttribute(sb, "Height", element.Height.ToString("0.###", CultureInfo.InvariantCulture));
+        }
+
         var classes = CanvasViewModel.GetUserStyleClasses(element.Visual);
         if (classes.Count > 0)
         {
@@ -4880,6 +5159,12 @@ public partial class MainWindowViewModel : ViewModelBase
         AppendAttribute(sb, "TabIndex", element.Visual.TabIndex.ToString(CultureInfo.InvariantCulture));
         AppendAttribute(sb, "IsTabStop", element.Visual.IsTabStop.ToString());
     }
+
+    private bool HasValidGridParent(DesignElement element)
+        => element.ParentName is not null
+            && Canvas.Elements.Any(parent =>
+                parent.Visual is Grid
+                && string.Equals(parent.DisplayName, element.ParentName, StringComparison.OrdinalIgnoreCase));
 
     private void AppendColorResourcesAxaml(StringBuilder sb, string rootElementName, string indent)
     {

@@ -27,41 +27,9 @@ public sealed class PreviewWindow : Window
         WindowStartupLocation = WindowStartupLocation.CenterOwner;
 
         var settings = document.Settings ?? new DesignerCanvasSettings();
-        var colorResources = document.ColorResources ?? new Dictionary<string, string>(StringComparer.Ordinal);
-        var styles = document.Styles ?? Array.Empty<DesignerStyleDefinition>();
         Width = Math.Clamp(settings.Width + 32, MinWidth, 1280);
         Height = Math.Clamp(settings.Height + 72, MinHeight, 960);
-
-        var canvas = new Canvas
-        {
-            Background = Brush.Parse(settings.Background),
-            Width = Math.Max(settings.Width, document.Elements.Count == 0 ? 0 : document.Elements.Max(element => element.X + element.Width + 32)),
-            Height = Math.Max(settings.Height, document.Elements.Count == 0 ? 0 : document.Elements.Max(element => element.Y + element.Height + 32)),
-        };
-        foreach (var pair in colorResources)
-        {
-            canvas.Resources[pair.Key] = Brush.Parse(pair.Value);
-        }
-
-        var controlsByName = new Dictionary<string, Control>(StringComparer.OrdinalIgnoreCase);
-        foreach (var element in document.Elements)
-        {
-            var control = CreateControl(element, colorResources, styles);
-            control.Width = element.Width;
-            control.Height = element.Height;
-            Canvas.SetLeft(control, element.X);
-            Canvas.SetTop(control, element.Y);
-            canvas.Children.Add(control);
-            controlsByName[element.DisplayName] = control;
-        }
-
-        foreach (var label in controlsByName.Values.OfType<Label>())
-        {
-            if (label.Tag is string targetName && controlsByName.TryGetValue(targetName, out var target))
-            {
-                label.Target = target;
-            }
-        }
+        var canvas = CreatePreviewCanvas(document);
 
         Content = new Border
         {
@@ -74,6 +42,81 @@ public sealed class PreviewWindow : Window
                 Content = canvas,
             },
         };
+    }
+
+    internal static Canvas CreatePreviewCanvas(DesignerCanvasDocument document)
+    {
+        var settings = document.Settings ?? new DesignerCanvasSettings();
+        var colorResources = document.ColorResources ?? new Dictionary<string, string>(StringComparer.Ordinal);
+        var styles = document.Styles ?? Array.Empty<DesignerStyleDefinition>();
+        var canvas = new Canvas
+        {
+            Background = Brush.Parse(settings.Background),
+            Width = Math.Max(settings.Width, document.Elements.Count == 0 ? 0 : document.Elements.Max(element => element.X + element.Width + 32)),
+            Height = Math.Max(settings.Height, document.Elements.Count == 0 ? 0 : document.Elements.Max(element => element.Y + element.Height + 32)),
+        };
+        foreach (var pair in colorResources)
+        {
+            canvas.Resources[pair.Key] = Brush.Parse(pair.Value);
+        }
+
+        var controlsByName = new Dictionary<string, Control>(StringComparer.OrdinalIgnoreCase);
+        var gridNames = document.Elements
+            .Where(element => string.Equals(element.TypeName, "Avalonia.Controls.Grid", StringComparison.Ordinal))
+            .Select(element => element.DisplayName)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var childrenByParent = document.Elements
+            .Where(element => element.ParentName is not null && gridNames.Contains(element.ParentName))
+            .GroupBy(element => element.ParentName!, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(group => group.Key, group => group.ToList(), StringComparer.OrdinalIgnoreCase);
+        foreach (var element in document.Elements.Where(element =>
+                     element.ParentName is null || !gridNames.Contains(element.ParentName)))
+        {
+            var control = CreateControl(element, colorResources, styles);
+            control.Width = element.Width;
+            control.Height = element.Height;
+            Canvas.SetLeft(control, element.X);
+            Canvas.SetTop(control, element.Y);
+            canvas.Children.Add(control);
+            controlsByName[element.DisplayName] = control;
+            if (control is Grid grid)
+            {
+                AddGridChildren(grid, element.DisplayName);
+            }
+        }
+
+        foreach (var label in controlsByName.Values.OfType<Label>())
+        {
+            if (label.Tag is string targetName && controlsByName.TryGetValue(targetName, out var target))
+            {
+                label.Target = target;
+            }
+        }
+
+        return canvas;
+
+        void AddGridChildren(Grid parent, string parentName)
+        {
+            if (!childrenByParent.TryGetValue(parentName, out var children))
+            {
+                return;
+            }
+
+            foreach (var childSnapshot in children)
+            {
+                var child = CreateControl(childSnapshot, colorResources, styles);
+                Grid.SetRow(child, Math.Max(0, childSnapshot.GridRow));
+                Grid.SetColumn(child, Math.Max(0, childSnapshot.GridColumn));
+                Grid.SetRowSpan(child, Math.Max(1, childSnapshot.GridRowSpan));
+                Grid.SetColumnSpan(child, Math.Max(1, childSnapshot.GridColumnSpan));
+                parent.Children.Add(child);
+                controlsByName[childSnapshot.DisplayName] = child;
+                if (child is Grid childGrid)
+                {
+                    AddGridChildren(childGrid, childSnapshot.DisplayName);
+                }
+            }
+        }
     }
 
     private static Control CreateControl(

@@ -33,4 +33,9 @@ public sealed record DesignerElementSnapshot(
     double Width,
     double Height,
     IReadOnlyDictionary<string, string>? VisualProperties = null,
-    bool IsLocked = false);
+    bool IsLocked = false,
+    string? ParentName = null,
+    int GridRow = 0,
+    int GridColumn = 0,
+    int GridRowSpan = 1,
+    int GridColumnSpan = 1);

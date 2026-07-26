@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using System.Linq;
 using CommunityToolkit.Mvvm.ComponentModel;
 
 namespace AvaloniaUIDesigner.App.ViewModels;
@@ -84,14 +85,37 @@ public partial class ObjectTreeViewModel : ViewModelBase
     private void RefreshVisibleChildren()
     {
         var query = SearchText.Trim();
-        var visibleChildren = string.IsNullOrWhiteSpace(query)
-            ? (System.Collections.Generic.IEnumerable<ObjectNodeViewModel>)_allChildren
-            : System.Linq.Enumerable.Where(_allChildren, node => MatchesQuery(node, query));
-
         Root.Children.Clear();
-        foreach (var node in visibleChildren)
+        foreach (var node in _allChildren)
         {
-            Root.Children.Add(node);
+            node.Children.Clear();
+        }
+
+        if (!string.IsNullOrWhiteSpace(query))
+        {
+            foreach (var node in System.Linq.Enumerable.Where(_allChildren, node => MatchesQuery(node, query)))
+            {
+                Root.Children.Add(node);
+            }
+        }
+        else
+        {
+            var nodesByName = _allChildren
+                .Where(node => node.Element is not null)
+                .ToDictionary(node => node.Element!.DisplayName, System.StringComparer.OrdinalIgnoreCase);
+            foreach (var node in _allChildren)
+            {
+                if (node.Element?.ParentName is { Length: > 0 } parentName
+                    && nodesByName.TryGetValue(parentName, out var parent)
+                    && parent.Element?.Visual is Avalonia.Controls.Grid)
+                {
+                    parent.Children.Add(node);
+                }
+                else
+                {
+                    Root.Children.Add(node);
+                }
+            }
         }
 
         OnPropertyChanged(nameof(SearchResultText));
