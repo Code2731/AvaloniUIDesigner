@@ -325,7 +325,9 @@ public static class DesignerDataGridRuntime
             return value[1..^1].Trim();
         }
 
-        const string bindingPrefix = "{Binding";
+        var bindingPrefix = value.StartsWith("{ReflectionBinding", StringComparison.OrdinalIgnoreCase)
+            ? "{ReflectionBinding"
+            : "{Binding";
         if (!value.StartsWith(bindingPrefix, StringComparison.OrdinalIgnoreCase)
             || !value.EndsWith('}'))
         {

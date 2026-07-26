@@ -158,6 +158,12 @@ public sealed class AxamlDocumentSerializer : IDesignerSerializer
 
         if (string.Equals(element.TypeName, "Avalonia.Controls.TreeView", StringComparison.Ordinal))
         {
+            if (HasBinding(element, "ItemsSource"))
+            {
+                sb.AppendLine(" />");
+                return;
+            }
+
             sb.AppendLine(">");
             AppendTreeItems(sb, ReadTreeItems(element), indent + "  ");
             sb.Append(indent);
@@ -435,7 +441,7 @@ public sealed class AxamlDocumentSerializer : IDesignerSerializer
             sb.Append(" Header=\"");
             sb.Append(EscapeXmlAttribute(definition.Header));
             sb.Append("\" Binding=\"");
-            sb.Append(EscapeXmlAttribute($"{{Binding {definition.BindingPath}}}"));
+            sb.Append(EscapeXmlAttribute($"{{ReflectionBinding {definition.BindingPath}}}"));
             sb.Append("\" Width=\"");
             sb.Append(EscapeXmlAttribute(definition.Width));
             if (definition.IsReadOnly)
@@ -564,9 +570,24 @@ public sealed class AxamlDocumentSerializer : IDesignerSerializer
             return;
         }
 
+        var bindings = ReadBindings(properties);
+        foreach (var binding in bindings)
+        {
+            sb.Append(" ");
+            sb.Append(binding.PropertyName);
+            sb.Append("=\"");
+            sb.Append(EscapeXmlAttribute(DesignerBindingRuntime.FormatExpression(binding)));
+            sb.Append("\"");
+        }
+
+        var boundProperties = bindings
+            .Select(binding => binding.PropertyName)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
         foreach (var pair in properties)
         {
-            if (string.IsNullOrWhiteSpace(pair.Key) || pair.Key.StartsWith("__", StringComparison.Ordinal))
+            if (string.IsNullOrWhiteSpace(pair.Key)
+                || pair.Key.StartsWith("__", StringComparison.Ordinal)
+                || boundProperties.Contains(pair.Key))
             {
                 continue;
             }
@@ -578,6 +599,23 @@ public sealed class AxamlDocumentSerializer : IDesignerSerializer
             sb.Append("\"");
         }
     }
+
+    private static IReadOnlyList<DesignerBindingDefinition> ReadBindings(
+        IReadOnlyDictionary<string, string>? properties)
+    {
+        if (properties is null
+            || !properties.TryGetValue("__bindings", out var json)
+            || !DesignerBindingRuntime.TryDeserialize(json, out var definitions))
+        {
+            return [];
+        }
+
+        return definitions;
+    }
+
+    private static bool HasBinding(DesignerElementSnapshot element, string propertyName)
+        => ReadBindings(element.VisualProperties).Any(binding =>
+            string.Equals(binding.PropertyName, propertyName, StringComparison.Ordinal));
 
     private static string EscapeXmlAttribute(string? value)
     {

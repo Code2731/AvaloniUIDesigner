@@ -610,6 +610,21 @@ public partial class MainWindow : Window
         }
     }
 
+    private async void OnEditBindingsMenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        FlushPendingPropertyHistory();
+        if (Vm is null || !Vm.TryGetSelectedBindings(out var state))
+        {
+            return;
+        }
+
+        var updatedBindings = await ShowBindingEditorDialogAsync(state);
+        if (updatedBindings is not null)
+        {
+            Vm.SetSelectedBindings(updatedBindings);
+        }
+    }
+
     private async void OnEditGridDefinitionsMenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
         FlushPendingPropertyHistory();
@@ -2697,6 +2712,87 @@ public partial class MainWindow : Window
         Grid.SetRow(buttons, 3);
         dialog.Content = content;
 
+        return await dialog.ShowDialog<IReadOnlyList<string>?>(this);
+    }
+
+    private async Task<IReadOnlyList<string>?> ShowBindingEditorDialogAsync(BindingEditorState state)
+    {
+        var editor = new TextBox
+        {
+            Text = string.Join(Environment.NewLine, state.Lines),
+            AcceptsReturn = true,
+            MinHeight = 220,
+        };
+        var errorText = new TextBlock
+        {
+            Foreground = Avalonia.Media.Brushes.IndianRed,
+            TextWrapping = Avalonia.Media.TextWrapping.Wrap,
+        };
+        var dialog = new Window
+        {
+            Title = $"Edit Bindings - {state.ControlName}",
+            Width = 720,
+            Height = 450,
+            MinWidth = 520,
+            MinHeight = 320,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner,
+        };
+        var applyButton = new Button { Content = "Apply", MinWidth = 84 };
+        applyButton.Click += (_, _) =>
+        {
+            var lines = (editor.Text ?? string.Empty)
+                .Replace("\r\n", "\n", StringComparison.Ordinal)
+                .Split('\n', StringSplitOptions.None)
+                .ToList();
+            if (!DesignerBindingRuntime.TryParseEditorLines(
+                    state.TargetType,
+                    lines,
+                    out _,
+                    out var error))
+            {
+                errorText.Text = error;
+                return;
+            }
+
+            dialog.Close(lines);
+        };
+        var cancelButton = new Button { Content = "Cancel", MinWidth = 84 };
+        cancelButton.Click += (_, _) => dialog.Close(null);
+        var buttons = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            Spacing = 8,
+            HorizontalAlignment = HorizontalAlignment.Right,
+            Children = { cancelButton, applyButton },
+        };
+        var content = new Grid
+        {
+            Margin = new Thickness(16),
+            RowDefinitions = new RowDefinitions("Auto,Auto,*,Auto,Auto"),
+            RowSpacing = 10,
+            Children =
+            {
+                new TextBlock
+                {
+                    Text = "One binding per line: Property | Path | Mode | Fallback. Mode and Fallback are optional.",
+                    TextWrapping = Avalonia.Media.TextWrapping.Wrap,
+                },
+                new TextBlock
+                {
+                    Text = $"Supported: {string.Join(", ", state.SupportedProperties)}",
+                    Foreground = Avalonia.Media.Brushes.SlateGray,
+                    TextWrapping = Avalonia.Media.TextWrapping.Wrap,
+                },
+                editor,
+                errorText,
+                buttons,
+            },
+        };
+        Grid.SetRow(content.Children[1], 1);
+        Grid.SetRow(editor, 2);
+        Grid.SetRow(errorText, 3);
+        Grid.SetRow(buttons, 4);
+        dialog.Content = content;
         return await dialog.ShowDialog<IReadOnlyList<string>?>(this);
     }
 

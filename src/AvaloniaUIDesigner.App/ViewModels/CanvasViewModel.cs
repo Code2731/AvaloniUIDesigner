@@ -2117,6 +2117,12 @@ public partial class CanvasViewModel : ViewModelBase
             return;
         }
 
+        if (properties.TryGetValue("__bindings", out var bindingsJson)
+            && DesignerBindingRuntime.TryDeserialize(bindingsJson, out var bindings))
+        {
+            DesignerBindingRuntime.ReplaceBindings(visual, bindings);
+        }
+
         if (properties.TryGetValue("Opacity", out var opacity)
             && double.TryParse(opacity, NumberStyles.Float, CultureInfo.InvariantCulture, out var parsedOpacity))
         {

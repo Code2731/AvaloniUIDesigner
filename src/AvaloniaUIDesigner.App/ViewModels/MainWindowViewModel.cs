@@ -42,6 +42,12 @@ public sealed record ItemsEditorState(
     IReadOnlyList<string> Items,
     ItemsEditorMode Mode);
 
+public sealed record BindingEditorState(
+    string ControlName,
+    string TargetType,
+    IReadOnlyList<string> Lines,
+    IReadOnlyList<string> SupportedProperties);
+
 public sealed record GridDefinitionEditorState(
     string ControlName,
     string RowDefinitions,
@@ -2483,6 +2489,72 @@ public partial class MainWindowViewModel : ViewModelBase
         }
     }
 
+    public bool TryGetSelectedBindings(out BindingEditorState state)
+    {
+        var target = Canvas.SelectedElement;
+        if (target is null)
+        {
+            state = new BindingEditorState(string.Empty, string.Empty, [], []);
+            StatusText = "Select a control before editing bindings.";
+            return false;
+        }
+
+        if (target.IsLocked)
+        {
+            state = new BindingEditorState(string.Empty, string.Empty, [], []);
+            StatusText = "Unlock the selected control before editing bindings.";
+            return false;
+        }
+
+        var targetType = target.Visual.GetType().Name;
+        var supportedProperties = DesignerBindingRuntime.GetSupportedProperties(targetType);
+        state = new BindingEditorState(
+            target.DisplayName,
+            targetType,
+            DesignerBindingRuntime.FormatEditorLines(target.Visual),
+            supportedProperties);
+        return true;
+    }
+
+    public bool SetSelectedBindings(IEnumerable<string> lines)
+    {
+        var target = Canvas.SelectedElement;
+        if (target is null || target.IsLocked)
+        {
+            StatusText = "Select an unlocked control before editing bindings.";
+            return false;
+        }
+
+        var targetType = target.Visual.GetType().Name;
+        if (!DesignerBindingRuntime.TryParseEditorLines(
+                targetType,
+                lines,
+                out var definitions,
+                out var error))
+        {
+            StatusText = $"Bindings were not changed. {error}";
+            return false;
+        }
+
+        var currentDefinitions = DesignerBindingRuntime.ReadBindings(target.Visual);
+        if (string.Equals(
+                DesignerBindingRuntime.Serialize(currentDefinitions),
+                DesignerBindingRuntime.Serialize(definitions),
+                StringComparison.Ordinal))
+        {
+            StatusText = "Bindings are unchanged.";
+            return true;
+        }
+
+        BeginCanvasMutation(HistoryActionType.EditProperty, "Updated control bindings.");
+        DesignerBindingRuntime.ReplaceBindings(target.Visual, definitions);
+        CommitCanvasMutation();
+        StatusText = definitions.Count == 0
+            ? $"Cleared bindings from {target.DisplayName}."
+            : $"Updated {definitions.Count} binding(s) on {target.DisplayName}.";
+        return true;
+    }
+
     public void SetSelectedItems(IEnumerable<string> items)
     {
         var target = Canvas.SelectedElement;
@@ -3734,6 +3806,12 @@ public partial class MainWindowViewModel : ViewModelBase
 
             foreach (var pair in currentByName)
             {
+                if (!HaveSameBindings(pair.Value, parsedByName[pair.Key]))
+                {
+                    result = $"Validation failed: bindings do not round-trip for {pair.Key}.";
+                    return false;
+                }
+
                 if (!HaveSameAppearance(pair.Value, parsedByName[pair.Key]))
                 {
                     result = $"Validation failed: appearance properties do not round-trip for {pair.Key}.";
@@ -4209,6 +4287,12 @@ public partial class MainWindowViewModel : ViewModelBase
         if (!string.IsNullOrWhiteSpace(automationName))
         {
             result["__automationName"] = automationName;
+        }
+
+        var bindings = DesignerBindingRuntime.ReadBindings(visual);
+        if (bindings.Count > 0)
+        {
+            result["__bindings"] = DesignerBindingRuntime.Serialize(bindings);
         }
 
         if (!visual.IsEnabled)
@@ -4872,6 +4956,25 @@ public partial class MainWindowViewModel : ViewModelBase
             "Classes",
         })
         {
+            var expectedBinding = ReadSnapshotBindings(expected).FirstOrDefault(binding =>
+                string.Equals(binding.PropertyName, propertyName, StringComparison.Ordinal));
+            var actualBinding = ReadSnapshotBindings(actual).FirstOrDefault(binding =>
+                string.Equals(binding.PropertyName, propertyName, StringComparison.Ordinal));
+            if (expectedBinding is not null || actualBinding is not null)
+            {
+                if (expectedBinding is null
+                    || actualBinding is null
+                    || !string.Equals(
+                        DesignerBindingRuntime.Serialize([expectedBinding]),
+                        DesignerBindingRuntime.Serialize([actualBinding]),
+                        StringComparison.Ordinal))
+                {
+                    return false;
+                }
+
+                continue;
+            }
+
             var expectedValue = ReadSnapshotProperty(expected, propertyName);
             var actualValue = ReadSnapshotProperty(actual, propertyName);
             if (!string.Equals(expectedValue, actualValue, StringComparison.Ordinal))
@@ -4881,6 +4984,27 @@ public partial class MainWindowViewModel : ViewModelBase
         }
 
         return true;
+    }
+
+    private static bool HaveSameBindings(
+        DesignerElementSnapshot expected,
+        DesignerElementSnapshot actual)
+        => string.Equals(
+            DesignerBindingRuntime.Serialize(ReadSnapshotBindings(expected)),
+            DesignerBindingRuntime.Serialize(ReadSnapshotBindings(actual)),
+            StringComparison.Ordinal);
+
+    private static IReadOnlyList<DesignerBindingDefinition> ReadSnapshotBindings(
+        DesignerElementSnapshot snapshot)
+    {
+        if (snapshot.VisualProperties is null
+            || !snapshot.VisualProperties.TryGetValue("__bindings", out var json)
+            || !DesignerBindingRuntime.TryDeserialize(json, out var definitions))
+        {
+            return [];
+        }
+
+        return definitions;
     }
 
     private static string? ReadSnapshotProperty(DesignerElementSnapshot snapshot, string propertyName)
@@ -5436,10 +5560,29 @@ public partial class MainWindowViewModel : ViewModelBase
     {
         var map = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         var tagName = element.Name.LocalName;
+        var bindings = new List<DesignerBindingDefinition>();
 
         foreach (var attr in element.Attributes())
         {
             var name = attr.Name.LocalName;
+            if (DesignerBindingRuntime.IsBindingExpression(attr.Value))
+            {
+                if (!DesignerBindingRuntime.IsSupportedProperty(tagName, name))
+                {
+                    warnings.Add($"Ignored unsupported binding property {tagName}.{name}.");
+                }
+                else if (!DesignerBindingRuntime.TryParseExpression(name, attr.Value, out var binding))
+                {
+                    warnings.Add($"Ignored unsupported binding expression on {tagName}.{name}.");
+                }
+                else
+                {
+                    bindings.Add(binding);
+                }
+
+                continue;
+            }
+
             if (name == "ToolTip.Tip")
             {
                 map["__toolTip"] = attr.Value;
@@ -5505,12 +5648,16 @@ public partial class MainWindowViewModel : ViewModelBase
             map.TryAdd("RowDefinitions", string.Empty);
             map.TryAdd("ColumnDefinitions", string.Empty);
         }
-        else if (string.Equals(element.Name.LocalName, "ComboBox", StringComparison.OrdinalIgnoreCase)
-            || string.Equals(element.Name.LocalName, "ListBox", StringComparison.OrdinalIgnoreCase))
+        else if ((string.Equals(element.Name.LocalName, "ComboBox", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(element.Name.LocalName, "ListBox", StringComparison.OrdinalIgnoreCase))
+            && !bindings.Any(binding =>
+                string.Equals(binding.PropertyName, "ItemsSource", StringComparison.Ordinal)))
         {
             map["__items"] = SerializeItems(element);
         }
-        else if (string.Equals(element.Name.LocalName, "TreeView", StringComparison.OrdinalIgnoreCase))
+        else if (string.Equals(element.Name.LocalName, "TreeView", StringComparison.OrdinalIgnoreCase)
+            && !bindings.Any(binding =>
+                string.Equals(binding.PropertyName, "ItemsSource", StringComparison.Ordinal)))
         {
             map["__treeItems"] = DesignerTreeItemRuntime.Serialize(element);
         }
@@ -5562,6 +5709,11 @@ public partial class MainWindowViewModel : ViewModelBase
             {
                 map["__contentText"] = content.Attribute("Text")?.Value ?? string.Empty;
             }
+        }
+
+        if (bindings.Count > 0)
+        {
+            map["__bindings"] = DesignerBindingRuntime.Serialize(bindings);
         }
 
         return map.Count == 0 ? null : map;
@@ -6876,6 +7028,12 @@ public partial class MainWindowViewModel : ViewModelBase
                 sb.Append("<ComboBox");
                 AppendCanvasLayoutAttributes(sb, element);
                 AppendAttribute(sb, "SelectedIndex", comboBox.SelectedIndex.ToString(CultureInfo.InvariantCulture));
+                if (DesignerBindingRuntime.HasBinding(comboBox, "ItemsSource"))
+                {
+                    sb.AppendLine(" />");
+                    break;
+                }
+
                 sb.AppendLine(">");
                 foreach (var item in comboBox.Items)
                 {
@@ -6896,6 +7054,12 @@ public partial class MainWindowViewModel : ViewModelBase
                 sb.Append("<ListBox");
                 AppendCanvasLayoutAttributes(sb, element);
                 AppendAttribute(sb, "SelectedIndex", listBox.SelectedIndex.ToString(CultureInfo.InvariantCulture));
+                if (DesignerBindingRuntime.HasBinding(listBox, "ItemsSource"))
+                {
+                    sb.AppendLine(" />");
+                    break;
+                }
+
                 sb.AppendLine(">");
                 foreach (var item in listBox.Items)
                 {
@@ -6915,6 +7079,12 @@ public partial class MainWindowViewModel : ViewModelBase
                 sb.Append(indent);
                 sb.Append("<TreeView");
                 AppendCanvasLayoutAttributes(sb, element);
+                if (DesignerBindingRuntime.HasBinding(treeView, "ItemsSource"))
+                {
+                    sb.AppendLine(" />");
+                    break;
+                }
+
                 sb.AppendLine(">");
                 WriteTreeItemsAxaml(sb, DesignerTreeItemRuntime.ReadItems(treeView), indent + "  ");
                 sb.Append(indent);
@@ -7489,7 +7659,7 @@ public partial class MainWindowViewModel : ViewModelBase
                 ? "DataGridCheckBoxColumn"
                 : "DataGridTextColumn");
             AppendAttribute(sb, "Header", definition.Header);
-            AppendAttribute(sb, "Binding", $"{{Binding {definition.BindingPath}}}");
+            AppendAttribute(sb, "Binding", $"{{ReflectionBinding {definition.BindingPath}}}");
             AppendAttribute(sb, "Width", definition.Width);
             if (definition.IsReadOnly)
             {
@@ -7719,6 +7889,14 @@ public partial class MainWindowViewModel : ViewModelBase
         if (classes.Count > 0)
         {
             AppendAttribute(sb, "Classes", string.Join(" ", classes));
+        }
+
+        foreach (var binding in DesignerBindingRuntime.ReadBindings(element.Visual))
+        {
+            AppendAttribute(
+                sb,
+                binding.PropertyName,
+                DesignerBindingRuntime.FormatExpression(binding));
         }
 
         if (!ShouldSuppressInlineStyleProperty(element.Visual, "Opacity"))
@@ -8116,6 +8294,19 @@ public partial class MainWindowViewModel : ViewModelBase
 
     private static void AppendAttribute(StringBuilder sb, string name, string value)
     {
+        var lineStart = sb.Length - 1;
+        while (lineStart >= 0 && sb[lineStart] is not '\r' and not '\n')
+        {
+            lineStart--;
+        }
+
+        lineStart++;
+        if (sb.ToString(lineStart, sb.Length - lineStart)
+            .Contains($" {name}=\"", StringComparison.Ordinal))
+        {
+            return;
+        }
+
         sb.Append(" ");
         sb.Append(name);
         sb.Append("=\"");
