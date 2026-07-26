@@ -70,6 +70,17 @@ public sealed record RootEditorState(
     string MaxWidth,
     string MaxHeight);
 
+public sealed record TypographyEditorState(
+    string ControlName,
+    string FontFamily,
+    string FontSize,
+    string FontStyle,
+    string FontWeight,
+    string TextAlignment,
+    string TextWrapping,
+    bool SupportsTextAlignment,
+    bool SupportsTextWrapping);
+
 public sealed record GridDefinitionEditorState(
     string ControlName,
     string RowDefinitions,
@@ -2677,6 +2688,101 @@ public partial class MainWindowViewModel : ViewModelBase
         return true;
     }
 
+    public bool TryGetSelectedTypographyProperties(out TypographyEditorState state)
+    {
+        var target = Canvas.SelectedElement;
+        if (target is null
+            || target.IsLocked
+            || !DesignerTypographyRuntime.SupportsTypography(target.Visual))
+        {
+            state = new TypographyEditorState(
+                string.Empty,
+                FontFamily.Default.ToString(),
+                "12",
+                FontStyle.Normal.ToString(),
+                FontWeight.Normal.ToString(),
+                TextAlignment.Start.ToString(),
+                TextWrapping.NoWrap.ToString(),
+                false,
+                false);
+            StatusText = target is { IsLocked: true }
+                ? "Unlock the selected control before editing typography."
+                : "Select a text or font-aware control before editing typography.";
+            return false;
+        }
+
+        var values = DesignerTypographyRuntime.Read(target.Visual);
+        state = new TypographyEditorState(
+            target.DisplayName,
+            values.FontFamily,
+            values.FontSize.ToString("0.###", CultureInfo.InvariantCulture),
+            values.FontStyle.ToString(),
+            DesignerTypographyRuntime.FormatFontWeight(values.FontWeight),
+            values.TextAlignment.ToString(),
+            values.TextWrapping.ToString(),
+            DesignerTypographyRuntime.SupportsTextAlignment(target.Visual),
+            DesignerTypographyRuntime.SupportsTextWrapping(target.Visual));
+        return true;
+    }
+
+    public bool SetSelectedTypographyProperties(
+        string fontFamily,
+        string fontSize,
+        string fontStyle,
+        string fontWeight,
+        string textAlignment,
+        string textWrapping)
+    {
+        var target = Canvas.SelectedElement;
+        if (target is null
+            || target.IsLocked
+            || !DesignerTypographyRuntime.SupportsTypography(target.Visual))
+        {
+            StatusText = "Select an unlocked text or font-aware control before editing typography.";
+            return false;
+        }
+
+        if (!DesignerTypographyRuntime.TryParseValues(
+                target.Visual,
+                fontFamily,
+                fontSize,
+                fontStyle,
+                fontWeight,
+                textAlignment,
+                textWrapping,
+                out var values,
+                out var error))
+        {
+            StatusText = $"Typography properties were not changed. {error}";
+            return false;
+        }
+
+        if (DesignerTypographyRuntime.Read(target.Visual) == values)
+        {
+            StatusText = "Typography properties are unchanged.";
+            return true;
+        }
+
+        BeginCanvasMutation(HistoryActionType.EditProperty, "Updated typography properties.");
+        DesignerTypographyRuntime.Apply(target.Visual, values);
+        foreach (var propertyName in new[]
+                 {
+                     "FontFamily",
+                     "FontSize",
+                     "FontStyle",
+                     "FontWeight",
+                     "TextAlignment",
+                     "TextWrapping",
+                 })
+        {
+            DesignerStyleApplicationMetadata.ClearApplied(target.Visual, propertyName);
+        }
+
+        CommitCanvasMutation();
+        StatusText = $"Updated typography for {target.DisplayName}.";
+        return true;
+    }
+
     public RootEditorState GetRootEditorState()
         => new(
             _rootSettings.Kind.ToString(),
@@ -4778,6 +4884,7 @@ public partial class MainWindowViewModel : ViewModelBase
             : new Dictionary<string, string>(properties, StringComparer.Ordinal);
         CaptureCommonAppearanceProperties(result, visual);
         DesignerLayoutRuntime.Capture(visual, result);
+        DesignerTypographyRuntime.Capture(visual, result);
         foreach (var pair in DesignerResourceReferenceMetadata.GetReferences(visual))
         {
             result[pair.Key] = DesignerResourceReferenceMetadata.FormatExpression(pair.Value);
@@ -6489,6 +6596,26 @@ public partial class MainWindowViewModel : ViewModelBase
                 continue;
             }
 
+            if (DesignerTypographyRuntime.IsSupportedProperty(tagName, name))
+            {
+                if (DesignerTypographyRuntime.TryNormalizeProperty(
+                        tagName,
+                        name,
+                        attr.Value,
+                        out var canonicalName,
+                        out var normalizedValue,
+                        out var typographyError))
+                {
+                    map[canonicalName] = normalizedValue;
+                }
+                else
+                {
+                    warnings.Add($"Ignored {tagName}.{name}: {typographyError}");
+                }
+
+                continue;
+            }
+
             if (IsSupportedVisualProperty(tagName, name))
             {
                 map[name] = attr.Value;
@@ -7797,8 +7924,6 @@ public partial class MainWindowViewModel : ViewModelBase
                 }
 
                 AppendAttribute(sb, "AcceptsReturn", textBox.AcceptsReturn.ToString());
-                AppendAttribute(sb, "TextWrapping", textBox.TextWrapping.ToString());
-
                 sb.AppendLine(" />");
                 break;
 
@@ -7807,16 +7932,6 @@ public partial class MainWindowViewModel : ViewModelBase
                 sb.Append("<TextBlock");
                 AppendCanvasLayoutAttributes(sb, element);
                 AppendAttribute(sb, "Text", textBlock.Text ?? string.Empty);
-                if (!ShouldSuppressInlineStyleProperty(textBlock, "FontSize"))
-                {
-                    AppendAttribute(sb, "FontSize", textBlock.FontSize.ToString("0.###", CultureInfo.InvariantCulture));
-                }
-
-                if (!ShouldSuppressInlineStyleProperty(textBlock, "FontWeight"))
-                {
-                    AppendAttribute(sb, "FontWeight", textBlock.FontWeight.ToString());
-                }
-
                 sb.AppendLine(" />");
                 break;
 
@@ -8779,6 +8894,7 @@ public partial class MainWindowViewModel : ViewModelBase
 
         AppendCommonAppearanceAttributes(sb, element.Visual);
         AppendCommonLayoutAttributes(sb, element.Visual);
+        AppendCommonTypographyAttributes(sb, element.Visual);
         if (ToolTip.GetTip(element.Visual) is { } toolTip && !string.IsNullOrWhiteSpace(toolTip.ToString()))
         {
             AppendAttribute(sb, "ToolTip.Tip", toolTip.ToString() ?? string.Empty);
@@ -9156,6 +9272,28 @@ public partial class MainWindowViewModel : ViewModelBase
                  })
         {
             if (properties.TryGetValue(propertyName, out var value))
+            {
+                AppendAttribute(sb, propertyName, value);
+            }
+        }
+    }
+
+    private void AppendCommonTypographyAttributes(StringBuilder sb, Control visual)
+    {
+        var properties = new Dictionary<string, string>(StringComparer.Ordinal);
+        DesignerTypographyRuntime.Capture(visual, properties);
+        foreach (var propertyName in new[]
+                 {
+                     "FontFamily",
+                     "FontSize",
+                     "FontStyle",
+                     "FontWeight",
+                     "TextAlignment",
+                     "TextWrapping",
+                 })
+        {
+            if (properties.TryGetValue(propertyName, out var value)
+                && !ShouldSuppressInlineStyleProperty(visual, propertyName))
             {
                 AppendAttribute(sb, propertyName, value);
             }

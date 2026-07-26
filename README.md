@@ -28,6 +28,7 @@ dotnet run --project src/AvaloniaUIDesigner.App/AvaloniaUIDesigner.App.csproj
 - **데이터 바인딩**: 선택 컨트롤의 지원 속성에 Path·Mode·Fallback을 여러 개 선언하고, 디자인 샘플을 유지한 채 ReflectionBinding·Undo/Redo·복제·미리보기·AXAML 왕복에 보존
 - **샘플 DataContext**: 문서 단위 JSON을 바인딩 Path에 연결해 Text·상태·숫자·선택·ItemsSource를 캔버스와 Preview에서 확인하고, 원래 디자인 값·Undo/Redo·AXAML 왕복에 보존
 - **공통 레이아웃 속성**: Margin·Padding·수평/수직 정렬·Min/Max 크기를 편집하고 컨테이너 자식, Undo/Redo, 복제, Preview, AXAML 왕복에 보존
+- **공통 Typography 속성**: FontFamily·Size·Style·Weight와 TextBlock/TextBox의 Alignment·Wrapping을 편집하고 Undo/Redo, 복제, Preview, AXAML 왕복에 보존
 - **문서 루트 속성**: Window/UserControl 루트 종류와 Window 제목·리사이즈·시작 위치, 루트 Min/Max 크기를 편집하고 Undo/Redo, Preview, Draft·Full AXAML 왕복에 보존
 - **벡터 Shape 편집**: Rectangle, Ellipse, Line, Path의 Fill·Stroke·대시·끝점·결합 스타일과 반지름·점 좌표를 편집하고, 검증된 Path geometry를 리소스·Undo/Redo·복제·미리보기·AXAML 왕복에 보존
 - **요소 선택**: 배치된 요소 클릭 시 파란 외곽선
@@ -56,6 +57,7 @@ dotnet run --project src/AvaloniaUIDesigner.App/AvaloniaUIDesigner.App.csproj
 10. `Edit > Edit Root Properties...`에서 Window/UserControl 루트와 Window 동작·루트 크기 제약 편집
 11. `Edit > Edit Sample Data...`에서 JSON 샘플 DataContext를 검증하고 바인딩된 컨트롤에 적용
 12. `Edit > Edit Layout Properties...`에서 선택 컨트롤의 Margin·Padding·Alignment·Min/Max 크기 편집
+13. `Edit > Edit Typography Properties...`에서 글꼴과 지원 컨트롤의 텍스트 정렬·줄바꿈 편집
 
 DataGrid가 포함된 생성 AXAML을 다른 프로젝트에서 사용할 때는 같은 Avalonia 버전의 `Avalonia.Controls.DataGrid` 패키지와 `avares://Avalonia.Controls.DataGrid/Themes/Fluent.xaml` 스타일 include가 필요합니다.
 
@@ -64,6 +66,8 @@ DataGrid가 포함된 생성 AXAML을 다른 프로젝트에서 사용할 때는
 샘플 DataContext 편집기는 JSON 주석과 trailing comma를 허용하며 저장 시 정규화합니다. 샘플 값은 디자이너 전용 Base64 메타데이터로 보존되어 생성 AXAML의 실제 DataContext를 강제하지 않고, 캔버스·Preview에서만 바인딩 결과를 표시합니다. 샘플을 지우면 바인딩 전 디자인 값과 정적 항목이 복원됩니다.
 
 공통 레이아웃 편집기의 Margin과 Padding은 `8`, `8,12`, `8,12,16,20`처럼 1·2·4개의 값을 사용할 수 있습니다. Padding은 지원 컨트롤에서만 활성화되며 음수 값을 허용하지 않습니다. 최대 너비·높이를 빈 칸으로 적용하면 해당 제한이 제거됩니다.
+
+Typography 편집기는 TextBlock과 텍스트를 표시하는 TemplatedControl의 공통 글꼴을 편집합니다. TextAlignment와 TextWrapping은 해당 속성을 직접 지원하는 TextBlock과 TextBox에서만 활성화됩니다.
 
 문서 루트 편집기에서 선택한 종류는 일반 저장과 Full AXAML 복사에 반영됩니다. UserControl은 Window 전용 속성을 사용하지 않으며, `File > Export UserControl AXAML...`은 현재 문서 종류와 관계없이 재사용 가능한 UserControl을 생성합니다.
 

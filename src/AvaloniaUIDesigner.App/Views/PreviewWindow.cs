@@ -453,6 +453,7 @@ public sealed class PreviewWindow : Window
         }
 
         DesignerLayoutRuntime.Apply(control, properties);
+        DesignerTypographyRuntime.Apply(control, properties);
         ApplyTemplatedAppearanceProperties(control, properties, colorResources);
 
         if (properties.TryGetValue("__toolTip", out var toolTip))

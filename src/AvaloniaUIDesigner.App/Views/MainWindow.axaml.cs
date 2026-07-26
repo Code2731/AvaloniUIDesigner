@@ -638,6 +638,19 @@ public partial class MainWindow : Window
         await ShowLayoutPropertiesDialogAsync(state);
     }
 
+    private async void OnEditTypographyPropertiesMenuClicked(
+        object? sender,
+        Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        FlushPendingPropertyHistory();
+        if (Vm is null || !Vm.TryGetSelectedTypographyProperties(out var state))
+        {
+            return;
+        }
+
+        await ShowTypographyPropertiesDialogAsync(state);
+    }
+
     private async void OnEditGridDefinitionsMenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
         FlushPendingPropertyHistory();
@@ -2765,6 +2778,140 @@ public partial class MainWindow : Window
         dialog.Content = content;
 
         return await dialog.ShowDialog<IReadOnlyList<string>?>(this);
+    }
+
+    private async Task ShowTypographyPropertiesDialogAsync(TypographyEditorState state)
+    {
+        if (Vm is null)
+        {
+            return;
+        }
+
+        var fontFamilyEditor = new TextBox
+        {
+            Text = state.FontFamily,
+            Watermark = "Font family or avares URI",
+        };
+        var fontSizeEditor = new TextBox { Text = state.FontSize };
+        var fontStyleEditor = new ComboBox
+        {
+            ItemsSource = Enum.GetNames<Avalonia.Media.FontStyle>(),
+            SelectedItem = state.FontStyle,
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+        };
+        var fontWeightEditor = new ComboBox
+        {
+            ItemsSource = DesignerTypographyRuntime.FontWeightNames,
+            SelectedItem = state.FontWeight,
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+        };
+        var textAlignmentEditor = new ComboBox
+        {
+            ItemsSource = Enum.GetNames<Avalonia.Media.TextAlignment>(),
+            SelectedItem = state.TextAlignment,
+            IsEnabled = state.SupportsTextAlignment,
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+        };
+        var textWrappingEditor = new ComboBox
+        {
+            ItemsSource = Enum.GetNames<Avalonia.Media.TextWrapping>(),
+            SelectedItem = state.TextWrapping,
+            IsEnabled = state.SupportsTextWrapping,
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+        };
+        var errorText = new TextBlock
+        {
+            Foreground = Avalonia.Media.Brushes.IndianRed,
+            TextWrapping = Avalonia.Media.TextWrapping.Wrap,
+        };
+        var dialog = new Window
+        {
+            Title = $"Edit Typography Properties - {state.ControlName}",
+            Width = 620,
+            Height = 440,
+            MinWidth = 520,
+            MinHeight = 390,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner,
+        };
+        var applyButton = new Button { Content = "Apply", MinWidth = 84 };
+        applyButton.Click += (_, _) =>
+        {
+            if (!Vm.SetSelectedTypographyProperties(
+                    fontFamilyEditor.Text ?? string.Empty,
+                    fontSizeEditor.Text ?? string.Empty,
+                    fontStyleEditor.SelectedItem?.ToString() ?? string.Empty,
+                    fontWeightEditor.SelectedItem?.ToString() ?? string.Empty,
+                    textAlignmentEditor.SelectedItem?.ToString() ?? state.TextAlignment,
+                    textWrappingEditor.SelectedItem?.ToString() ?? state.TextWrapping))
+            {
+                errorText.Text = Vm.StatusText;
+                return;
+            }
+
+            dialog.Close();
+        };
+        var cancelButton = new Button { Content = "Cancel", MinWidth = 84 };
+        cancelButton.Click += (_, _) => dialog.Close();
+        var buttons = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            Spacing = 8,
+            HorizontalAlignment = HorizontalAlignment.Right,
+            Children = { cancelButton, applyButton },
+        };
+        var fields = new Grid
+        {
+            ColumnDefinitions = new ColumnDefinitions("*,*"),
+            RowDefinitions = new RowDefinitions("Auto,Auto,Auto"),
+            ColumnSpacing = 12,
+            RowSpacing = 10,
+        };
+        AddField("Font family", fontFamilyEditor, 0, 0);
+        AddField("Font size", fontSizeEditor, 0, 1);
+        AddField("Font style", fontStyleEditor, 1, 0);
+        AddField("Font weight", fontWeightEditor, 1, 1);
+        AddField("Text alignment", textAlignmentEditor, 2, 0);
+        AddField("Text wrapping", textWrappingEditor, 2, 1);
+
+        var content = new Grid
+        {
+            Margin = new Thickness(16),
+            RowDefinitions = new RowDefinitions("Auto,*,Auto,Auto"),
+            RowSpacing = 12,
+            Children =
+            {
+                new TextBlock
+                {
+                    Text = "Font settings apply to text and font-aware controls. Alignment and wrapping are available for TextBlock and TextBox.",
+                    TextWrapping = Avalonia.Media.TextWrapping.Wrap,
+                },
+                fields,
+                errorText,
+                buttons,
+            },
+        };
+        Grid.SetRow(fields, 1);
+        Grid.SetRow(errorText, 2);
+        Grid.SetRow(buttons, 3);
+        dialog.Content = content;
+        await dialog.ShowDialog(this);
+        return;
+
+        void AddField(string label, Control editor, int row, int column)
+        {
+            var field = new StackPanel
+            {
+                Spacing = 4,
+                Children =
+                {
+                    new TextBlock { Text = label },
+                    editor,
+                },
+            };
+            Grid.SetRow(field, row);
+            Grid.SetColumn(field, column);
+            fields.Children.Add(field);
+        }
     }
 
     private async Task ShowLayoutPropertiesDialogAsync(LayoutEditorState state)
