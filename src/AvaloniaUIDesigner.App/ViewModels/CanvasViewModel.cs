@@ -2317,6 +2317,12 @@ public partial class CanvasViewModel : ViewModelBase
             return;
         }
 
+        if (visual is Avalonia.Controls.Calendar calendar)
+        {
+            DesignerDateTimeRuntime.Apply(calendar, properties);
+            return;
+        }
+
         if (visual is TimePicker timePicker)
         {
             DesignerDateTimeRuntime.Apply(timePicker, properties);

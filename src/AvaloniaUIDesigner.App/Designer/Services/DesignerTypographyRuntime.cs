@@ -42,6 +42,7 @@ public static class DesignerTypographyRuntime
         "DataGrid",
         "DatePicker",
         "CalendarDatePicker",
+        "Calendar",
         "TimePicker",
         "NumericUpDown",
         "TabControl",

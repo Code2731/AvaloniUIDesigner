@@ -4,6 +4,7 @@ using System.Globalization;
 using System.Linq;
 using Avalonia.Controls;
 using Avalonia.Layout;
+using CalendarControl = Avalonia.Controls.Calendar;
 
 namespace AvaloniaUIDesigner.App.Designer.Services;
 
@@ -11,6 +12,7 @@ public enum DesignerDateTimeControlKind
 {
     DatePicker,
     CalendarDatePicker,
+    Calendar,
     TimePicker,
 }
 
@@ -41,7 +43,10 @@ public sealed record DesignerDateTimeValues(
     int MinuteIncrement,
     int SecondIncrement,
     string ClockIdentifier,
-    bool UseSeconds);
+    bool UseSeconds,
+    CalendarSelectionMode CalendarSelectionMode,
+    CalendarMode CalendarDisplayMode,
+    bool AllowTapRangeSelection);
 
 public sealed record DesignerDateTimeEditorInput(
     string SelectedDate,
@@ -68,7 +73,10 @@ public sealed record DesignerDateTimeEditorInput(
     string MinuteIncrement,
     string SecondIncrement,
     string ClockIdentifier,
-    bool UseSeconds);
+    bool UseSeconds,
+    string CalendarSelectionMode,
+    string CalendarDisplayMode,
+    bool AllowTapRangeSelection);
 
 public sealed record DesignerDateTimeAttribute(string Name, string Value);
 
@@ -104,6 +112,19 @@ public static class DesignerDateTimeRuntime
         "VerticalContentAlignment",
     ];
 
+    private static readonly string[] CalendarProperties =
+    [
+        "SelectedDate",
+        "DisplayDate",
+        "DisplayDateStart",
+        "DisplayDateEnd",
+        "FirstDayOfWeek",
+        "IsTodayHighlighted",
+        "SelectionMode",
+        "DisplayMode",
+        "AllowTapRangeSelection",
+    ];
+
     private static readonly string[] TimePickerProperties =
     [
         "SelectedTime",
@@ -118,6 +139,12 @@ public static class DesignerDateTimeRuntime
     public static IReadOnlyList<string> CalendarDateFormatNames { get; } =
         Enum.GetNames<CalendarDatePickerFormat>();
 
+    public static IReadOnlyList<string> CalendarSelectionModeNames { get; } =
+        Enum.GetNames<CalendarSelectionMode>();
+
+    public static IReadOnlyList<string> CalendarDisplayModeNames { get; } =
+        Enum.GetNames<CalendarMode>();
+
     public static IReadOnlyList<string> HorizontalAlignmentNames { get; } =
         Enum.GetNames<HorizontalAlignment>();
 
@@ -128,7 +155,8 @@ public static class DesignerDateTimeRuntime
         ["12HourClock", "24HourClock"];
 
     public static bool IsSupportedControl(Control control)
-        => control is DatePicker or CalendarDatePicker or TimePicker;
+        => control is DatePicker or CalendarDatePicker or CalendarControl
+            or TimePicker;
 
     public static bool TryRead(
         Control control,
@@ -170,6 +198,21 @@ public static class DesignerDateTimeRuntime
                 };
                 error = string.Empty;
                 return true;
+            case CalendarControl calendar:
+                values = CreateDefaults(DesignerDateTimeControlKind.Calendar) with
+                {
+                    CalendarSelectedDate = calendar.SelectedDate,
+                    DisplayDate = calendar.DisplayDate,
+                    DisplayDateStart = calendar.DisplayDateStart,
+                    DisplayDateEnd = calendar.DisplayDateEnd,
+                    FirstDayOfWeek = calendar.FirstDayOfWeek,
+                    IsTodayHighlighted = calendar.IsTodayHighlighted,
+                    CalendarSelectionMode = calendar.SelectionMode,
+                    CalendarDisplayMode = calendar.DisplayMode,
+                    AllowTapRangeSelection = calendar.AllowTapRangeSelection,
+                };
+                error = string.Empty;
+                return true;
             case TimePicker timePicker:
                 values = CreateDefaults(DesignerDateTimeControlKind.TimePicker) with
                 {
@@ -183,7 +226,7 @@ public static class DesignerDateTimeRuntime
                 return true;
             default:
                 values = default!;
-                error = "Date and time editing is available for DatePicker, CalendarDatePicker, and TimePicker controls.";
+                error = "Date and time editing is available for DatePicker, CalendarDatePicker, Calendar, and TimePicker controls.";
                 return false;
         }
     }
@@ -206,11 +249,13 @@ public static class DesignerDateTimeRuntime
                 return TryParseDatePicker(input, current, out values, out error);
             case CalendarDatePicker:
                 return TryParseCalendarDatePicker(input, current, out values, out error);
+            case CalendarControl:
+                return TryParseCalendar(input, current, out values, out error);
             case TimePicker:
                 return TryParseTimePicker(input, current, out values, out error);
             default:
                 values = default!;
-                error = "Date and time editing is available for DatePicker, CalendarDatePicker, and TimePicker controls.";
+                error = "Date and time editing is available for DatePicker, CalendarDatePicker, Calendar, and TimePicker controls.";
                 return false;
         }
     }
@@ -231,7 +276,7 @@ public static class DesignerDateTimeRuntime
         }
 
         var input = new DesignerDateTimeEditorInput(
-            control is CalendarDatePicker
+            control is CalendarDatePicker or CalendarControl
                 ? FormatDate(current.CalendarSelectedDate)
                 : FormatDate(current.SelectedDate),
             FormatDate(current.MinYear),
@@ -269,7 +314,19 @@ public static class DesignerDateTimeRuntime
                 "SecondIncrement",
                 current.SecondIncrement.ToString(CultureInfo.InvariantCulture)),
             Get(properties, "ClockIdentifier", current.ClockIdentifier),
-            GetBoolean(properties, "UseSeconds", current.UseSeconds));
+            GetBoolean(properties, "UseSeconds", current.UseSeconds),
+            Get(
+                properties,
+                "SelectionMode",
+                current.CalendarSelectionMode.ToString()),
+            Get(
+                properties,
+                "DisplayMode",
+                current.CalendarDisplayMode.ToString()),
+            GetBoolean(
+                properties,
+                "AllowTapRangeSelection",
+                current.AllowTapRangeSelection));
 
         input = input with
         {
@@ -314,6 +371,25 @@ public static class DesignerDateTimeRuntime
                 calendar.HorizontalContentAlignment = values.HorizontalContentAlignment;
                 calendar.VerticalContentAlignment = values.VerticalContentAlignment;
                 calendar.SelectedDate = values.CalendarSelectedDate;
+                break;
+            case CalendarControl calendar
+                when values.Kind == DesignerDateTimeControlKind.Calendar:
+                calendar.SelectedDate = null;
+                calendar.DisplayDateStart = null;
+                calendar.DisplayDateEnd = null;
+                calendar.DisplayDateStart = values.DisplayDateStart;
+                calendar.DisplayDateEnd = values.DisplayDateEnd;
+                calendar.DisplayDate = values.DisplayDate;
+                calendar.FirstDayOfWeek = values.FirstDayOfWeek;
+                calendar.IsTodayHighlighted = values.IsTodayHighlighted;
+                calendar.DisplayMode = values.CalendarDisplayMode;
+                calendar.AllowTapRangeSelection = values.AllowTapRangeSelection;
+                calendar.SelectionMode = values.CalendarSelectionMode;
+                if (values.CalendarSelectionMode != CalendarSelectionMode.None)
+                {
+                    calendar.SelectedDate = values.CalendarSelectedDate;
+                }
+
                 break;
             case TimePicker timePicker when values.Kind == DesignerDateTimeControlKind.TimePicker:
                 timePicker.MinuteIncrement = values.MinuteIncrement;
@@ -391,6 +467,7 @@ public static class DesignerDateTimeRuntime
             case "IsTodayHighlighted":
             case "UseFloatingWatermark":
             case "UseSeconds":
+            case "AllowTapRangeSelection":
                 if (!bool.TryParse(rawValue.Trim(), out var boolean))
                 {
                     error = $"{canonicalName} must be True or False.";
@@ -417,6 +494,18 @@ public static class DesignerDateTimeRuntime
                     out error);
             case "SelectedDateFormat":
                 return TryNormalizeEnum<CalendarDatePickerFormat>(
+                    rawValue,
+                    canonicalName,
+                    out normalizedValue,
+                    out error);
+            case "SelectionMode":
+                return TryNormalizeEnum<CalendarSelectionMode>(
+                    rawValue,
+                    canonicalName,
+                    out normalizedValue,
+                    out error);
+            case "DisplayMode":
+                return TryNormalizeEnum<CalendarMode>(
                     rawValue,
                     canonicalName,
                     out normalizedValue,
@@ -501,7 +590,14 @@ public static class DesignerDateTimeRuntime
             return true;
         }
 
-        if (string.Equals(tagName, "CalendarDatePicker", StringComparison.OrdinalIgnoreCase))
+        if (string.Equals(
+                tagName,
+                "CalendarDatePicker",
+                StringComparison.OrdinalIgnoreCase)
+            || string.Equals(
+                tagName,
+                "Calendar",
+                StringComparison.OrdinalIgnoreCase))
         {
             var start = ReadNullableDate(properties, "DisplayDateStart");
             var end = ReadNullableDate(properties, "DisplayDateEnd");
@@ -529,6 +625,26 @@ public static class DesignerDateTimeRuntime
                 return false;
             }
 
+            if (string.Equals(
+                    tagName,
+                    "Calendar",
+                    StringComparison.OrdinalIgnoreCase)
+                && TryGetValue(
+                    properties,
+                    "SelectionMode",
+                    out var rawSelectionMode)
+                && Enum.TryParse<CalendarSelectionMode>(
+                    rawSelectionMode,
+                    true,
+                    out var selectionMode)
+                && selectionMode == CalendarSelectionMode.None
+                && selected is not null)
+            {
+                error =
+                    "SelectedDate must be empty when SelectionMode is None.";
+                return false;
+            }
+
             error = string.Empty;
             return true;
         }
@@ -543,7 +659,14 @@ public static class DesignerDateTimeRuntime
     {
         var names = string.Equals(tagName, "DatePicker", StringComparison.OrdinalIgnoreCase)
             ? new[] { "SelectedDate", "MinYear", "MaxYear", "DayVisible", "MonthVisible", "YearVisible" }
-            : string.Equals(tagName, "CalendarDatePicker", StringComparison.OrdinalIgnoreCase)
+            : string.Equals(
+                    tagName,
+                    "CalendarDatePicker",
+                    StringComparison.OrdinalIgnoreCase)
+                || string.Equals(
+                    tagName,
+                    "Calendar",
+                    StringComparison.OrdinalIgnoreCase)
                 ? new[] { "SelectedDate", "DisplayDate", "DisplayDateStart", "DisplayDateEnd" }
                 : [];
         foreach (var name in names)
@@ -617,6 +740,38 @@ public static class DesignerDateTimeRuntime
                 attributes.Add(new(
                     "VerticalContentAlignment",
                     values.VerticalContentAlignment.ToString()));
+                break;
+            case DesignerDateTimeControlKind.Calendar:
+                AddNullable(
+                    attributes,
+                    "SelectedDate",
+                    FormatDate(values.CalendarSelectedDate));
+                attributes.Add(new(
+                    "DisplayDate",
+                    FormatDate(values.DisplayDate)));
+                AddNullable(
+                    attributes,
+                    "DisplayDateStart",
+                    FormatDate(values.DisplayDateStart));
+                AddNullable(
+                    attributes,
+                    "DisplayDateEnd",
+                    FormatDate(values.DisplayDateEnd));
+                attributes.Add(new(
+                    "FirstDayOfWeek",
+                    values.FirstDayOfWeek.ToString()));
+                attributes.Add(new(
+                    "IsTodayHighlighted",
+                    values.IsTodayHighlighted.ToString()));
+                attributes.Add(new(
+                    "SelectionMode",
+                    values.CalendarSelectionMode.ToString()));
+                attributes.Add(new(
+                    "DisplayMode",
+                    values.CalendarDisplayMode.ToString()));
+                attributes.Add(new(
+                    "AllowTapRangeSelection",
+                    values.AllowTapRangeSelection.ToString()));
                 break;
             case DesignerDateTimeControlKind.TimePicker:
                 AddNullable(attributes, "SelectedTime", FormatTime(values.SelectedTime));
@@ -826,6 +981,109 @@ public static class DesignerDateTimeRuntime
         return true;
     }
 
+    private static bool TryParseCalendar(
+        DesignerDateTimeEditorInput input,
+        DesignerDateTimeValues current,
+        out DesignerDateTimeValues values,
+        out string error)
+    {
+        if (!TryParseNullableDate(
+                input.SelectedDate,
+                "Selected date",
+                out var selectedDate,
+                out error)
+            || !TryParseDate(
+                input.DisplayDate,
+                "Display date",
+                out var displayDate,
+                out error)
+            || !TryParseNullableDate(
+                input.DisplayDateStart,
+                "Display date start",
+                out var start,
+                out error)
+            || !TryParseNullableDate(
+                input.DisplayDateEnd,
+                "Display date end",
+                out var end,
+                out error))
+        {
+            values = default!;
+            return false;
+        }
+
+        if (start is { } startDate
+            && end is { } endDate
+            && startDate > endDate)
+        {
+            values = default!;
+            error =
+                "Display date start must not be later than display date end.";
+            return false;
+        }
+
+        if (selectedDate is { } selected
+            && (start is { } rangeStart && selected < rangeStart
+                || end is { } rangeEnd && selected > rangeEnd))
+        {
+            values = default!;
+            error = "Selected date must be inside the display date range.";
+            return false;
+        }
+
+        if (displayDate < (start ?? DateTime.MinValue)
+            || displayDate > (end ?? DateTime.MaxValue))
+        {
+            values = default!;
+            error = "Display date must be inside the display date range.";
+            return false;
+        }
+
+        if (!TryParseEnum(
+                input.FirstDayOfWeek,
+                "First day of week",
+                out DayOfWeek firstDay,
+                out error)
+            || !TryParseEnum(
+                input.CalendarSelectionMode,
+                "Selection mode",
+                out CalendarSelectionMode selectionMode,
+                out error)
+            || !TryParseEnum(
+                input.CalendarDisplayMode,
+                "Display mode",
+                out CalendarMode displayMode,
+                out error))
+        {
+            values = default!;
+            return false;
+        }
+
+        if (selectionMode == CalendarSelectionMode.None
+            && selectedDate is not null)
+        {
+            values = default!;
+            error =
+                "Selected date must be empty when selection mode is None.";
+            return false;
+        }
+
+        values = current with
+        {
+            CalendarSelectedDate = selectedDate,
+            DisplayDate = displayDate,
+            DisplayDateStart = start,
+            DisplayDateEnd = end,
+            FirstDayOfWeek = firstDay,
+            IsTodayHighlighted = input.IsTodayHighlighted,
+            CalendarSelectionMode = selectionMode,
+            CalendarDisplayMode = displayMode,
+            AllowTapRangeSelection = input.AllowTapRangeSelection,
+        };
+        error = string.Empty;
+        return true;
+    }
+
     private static DesignerDateTimeValues CreateDefaults(DesignerDateTimeControlKind kind)
     {
         var today = DateTime.Today;
@@ -858,7 +1116,10 @@ public static class DesignerDateTimeRuntime
             MinuteIncrement: 1,
             SecondIncrement: 1,
             ClockIdentifier: "12HourClock",
-            UseSeconds: false);
+            UseSeconds: false,
+            CalendarSelectionMode: CalendarSelectionMode.SingleDate,
+            CalendarDisplayMode: CalendarMode.Month,
+            AllowTapRangeSelection: true);
     }
 
     private static void ApplyDatePickerRange(
@@ -1042,6 +1303,7 @@ public static class DesignerDateTimeRuntime
         {
             "DATEPICKER" => DatePickerProperties,
             "CALENDARDATEPICKER" => CalendarDatePickerProperties,
+            "CALENDAR" => CalendarProperties,
             "TIMEPICKER" => TimePickerProperties,
             _ => [],
         };

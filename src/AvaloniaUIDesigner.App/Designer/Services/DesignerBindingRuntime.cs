@@ -42,7 +42,8 @@ public static class DesignerBindingRuntime
             "TreeView" => ["ItemsSource", "SelectedItem"],
             "DataGrid" => ["ItemsSource", "SelectedIndex", "SelectedItem", "IsReadOnly"],
             "Slider" or "ProgressBar" => ["Minimum", "Maximum", "Value"],
-            "DatePicker" or "CalendarDatePicker" => ["SelectedDate"],
+            "DatePicker" or "CalendarDatePicker" or "Calendar"
+                => ["SelectedDate"],
             "TimePicker" => ["SelectedTime"],
             "NumericUpDown" => ["Value"],
             "TabControl" => ["SelectedIndex"],

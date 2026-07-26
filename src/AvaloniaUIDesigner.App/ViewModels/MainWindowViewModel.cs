@@ -215,7 +215,10 @@ public sealed record DateTimeEditorState(
     string MinuteIncrement,
     string SecondIncrement,
     string ClockIdentifier,
-    bool UseSeconds);
+    bool UseSeconds,
+    string CalendarSelectionMode,
+    string CalendarDisplayMode,
+    bool AllowTapRangeSelection);
 
 public sealed record ToggleEditorState(
     string ControlName,
@@ -4135,9 +4138,9 @@ public partial class MainWindowViewModel : ViewModelBase
             state = default!;
             StatusText = target switch
             {
-                null => "Select a DatePicker, CalendarDatePicker, or TimePicker before editing date and time input.",
+                null => "Select a DatePicker, CalendarDatePicker, Calendar, or TimePicker before editing date and time input.",
                 { IsLocked: true } => "Unlock the selected control before editing date and time input.",
-                _ => "Date and time editing is available for DatePicker, CalendarDatePicker, and TimePicker controls.",
+                _ => "Date and time editing is available for DatePicker, CalendarDatePicker, Calendar, and TimePicker controls.",
             };
             return false;
         }
@@ -4158,7 +4161,7 @@ public partial class MainWindowViewModel : ViewModelBase
         var target = Canvas.SelectedElement;
         if (target is null || target.IsLocked || !DesignerDateTimeRuntime.IsSupportedControl(target.Visual))
         {
-            StatusText = "Select an unlocked DatePicker, CalendarDatePicker, or TimePicker before editing date and time input.";
+            StatusText = "Select an unlocked DatePicker, CalendarDatePicker, Calendar, or TimePicker before editing date and time input.";
             return false;
         }
 
@@ -4209,6 +4212,9 @@ public partial class MainWindowViewModel : ViewModelBase
                      "SecondIncrement",
                      "ClockIdentifier",
                      "UseSeconds",
+                     "SelectionMode",
+                     "DisplayMode",
+                     "AllowTapRangeSelection",
                  })
         {
             DesignerStyleApplicationMetadata.ClearApplied(target.Visual, propertyName);
@@ -4226,7 +4232,8 @@ public partial class MainWindowViewModel : ViewModelBase
         => new(
             controlName,
             values.Kind.ToString(),
-            FormatDate(values.Kind == DesignerDateTimeControlKind.CalendarDatePicker
+            FormatDate(values.Kind is DesignerDateTimeControlKind.CalendarDatePicker
+                    or DesignerDateTimeControlKind.Calendar
                 ? values.CalendarSelectedDate
                 : values.SelectedDate),
             FormatDate(values.MinYear),
@@ -4252,7 +4259,10 @@ public partial class MainWindowViewModel : ViewModelBase
             values.MinuteIncrement.ToString(CultureInfo.InvariantCulture),
             values.SecondIncrement.ToString(CultureInfo.InvariantCulture),
             values.ClockIdentifier,
-            values.UseSeconds);
+            values.UseSeconds,
+            values.CalendarSelectionMode.ToString(),
+            values.CalendarDisplayMode.ToString(),
+            values.AllowTapRangeSelection);
 
     private static string FormatDate(DateTimeOffset? value)
         => value?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) ?? string.Empty;
@@ -8417,7 +8427,8 @@ public partial class MainWindowViewModel : ViewModelBase
                 or "TickPlacement" or "IsSnapToTickEnabled",
             "ProgressBar" => propertyName is "Minimum" or "Maximum" or "Value" or "Orientation"
                 or "IsIndeterminate" or "ShowProgressText" or "ProgressTextFormat",
-            "DatePicker" or "CalendarDatePicker" or "TimePicker" => false,
+            "DatePicker" or "CalendarDatePicker" or "Calendar"
+                or "TimePicker" => false,
             "NumericUpDown" => propertyName is "Minimum" or "Maximum" or "Increment" or "Value"
                 or "FormatString" or "ClipValueToMinMax" or "AllowSpin"
                 or "ShowButtonSpinner" or "ButtonSpinnerLocation",
@@ -8442,7 +8453,8 @@ public partial class MainWindowViewModel : ViewModelBase
     private static bool SupportsTemplatedAppearance(string tagName)
         => tagName is "Button" or "TextBox" or "Label" or "CheckBox" or "RadioButton"
             or "ToggleSwitch" or "ToggleButton" or "ComboBox" or "ListBox" or "TreeView" or "Menu" or "Slider"
-            or "ProgressBar" or "DatePicker" or "CalendarDatePicker" or "TimePicker"
+            or "ProgressBar" or "DatePicker" or "CalendarDatePicker"
+            or "Calendar" or "TimePicker"
             or "NumericUpDown" or "TabControl" or "Expander" or "ScrollViewer" or "DataGrid";
 
     private static bool IsSupportedShapeProperty(string propertyName)
@@ -9761,6 +9773,14 @@ public partial class MainWindowViewModel : ViewModelBase
                 sb.Append("<CalendarDatePicker");
                 AppendCanvasLayoutAttributes(sb, element);
                 AppendDateTimeAttributes(sb, calendarDatePicker);
+                sb.AppendLine(" />");
+                break;
+
+            case Avalonia.Controls.Calendar calendar:
+                sb.Append(indent);
+                sb.Append("<Calendar");
+                AppendCanvasLayoutAttributes(sb, element);
+                AppendDateTimeAttributes(sb, calendar);
                 sb.AppendLine(" />");
                 break;
 

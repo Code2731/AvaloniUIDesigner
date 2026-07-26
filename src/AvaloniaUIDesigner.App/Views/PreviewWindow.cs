@@ -303,6 +303,7 @@ public sealed class PreviewWindow : Window
             "Avalonia.Controls.ProgressBar" => new ProgressBar { Minimum = 0, Maximum = 100, Value = 50 },
             "Avalonia.Controls.DatePicker" => new DatePicker(),
             "Avalonia.Controls.CalendarDatePicker" => new CalendarDatePicker { Watermark = "Select date" },
+            "Avalonia.Controls.Calendar" => new Avalonia.Controls.Calendar(),
             "Avalonia.Controls.TimePicker" => new TimePicker(),
             "Avalonia.Controls.NumericUpDown" => new NumericUpDown
             {
@@ -529,6 +530,9 @@ public sealed class PreviewWindow : Window
                 break;
             case CalendarDatePicker calendarDatePicker:
                 ApplyCalendarDatePickerProperties(calendarDatePicker, properties);
+                break;
+            case Avalonia.Controls.Calendar calendar:
+                DesignerDateTimeRuntime.Apply(calendar, properties);
                 break;
             case TimePicker timePicker:
                 ApplyTimePickerProperties(timePicker, properties);

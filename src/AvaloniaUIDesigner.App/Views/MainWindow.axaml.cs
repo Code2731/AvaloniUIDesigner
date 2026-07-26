@@ -4430,7 +4430,11 @@ public partial class MainWindow : Window
         }
 
         var isDatePicker = state.ControlKind == nameof(DesignerDateTimeControlKind.DatePicker);
-        var isCalendar = state.ControlKind == nameof(DesignerDateTimeControlKind.CalendarDatePicker);
+        var isCalendarDatePicker =
+            state.ControlKind
+            == nameof(DesignerDateTimeControlKind.CalendarDatePicker);
+        var isCalendarControl =
+            state.ControlKind == nameof(DesignerDateTimeControlKind.Calendar);
         var selectedDateEditor = new TextBox
         {
             Text = state.SelectedDate,
@@ -4470,6 +4474,54 @@ public partial class MainWindow : Window
         };
         var customDateFormatEditor = new TextBox { Text = state.CustomDateFormatString };
         var todayHighlightedEditor = new CheckBox
+        {
+            Content = "Highlight today",
+            IsChecked = state.IsTodayHighlighted,
+        };
+        var calendarSelectionModeEditor = new ComboBox
+        {
+            ItemsSource = DesignerDateTimeRuntime.CalendarSelectionModeNames,
+            SelectedItem = state.CalendarSelectionMode,
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+        };
+        var calendarDisplayModeEditor = new ComboBox
+        {
+            ItemsSource = DesignerDateTimeRuntime.CalendarDisplayModeNames,
+            SelectedItem = state.CalendarDisplayMode,
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+        };
+        var allowTapRangeEditor = new CheckBox
+        {
+            Content = "Allow tap range selection",
+            IsChecked = state.AllowTapRangeSelection,
+        };
+        var calendarControlSelectedDateEditor = new TextBox
+        {
+            Text = state.SelectedDate,
+            Watermark = "Optional: yyyy-MM-dd",
+        };
+        var calendarControlDisplayDateEditor = new TextBox
+        {
+            Text = state.DisplayDate,
+            Watermark = "yyyy-MM-dd",
+        };
+        var calendarControlDisplayStartEditor = new TextBox
+        {
+            Text = state.DisplayDateStart,
+            Watermark = "Optional: yyyy-MM-dd",
+        };
+        var calendarControlDisplayEndEditor = new TextBox
+        {
+            Text = state.DisplayDateEnd,
+            Watermark = "Optional: yyyy-MM-dd",
+        };
+        var calendarControlFirstDayEditor = new ComboBox
+        {
+            ItemsSource = DesignerDateTimeRuntime.DayOfWeekNames,
+            SelectedItem = state.FirstDayOfWeek,
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+        };
+        var calendarControlTodayHighlightedEditor = new CheckBox
         {
             Content = "Highlight today",
             IsChecked = state.IsTodayHighlighted,
@@ -4548,7 +4600,7 @@ public partial class MainWindow : Window
         };
 
         var calendarFields = CreateFieldGrid(6);
-        if (isCalendar)
+        if (isCalendarDatePicker)
         {
             AddField(calendarFields, "Selected date", selectedDateEditor, 0, 0);
         }
@@ -4573,6 +4625,64 @@ public partial class MainWindow : Window
         Grid.SetColumnSpan(calendarSwitches, 2);
         calendarFields.Children.Add(calendarSwitches);
 
+        var calendarControlFields = CreateFieldGrid(5);
+        AddField(
+            calendarControlFields,
+            "Selected date",
+            calendarControlSelectedDateEditor,
+            0,
+            0);
+        AddField(
+            calendarControlFields,
+            "Displayed date",
+            calendarControlDisplayDateEditor,
+            0,
+            1);
+        AddField(
+            calendarControlFields,
+            "Display range start",
+            calendarControlDisplayStartEditor,
+            1,
+            0);
+        AddField(
+            calendarControlFields,
+            "Display range end",
+            calendarControlDisplayEndEditor,
+            1,
+            1);
+        AddField(
+            calendarControlFields,
+            "First day of week",
+            calendarControlFirstDayEditor,
+            2,
+            0);
+        AddField(
+            calendarControlFields,
+            "Selection mode",
+            calendarSelectionModeEditor,
+            2,
+            1);
+        AddField(
+            calendarControlFields,
+            "Display mode",
+            calendarDisplayModeEditor,
+            3,
+            0);
+        var calendarControlSwitches = new WrapPanel
+        {
+            Orientation = Orientation.Horizontal,
+            ItemSpacing = 18,
+            LineSpacing = 8,
+            Children =
+            {
+                calendarControlTodayHighlightedEditor,
+                allowTapRangeEditor,
+            },
+        };
+        Grid.SetRow(calendarControlSwitches, 4);
+        Grid.SetColumnSpan(calendarControlSwitches, 2);
+        calendarControlFields.Children.Add(calendarControlSwitches);
+
         var timePickerFields = CreateFieldGrid(3);
         AddField(timePickerFields, "Selected time", selectedTimeEditor, 0, 0);
         AddField(timePickerFields, "Clock", clockIdentifierEditor, 0, 1);
@@ -4591,9 +4701,13 @@ public partial class MainWindow : Window
                 Children = { datePickerFields, datePickerSwitches },
             };
         }
-        else if (isCalendar)
+        else if (isCalendarDatePicker)
         {
             editorContent = calendarFields;
+        }
+        else if (isCalendarControl)
+        {
+            editorContent = calendarControlFields;
         }
         else
         {
@@ -4609,7 +4723,9 @@ public partial class MainWindow : Window
         {
             Title = $"Edit Date & Time Input - {state.ControlName}",
             Width = 760,
-            Height = isCalendar ? 690 : 520,
+            Height = isCalendarDatePicker ? 690
+                : isCalendarControl ? 600
+                : 520,
             MinWidth = 640,
             MinHeight = 460,
             WindowStartupLocation = WindowStartupLocation.CenterOwner,
@@ -4618,7 +4734,9 @@ public partial class MainWindow : Window
         applyButton.Click += (_, _) =>
         {
             var input = new DesignerDateTimeEditorInput(
-                selectedDateEditor.Text ?? string.Empty,
+                isCalendarControl
+                    ? calendarControlSelectedDateEditor.Text ?? string.Empty
+                    : selectedDateEditor.Text ?? string.Empty,
                 minYearEditor.Text ?? string.Empty,
                 maxYearEditor.Text ?? string.Empty,
                 dayVisibleEditor.IsChecked == true,
@@ -4627,11 +4745,22 @@ public partial class MainWindow : Window
                 dayFormatEditor.Text ?? string.Empty,
                 monthFormatEditor.Text ?? string.Empty,
                 yearFormatEditor.Text ?? string.Empty,
-                displayDateEditor.Text ?? string.Empty,
-                displayDateStartEditor.Text ?? string.Empty,
-                displayDateEndEditor.Text ?? string.Empty,
-                firstDayEditor.SelectedItem?.ToString() ?? string.Empty,
-                todayHighlightedEditor.IsChecked == true,
+                isCalendarControl
+                    ? calendarControlDisplayDateEditor.Text ?? string.Empty
+                    : displayDateEditor.Text ?? string.Empty,
+                isCalendarControl
+                    ? calendarControlDisplayStartEditor.Text ?? string.Empty
+                    : displayDateStartEditor.Text ?? string.Empty,
+                isCalendarControl
+                    ? calendarControlDisplayEndEditor.Text ?? string.Empty
+                    : displayDateEndEditor.Text ?? string.Empty,
+                isCalendarControl
+                    ? calendarControlFirstDayEditor.SelectedItem?.ToString()
+                        ?? string.Empty
+                    : firstDayEditor.SelectedItem?.ToString() ?? string.Empty,
+                isCalendarControl
+                    ? calendarControlTodayHighlightedEditor.IsChecked == true
+                    : todayHighlightedEditor.IsChecked == true,
                 selectedDateFormatEditor.SelectedItem?.ToString() ?? string.Empty,
                 customDateFormatEditor.Text ?? string.Empty,
                 watermarkEditor.Text ?? string.Empty,
@@ -4642,7 +4771,12 @@ public partial class MainWindow : Window
                 minuteIncrementEditor.Text ?? string.Empty,
                 secondIncrementEditor.Text ?? string.Empty,
                 clockIdentifierEditor.SelectedItem?.ToString() ?? string.Empty,
-                useSecondsEditor.IsChecked == true);
+                useSecondsEditor.IsChecked == true,
+                calendarSelectionModeEditor.SelectedItem?.ToString()
+                    ?? string.Empty,
+                calendarDisplayModeEditor.SelectedItem?.ToString()
+                    ?? string.Empty,
+                allowTapRangeEditor.IsChecked == true);
             if (!Vm.SetSelectedDateTimeProperties(input))
             {
                 errorText.Text = Vm.StatusText;

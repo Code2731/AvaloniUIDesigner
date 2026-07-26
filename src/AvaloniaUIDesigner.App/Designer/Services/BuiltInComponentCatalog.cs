@@ -178,6 +178,12 @@ public sealed class BuiltInComponentCatalog : IComponentCatalog
             DefaultHeight: 32,
             VisualFactory: static () => new CalendarDatePicker { Watermark = "Select date" }),
         new(
+            DisplayName: "Calendar",
+            AvaloniaTypeName: "Avalonia.Controls.Calendar",
+            DefaultWidth: 320,
+            DefaultHeight: 280,
+            VisualFactory: static () => new Calendar()),
+        new(
             DisplayName: "TimePicker",
             AvaloniaTypeName: "Avalonia.Controls.TimePicker",
             DefaultWidth: 180,
