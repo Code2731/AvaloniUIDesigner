@@ -438,7 +438,7 @@ public static class DesignerStyleRuntime
         => targetType is "Button" or "TextBox" or "Label" or "CheckBox" or "RadioButton"
             or "ToggleSwitch" or "ToggleButton" or "ComboBox" or "ListBox" or "TreeView" or "Menu" or "Slider"
             or "ProgressBar" or "DatePicker" or "CalendarDatePicker" or "TimePicker"
-            or "NumericUpDown" or "TabControl" or "Expander" or "ScrollViewer";
+            or "NumericUpDown" or "TabControl" or "Expander" or "ScrollViewer" or "DataGrid";
 
     private static string FormatBrush(IBrush brush)
         => brush is ISolidColorBrush solidColorBrush

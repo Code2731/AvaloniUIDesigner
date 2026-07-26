@@ -34,6 +34,7 @@ public enum ItemsEditorMode
     Flat,
     TreeView,
     Menu,
+    DataGrid,
 }
 
 public sealed record ItemsEditorState(
@@ -2416,7 +2417,7 @@ public partial class MainWindowViewModel : ViewModelBase
 
         controlName = state.ControlName;
         items = state.Items;
-        supportsHierarchy = state.Mode != ItemsEditorMode.Flat;
+        supportsHierarchy = state.Mode is ItemsEditorMode.TreeView or ItemsEditorMode.Menu;
         return true;
     }
 
@@ -2426,7 +2427,7 @@ public partial class MainWindowViewModel : ViewModelBase
         if (target is null)
         {
             state = EmptyItemsEditorState();
-            StatusText = "Select a ComboBox, ListBox, TreeView, Menu, or TabControl to edit its items.";
+            StatusText = "Select a ComboBox, ListBox, TreeView, Menu, TabControl, or DataGrid to edit its items or columns.";
             return false;
         }
 
@@ -2463,6 +2464,12 @@ public partial class MainWindowViewModel : ViewModelBase
                     DesignerMenuItemRuntime.FormatEditorLines(menu),
                     ItemsEditorMode.Menu);
                 return true;
+            case DataGrid dataGrid:
+                state = new ItemsEditorState(
+                    target.DisplayName,
+                    DesignerDataGridRuntime.FormatEditorLines(dataGrid),
+                    ItemsEditorMode.DataGrid);
+                return true;
             case TabControl tabControl:
                 state = new ItemsEditorState(
                     target.DisplayName,
@@ -2471,7 +2478,7 @@ public partial class MainWindowViewModel : ViewModelBase
                 return true;
             default:
                 state = EmptyItemsEditorState();
-                StatusText = "Item editing is available for ComboBox, ListBox, TreeView, Menu, and TabControl controls.";
+                StatusText = "Item and column editing is available for ComboBox, ListBox, TreeView, Menu, TabControl, and DataGrid controls.";
                 return false;
         }
     }
@@ -2481,7 +2488,7 @@ public partial class MainWindowViewModel : ViewModelBase
         var target = Canvas.SelectedElement;
         if (target is null || target.IsLocked)
         {
-            StatusText = "Select an unlocked ComboBox, ListBox, TreeView, Menu, or TabControl to edit its items.";
+            StatusText = "Select an unlocked ComboBox, ListBox, TreeView, Menu, TabControl, or DataGrid to edit its items or columns.";
             return;
         }
 
@@ -2526,6 +2533,28 @@ public partial class MainWindowViewModel : ViewModelBase
             DesignerMenuItemRuntime.ReplaceItems(menu, definitions);
             CommitCanvasMutation();
             StatusText = $"Updated {DesignerMenuItemRuntime.CountEntries(definitions)} Menu entry(s).";
+            return;
+        }
+
+        if (target.Visual is DataGrid dataGrid)
+        {
+            if (!DesignerDataGridRuntime.TryParseEditorLines(items, out var definitions, out var error))
+            {
+                StatusText = $"DataGrid columns were not changed. {error}";
+                return;
+            }
+
+            var currentDefinitions = DesignerDataGridRuntime.ReadColumns(dataGrid);
+            if (DesignerDataGridRuntime.AreEquivalent(currentDefinitions, definitions))
+            {
+                StatusText = "DataGrid columns are unchanged.";
+                return;
+            }
+
+            BeginCanvasMutation(HistoryActionType.EditProperty, "Updated DataGrid columns.");
+            DesignerDataGridRuntime.ReplaceColumns(dataGrid, definitions);
+            CommitCanvasMutation();
+            StatusText = $"Updated {definitions.Count} DataGrid column(s).";
             return;
         }
 
@@ -2588,7 +2617,7 @@ public partial class MainWindowViewModel : ViewModelBase
                 return;
 
             default:
-                StatusText = "Item editing is available for ComboBox, ListBox, TreeView, Menu, and TabControl controls.";
+                StatusText = "Item and column editing is available for ComboBox, ListBox, TreeView, Menu, TabControl, and DataGrid controls.";
                 return;
         }
     }
@@ -4455,6 +4484,18 @@ public partial class MainWindowViewModel : ViewModelBase
             };
         }
 
+        if (visual is DataGrid dataGrid)
+        {
+            return new Dictionary<string, string>
+            {
+                ["__dataGridColumns"] = DesignerDataGridRuntime.Serialize(dataGrid),
+                ["AutoGenerateColumns"] = bool.FalseString,
+                ["GridLinesVisibility"] = dataGrid.GridLinesVisibility.ToString(),
+                ["IsReadOnly"] = dataGrid.IsReadOnly.ToString(),
+                ["Opacity"] = dataGrid.Opacity.ToString("0.###", CultureInfo.InvariantCulture),
+            };
+        }
+
         if (visual is Slider slider)
         {
             return new Dictionary<string, string>
@@ -5477,6 +5518,10 @@ public partial class MainWindowViewModel : ViewModelBase
         {
             map["__menuItems"] = DesignerMenuItemRuntime.Serialize(element);
         }
+        else if (string.Equals(element.Name.LocalName, "DataGrid", StringComparison.OrdinalIgnoreCase))
+        {
+            map["__dataGridColumns"] = DesignerDataGridRuntime.Serialize(element);
+        }
         else if (string.Equals(element.Name.LocalName, "TabControl", StringComparison.OrdinalIgnoreCase))
         {
             map["__tabs"] = SerializeTabHeaders(element);
@@ -5555,6 +5600,7 @@ public partial class MainWindowViewModel : ViewModelBase
             "ComboBox" or "ListBox" => propertyName == "SelectedIndex",
             "TreeView" => false,
             "Menu" => false,
+            "DataGrid" => propertyName is "AutoGenerateColumns" or "GridLinesVisibility" or "IsReadOnly",
             "Slider" or "ProgressBar" => propertyName is "Minimum" or "Maximum" or "Value",
             "DatePicker" => propertyName == "SelectedDate",
             "CalendarDatePicker" => propertyName is "SelectedDate" or "Watermark",
@@ -5583,7 +5629,7 @@ public partial class MainWindowViewModel : ViewModelBase
         => tagName is "Button" or "TextBox" or "Label" or "CheckBox" or "RadioButton"
             or "ToggleSwitch" or "ToggleButton" or "ComboBox" or "ListBox" or "TreeView" or "Menu" or "Slider"
             or "ProgressBar" or "DatePicker" or "CalendarDatePicker" or "TimePicker"
-            or "NumericUpDown" or "TabControl" or "Expander" or "ScrollViewer";
+            or "NumericUpDown" or "TabControl" or "Expander" or "ScrollViewer" or "DataGrid";
 
     private static bool IsSupportedShapeProperty(string propertyName)
         => propertyName is "Fill" or "Stroke" or "StrokeThickness" or "Stretch"
@@ -6885,6 +6931,22 @@ public partial class MainWindowViewModel : ViewModelBase
                 sb.AppendLine("</Menu>");
                 break;
 
+            case DataGrid dataGrid:
+                sb.Append(indent);
+                sb.Append("<DataGrid");
+                AppendCanvasLayoutAttributes(sb, element);
+                AppendAttribute(sb, "AutoGenerateColumns", bool.FalseString);
+                AppendAttribute(sb, "GridLinesVisibility", dataGrid.GridLinesVisibility.ToString());
+                AppendAttribute(sb, "IsReadOnly", dataGrid.IsReadOnly.ToString());
+                sb.AppendLine(">");
+                WriteDataGridColumnsAxaml(
+                    sb,
+                    DesignerDataGridRuntime.ReadColumns(dataGrid),
+                    indent + "  ");
+                sb.Append(indent);
+                sb.AppendLine("</DataGrid>");
+                break;
+
             case Slider slider:
                 sb.Append(indent);
                 sb.Append("<Slider");
@@ -7410,6 +7472,35 @@ public partial class MainWindowViewModel : ViewModelBase
                 sb.AppendLine();
                 break;
         }
+    }
+
+    private static void WriteDataGridColumnsAxaml(
+        StringBuilder sb,
+        IEnumerable<DesignerDataGridColumnDefinition> definitions,
+        string indent)
+    {
+        sb.Append(indent);
+        sb.AppendLine("<DataGrid.Columns>");
+        foreach (var definition in definitions)
+        {
+            sb.Append(indent);
+            sb.Append("  <");
+            sb.Append(definition.Kind == DesignerDataGridColumnKind.CheckBox
+                ? "DataGridCheckBoxColumn"
+                : "DataGridTextColumn");
+            AppendAttribute(sb, "Header", definition.Header);
+            AppendAttribute(sb, "Binding", $"{{Binding {definition.BindingPath}}}");
+            AppendAttribute(sb, "Width", definition.Width);
+            if (definition.IsReadOnly)
+            {
+                AppendAttribute(sb, "IsReadOnly", bool.TrueString);
+            }
+
+            sb.AppendLine(" />");
+        }
+
+        sb.Append(indent);
+        sb.AppendLine("</DataGrid.Columns>");
     }
 
     private void AppendShapeAttributes(StringBuilder sb, Shape shape)

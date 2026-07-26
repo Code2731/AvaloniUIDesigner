@@ -148,6 +148,12 @@ public sealed class BuiltInComponentCatalog : IComponentCatalog
             DefaultHeight: 32,
             VisualFactory: DesignerMenuItemRuntime.CreateDefaultMenu),
         new(
+            DisplayName: "DataGrid",
+            AvaloniaTypeName: "Avalonia.Controls.DataGrid",
+            DefaultWidth: 520,
+            DefaultHeight: 240,
+            VisualFactory: DesignerDataGridRuntime.CreateDefaultDataGrid),
+        new(
             DisplayName: "Slider",
             AvaloniaTypeName: "Avalonia.Controls.Slider",
             DefaultWidth: 180,

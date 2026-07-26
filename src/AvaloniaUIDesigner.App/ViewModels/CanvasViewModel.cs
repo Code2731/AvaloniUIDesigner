@@ -2409,6 +2409,32 @@ public partial class CanvasViewModel : ViewModelBase
             return;
         }
 
+        if (visual is DataGrid dataGrid)
+        {
+            if (properties.TryGetValue("__dataGridColumns", out var columnsJson)
+                && DesignerDataGridRuntime.TryDeserialize(columnsJson, out var definitions))
+            {
+                DesignerDataGridRuntime.ReplaceColumns(dataGrid, definitions);
+            }
+
+            if (properties.TryGetValue("GridLinesVisibility", out var gridLinesVisibility)
+                && Enum.TryParse<DataGridGridLinesVisibility>(
+                    gridLinesVisibility,
+                    ignoreCase: true,
+                    out var parsedGridLinesVisibility))
+            {
+                dataGrid.GridLinesVisibility = parsedGridLinesVisibility;
+            }
+
+            if (properties.TryGetValue("IsReadOnly", out var isReadOnly)
+                && bool.TryParse(isReadOnly, out var parsedIsReadOnly))
+            {
+                dataGrid.IsReadOnly = parsedIsReadOnly;
+            }
+
+            return;
+        }
+
         if (visual is Slider slider)
         {
             if (properties.TryGetValue("Minimum", out var minimum)

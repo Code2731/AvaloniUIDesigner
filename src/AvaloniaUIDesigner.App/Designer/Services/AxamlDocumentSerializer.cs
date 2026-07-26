@@ -165,6 +165,15 @@ public sealed class AxamlDocumentSerializer : IDesignerSerializer
             return;
         }
 
+        if (string.Equals(element.TypeName, "Avalonia.Controls.DataGrid", StringComparison.Ordinal))
+        {
+            sb.AppendLine(">");
+            AppendDataGridColumns(sb, ReadDataGridColumns(element), indent + "  ");
+            sb.Append(indent);
+            sb.AppendLine("</DataGrid>");
+            return;
+        }
+
         if (string.Equals(element.TypeName, "Avalonia.Controls.TabControl", StringComparison.Ordinal))
         {
             sb.AppendLine(">");
@@ -394,6 +403,51 @@ public sealed class AxamlDocumentSerializer : IDesignerSerializer
         }
 
         return definitions;
+    }
+
+    private static IReadOnlyList<DesignerDataGridColumnDefinition> ReadDataGridColumns(
+        DesignerElementSnapshot element)
+    {
+        if (element.VisualProperties is null
+            || !element.VisualProperties.TryGetValue("__dataGridColumns", out var json)
+            || !DesignerDataGridRuntime.TryDeserialize(json, out var definitions))
+        {
+            return [];
+        }
+
+        return definitions;
+    }
+
+    private static void AppendDataGridColumns(
+        StringBuilder sb,
+        IEnumerable<DesignerDataGridColumnDefinition> definitions,
+        string indent)
+    {
+        sb.Append(indent);
+        sb.AppendLine("<DataGrid.Columns>");
+        foreach (var definition in definitions)
+        {
+            sb.Append(indent);
+            sb.Append("  <");
+            sb.Append(definition.Kind == DesignerDataGridColumnKind.CheckBox
+                ? "DataGridCheckBoxColumn"
+                : "DataGridTextColumn");
+            sb.Append(" Header=\"");
+            sb.Append(EscapeXmlAttribute(definition.Header));
+            sb.Append("\" Binding=\"");
+            sb.Append(EscapeXmlAttribute($"{{Binding {definition.BindingPath}}}"));
+            sb.Append("\" Width=\"");
+            sb.Append(EscapeXmlAttribute(definition.Width));
+            if (definition.IsReadOnly)
+            {
+                sb.Append("\" IsReadOnly=\"True");
+            }
+
+            sb.AppendLine("\" />");
+        }
+
+        sb.Append(indent);
+        sb.AppendLine("</DataGrid.Columns>");
     }
 
     private static void AppendMenuEntries(

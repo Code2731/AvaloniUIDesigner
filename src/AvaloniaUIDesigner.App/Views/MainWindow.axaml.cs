@@ -2607,9 +2607,11 @@ public partial class MainWindow : Window
 
         var dialog = new Window
         {
-            Title = $"Edit Items - {state.ControlName}",
-            Width = state.Mode == ItemsEditorMode.Menu ? 620 : 460,
-            Height = state.Mode == ItemsEditorMode.Menu ? 430 : 380,
+            Title = state.Mode == ItemsEditorMode.DataGrid
+                ? $"Edit DataGrid Columns - {state.ControlName}"
+                : $"Edit Items - {state.ControlName}",
+            Width = state.Mode is ItemsEditorMode.Menu or ItemsEditorMode.DataGrid ? 680 : 460,
+            Height = state.Mode is ItemsEditorMode.Menu or ItemsEditorMode.DataGrid ? 430 : 380,
             MinWidth = 360,
             MinHeight = 260,
             WindowStartupLocation = WindowStartupLocation.CenterOwner,
@@ -2643,6 +2645,13 @@ public partial class MainWindow : Window
                 return;
             }
 
+            if (state.Mode == ItemsEditorMode.DataGrid
+                && !DesignerDataGridRuntime.TryParseEditorLines(updatedItems, out _, out var dataGridError))
+            {
+                errorText.Text = dataGridError;
+                return;
+            }
+
             dialog.Close(updatedItems);
         };
 
@@ -2672,6 +2681,8 @@ public partial class MainWindow : Window
                             "Use [-] for expanded, [+] for collapsed, and two spaces per child level.",
                         ItemsEditorMode.Menu =>
                             "Use two spaces per child level; --- separator; [x]/[ ] check; (x)/( ) radio with {Group}; | Ctrl+N shortcut.",
+                        ItemsEditorMode.DataGrid =>
+                            "One column per line: Type | Header | Binding | Width | ReadOnly. Type is Text or CheckBox; Width supports Auto, pixels, *, and N*.",
                         _ => "Enter one item per line. Empty lines are ignored.",
                     },
                     TextWrapping = Avalonia.Media.TextWrapping.Wrap,
