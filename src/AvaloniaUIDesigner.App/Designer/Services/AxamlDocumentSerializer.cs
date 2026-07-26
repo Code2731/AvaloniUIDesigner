@@ -23,6 +23,8 @@ public sealed class AxamlDocumentSerializer : IDesignerSerializer
         sb.Append(EscapeXmlAttribute(settings.Background));
         sb.AppendLine("\">");
 
+        AppendRootMetadata(sb, document.RootSettings ?? new DesignerRootSettings());
+
         if (document.SampleDataJson is not null)
         {
             var encodedSampleData = Convert.ToBase64String(
@@ -85,6 +87,51 @@ public sealed class AxamlDocumentSerializer : IDesignerSerializer
 
         sb.AppendLine("</Canvas>");
         return sb.ToString();
+    }
+
+    private static void AppendRootMetadata(StringBuilder sb, DesignerRootSettings settings)
+    {
+        var values = new List<string>();
+        if (settings.Kind != DesignerRootKind.Window)
+        {
+            values.Add($"RootKind={settings.Kind}");
+        }
+
+        if (!string.IsNullOrEmpty(settings.Title))
+        {
+            values.Add($"WindowTitleBase64={Convert.ToBase64String(Encoding.UTF8.GetBytes(settings.Title))}");
+        }
+
+        if (!settings.CanResize)
+        {
+            values.Add("CanResize=False");
+        }
+
+        if (settings.StartupLocation != DesignerWindowStartupLocation.Manual)
+        {
+            values.Add($"StartupLocation={settings.StartupLocation}");
+        }
+
+        AddConstraint("RootMinWidth", settings.MinWidth, 0);
+        AddConstraint("RootMinHeight", settings.MinHeight, 0);
+        AddConstraint("RootMaxWidth", settings.MaxWidth, double.PositiveInfinity);
+        AddConstraint("RootMaxHeight", settings.MaxHeight, double.PositiveInfinity);
+        if (values.Count > 0)
+        {
+            sb.Append("  <!-- AvaloniaUIDesigner: ");
+            sb.Append(string.Join("; ", values));
+            sb.AppendLine(" -->");
+        }
+
+        return;
+
+        void AddConstraint(string name, double value, double defaultValue)
+        {
+            if (!value.Equals(defaultValue))
+            {
+                values.Add($"{name}={ToInvariantString(value)}");
+            }
+        }
     }
 
     private static string ToInvariantString(double value)

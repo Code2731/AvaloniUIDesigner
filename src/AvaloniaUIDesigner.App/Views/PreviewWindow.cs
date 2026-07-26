@@ -24,16 +24,33 @@ public sealed class PreviewWindow : Window
 {
     public PreviewWindow(DesignerCanvasDocument document)
     {
-        Title = "Avalonia UI Designer - Preview";
-        Width = 960;
-        Height = 640;
-        MinWidth = 480;
-        MinHeight = 320;
-        WindowStartupLocation = WindowStartupLocation.CenterOwner;
-
         var settings = document.Settings ?? new DesignerCanvasSettings();
-        Width = Math.Clamp(settings.Width + 32, MinWidth, 1280);
-        Height = Math.Clamp(settings.Height + 72, MinHeight, 960);
+        var rootSettings = document.RootSettings ?? new DesignerRootSettings();
+        Title = rootSettings.Kind == DesignerRootKind.Window
+            && !string.IsNullOrEmpty(rootSettings.Title)
+                ? rootSettings.Title
+                : "Avalonia UI Designer - Preview";
+        CanResize = rootSettings.Kind != DesignerRootKind.Window || rootSettings.CanResize;
+        WindowStartupLocation = rootSettings.Kind == DesignerRootKind.UserControl
+            ? WindowStartupLocation.CenterOwner
+            : rootSettings.StartupLocation switch
+            {
+                DesignerWindowStartupLocation.CenterScreen => WindowStartupLocation.CenterScreen,
+                DesignerWindowStartupLocation.CenterOwner => WindowStartupLocation.CenterOwner,
+                _ => WindowStartupLocation.Manual,
+            };
+        MinWidth = rootSettings.MinWidth;
+        MinHeight = rootSettings.MinHeight;
+        MaxWidth = rootSettings.MaxWidth;
+        MaxHeight = rootSettings.MaxHeight;
+        var previewMaxWidth = double.IsPositiveInfinity(MaxWidth)
+            ? Math.Max(1280, MinWidth)
+            : MaxWidth;
+        var previewMaxHeight = double.IsPositiveInfinity(MaxHeight)
+            ? Math.Max(960, MinHeight)
+            : MaxHeight;
+        Width = Math.Clamp(settings.Width + 32, MinWidth, previewMaxWidth);
+        Height = Math.Clamp(settings.Height + 72, MinHeight, previewMaxHeight);
         var canvas = CreatePreviewCanvas(document);
 
         Content = new Border

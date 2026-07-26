@@ -1083,6 +1083,19 @@ public partial class MainWindow : Window
         await ShowAxamlSourceEditorDialogAsync(Vm.ExportFullAxaml());
     }
 
+    private async void OnEditRootPropertiesMenuClicked(
+        object? sender,
+        Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        FlushPendingPropertyHistory();
+        if (Vm is null)
+        {
+            return;
+        }
+
+        await ShowRootPropertiesDialogAsync(Vm.GetRootEditorState());
+    }
+
     private async void OnEditSampleDataMenuClicked(
         object? sender,
         Avalonia.Interactivity.RoutedEventArgs e)
@@ -2887,6 +2900,162 @@ public partial class MainWindow : Window
             };
             Grid.SetRow(field, row);
             Grid.SetColumn(field, column);
+            fields.Children.Add(field);
+        }
+    }
+
+    private async Task ShowRootPropertiesDialogAsync(RootEditorState state)
+    {
+        if (Vm is null)
+        {
+            return;
+        }
+
+        var rootKindEditor = new ComboBox
+        {
+            ItemsSource = Enum.GetNames<DesignerRootKind>(),
+            SelectedItem = state.RootKind,
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+        };
+        var titleEditor = new TextBox
+        {
+            Text = state.Title,
+            Watermark = "Application window title",
+        };
+        var canResizeEditor = new CheckBox
+        {
+            Content = "Allow the user to resize the window",
+            IsChecked = state.CanResize,
+        };
+        var startupEditor = new ComboBox
+        {
+            ItemsSource = Enum.GetNames<DesignerWindowStartupLocation>(),
+            SelectedItem = state.StartupLocation,
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+        };
+        var minWidthEditor = new TextBox { Text = state.MinWidth };
+        var minHeightEditor = new TextBox { Text = state.MinHeight };
+        var maxWidthEditor = new TextBox
+        {
+            Text = state.MaxWidth,
+            Watermark = "No maximum",
+        };
+        var maxHeightEditor = new TextBox
+        {
+            Text = state.MaxHeight,
+            Watermark = "No maximum",
+        };
+        var errorText = new TextBlock
+        {
+            Foreground = Avalonia.Media.Brushes.IndianRed,
+            TextWrapping = Avalonia.Media.TextWrapping.Wrap,
+        };
+        var dialog = new Window
+        {
+            Title = "Edit Document Root Properties",
+            Width = 620,
+            Height = 520,
+            MinWidth = 520,
+            MinHeight = 460,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner,
+        };
+        var applyButton = new Button { Content = "Apply", MinWidth = 84 };
+        applyButton.Click += (_, _) =>
+        {
+            if (!Vm.SetRootProperties(
+                    rootKindEditor.SelectedItem?.ToString() ?? string.Empty,
+                    titleEditor.Text ?? string.Empty,
+                    canResizeEditor.IsChecked == true,
+                    startupEditor.SelectedItem?.ToString() ?? string.Empty,
+                    minWidthEditor.Text ?? string.Empty,
+                    minHeightEditor.Text ?? string.Empty,
+                    maxWidthEditor.Text ?? string.Empty,
+                    maxHeightEditor.Text ?? string.Empty))
+            {
+                errorText.Text = Vm.StatusText;
+                return;
+            }
+
+            dialog.Close();
+        };
+        var cancelButton = new Button { Content = "Cancel", MinWidth = 84 };
+        cancelButton.Click += (_, _) => dialog.Close();
+        var buttons = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            Spacing = 8,
+            HorizontalAlignment = HorizontalAlignment.Right,
+            Children = { cancelButton, applyButton },
+        };
+        var fields = new Grid
+        {
+            ColumnDefinitions = new ColumnDefinitions("*,*"),
+            RowDefinitions = new RowDefinitions("Auto,Auto,Auto,Auto"),
+            ColumnSpacing = 12,
+            RowSpacing = 10,
+        };
+        AddField("Root type", rootKindEditor, 0, 0);
+        AddField("Window startup location", startupEditor, 0, 1);
+        AddField("Window title", titleEditor, 1, 0, 2);
+        AddField("Minimum width", minWidthEditor, 2, 0);
+        AddField("Minimum height", minHeightEditor, 2, 1);
+        AddField("Maximum width", maxWidthEditor, 3, 0);
+        AddField("Maximum height", maxHeightEditor, 3, 1);
+
+        var content = new Grid
+        {
+            Margin = new Thickness(16),
+            RowDefinitions = new RowDefinitions("Auto,Auto,*,Auto,Auto"),
+            RowSpacing = 12,
+            Children =
+            {
+                new TextBlock
+                {
+                    Text = "Full AXAML saves with the selected root type. Window-only settings are disabled for UserControl.",
+                    TextWrapping = Avalonia.Media.TextWrapping.Wrap,
+                },
+                canResizeEditor,
+                fields,
+                errorText,
+                buttons,
+            },
+        };
+        Grid.SetRow(canResizeEditor, 1);
+        Grid.SetRow(fields, 2);
+        Grid.SetRow(errorText, 3);
+        Grid.SetRow(buttons, 4);
+        dialog.Content = content;
+
+        rootKindEditor.SelectionChanged += (_, _) => UpdateWindowFields();
+        UpdateWindowFields();
+        await dialog.ShowDialog(this);
+        return;
+
+        void UpdateWindowFields()
+        {
+            var isWindow = string.Equals(
+                rootKindEditor.SelectedItem?.ToString(),
+                nameof(DesignerRootKind.Window),
+                StringComparison.Ordinal);
+            titleEditor.IsEnabled = isWindow;
+            canResizeEditor.IsEnabled = isWindow;
+            startupEditor.IsEnabled = isWindow;
+        }
+
+        void AddField(string label, Control editor, int row, int column, int columnSpan = 1)
+        {
+            var field = new StackPanel
+            {
+                Spacing = 4,
+                Children =
+                {
+                    new TextBlock { Text = label },
+                    editor,
+                },
+            };
+            Grid.SetRow(field, row);
+            Grid.SetColumn(field, column);
+            Grid.SetColumnSpan(field, columnSpan);
             fields.Children.Add(field);
         }
     }

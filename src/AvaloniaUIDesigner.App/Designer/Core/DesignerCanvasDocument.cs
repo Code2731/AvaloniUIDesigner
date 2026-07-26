@@ -2,6 +2,19 @@
 
 namespace AvaloniaUIDesigner.App.Designer.Core;
 
+public enum DesignerRootKind
+{
+    Window,
+    UserControl,
+}
+
+public enum DesignerWindowStartupLocation
+{
+    Manual,
+    CenterScreen,
+    CenterOwner,
+}
+
 public enum DesignerParentLayoutKind
 {
     None,
@@ -35,7 +48,18 @@ public sealed record DesignerCanvasDocument(
     DesignerCanvasSettings? Settings = null,
     IReadOnlyDictionary<string, string>? ColorResources = null,
     IReadOnlyList<DesignerStyleDefinition>? Styles = null,
-    string? SampleDataJson = null);
+    string? SampleDataJson = null,
+    DesignerRootSettings? RootSettings = null);
+
+public sealed record DesignerRootSettings(
+    DesignerRootKind Kind = DesignerRootKind.Window,
+    string Title = "",
+    bool CanResize = true,
+    DesignerWindowStartupLocation StartupLocation = DesignerWindowStartupLocation.Manual,
+    double MinWidth = 0,
+    double MinHeight = 0,
+    double MaxWidth = double.PositiveInfinity,
+    double MaxHeight = double.PositiveInfinity);
 
 public sealed record DesignerStyleDefinition(
     string TargetType,

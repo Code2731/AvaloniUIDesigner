@@ -60,6 +60,16 @@ public sealed record LayoutEditorState(
     string MaxWidth,
     string MaxHeight);
 
+public sealed record RootEditorState(
+    string RootKind,
+    string Title,
+    bool CanResize,
+    string StartupLocation,
+    string MinWidth,
+    string MinHeight,
+    string MaxWidth,
+    string MaxHeight);
+
 public sealed record GridDefinitionEditorState(
     string ControlName,
     string RowDefinitions,
@@ -231,6 +241,7 @@ public partial class MainWindowViewModel : ViewModelBase
     private List<DesignerElementSnapshot>? _clipboardSnapshots;
     private string? _sampleDataJson;
     private DesignerSampleObject? _sampleDataRoot;
+    private DesignerRootSettings _rootSettings = new();
 
     public MainWindowViewModel()
         : this(new BuiltInComponentCatalog(), new DefaultControlRenderer(), new AxamlDocumentSerializer())
@@ -279,6 +290,7 @@ public partial class MainWindowViewModel : ViewModelBase
     public bool HasStylePreviewOptions => StylePreviewOptions.Count > 1;
     public bool HasSampleData => _sampleDataRoot is not null;
     public string SampleDataJson => _sampleDataJson ?? string.Empty;
+    public string RootKindLabel => _rootSettings.Kind.ToString();
 
     [ObservableProperty]
     private string _statusText = "Ready";
@@ -2665,6 +2677,119 @@ public partial class MainWindowViewModel : ViewModelBase
         return true;
     }
 
+    public RootEditorState GetRootEditorState()
+        => new(
+            _rootSettings.Kind.ToString(),
+            _rootSettings.Title,
+            _rootSettings.CanResize,
+            _rootSettings.StartupLocation.ToString(),
+            FormatRootNumber(_rootSettings.MinWidth),
+            FormatRootNumber(_rootSettings.MinHeight),
+            FormatRootMaximum(_rootSettings.MaxWidth),
+            FormatRootMaximum(_rootSettings.MaxHeight));
+
+    public bool SetRootProperties(
+        string rootKind,
+        string title,
+        bool canResize,
+        string startupLocation,
+        string minWidth,
+        string minHeight,
+        string maxWidth,
+        string maxHeight)
+    {
+        if (!Enum.TryParse<DesignerRootKind>(rootKind, true, out var parsedKind)
+            || !Enum.IsDefined(parsedKind))
+        {
+            StatusText = "Root properties were not changed. Choose Window or UserControl.";
+            return false;
+        }
+
+        if (!Enum.TryParse<DesignerWindowStartupLocation>(
+                startupLocation,
+                true,
+                out var parsedStartupLocation)
+            || !Enum.IsDefined(parsedStartupLocation))
+        {
+            StatusText = "Root properties were not changed. Choose a supported startup location.";
+            return false;
+        }
+
+        if (title.Any(char.IsControl))
+        {
+            StatusText = "Root properties were not changed. Window title must be a single line without control characters.";
+            return false;
+        }
+
+        if (!TryParseRootConstraint(minWidth, false, out var parsedMinWidth)
+            || !TryParseRootConstraint(minHeight, false, out var parsedMinHeight)
+            || !TryParseRootConstraint(maxWidth, true, out var parsedMaxWidth)
+            || !TryParseRootConstraint(maxHeight, true, out var parsedMaxHeight))
+        {
+            StatusText = "Root properties were not changed. Sizes must be non-negative numbers; leave a maximum blank for no limit.";
+            return false;
+        }
+
+        if (parsedMinWidth > parsedMaxWidth || parsedMinHeight > parsedMaxHeight)
+        {
+            StatusText = "Root properties were not changed. Each minimum size must not exceed its maximum.";
+            return false;
+        }
+
+        var updated = parsedKind == DesignerRootKind.UserControl
+            ? new DesignerRootSettings(
+                parsedKind,
+                MinWidth: parsedMinWidth,
+                MinHeight: parsedMinHeight,
+                MaxWidth: parsedMaxWidth,
+                MaxHeight: parsedMaxHeight)
+            : new DesignerRootSettings(
+                parsedKind,
+                title,
+                canResize,
+                parsedStartupLocation,
+                parsedMinWidth,
+                parsedMinHeight,
+                parsedMaxWidth,
+                parsedMaxHeight);
+        if (updated == _rootSettings)
+        {
+            StatusText = "Root properties are unchanged.";
+            return true;
+        }
+
+        BeginCanvasMutation(HistoryActionType.EditRootProperties, "Updated document root properties.");
+        _rootSettings = updated;
+        OnPropertyChanged(nameof(RootKindLabel));
+        CommitCanvasMutation();
+        StatusText = $"Updated {_rootSettings.Kind} root properties.";
+        return true;
+    }
+
+    private static bool TryParseRootConstraint(string value, bool allowEmpty, out double result)
+    {
+        if (allowEmpty && (string.IsNullOrWhiteSpace(value)
+                || string.Equals(value.Trim(), "Infinity", StringComparison.OrdinalIgnoreCase)))
+        {
+            result = double.PositiveInfinity;
+            return true;
+        }
+
+        return double.TryParse(
+                value.Trim(),
+                NumberStyles.Float,
+                CultureInfo.InvariantCulture,
+                out result)
+            && double.IsFinite(result)
+            && result >= 0;
+    }
+
+    private static string FormatRootNumber(double value)
+        => value.ToString("0.###", CultureInfo.InvariantCulture);
+
+    private static string FormatRootMaximum(double value)
+        => double.IsPositiveInfinity(value) ? string.Empty : FormatRootNumber(value);
+
     public string GetSampleDataEditorText()
         => _sampleDataJson ?? """
         {
@@ -3931,18 +4056,42 @@ public partial class MainWindowViewModel : ViewModelBase
         return true;
     }
 
-    public string ExportFullAxaml() => ExportAxamlDocument("Window");
+    public string ExportFullAxaml() => ExportAxamlDocument(_rootSettings.Kind);
 
-    public string ExportUserControlAxaml() => ExportAxamlDocument("UserControl");
+    public string ExportUserControlAxaml() => ExportAxamlDocument(DesignerRootKind.UserControl);
 
-    private string ExportAxamlDocument(string rootElementName)
+    private string ExportAxamlDocument(DesignerRootKind rootKind)
     {
         var settings = CaptureCanvasSettings();
+        var rootElementName = rootKind.ToString();
         var sb = new StringBuilder();
         sb.AppendLine($"<{rootElementName} xmlns=\"https://github.com/avaloniaui\"");
         sb.AppendLine("        xmlns:x=\"http://schemas.microsoft.com/winfx/2006/xaml\"");
-        sb.AppendLine($"        Width=\"{settings.Width:0.###}\" Height=\"{settings.Height:0.###}\">");
-        if (string.Equals(rootElementName, "UserControl", StringComparison.Ordinal))
+        sb.Append($"        Width=\"{FormatRootNumber(settings.Width)}\" Height=\"{FormatRootNumber(settings.Height)}\"");
+        if (rootKind == DesignerRootKind.Window)
+        {
+            if (!string.IsNullOrEmpty(_rootSettings.Title))
+            {
+                sb.Append($" Title=\"{EscapeXmlAttribute(_rootSettings.Title)}\"");
+            }
+
+            if (!_rootSettings.CanResize)
+            {
+                sb.Append(" CanResize=\"False\"");
+            }
+
+            if (_rootSettings.StartupLocation != DesignerWindowStartupLocation.Manual)
+            {
+                sb.Append($" WindowStartupLocation=\"{_rootSettings.StartupLocation}\"");
+            }
+        }
+
+        AppendRootConstraintAttribute(sb, "MinWidth", _rootSettings.MinWidth, 0);
+        AppendRootConstraintAttribute(sb, "MinHeight", _rootSettings.MinHeight, 0);
+        AppendRootConstraintAttribute(sb, "MaxWidth", _rootSettings.MaxWidth, double.PositiveInfinity);
+        AppendRootConstraintAttribute(sb, "MaxHeight", _rootSettings.MaxHeight, double.PositiveInfinity);
+        sb.AppendLine(">");
+        if (rootKind == DesignerRootKind.UserControl)
         {
             sb.AppendLine("  <!-- Add x:Class when pairing this layout with a code-behind file. -->");
         }
@@ -3971,6 +4120,20 @@ public partial class MainWindowViewModel : ViewModelBase
         sb.AppendLine("  </Canvas>");
         sb.AppendLine($"</{rootElementName}>");
         return sb.ToString();
+    }
+
+    private static void AppendRootConstraintAttribute(
+        StringBuilder sb,
+        string attributeName,
+        double value,
+        double defaultValue)
+    {
+        if (value.Equals(defaultValue))
+        {
+            return;
+        }
+
+        sb.Append($" {attributeName}=\"{FormatRootNumber(value)}\"");
     }
 
     public bool TryImportDraftAxaml(string axaml, out string error, out string warning)
@@ -4090,6 +4253,13 @@ public partial class MainWindowViewModel : ViewModelBase
                 return false;
             }
 
+            if ((current.RootSettings ?? new DesignerRootSettings())
+                != (parsed.RootSettings ?? new DesignerRootSettings()))
+            {
+                result = "Validation failed: document root properties do not round-trip.";
+                return false;
+            }
+
             foreach (var pair in currentByName)
             {
                 if (!HaveSameBindings(pair.Value, parsedByName[pair.Key]))
@@ -4126,6 +4296,18 @@ public partial class MainWindowViewModel : ViewModelBase
             if (userControl.Settings != settings)
             {
                 result = "Validation failed: UserControl export does not preserve canvas settings.";
+                return false;
+            }
+
+            var expectedUserControlRoot = new DesignerRootSettings(
+                DesignerRootKind.UserControl,
+                MinWidth: _rootSettings.MinWidth,
+                MinHeight: _rootSettings.MinHeight,
+                MaxWidth: _rootSettings.MaxWidth,
+                MaxHeight: _rootSettings.MaxHeight);
+            if ((userControl.RootSettings ?? new DesignerRootSettings()) != expectedUserControlRoot)
+            {
+                result = "Validation failed: UserControl export does not preserve root layout constraints.";
                 return false;
             }
 
@@ -4377,6 +4559,7 @@ public partial class MainWindowViewModel : ViewModelBase
 
             _sampleDataJson = sampleData?.Json;
             _sampleDataRoot = sampleData?.Root;
+            _rootSettings = document.RootSettings ?? new DesignerRootSettings();
             foreach (var snapshot in document.Elements)
             {
                 Canvas.AddElementFromSnapshot(
@@ -4398,6 +4581,7 @@ public partial class MainWindowViewModel : ViewModelBase
         RefreshStylePreviewOptions();
         OnPropertyChanged(nameof(HasSampleData));
         OnPropertyChanged(nameof(SampleDataJson));
+        OnPropertyChanged(nameof(RootKindLabel));
     }
 
     private DesignerCanvasDocument CaptureDocument()
@@ -4438,7 +4622,8 @@ public partial class MainWindowViewModel : ViewModelBase
             CaptureCanvasSettings(),
             new Dictionary<string, string>(_colorResources, StringComparer.Ordinal),
             CloneStyles(_documentStyles),
-            _sampleDataJson);
+            _sampleDataJson,
+            _rootSettings);
     }
 
     private DesignerCanvasSettings CaptureCanvasSettings()
@@ -5283,6 +5468,12 @@ public partial class MainWindowViewModel : ViewModelBase
             return false;
         }
 
+        if ((left.RootSettings ?? new DesignerRootSettings())
+            != (right.RootSettings ?? new DesignerRootSettings()))
+        {
+            return false;
+        }
+
         for (var i = 0; i < left.Elements.Count; i++)
         {
             var a = left.Elements[i];
@@ -5676,7 +5867,8 @@ public partial class MainWindowViewModel : ViewModelBase
             ReadCanvasSettings(parseRoot, warnings),
             colorResources,
             ReadDocumentStyles(root, parseRoot, colorResources, warnings),
-            ReadSampleDataJson(parseRoot, warnings));
+            ReadSampleDataJson(parseRoot, warnings),
+            ReadRootSettings(root, parseRoot, warnings));
     }
 
     private static IReadOnlyDictionary<string, string> ReadColorResources(
@@ -5861,6 +6053,229 @@ public partial class MainWindowViewModel : ViewModelBase
         }
 
         return null;
+    }
+
+    private static DesignerRootSettings ReadRootSettings(
+        XElement root,
+        XElement parseRoot,
+        ICollection<string> warnings)
+    {
+        var rootName = root.Name.LocalName;
+        var isWindow = string.Equals(rootName, "Window", StringComparison.OrdinalIgnoreCase);
+        var isUserControl = string.Equals(rootName, "UserControl", StringComparison.OrdinalIgnoreCase);
+        var metadata = parseRoot.Nodes()
+            .OfType<XComment>()
+            .Select(ReadDesignerMetadata)
+            .FirstOrDefault(values =>
+                values.ContainsKey("RootKind")
+                || values.ContainsKey("WindowTitleBase64")
+                || values.ContainsKey("CanResize")
+                || values.ContainsKey("StartupLocation")
+                || values.ContainsKey("RootMinWidth")
+                || values.ContainsKey("RootMinHeight")
+                || values.ContainsKey("RootMaxWidth")
+                || values.ContainsKey("RootMaxHeight"));
+
+        var kind = isUserControl ? DesignerRootKind.UserControl : DesignerRootKind.Window;
+        if (!isWindow && !isUserControl
+            && metadata is not null
+            && metadata.TryGetValue("RootKind", out var rawKind))
+        {
+            if (!Enum.TryParse<DesignerRootKind>(rawKind, true, out kind)
+                || !Enum.IsDefined(kind))
+            {
+                warnings.Add($"Ignored unsupported document root kind '{rawKind}'.");
+                kind = DesignerRootKind.Window;
+            }
+        }
+
+        var title = isWindow
+            ? root.Attribute("Title")?.Value ?? string.Empty
+            : ReadRootTitle(metadata, warnings);
+        if (title.Any(char.IsControl))
+        {
+            warnings.Add("Ignored a Window title containing line breaks or control characters.");
+            title = string.Empty;
+        }
+
+        var canResize = isWindow
+            ? ReadRootBooleanAttribute(root, "CanResize", true, warnings)
+            : ReadRootBooleanMetadata(metadata, "CanResize", true, warnings);
+        var startupLocation = isWindow
+            ? ReadRootStartupLocation(root.Attribute("WindowStartupLocation")?.Value, warnings)
+            : ReadRootStartupLocation(
+                metadata is not null && metadata.TryGetValue("StartupLocation", out var rawStartup)
+                    ? rawStartup
+                    : null,
+                warnings);
+        var minWidth = isWindow || isUserControl
+            ? ReadRootConstraintAttribute(root, "MinWidth", 0, false, warnings)
+            : ReadRootConstraintMetadata(metadata, "RootMinWidth", 0, false, warnings);
+        var minHeight = isWindow || isUserControl
+            ? ReadRootConstraintAttribute(root, "MinHeight", 0, false, warnings)
+            : ReadRootConstraintMetadata(metadata, "RootMinHeight", 0, false, warnings);
+        var maxWidth = isWindow || isUserControl
+            ? ReadRootConstraintAttribute(root, "MaxWidth", double.PositiveInfinity, true, warnings)
+            : ReadRootConstraintMetadata(metadata, "RootMaxWidth", double.PositiveInfinity, true, warnings);
+        var maxHeight = isWindow || isUserControl
+            ? ReadRootConstraintAttribute(root, "MaxHeight", double.PositiveInfinity, true, warnings)
+            : ReadRootConstraintMetadata(metadata, "RootMaxHeight", double.PositiveInfinity, true, warnings);
+
+        if (minWidth > maxWidth || minHeight > maxHeight)
+        {
+            warnings.Add("Invalid document root size constraints were reset to defaults.");
+            minWidth = 0;
+            minHeight = 0;
+            maxWidth = double.PositiveInfinity;
+            maxHeight = double.PositiveInfinity;
+        }
+
+        return kind == DesignerRootKind.UserControl
+            ? new DesignerRootSettings(
+                kind,
+                MinWidth: minWidth,
+                MinHeight: minHeight,
+                MaxWidth: maxWidth,
+                MaxHeight: maxHeight)
+            : new DesignerRootSettings(
+                kind,
+                title,
+                canResize,
+                startupLocation,
+                minWidth,
+                minHeight,
+                maxWidth,
+                maxHeight);
+    }
+
+    private static string ReadRootTitle(
+        IReadOnlyDictionary<string, string>? metadata,
+        ICollection<string> warnings)
+    {
+        if (metadata is null || !metadata.TryGetValue("WindowTitleBase64", out var encoded))
+        {
+            return string.Empty;
+        }
+
+        try
+        {
+            return Encoding.UTF8.GetString(Convert.FromBase64String(encoded));
+        }
+        catch (FormatException)
+        {
+            warnings.Add("Ignored invalid Window title metadata: Base64 payload is malformed.");
+            return string.Empty;
+        }
+    }
+
+    private static bool ReadRootBooleanAttribute(
+        XElement root,
+        string name,
+        bool fallback,
+        ICollection<string> warnings)
+    {
+        var raw = root.Attribute(name)?.Value;
+        if (raw is null)
+        {
+            return fallback;
+        }
+
+        if (bool.TryParse(raw, out var value))
+        {
+            return value;
+        }
+
+        warnings.Add($"Ignored invalid document root {name} value '{raw}'.");
+        return fallback;
+    }
+
+    private static bool ReadRootBooleanMetadata(
+        IReadOnlyDictionary<string, string>? metadata,
+        string name,
+        bool fallback,
+        ICollection<string> warnings)
+    {
+        if (metadata is null || !metadata.TryGetValue(name, out var raw))
+        {
+            return fallback;
+        }
+
+        if (bool.TryParse(raw, out var value))
+        {
+            return value;
+        }
+
+        warnings.Add($"Ignored invalid document root {name} metadata '{raw}'.");
+        return fallback;
+    }
+
+    private static DesignerWindowStartupLocation ReadRootStartupLocation(
+        string? raw,
+        ICollection<string> warnings)
+    {
+        if (string.IsNullOrWhiteSpace(raw))
+        {
+            return DesignerWindowStartupLocation.Manual;
+        }
+
+        if (Enum.TryParse<DesignerWindowStartupLocation>(raw, true, out var value)
+            && Enum.IsDefined(value))
+        {
+            return value;
+        }
+
+        warnings.Add($"Ignored unsupported Window startup location '{raw}'.");
+        return DesignerWindowStartupLocation.Manual;
+    }
+
+    private static double ReadRootConstraintAttribute(
+        XElement root,
+        string name,
+        double fallback,
+        bool allowInfinity,
+        ICollection<string> warnings)
+        => ReadRootConstraint(root.Attribute(name)?.Value, name, fallback, allowInfinity, warnings);
+
+    private static double ReadRootConstraintMetadata(
+        IReadOnlyDictionary<string, string>? metadata,
+        string name,
+        double fallback,
+        bool allowInfinity,
+        ICollection<string> warnings)
+        => ReadRootConstraint(
+            metadata is not null && metadata.TryGetValue(name, out var raw) ? raw : null,
+            name,
+            fallback,
+            allowInfinity,
+            warnings);
+
+    private static double ReadRootConstraint(
+        string? raw,
+        string name,
+        double fallback,
+        bool allowInfinity,
+        ICollection<string> warnings)
+    {
+        if (raw is null)
+        {
+            return fallback;
+        }
+
+        if (allowInfinity
+            && string.Equals(raw.Trim(), "Infinity", StringComparison.OrdinalIgnoreCase))
+        {
+            return double.PositiveInfinity;
+        }
+
+        if (double.TryParse(raw, NumberStyles.Float, CultureInfo.InvariantCulture, out var value)
+            && double.IsFinite(value)
+            && value >= 0)
+        {
+            return value;
+        }
+
+        warnings.Add($"Ignored invalid document root {name} value '{raw}'.");
+        return fallback;
     }
 
     private static IReadOnlyDictionary<string, string> ReadDesignerMetadata(XComment comment)
@@ -6364,6 +6779,7 @@ public partial class MainWindowViewModel : ViewModelBase
             HistoryActionType.EditProperty => "edit properties",
             HistoryActionType.EditAxamlSource => "edit AXAML source",
             HistoryActionType.EditSampleData => "edit sample data",
+            HistoryActionType.EditRootProperties => "edit root properties",
             HistoryActionType.LoadDocument => "load document",
             HistoryActionType.NewDocument => "new document",
             _ => "change",
@@ -8819,6 +9235,7 @@ public partial class MainWindowViewModel : ViewModelBase
         EditProperty,
         EditAxamlSource,
         EditSampleData,
+        EditRootProperties,
         LoadDocument,
         NewDocument,
     }

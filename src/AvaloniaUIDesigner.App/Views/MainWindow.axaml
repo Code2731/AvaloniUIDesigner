@@ -59,6 +59,7 @@
                 <MenuItem Header="Delete" Click="OnDeleteMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
                 <Separator/>
                 <MenuItem Header="Edit AXAML Source..." Click="OnEditAxamlSourceMenuClicked"/>
+                <MenuItem Header="Edit Root Properties..." Click="OnEditRootPropertiesMenuClicked"/>
                 <MenuItem Header="Edit Sample Data..." Click="OnEditSampleDataMenuClicked"/>
                 <Separator/>
                 <MenuItem Header="Edit Items / Columns..." Click="OnEditItemsMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
@@ -209,6 +210,18 @@
             <DockPanel>
                 <TextBlock Text="{Binding Canvas.ZoomPercentage}" DockPanel.Dock="Right" VerticalAlignment="Center" Margin="8,0" Foreground="#CCCCCC"/>
                 <TextBlock Text="{Binding HistorySummary}" DockPanel.Dock="Right" VerticalAlignment="Center" Margin="8,0" Foreground="#9CDCFE"/>
+                <Border DockPanel.Dock="Right"
+                        Background="#374151"
+                        BorderBrush="#64748B"
+                        BorderThickness="1"
+                        CornerRadius="3"
+                        Padding="5,1"
+                        Margin="4,2">
+                    <TextBlock Text="{Binding RootKindLabel}"
+                               FontSize="9"
+                               FontWeight="Bold"
+                               Foreground="#E2E8F0"/>
+                </Border>
                 <Border DockPanel.Dock="Right"
                         Background="#0F766E"
                         BorderBrush="#2DD4BF"
