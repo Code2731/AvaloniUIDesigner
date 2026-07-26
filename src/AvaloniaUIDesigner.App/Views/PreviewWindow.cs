@@ -434,12 +434,6 @@ public sealed class PreviewWindow : Window
             DesignerBindingRuntime.ReplaceBindings(control, bindings);
         }
 
-        if (properties.TryGetValue("Opacity", out var opacity)
-            && double.TryParse(opacity, NumberStyles.Float, CultureInfo.InvariantCulture, out var parsedOpacity))
-        {
-            control.Opacity = Math.Clamp(parsedOpacity, 0, 1);
-        }
-
         if (properties.TryGetValue("Classes", out var classes))
         {
             foreach (var className in classes.Split(
@@ -455,19 +449,8 @@ public sealed class PreviewWindow : Window
         DesignerTypographyRuntime.Apply(control, properties);
         DesignerTransformRuntime.Apply(control, properties);
         DesignerAccessibilityRuntime.Apply(control, properties);
+        DesignerInteractionRuntime.Apply(control, properties);
         ApplyTemplatedAppearanceProperties(control, properties, colorResources);
-
-        if (properties.TryGetValue("__isEnabled", out var isEnabled)
-            && bool.TryParse(isEnabled, out var parsedIsEnabled))
-        {
-            control.IsEnabled = parsedIsEnabled;
-        }
-
-        if (properties.TryGetValue("__isVisible", out var isVisible)
-            && bool.TryParse(isVisible, out var parsedIsVisible))
-        {
-            control.IsVisible = parsedIsVisible;
-        }
 
         switch (control)
         {

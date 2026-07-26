@@ -2122,12 +2122,6 @@ public partial class CanvasViewModel : ViewModelBase
             DesignerBindingRuntime.ReplaceBindings(visual, bindings);
         }
 
-        if (properties.TryGetValue("Opacity", out var opacity)
-            && double.TryParse(opacity, NumberStyles.Float, CultureInfo.InvariantCulture, out var parsedOpacity))
-        {
-            visual.Opacity = Math.Clamp(parsedOpacity, 0, 1);
-        }
-
         if (properties.TryGetValue("Classes", out var classes))
         {
             SetUserStyleClasses(visual, classes);
@@ -2137,19 +2131,8 @@ public partial class CanvasViewModel : ViewModelBase
         DesignerTypographyRuntime.Apply(visual, properties);
         DesignerTransformRuntime.Apply(visual, properties);
         DesignerAccessibilityRuntime.Apply(visual, properties);
+        DesignerInteractionRuntime.Apply(visual, properties);
         ApplyTemplatedAppearanceProperties(visual, properties);
-
-        if (properties.TryGetValue("__isEnabled", out var isEnabled)
-            && bool.TryParse(isEnabled, out var parsedIsEnabled))
-        {
-            visual.IsEnabled = parsedIsEnabled;
-        }
-
-        if (properties.TryGetValue("__isVisible", out var isVisible)
-            && bool.TryParse(isVisible, out var parsedIsVisible))
-        {
-            visual.IsVisible = parsedIsVisible;
-        }
 
         if (visual is Shape shape)
         {

@@ -107,6 +107,17 @@ public sealed record AccessibilityEditorState(
     bool IsTabStop,
     bool Focusable);
 
+public sealed record InteractionEditorState(
+    string ControlName,
+    string Opacity,
+    bool IsEnabled,
+    bool IsVisible,
+    bool IsHitTestVisible,
+    bool ClipToBounds,
+    bool UseLayoutRounding,
+    string FlowDirection,
+    string Cursor);
+
 public sealed record GridDefinitionEditorState(
     string ControlName,
     string RowDefinitions,
@@ -3491,6 +3502,117 @@ public partial class MainWindowViewModel : ViewModelBase
             values.IsTabStop,
             values.Focusable);
 
+    public bool TryGetSelectedInteractionProperties(out InteractionEditorState state)
+    {
+        var target = Canvas.SelectedElement;
+        if (target is null || target.IsLocked)
+        {
+            state = new InteractionEditorState(
+                string.Empty,
+                "1",
+                true,
+                true,
+                true,
+                false,
+                true,
+                FlowDirection.LeftToRight.ToString(),
+                "Default");
+            StatusText = target is { IsLocked: true }
+                ? "Unlock the selected control before editing interaction and rendering."
+                : "Select a control before editing interaction and rendering.";
+            return false;
+        }
+
+        if (!DesignerInteractionRuntime.TryRead(target.Visual, out var values, out var error))
+        {
+            state = new InteractionEditorState(
+                target.DisplayName,
+                "1",
+                true,
+                true,
+                true,
+                target.Visual.ClipToBounds,
+                true,
+                FlowDirection.LeftToRight.ToString(),
+                "Default");
+            StatusText = $"Interaction properties cannot be edited. {error}";
+            return false;
+        }
+
+        state = CreateInteractionEditorState(target.DisplayName, values);
+        return true;
+    }
+
+    public bool SetSelectedInteractionProperties(
+        string opacity,
+        bool isEnabled,
+        bool isVisible,
+        bool isHitTestVisible,
+        bool clipToBounds,
+        bool useLayoutRounding,
+        string flowDirection,
+        string cursor)
+    {
+        var target = Canvas.SelectedElement;
+        if (target is null || target.IsLocked)
+        {
+            StatusText = "Select an unlocked control before editing interaction and rendering.";
+            return false;
+        }
+
+        if (!DesignerInteractionRuntime.TryParseValues(
+                opacity,
+                isEnabled,
+                isVisible,
+                isHitTestVisible,
+                clipToBounds,
+                useLayoutRounding,
+                flowDirection,
+                cursor,
+                out var values,
+                out var error))
+        {
+            StatusText = $"Interaction properties were not changed. {error}";
+            return false;
+        }
+
+        if (!DesignerInteractionRuntime.TryRead(target.Visual, out var current, out error))
+        {
+            StatusText = $"Interaction properties were not changed. {error}";
+            return false;
+        }
+
+        if (current == values)
+        {
+            StatusText = "Interaction and rendering properties are unchanged.";
+            return true;
+        }
+
+        BeginCanvasMutation(
+            HistoryActionType.EditProperty,
+            "Updated interaction and rendering properties.");
+        DesignerInteractionRuntime.Apply(target.Visual, values);
+        DesignerStyleApplicationMetadata.ClearApplied(target.Visual, "Opacity");
+        Canvas.RefreshDocumentStyles(target.Visual);
+        CommitCanvasMutation();
+        StatusText = $"Updated interaction and rendering for {target.DisplayName}.";
+        return true;
+    }
+
+    private static InteractionEditorState CreateInteractionEditorState(
+        string controlName,
+        DesignerInteractionValues values)
+        => new(
+            controlName,
+            values.Opacity.ToString("0.###", CultureInfo.InvariantCulture),
+            values.IsEnabled,
+            values.IsVisible,
+            values.IsHitTestVisible,
+            values.ClipToBounds,
+            values.UseLayoutRounding,
+            values.FlowDirection.ToString(),
+            values.Cursor);
+
     public bool TryGetSelectedToolTip(out string controlName, out string toolTip)
     {
         var target = Canvas.SelectedElement;
@@ -5109,6 +5231,7 @@ public partial class MainWindowViewModel : ViewModelBase
         DesignerTypographyRuntime.Capture(visual, result);
         DesignerTransformRuntime.Capture(visual, result);
         DesignerAccessibilityRuntime.Capture(visual, result);
+        DesignerInteractionRuntime.Capture(visual, result);
         foreach (var pair in DesignerResourceReferenceMetadata.GetReferences(visual))
         {
             result[pair.Key] = DesignerResourceReferenceMetadata.FormatExpression(pair.Value);
@@ -5137,16 +5260,6 @@ public partial class MainWindowViewModel : ViewModelBase
         if (bindings.Count > 0)
         {
             result["__bindings"] = DesignerBindingRuntime.Serialize(bindings);
-        }
-
-        if (!visual.IsEnabled)
-        {
-            result["__isEnabled"] = bool.FalseString;
-        }
-
-        if (!visual.IsVisible)
-        {
-            result["__isVisible"] = bool.FalseString;
         }
 
         if (visual is Button { Tag: ButtonClickHandlerMetadata clickHandler }
@@ -6762,15 +6875,22 @@ public partial class MainWindowViewModel : ViewModelBase
                 continue;
             }
 
-            if (name == "IsEnabled")
+            if (DesignerInteractionRuntime.IsSupportedAxamlProperty(name))
             {
-                map["__isEnabled"] = attr.Value;
-                continue;
-            }
+                if (DesignerInteractionRuntime.TryNormalizeAxamlProperty(
+                        name,
+                        attr.Value,
+                        out var internalKey,
+                        out var normalizedValue,
+                        out var interactionError))
+                {
+                    map[internalKey] = normalizedValue;
+                }
+                else
+                {
+                    warnings.Add($"Ignored {tagName}.{name}: {interactionError}");
+                }
 
-            if (name == "IsVisible")
-            {
-                map["__isVisible"] = attr.Value;
                 continue;
             }
 
@@ -9122,16 +9242,7 @@ public partial class MainWindowViewModel : ViewModelBase
         AppendCommonTypographyAttributes(sb, element.Visual);
         AppendCommonTransformAttributes(sb, element.Visual);
         AppendCommonAccessibilityAttributes(sb, element.Visual);
-
-        if (!element.Visual.IsEnabled)
-        {
-            AppendAttribute(sb, "IsEnabled", bool.FalseString);
-        }
-
-        if (!element.Visual.IsVisible)
-        {
-            AppendAttribute(sb, "IsVisible", bool.FalseString);
-        }
+        AppendCommonInteractionAttributes(sb, element.Visual);
 
     }
 
@@ -9533,6 +9644,16 @@ public partial class MainWindowViewModel : ViewModelBase
         var properties = new Dictionary<string, string>(StringComparer.Ordinal);
         DesignerAccessibilityRuntime.Capture(visual, properties);
         foreach (var attribute in DesignerAccessibilityRuntime.GetAxamlAttributes(properties))
+        {
+            AppendAttribute(sb, attribute.Name, attribute.Value);
+        }
+    }
+
+    private static void AppendCommonInteractionAttributes(StringBuilder sb, Control visual)
+    {
+        var properties = new Dictionary<string, string>(StringComparer.Ordinal);
+        DesignerInteractionRuntime.Capture(visual, properties);
+        foreach (var attribute in DesignerInteractionRuntime.GetAxamlAttributes(properties))
         {
             AppendAttribute(sb, attribute.Name, attribute.Value);
         }

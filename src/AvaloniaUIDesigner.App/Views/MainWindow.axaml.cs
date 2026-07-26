@@ -677,6 +677,19 @@ public partial class MainWindow : Window
         await ShowAccessibilityPropertiesDialogAsync(state);
     }
 
+    private async void OnEditInteractionPropertiesMenuClicked(
+        object? sender,
+        Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        FlushPendingPropertyHistory();
+        if (Vm is null || !Vm.TryGetSelectedInteractionProperties(out var state))
+        {
+            return;
+        }
+
+        await ShowInteractionPropertiesDialogAsync(state);
+    }
+
     private async void OnEditGridDefinitionsMenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
         FlushPendingPropertyHistory();
@@ -3230,6 +3243,167 @@ public partial class MainWindow : Window
         Grid.SetRow(fields, 1);
         Grid.SetRow(errorText, 2);
         Grid.SetRow(buttons, 3);
+        dialog.Content = content;
+        await dialog.ShowDialog(this);
+        return;
+
+        void AddField(string label, Control editor, int row, int column)
+        {
+            var field = new StackPanel
+            {
+                Spacing = 4,
+                Children =
+                {
+                    new TextBlock { Text = label },
+                    editor,
+                },
+            };
+            Grid.SetRow(field, row);
+            Grid.SetColumn(field, column);
+            fields.Children.Add(field);
+        }
+    }
+
+    private async Task ShowInteractionPropertiesDialogAsync(InteractionEditorState state)
+    {
+        if (Vm is null)
+        {
+            return;
+        }
+
+        var opacityEditor = new TextBox
+        {
+            Text = state.Opacity,
+            Watermark = "0 to 1",
+        };
+        var flowDirectionEditor = new ComboBox
+        {
+            ItemsSource = Enum.GetNames<Avalonia.Media.FlowDirection>(),
+            SelectedItem = state.FlowDirection,
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+        };
+        var cursorEditor = new ComboBox
+        {
+            ItemsSource = DesignerInteractionRuntime.CursorNames,
+            SelectedItem = state.Cursor,
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+            MaxDropDownHeight = 300,
+        };
+        var enabledEditor = new CheckBox
+        {
+            Content = "Enabled",
+            IsChecked = state.IsEnabled,
+        };
+        var visibleEditor = new CheckBox
+        {
+            Content = "Visible",
+            IsChecked = state.IsVisible,
+        };
+        var hitTestEditor = new CheckBox
+        {
+            Content = "Hit test visible",
+            IsChecked = state.IsHitTestVisible,
+        };
+        var clipEditor = new CheckBox
+        {
+            Content = "Clip to bounds",
+            IsChecked = state.ClipToBounds,
+        };
+        var layoutRoundingEditor = new CheckBox
+        {
+            Content = "Use layout rounding",
+            IsChecked = state.UseLayoutRounding,
+        };
+        var errorText = new TextBlock
+        {
+            Foreground = Avalonia.Media.Brushes.IndianRed,
+            TextWrapping = Avalonia.Media.TextWrapping.Wrap,
+        };
+        var dialog = new Window
+        {
+            Title = $"Edit Interaction & Rendering - {state.ControlName}",
+            Width = 640,
+            Height = 480,
+            MinWidth = 540,
+            MinHeight = 430,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner,
+        };
+        var applyButton = new Button { Content = "Apply", MinWidth = 84 };
+        applyButton.Click += (_, _) =>
+        {
+            if (!Vm.SetSelectedInteractionProperties(
+                    opacityEditor.Text ?? string.Empty,
+                    enabledEditor.IsChecked == true,
+                    visibleEditor.IsChecked == true,
+                    hitTestEditor.IsChecked == true,
+                    clipEditor.IsChecked == true,
+                    layoutRoundingEditor.IsChecked == true,
+                    flowDirectionEditor.SelectedItem?.ToString() ?? string.Empty,
+                    cursorEditor.SelectedItem?.ToString() ?? string.Empty))
+            {
+                errorText.Text = Vm.StatusText;
+                return;
+            }
+
+            dialog.Close();
+        };
+        var cancelButton = new Button { Content = "Cancel", MinWidth = 84 };
+        cancelButton.Click += (_, _) => dialog.Close();
+        var buttons = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            Spacing = 8,
+            HorizontalAlignment = HorizontalAlignment.Right,
+            Children = { cancelButton, applyButton },
+        };
+        var fields = new Grid
+        {
+            ColumnDefinitions = new ColumnDefinitions("*,*"),
+            RowDefinitions = new RowDefinitions("Auto,Auto"),
+            ColumnSpacing = 12,
+            RowSpacing = 10,
+        };
+        AddField("Opacity", opacityEditor, 0, 0);
+        AddField("Flow direction", flowDirectionEditor, 0, 1);
+        AddField("Cursor", cursorEditor, 1, 0);
+        var switches = new WrapPanel
+        {
+            Orientation = Orientation.Horizontal,
+            ItemSpacing = 16,
+            LineSpacing = 8,
+            Margin = new Thickness(0, 8, 0, 0),
+            Children =
+            {
+                enabledEditor,
+                visibleEditor,
+                hitTestEditor,
+                clipEditor,
+                layoutRoundingEditor,
+            },
+        };
+
+        var content = new Grid
+        {
+            Margin = new Thickness(16),
+            RowDefinitions = new RowDefinitions("Auto,Auto,Auto,*,Auto,Auto"),
+            RowSpacing = 12,
+            Children =
+            {
+                new TextBlock
+                {
+                    Text = "Configure rendering visibility, input participation, clipping, right-to-left flow, and the pointer cursor.",
+                    TextWrapping = Avalonia.Media.TextWrapping.Wrap,
+                },
+                fields,
+                switches,
+                errorText,
+                buttons,
+            },
+        };
+        Grid.SetRow(fields, 1);
+        Grid.SetRow(switches, 2);
+        Grid.SetRow(errorText, 4);
+        Grid.SetRow(buttons, 5);
         dialog.Content = content;
         await dialog.ShowDialog(this);
         return;

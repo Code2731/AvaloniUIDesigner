@@ -635,6 +635,15 @@ public sealed class AxamlDocumentSerializer : IDesignerSerializer
             sb.Append("\"");
         }
 
+        foreach (var attribute in DesignerInteractionRuntime.GetAxamlAttributes(properties))
+        {
+            sb.Append(" ");
+            sb.Append(attribute.Name);
+            sb.Append("=\"");
+            sb.Append(EscapeXmlAttribute(attribute.Value));
+            sb.Append("\"");
+        }
+
         var bindings = ReadBindings(properties);
         foreach (var binding in bindings)
         {
