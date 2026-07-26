@@ -70,6 +70,7 @@
                 <MenuItem Header="Edit Accessibility &amp; Navigation..." Click="OnEditAccessibilityPropertiesMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
                 <MenuItem Header="Edit Interaction &amp; Rendering..." Click="OnEditInteractionPropertiesMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
                 <MenuItem Header="Edit Visual Effects..." Click="OnEditEffectPropertiesMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
+                <MenuItem Header="Edit Range &amp; Value..." Click="OnEditRangePropertiesMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
                 <MenuItem Header="Edit Grid Definitions..." Click="OnEditGridDefinitionsMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
                 <MenuItem Header="Assign to Grid Cell..." Click="OnAssignToGridCellMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
                 <MenuItem Header="Assign to StackPanel..." Click="OnAssignToStackPanelMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
@@ -376,6 +377,7 @@
                                                     <MenuItem Header="Edit Accessibility &amp; Navigation..." Click="OnEditAccessibilityPropertiesMenuClicked"/>
                                                     <MenuItem Header="Edit Interaction &amp; Rendering..." Click="OnEditInteractionPropertiesMenuClicked"/>
                                                     <MenuItem Header="Edit Visual Effects..." Click="OnEditEffectPropertiesMenuClicked"/>
+                                                    <MenuItem Header="Edit Range &amp; Value..." Click="OnEditRangePropertiesMenuClicked"/>
                                                     <MenuItem Header="Edit Path Data..." Click="OnEditPathDataMenuClicked"/>
                                                     <MenuItem Header="Edit Grid Definitions..." Click="OnEditGridDefinitionsMenuClicked"/>
                                                     <MenuItem Header="Assign to Grid Cell..." Click="OnAssignToGridCellMenuClicked"/>

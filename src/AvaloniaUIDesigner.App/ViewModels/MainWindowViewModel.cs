@@ -128,6 +128,29 @@ public sealed record EffectEditorState(
     string ShadowColor,
     string ShadowOpacity);
 
+public sealed record RangeEditorState(
+    string ControlName,
+    string ControlKind,
+    string Minimum,
+    string Maximum,
+    string Value,
+    string SmallChange,
+    string LargeChange,
+    string Orientation,
+    bool IsDirectionReversed,
+    string TickFrequency,
+    string TickPlacement,
+    bool IsSnapToTickEnabled,
+    bool IsIndeterminate,
+    bool ShowProgressText,
+    string ProgressTextFormat,
+    string Increment,
+    string FormatString,
+    bool ClipValueToMinMax,
+    bool AllowSpin,
+    bool ShowButtonSpinner,
+    string ButtonSpinnerLocation);
+
 public sealed record GridDefinitionEditorState(
     string ControlName,
     string RowDefinitions,
@@ -3710,6 +3733,109 @@ public partial class MainWindowViewModel : ViewModelBase
             values.ShadowColor,
             values.ShadowOpacity.ToString("0.###", CultureInfo.InvariantCulture));
 
+    public bool TryGetSelectedRangeProperties(out RangeEditorState state)
+    {
+        var target = Canvas.SelectedElement;
+        if (target is null || target.IsLocked || !DesignerRangeRuntime.IsSupportedControl(target.Visual))
+        {
+            state = default!;
+            StatusText = target switch
+            {
+                null => "Select a Slider, ProgressBar, or NumericUpDown before editing range and value.",
+                { IsLocked: true } => "Unlock the selected control before editing range and value.",
+                _ => "Range and value editing is available for Slider, ProgressBar, and NumericUpDown.",
+            };
+            return false;
+        }
+
+        if (!DesignerRangeRuntime.TryRead(target.Visual, out var values, out var error))
+        {
+            state = default!;
+            StatusText = $"Range and value properties cannot be edited. {error}";
+            return false;
+        }
+
+        state = CreateRangeEditorState(target.DisplayName, values);
+        return true;
+    }
+
+    public bool SetSelectedRangeProperties(DesignerRangeEditorInput input)
+    {
+        var target = Canvas.SelectedElement;
+        if (target is null || target.IsLocked || !DesignerRangeRuntime.IsSupportedControl(target.Visual))
+        {
+            StatusText = "Select an unlocked Slider, ProgressBar, or NumericUpDown before editing range and value.";
+            return false;
+        }
+
+        if (!DesignerRangeRuntime.TryParseValues(target.Visual, input, out var values, out var error))
+        {
+            StatusText = $"Range and value properties were not changed. {error}";
+            return false;
+        }
+
+        if (!DesignerRangeRuntime.TryRead(target.Visual, out var current, out error))
+        {
+            StatusText = $"Range and value properties were not changed. {error}";
+            return false;
+        }
+
+        if (current == values)
+        {
+            StatusText = "Range and value properties are unchanged.";
+            return true;
+        }
+
+        BeginCanvasMutation(HistoryActionType.EditProperty, "Updated range and value properties.");
+        DesignerRangeRuntime.Apply(target.Visual, values);
+        foreach (var attribute in DesignerRangeRuntime.GetAxamlAttributes(target.Visual))
+        {
+            DesignerStyleApplicationMetadata.ClearApplied(target.Visual, attribute.Name);
+        }
+
+        Canvas.RefreshDocumentStyles(target.Visual);
+        CommitCanvasMutation();
+        StatusText = $"Updated range and value properties for {target.DisplayName}.";
+        return true;
+    }
+
+    private static RangeEditorState CreateRangeEditorState(
+        string controlName,
+        DesignerRangeValues values)
+    {
+        var isNumeric = values.Kind == DesignerRangeControlKind.NumericUpDown;
+        return new RangeEditorState(
+            controlName,
+            values.Kind.ToString(),
+            isNumeric ? FormatRangeValue(values.NumericMinimum) : FormatRangeValue(values.Minimum),
+            isNumeric ? FormatRangeValue(values.NumericMaximum) : FormatRangeValue(values.Maximum),
+            isNumeric
+                ? values.NumericValue is { } numericValue ? FormatRangeValue(numericValue) : string.Empty
+                : FormatRangeValue(values.Value),
+            FormatRangeValue(values.SmallChange),
+            FormatRangeValue(values.LargeChange),
+            values.Orientation.ToString(),
+            values.IsDirectionReversed,
+            FormatRangeValue(values.TickFrequency),
+            values.TickPlacement.ToString(),
+            values.IsSnapToTickEnabled,
+            values.IsIndeterminate,
+            values.ShowProgressText,
+            values.ProgressTextFormat,
+            FormatRangeValue(values.Increment),
+            values.FormatString,
+            values.ClipValueToMinMax,
+            values.AllowSpin,
+            values.ShowButtonSpinner,
+            values.ButtonSpinnerLocation.ToString());
+    }
+
+    private static string FormatRangeValue(double value)
+        => value.ToString("0.###", CultureInfo.InvariantCulture);
+
+    private static string FormatRangeValue(decimal value)
+        => value.ToString(CultureInfo.InvariantCulture);
+
     public bool TryGetSelectedToolTip(out string controlName, out string toolTip)
     {
         var target = Canvas.SelectedElement;
@@ -5330,6 +5456,7 @@ public partial class MainWindowViewModel : ViewModelBase
         DesignerAccessibilityRuntime.Capture(visual, result);
         DesignerInteractionRuntime.Capture(visual, result);
         DesignerEffectRuntime.Capture(visual, result);
+        DesignerRangeRuntime.Capture(visual, result);
         foreach (var pair in DesignerResourceReferenceMetadata.GetReferences(visual))
         {
             result[pair.Key] = DesignerResourceReferenceMetadata.FormatExpression(pair.Value);
@@ -7078,6 +7205,26 @@ public partial class MainWindowViewModel : ViewModelBase
                 continue;
             }
 
+            if (DesignerRangeRuntime.IsSupportedProperty(tagName, name))
+            {
+                if (DesignerRangeRuntime.TryNormalizeProperty(
+                        tagName,
+                        name,
+                        attr.Value,
+                        out var canonicalName,
+                        out var normalizedValue,
+                        out var rangeError))
+                {
+                    map[canonicalName] = normalizedValue;
+                }
+                else
+                {
+                    warnings.Add($"Ignored {tagName}.{name}: {rangeError}");
+                }
+
+                continue;
+            }
+
             if (IsSupportedVisualProperty(tagName, name))
             {
                 map[name] = attr.Value;
@@ -7095,6 +7242,12 @@ public partial class MainWindowViewModel : ViewModelBase
             map.Remove("MinHeight");
             map.Remove("MaxWidth");
             map.Remove("MaxHeight");
+        }
+
+        if (!DesignerRangeRuntime.TryValidateProperties(tagName, map, out var rangeConstraintError))
+        {
+            warnings.Add($"Ignored {tagName} range properties: {rangeConstraintError}");
+            DesignerRangeRuntime.RemoveProperties(tagName, map);
         }
 
         if (string.Equals(element.Name.LocalName, "Grid", StringComparison.OrdinalIgnoreCase))
@@ -7212,11 +7365,17 @@ public partial class MainWindowViewModel : ViewModelBase
             "TreeView" => false,
             "Menu" => false,
             "DataGrid" => propertyName is "AutoGenerateColumns" or "GridLinesVisibility" or "IsReadOnly",
-            "Slider" or "ProgressBar" => propertyName is "Minimum" or "Maximum" or "Value",
+            "Slider" => propertyName is "Minimum" or "Maximum" or "Value" or "SmallChange"
+                or "LargeChange" or "Orientation" or "IsDirectionReversed" or "TickFrequency"
+                or "TickPlacement" or "IsSnapToTickEnabled",
+            "ProgressBar" => propertyName is "Minimum" or "Maximum" or "Value" or "Orientation"
+                or "IsIndeterminate" or "ShowProgressText" or "ProgressTextFormat",
             "DatePicker" => propertyName == "SelectedDate",
             "CalendarDatePicker" => propertyName is "SelectedDate" or "Watermark",
             "TimePicker" => propertyName == "SelectedTime",
-            "NumericUpDown" => propertyName is "Minimum" or "Maximum" or "Increment" or "Value",
+            "NumericUpDown" => propertyName is "Minimum" or "Maximum" or "Increment" or "Value"
+                or "FormatString" or "ClipValueToMinMax" or "AllowSpin"
+                or "ShowButtonSpinner" or "ButtonSpinnerLocation",
             "TabControl" => propertyName == "SelectedIndex",
             "SplitView" => propertyName is "DisplayMode" or "IsPaneOpen" or "OpenPaneLength"
                 or "CompactPaneLength" or "PanePlacement" or "PaneBackground"
@@ -8571,9 +8730,7 @@ public partial class MainWindowViewModel : ViewModelBase
                 sb.Append(indent);
                 sb.Append("<Slider");
                 AppendCanvasLayoutAttributes(sb, element);
-                AppendAttribute(sb, "Minimum", slider.Minimum.ToString("0.###", CultureInfo.InvariantCulture));
-                AppendAttribute(sb, "Maximum", slider.Maximum.ToString("0.###", CultureInfo.InvariantCulture));
-                AppendAttribute(sb, "Value", slider.Value.ToString("0.###", CultureInfo.InvariantCulture));
+                AppendRangeAttributes(sb, slider);
                 sb.AppendLine(" />");
                 break;
 
@@ -8581,9 +8738,7 @@ public partial class MainWindowViewModel : ViewModelBase
                 sb.Append(indent);
                 sb.Append("<ProgressBar");
                 AppendCanvasLayoutAttributes(sb, element);
-                AppendAttribute(sb, "Minimum", progressBar.Minimum.ToString("0.###", CultureInfo.InvariantCulture));
-                AppendAttribute(sb, "Maximum", progressBar.Maximum.ToString("0.###", CultureInfo.InvariantCulture));
-                AppendAttribute(sb, "Value", progressBar.Value.ToString("0.###", CultureInfo.InvariantCulture));
+                AppendRangeAttributes(sb, progressBar);
                 sb.AppendLine(" />");
                 break;
 
@@ -8632,14 +8787,7 @@ public partial class MainWindowViewModel : ViewModelBase
                 sb.Append(indent);
                 sb.Append("<NumericUpDown");
                 AppendCanvasLayoutAttributes(sb, element);
-                AppendAttribute(sb, "Minimum", numericUpDown.Minimum.ToString(CultureInfo.InvariantCulture));
-                AppendAttribute(sb, "Maximum", numericUpDown.Maximum.ToString(CultureInfo.InvariantCulture));
-                AppendAttribute(sb, "Increment", numericUpDown.Increment.ToString(CultureInfo.InvariantCulture));
-                if (numericUpDown.Value is { } value)
-                {
-                    AppendAttribute(sb, "Value", value.ToString(CultureInfo.InvariantCulture));
-                }
-
+                AppendRangeAttributes(sb, numericUpDown);
                 sb.AppendLine(" />");
                 break;
 
@@ -9784,6 +9932,20 @@ public partial class MainWindowViewModel : ViewModelBase
         foreach (var attribute in DesignerEffectRuntime.GetAxamlAttributes(properties))
         {
             AppendAttribute(sb, attribute.Name, attribute.Value);
+        }
+    }
+
+    private static void AppendRangeAttributes(StringBuilder sb, Control visual)
+    {
+        var boundProperties = DesignerBindingRuntime.ReadBindings(visual)
+            .Select(binding => binding.PropertyName)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        foreach (var attribute in DesignerRangeRuntime.GetAxamlAttributes(visual))
+        {
+            if (!boundProperties.Contains(attribute.Name))
+            {
+                AppendAttribute(sb, attribute.Name, attribute.Value);
+            }
         }
     }
 

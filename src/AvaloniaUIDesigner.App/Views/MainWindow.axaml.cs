@@ -703,6 +703,19 @@ public partial class MainWindow : Window
         await ShowEffectPropertiesDialogAsync(state);
     }
 
+    private async void OnEditRangePropertiesMenuClicked(
+        object? sender,
+        Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        FlushPendingPropertyHistory();
+        if (Vm is null || !Vm.TryGetSelectedRangeProperties(out var state))
+        {
+            return;
+        }
+
+        await ShowRangePropertiesDialogAsync(state);
+    }
+
     private async void OnEditGridDefinitionsMenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
         FlushPendingPropertyHistory();
@@ -3559,6 +3572,256 @@ public partial class MainWindow : Window
         Grid.SetRow(buttons, 6);
         dialog.Content = content;
         await dialog.ShowDialog(this);
+
+        static void AddField(Grid owner, string label, Control editor, int row, int column)
+        {
+            var field = new StackPanel
+            {
+                Spacing = 4,
+                Children =
+                {
+                    new TextBlock { Text = label },
+                    editor,
+                },
+            };
+            Grid.SetRow(field, row);
+            Grid.SetColumn(field, column);
+            owner.Children.Add(field);
+        }
+    }
+
+    private async Task ShowRangePropertiesDialogAsync(RangeEditorState state)
+    {
+        if (Vm is null)
+        {
+            return;
+        }
+
+        var minimumEditor = new TextBox { Text = state.Minimum };
+        var maximumEditor = new TextBox { Text = state.Maximum };
+        var valueEditor = new TextBox
+        {
+            Text = state.Value,
+            Watermark = state.ControlKind == "NumericUpDown" ? "Blank is allowed" : null,
+        };
+        var smallChangeEditor = new TextBox { Text = state.SmallChange };
+        var largeChangeEditor = new TextBox { Text = state.LargeChange };
+        var sliderOrientationEditor = CreateCombo(
+            DesignerRangeRuntime.OrientationNames,
+            state.Orientation);
+        var directionReversedEditor = new CheckBox
+        {
+            Content = "Reverse direction",
+            IsChecked = state.IsDirectionReversed,
+        };
+        var tickFrequencyEditor = new TextBox { Text = state.TickFrequency };
+        var tickPlacementEditor = CreateCombo(
+            DesignerRangeRuntime.TickPlacementNames,
+            state.TickPlacement);
+        var snapToTickEditor = new CheckBox
+        {
+            Content = "Snap value to ticks",
+            IsChecked = state.IsSnapToTickEnabled,
+        };
+        var progressOrientationEditor = CreateCombo(
+            DesignerRangeRuntime.OrientationNames,
+            state.Orientation);
+        var indeterminateEditor = new CheckBox
+        {
+            Content = "Indeterminate",
+            IsChecked = state.IsIndeterminate,
+        };
+        var showProgressTextEditor = new CheckBox
+        {
+            Content = "Show progress text",
+            IsChecked = state.ShowProgressText,
+        };
+        var progressTextFormatEditor = new TextBox
+        {
+            Text = state.ProgressTextFormat,
+            Watermark = "{1:0}%",
+        };
+        var incrementEditor = new TextBox { Text = state.Increment };
+        var formatStringEditor = new TextBox
+        {
+            Text = state.FormatString,
+            Watermark = "Blank or N2",
+        };
+        var clipValueEditor = new CheckBox
+        {
+            Content = "Clip value to range",
+            IsChecked = state.ClipValueToMinMax,
+        };
+        var allowSpinEditor = new CheckBox
+        {
+            Content = "Allow spin",
+            IsChecked = state.AllowSpin,
+        };
+        var showSpinnerEditor = new CheckBox
+        {
+            Content = "Show spinner buttons",
+            IsChecked = state.ShowButtonSpinner,
+        };
+        var spinnerLocationEditor = CreateCombo(
+            DesignerRangeRuntime.SpinnerLocationNames,
+            state.ButtonSpinnerLocation);
+
+        var commonFields = CreateFieldGrid("*,*,*");
+        AddField(commonFields, "Minimum", minimumEditor, 0, 0);
+        AddField(commonFields, "Maximum", maximumEditor, 0, 1);
+        AddField(commonFields, "Value", valueEditor, 0, 2);
+
+        var sliderFields = CreateFieldGrid("*,*");
+        sliderFields.RowDefinitions = new RowDefinitions("Auto,Auto,Auto");
+        AddField(sliderFields, "Small change", smallChangeEditor, 0, 0);
+        AddField(sliderFields, "Large change", largeChangeEditor, 0, 1);
+        AddField(sliderFields, "Orientation", sliderOrientationEditor, 1, 0);
+        AddField(sliderFields, "Tick frequency", tickFrequencyEditor, 1, 1);
+        AddField(sliderFields, "Tick placement", tickPlacementEditor, 2, 0);
+        var sliderSwitches = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            Spacing = 16,
+            VerticalAlignment = VerticalAlignment.Center,
+            Children = { directionReversedEditor, snapToTickEditor },
+        };
+        Grid.SetRow(sliderSwitches, 2);
+        Grid.SetColumn(sliderSwitches, 1);
+        sliderFields.Children.Add(sliderSwitches);
+
+        var progressFields = CreateFieldGrid("*,*");
+        progressFields.RowDefinitions = new RowDefinitions("Auto,Auto");
+        AddField(progressFields, "Orientation", progressOrientationEditor, 0, 0);
+        AddField(progressFields, "Progress text format", progressTextFormatEditor, 0, 1);
+        var progressSwitches = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            Spacing = 16,
+            Children = { indeterminateEditor, showProgressTextEditor },
+        };
+        Grid.SetRow(progressSwitches, 1);
+        Grid.SetColumnSpan(progressSwitches, 2);
+        progressFields.Children.Add(progressSwitches);
+
+        var numericFields = CreateFieldGrid("*,*");
+        numericFields.RowDefinitions = new RowDefinitions("Auto,Auto");
+        AddField(numericFields, "Increment", incrementEditor, 0, 0);
+        AddField(numericFields, "Number format", formatStringEditor, 0, 1);
+        AddField(numericFields, "Spinner location", spinnerLocationEditor, 1, 0);
+        var numericSwitches = new WrapPanel
+        {
+            ItemSpacing = 16,
+            LineSpacing = 8,
+            Children = { clipValueEditor, allowSpinEditor, showSpinnerEditor },
+        };
+        Grid.SetRow(numericSwitches, 1);
+        Grid.SetColumn(numericSwitches, 1);
+        numericFields.Children.Add(numericSwitches);
+
+        sliderFields.IsVisible = state.ControlKind == "Slider";
+        progressFields.IsVisible = state.ControlKind == "ProgressBar";
+        numericFields.IsVisible = state.ControlKind == "NumericUpDown";
+        var errorText = new TextBlock
+        {
+            Foreground = Avalonia.Media.Brushes.IndianRed,
+            TextWrapping = Avalonia.Media.TextWrapping.Wrap,
+        };
+        var dialog = new Window
+        {
+            Title = $"Edit Range & Value - {state.ControlName}",
+            Width = 720,
+            Height = 570,
+            MinWidth = 600,
+            MinHeight = 500,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner,
+        };
+        var applyButton = new Button { Content = "Apply", MinWidth = 84 };
+        applyButton.Click += (_, _) =>
+        {
+            var input = new DesignerRangeEditorInput(
+                minimumEditor.Text ?? string.Empty,
+                maximumEditor.Text ?? string.Empty,
+                valueEditor.Text ?? string.Empty,
+                smallChangeEditor.Text ?? string.Empty,
+                largeChangeEditor.Text ?? string.Empty,
+                state.ControlKind == "ProgressBar"
+                    ? progressOrientationEditor.SelectedItem?.ToString() ?? string.Empty
+                    : sliderOrientationEditor.SelectedItem?.ToString() ?? string.Empty,
+                directionReversedEditor.IsChecked == true,
+                tickFrequencyEditor.Text ?? string.Empty,
+                tickPlacementEditor.SelectedItem?.ToString() ?? string.Empty,
+                snapToTickEditor.IsChecked == true,
+                indeterminateEditor.IsChecked == true,
+                showProgressTextEditor.IsChecked == true,
+                progressTextFormatEditor.Text ?? string.Empty,
+                incrementEditor.Text ?? string.Empty,
+                formatStringEditor.Text ?? string.Empty,
+                clipValueEditor.IsChecked == true,
+                allowSpinEditor.IsChecked == true,
+                showSpinnerEditor.IsChecked == true,
+                spinnerLocationEditor.SelectedItem?.ToString() ?? string.Empty);
+            if (!Vm.SetSelectedRangeProperties(input))
+            {
+                errorText.Text = Vm.StatusText;
+                return;
+            }
+
+            dialog.Close();
+        };
+        var cancelButton = new Button { Content = "Cancel", MinWidth = 84 };
+        cancelButton.Click += (_, _) => dialog.Close();
+        var buttons = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            Spacing = 8,
+            HorizontalAlignment = HorizontalAlignment.Right,
+            Children = { cancelButton, applyButton },
+        };
+        var content = new Grid
+        {
+            Margin = new Thickness(16),
+            RowDefinitions = new RowDefinitions("Auto,Auto,Auto,Auto,Auto,*,Auto,Auto"),
+            RowSpacing = 12,
+            Children =
+            {
+                new TextBlock
+                {
+                    Text = $"Configure validated range behavior for {state.ControlKind}. Minimum must be less than Maximum, and Value must stay inside the range.",
+                    TextWrapping = Avalonia.Media.TextWrapping.Wrap,
+                },
+                commonFields,
+                sliderFields,
+                progressFields,
+                numericFields,
+                errorText,
+                buttons,
+            },
+        };
+        Grid.SetRow(commonFields, 1);
+        Grid.SetRow(sliderFields, 2);
+        Grid.SetRow(progressFields, 3);
+        Grid.SetRow(numericFields, 4);
+        Grid.SetRow(errorText, 6);
+        Grid.SetRow(buttons, 7);
+        dialog.Content = content;
+        await dialog.ShowDialog(this);
+
+        static ComboBox CreateCombo(IEnumerable<string> items, string selected)
+            => new()
+            {
+                ItemsSource = items,
+                SelectedItem = selected,
+                HorizontalAlignment = HorizontalAlignment.Stretch,
+            };
+
+        static Grid CreateFieldGrid(string columns)
+            => new()
+            {
+                ColumnDefinitions = new ColumnDefinitions(columns),
+                RowDefinitions = new RowDefinitions("Auto"),
+                ColumnSpacing = 12,
+                RowSpacing = 10,
+            };
 
         static void AddField(Grid owner, string label, Control editor, int row, int column)
         {

@@ -2133,6 +2133,7 @@ public partial class CanvasViewModel : ViewModelBase
         DesignerAccessibilityRuntime.Apply(visual, properties);
         DesignerInteractionRuntime.Apply(visual, properties);
         DesignerEffectRuntime.Apply(visual, properties);
+        DesignerRangeRuntime.Apply(visual, properties);
         ApplyTemplatedAppearanceProperties(visual, properties);
 
         if (visual is Shape shape)
@@ -2406,52 +2407,6 @@ public partial class CanvasViewModel : ViewModelBase
             return;
         }
 
-        if (visual is Slider slider)
-        {
-            if (properties.TryGetValue("Minimum", out var minimum)
-                && double.TryParse(minimum, NumberStyles.Float, CultureInfo.InvariantCulture, out var parsedMinimum))
-            {
-                slider.Minimum = parsedMinimum;
-            }
-
-            if (properties.TryGetValue("Maximum", out var maximum)
-                && double.TryParse(maximum, NumberStyles.Float, CultureInfo.InvariantCulture, out var parsedMaximum))
-            {
-                slider.Maximum = parsedMaximum;
-            }
-
-            if (properties.TryGetValue("Value", out var value)
-                && double.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out var parsedValue))
-            {
-                slider.Value = parsedValue;
-            }
-
-            return;
-        }
-
-        if (visual is ProgressBar progressBar)
-        {
-            if (properties.TryGetValue("Minimum", out var minimum)
-                && double.TryParse(minimum, NumberStyles.Float, CultureInfo.InvariantCulture, out var parsedMinimum))
-            {
-                progressBar.Minimum = parsedMinimum;
-            }
-
-            if (properties.TryGetValue("Maximum", out var maximum)
-                && double.TryParse(maximum, NumberStyles.Float, CultureInfo.InvariantCulture, out var parsedMaximum))
-            {
-                progressBar.Maximum = parsedMaximum;
-            }
-
-            if (properties.TryGetValue("Value", out var value)
-                && double.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out var parsedValue))
-            {
-                progressBar.Value = parsedValue;
-            }
-
-            return;
-        }
-
         if (visual is DatePicker datePicker)
         {
             if (properties.TryGetValue("SelectedDate", out var selectedDate)
@@ -2499,35 +2454,6 @@ public partial class CanvasViewModel : ViewModelBase
                     out var parsedSelectedTime))
             {
                 timePicker.SelectedTime = parsedSelectedTime;
-            }
-
-            return;
-        }
-
-        if (visual is NumericUpDown numericUpDown)
-        {
-            if (properties.TryGetValue("Minimum", out var minimum)
-                && decimal.TryParse(minimum, NumberStyles.Number, CultureInfo.InvariantCulture, out var parsedMinimum))
-            {
-                numericUpDown.Minimum = parsedMinimum;
-            }
-
-            if (properties.TryGetValue("Maximum", out var maximum)
-                && decimal.TryParse(maximum, NumberStyles.Number, CultureInfo.InvariantCulture, out var parsedMaximum))
-            {
-                numericUpDown.Maximum = parsedMaximum;
-            }
-
-            if (properties.TryGetValue("Increment", out var increment)
-                && decimal.TryParse(increment, NumberStyles.Number, CultureInfo.InvariantCulture, out var parsedIncrement))
-            {
-                numericUpDown.Increment = parsedIncrement;
-            }
-
-            if (properties.TryGetValue("Value", out var value)
-                && decimal.TryParse(value, NumberStyles.Number, CultureInfo.InvariantCulture, out var parsedValue))
-            {
-                numericUpDown.Value = parsedValue;
             }
 
             return;

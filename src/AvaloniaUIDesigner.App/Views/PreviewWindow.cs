@@ -451,6 +451,7 @@ public sealed class PreviewWindow : Window
         DesignerAccessibilityRuntime.Apply(control, properties);
         DesignerInteractionRuntime.Apply(control, properties);
         DesignerEffectRuntime.Apply(control, properties);
+        DesignerRangeRuntime.Apply(control, properties);
         ApplyTemplatedAppearanceProperties(control, properties, colorResources);
 
         switch (control)
@@ -606,12 +607,6 @@ public sealed class PreviewWindow : Window
             case DataGrid dataGrid:
                 ApplyDataGridProperties(dataGrid, properties);
                 break;
-            case Slider slider:
-                ApplySliderProperties(slider, properties);
-                break;
-            case ProgressBar progressBar:
-                ApplyProgressBarProperties(progressBar, properties);
-                break;
             case DatePicker datePicker:
                 ApplyDatePickerProperties(datePicker, properties);
                 break;
@@ -620,9 +615,6 @@ public sealed class PreviewWindow : Window
                 break;
             case TimePicker timePicker:
                 ApplyTimePickerProperties(timePicker, properties);
-                break;
-            case NumericUpDown numericUpDown:
-                ApplyNumericUpDownProperties(numericUpDown, properties);
                 break;
             case TabControl tabControl:
                 ApplyTabControlProperties(tabControl, properties);
@@ -809,27 +801,6 @@ public sealed class PreviewWindow : Window
         }
     }
 
-    private static void ApplySliderProperties(Slider slider, IReadOnlyDictionary<string, string> properties)
-    {
-        if (properties.TryGetValue("Minimum", out var minimum)
-            && double.TryParse(minimum, NumberStyles.Float, CultureInfo.InvariantCulture, out var parsedMinimum))
-        {
-            slider.Minimum = parsedMinimum;
-        }
-
-        if (properties.TryGetValue("Maximum", out var maximum)
-            && double.TryParse(maximum, NumberStyles.Float, CultureInfo.InvariantCulture, out var parsedMaximum))
-        {
-            slider.Maximum = parsedMaximum;
-        }
-
-        if (properties.TryGetValue("Value", out var value)
-            && double.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out var parsedValue))
-        {
-            slider.Value = parsedValue;
-        }
-    }
-
     private static void ApplyComboBoxProperties(ComboBox comboBox, IReadOnlyDictionary<string, string> properties)
     {
         if (properties.TryGetValue("__items", out var itemsJson))
@@ -858,27 +829,6 @@ public sealed class PreviewWindow : Window
             && int.TryParse(selectedIndex, NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsedSelectedIndex))
         {
             comboBox.SelectedIndex = Math.Clamp(parsedSelectedIndex, -1, comboBox.Items.Count - 1);
-        }
-    }
-
-    private static void ApplyProgressBarProperties(ProgressBar progressBar, IReadOnlyDictionary<string, string> properties)
-    {
-        if (properties.TryGetValue("Minimum", out var minimum)
-            && double.TryParse(minimum, NumberStyles.Float, CultureInfo.InvariantCulture, out var parsedMinimum))
-        {
-            progressBar.Minimum = parsedMinimum;
-        }
-
-        if (properties.TryGetValue("Maximum", out var maximum)
-            && double.TryParse(maximum, NumberStyles.Float, CultureInfo.InvariantCulture, out var parsedMaximum))
-        {
-            progressBar.Maximum = parsedMaximum;
-        }
-
-        if (properties.TryGetValue("Value", out var value)
-            && double.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out var parsedValue))
-        {
-            progressBar.Value = parsedValue;
         }
     }
 
@@ -925,33 +875,6 @@ public sealed class PreviewWindow : Window
                 out var parsedSelectedTime))
         {
             timePicker.SelectedTime = parsedSelectedTime;
-        }
-    }
-
-    private static void ApplyNumericUpDownProperties(NumericUpDown numericUpDown, IReadOnlyDictionary<string, string> properties)
-    {
-        if (properties.TryGetValue("Minimum", out var minimum)
-            && decimal.TryParse(minimum, NumberStyles.Number, CultureInfo.InvariantCulture, out var parsedMinimum))
-        {
-            numericUpDown.Minimum = parsedMinimum;
-        }
-
-        if (properties.TryGetValue("Maximum", out var maximum)
-            && decimal.TryParse(maximum, NumberStyles.Number, CultureInfo.InvariantCulture, out var parsedMaximum))
-        {
-            numericUpDown.Maximum = parsedMaximum;
-        }
-
-        if (properties.TryGetValue("Increment", out var increment)
-            && decimal.TryParse(increment, NumberStyles.Number, CultureInfo.InvariantCulture, out var parsedIncrement))
-        {
-            numericUpDown.Increment = parsedIncrement;
-        }
-
-        if (properties.TryGetValue("Value", out var value)
-            && decimal.TryParse(value, NumberStyles.Number, CultureInfo.InvariantCulture, out var parsedValue))
-        {
-            numericUpDown.Value = parsedValue;
         }
     }
 
