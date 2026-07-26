@@ -463,8 +463,8 @@ public sealed class PreviewWindow : Window
             case ToggleButton toggleButton:
                 DesignerToggleRuntime.Apply(toggleButton, properties);
                 break;
-            case Button button when properties.TryGetValue("Content", out var content):
-                button.Content = content;
+            case Button button:
+                DesignerButtonRuntime.Apply(button, properties);
                 break;
             case TextBlock textBlock:
                 if (properties.TryGetValue("Text", out var textBlockText))

@@ -795,6 +795,19 @@ public partial class MainWindow : Window
         await ShowImagePropertiesDialogAsync(state);
     }
 
+    private async void OnEditButtonPropertiesMenuClicked(
+        object? sender,
+        Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        FlushPendingPropertyHistory();
+        if (Vm is null || !Vm.TryGetSelectedButtonProperties(out var state))
+        {
+            return;
+        }
+
+        await ShowButtonPropertiesDialogAsync(state);
+    }
+
     private async void OnEditGridDefinitionsMenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
         FlushPendingPropertyHistory();
@@ -1832,6 +1845,13 @@ public partial class MainWindow : Window
 
     private static bool IsUndoTrackedVisualProperty(Control control, string propertyName)
     {
+        if (DesignerButtonRuntime.IsSupportedProperty(
+                control.GetType().Name,
+                propertyName))
+        {
+            return true;
+        }
+
         if (DesignerImageRuntime.IsSupportedProperty(
                 control.GetType().Name,
                 propertyName))
@@ -5278,6 +5298,170 @@ public partial class MainWindow : Window
                 SelectedItem = selected,
                 HorizontalAlignment = HorizontalAlignment.Stretch,
             };
+
+        static void AddField(
+            Grid owner,
+            string label,
+            Control editor,
+            int row,
+            int column,
+            int columnSpan = 1)
+        {
+            var field = new StackPanel
+            {
+                Spacing = 4,
+                Children =
+                {
+                    new TextBlock { Text = label },
+                    editor,
+                },
+            };
+            Grid.SetRow(field, row);
+            Grid.SetColumn(field, column);
+            Grid.SetColumnSpan(field, columnSpan);
+            owner.Children.Add(field);
+        }
+    }
+
+    private async Task ShowButtonPropertiesDialogAsync(ButtonEditorState state)
+    {
+        if (Vm is null)
+        {
+            return;
+        }
+
+        var contentEditor = new TextBox { Text = state.Content };
+        var clickModeEditor = new ComboBox
+        {
+            ItemsSource = DesignerButtonRuntime.ClickModeNames,
+            SelectedItem = state.ClickMode,
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+        };
+        var hotKeyEditor = new TextBox
+        {
+            Text = state.HotKey,
+            Watermark = "For example Ctrl+S",
+        };
+        var commandParameterEditor = new TextBox
+        {
+            Text = state.CommandParameter,
+            Watermark = "Optional static parameter",
+        };
+        var clickHandlerEditor = new TextBox
+        {
+            Text = state.ClickHandler,
+            Watermark = "For example SaveButton_Click",
+        };
+        var defaultEditor = new CheckBox
+        {
+            Content = "Default action for the host Window",
+            IsChecked = state.IsDefault,
+        };
+        var cancelEditor = new CheckBox
+        {
+            Content = "Cancel action for the host Window",
+            IsChecked = state.IsCancel,
+        };
+        var fields = new Grid
+        {
+            ColumnDefinitions = new ColumnDefinitions("*,*"),
+            RowDefinitions = new RowDefinitions("Auto,Auto,Auto"),
+            ColumnSpacing = 12,
+            RowSpacing = 10,
+        };
+        AddField(fields, "Content", contentEditor, 0, 0);
+        AddField(fields, "Click mode", clickModeEditor, 0, 1);
+        AddField(fields, "HotKey", hotKeyEditor, 1, 0);
+        AddField(
+            fields,
+            "Command parameter",
+            commandParameterEditor,
+            1,
+            1);
+        AddField(fields, "Click handler", clickHandlerEditor, 2, 0, 2);
+
+        var switches = new WrapPanel
+        {
+            Orientation = Orientation.Horizontal,
+            ItemSpacing = 18,
+            LineSpacing = 8,
+            Children = { defaultEditor, cancelEditor },
+        };
+        var errorText = new TextBlock
+        {
+            Foreground = Avalonia.Media.Brushes.IndianRed,
+            TextWrapping = Avalonia.Media.TextWrapping.Wrap,
+        };
+        var dialog = new Window
+        {
+            Title = $"Edit Button Actions & Commands - {state.ControlName}",
+            Width = 740,
+            Height = 580,
+            MinWidth = 640,
+            MinHeight = 500,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner,
+        };
+        var applyButton = new Button { Content = "Apply", MinWidth = 84 };
+        applyButton.Click += (_, _) =>
+        {
+            var input = new DesignerButtonEditorInput(
+                contentEditor.Text ?? string.Empty,
+                clickModeEditor.SelectedItem?.ToString() ?? string.Empty,
+                hotKeyEditor.Text ?? string.Empty,
+                defaultEditor.IsChecked == true,
+                cancelEditor.IsChecked == true,
+                commandParameterEditor.Text ?? string.Empty,
+                clickHandlerEditor.Text ?? string.Empty);
+            if (!Vm.SetSelectedButtonProperties(input))
+            {
+                errorText.Text = Vm.StatusText;
+                return;
+            }
+
+            dialog.Close();
+        };
+        var cancelButton = new Button { Content = "Cancel", MinWidth = 84 };
+        cancelButton.Click += (_, _) => dialog.Close();
+        var buttons = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            Spacing = 8,
+            HorizontalAlignment = HorizontalAlignment.Right,
+            Children = { cancelButton, applyButton },
+        };
+        var bindingHint = new TextBlock
+        {
+            Text = "Use Edit Bindings... to connect Command or CommandParameter to the application ViewModel. A Click handler and Command may be declared together.",
+            TextWrapping = Avalonia.Media.TextWrapping.Wrap,
+            Opacity = 0.72,
+        };
+        var content = new Grid
+        {
+            Margin = new Thickness(16),
+            RowDefinitions =
+                new RowDefinitions("Auto,Auto,Auto,Auto,*,Auto,Auto"),
+            RowSpacing = 12,
+            Children =
+            {
+                new TextBlock
+                {
+                    Text = "Configure pointer activation, keyboard activation, Window default/cancel behavior, command data, and the generated Click event declaration.",
+                    TextWrapping = Avalonia.Media.TextWrapping.Wrap,
+                },
+                fields,
+                switches,
+                bindingHint,
+                errorText,
+                buttons,
+            },
+        };
+        Grid.SetRow(fields, 1);
+        Grid.SetRow(switches, 2);
+        Grid.SetRow(bindingHint, 3);
+        Grid.SetRow(errorText, 5);
+        Grid.SetRow(buttons, 6);
+        dialog.Content = content;
+        await dialog.ShowDialog(this);
 
         static void AddField(
             Grid owner,

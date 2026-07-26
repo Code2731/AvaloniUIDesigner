@@ -258,6 +258,16 @@ public sealed record ImageEditorState(
     string EdgeMode,
     string BitmapBlendingMode);
 
+public sealed record ButtonEditorState(
+    string ControlName,
+    string Content,
+    string ClickMode,
+    string HotKey,
+    bool IsDefault,
+    bool IsCancel,
+    string CommandParameter,
+    string ClickHandler);
+
 public sealed record GridDefinitionEditorState(
     string ControlName,
     string RowDefinitions,
@@ -4571,6 +4581,114 @@ public partial class MainWindowViewModel : ViewModelBase
             values.EdgeMode.ToString(),
             values.BitmapBlendingMode.ToString());
 
+    public bool TryGetSelectedButtonProperties(out ButtonEditorState state)
+    {
+        var target = Canvas.SelectedElement;
+        if (target is null
+            || target.IsLocked
+            || !DesignerButtonRuntime.IsSupportedControl(target.Visual))
+        {
+            state = default!;
+            StatusText = target switch
+            {
+                null => "Select a Button before editing actions and commands.",
+                { IsLocked: true } => "Unlock the selected Button before editing actions and commands.",
+                _ => "Button actions and commands editing is available for Button controls.",
+            };
+            return false;
+        }
+
+        if (!DesignerButtonRuntime.TryRead(
+                target.Visual,
+                out var values,
+                out var error))
+        {
+            state = default!;
+            StatusText = $"Button actions and commands cannot be edited. {error}";
+            return false;
+        }
+
+        state = CreateButtonEditorState(target.DisplayName, values);
+        return true;
+    }
+
+    public bool SetSelectedButtonProperties(DesignerButtonEditorInput input)
+    {
+        var target = Canvas.SelectedElement;
+        if (target is null
+            || target.IsLocked
+            || target.Visual is not Button button
+            || !DesignerButtonRuntime.IsSupportedControl(button))
+        {
+            StatusText =
+                "Select an unlocked Button before editing actions and commands.";
+            return false;
+        }
+
+        if (!DesignerButtonRuntime.TryParseValues(
+                button,
+                input,
+                out var values,
+                out var error))
+        {
+            StatusText = $"Button actions and commands were not changed. {error}";
+            return false;
+        }
+
+        if (!DesignerButtonRuntime.TryRead(
+                button,
+                out var current,
+                out error))
+        {
+            StatusText = $"Button actions and commands were not changed. {error}";
+            return false;
+        }
+
+        if (current == values)
+        {
+            StatusText = "Button actions and commands are unchanged.";
+            return true;
+        }
+
+        BeginCanvasMutation(
+            HistoryActionType.EditProperty,
+            "Updated Button actions and commands.");
+        DesignerButtonRuntime.Apply(button, values);
+        foreach (var propertyName in new[]
+                 {
+                     "Content",
+                     "ClickMode",
+                     "HotKey",
+                     "IsDefault",
+                     "IsCancel",
+                     "CommandParameter",
+                 })
+        {
+            DesignerStyleApplicationMetadata.ClearApplied(
+                button,
+                propertyName);
+        }
+
+        Canvas.RefreshDocumentStyles(button);
+        CommitCanvasMutation();
+        StatusText =
+            $"Updated Button actions and commands for {target.DisplayName}.";
+        return true;
+    }
+
+    private static ButtonEditorState CreateButtonEditorState(
+        string controlName,
+        DesignerButtonValues values)
+        => new(
+            controlName,
+            values.Content,
+            values.ClickMode.ToString(),
+            values.HotKey,
+            values.IsDefault,
+            values.IsCancel,
+            values.CommandParameter,
+            values.ClickHandler);
+
     public bool TryGetSelectedToolTip(out string controlName, out string toolTip)
     {
         var target = Canvas.SelectedElement;
@@ -6198,6 +6316,7 @@ public partial class MainWindowViewModel : ViewModelBase
         DesignerToggleRuntime.Capture(visual, result);
         DesignerContainerBehaviorRuntime.Capture(visual, result);
         DesignerImageRuntime.Capture(visual, result);
+        DesignerButtonRuntime.Capture(visual, result);
         foreach (var pair in DesignerResourceReferenceMetadata.GetReferences(visual))
         {
             result[pair.Key] = DesignerResourceReferenceMetadata.FormatExpression(pair.Value);
@@ -6226,12 +6345,6 @@ public partial class MainWindowViewModel : ViewModelBase
         if (bindings.Count > 0)
         {
             result["__bindings"] = DesignerBindingRuntime.Serialize(bindings);
-        }
-
-        if (visual is Button { Tag: ButtonClickHandlerMetadata clickHandler }
-            && !string.IsNullOrWhiteSpace(clickHandler.HandlerName))
-        {
-            result["__clickHandler"] = clickHandler.HandlerName;
         }
 
         return result;
@@ -7789,7 +7902,19 @@ public partial class MainWindowViewModel : ViewModelBase
 
             if (tagName == "Button" && name == "Click")
             {
-                map["__clickHandler"] = attr.Value;
+                if (DesignerButtonRuntime.TryNormalizeClickHandler(
+                        attr.Value,
+                        out var clickHandler,
+                        out var clickHandlerError))
+                {
+                    map["__clickHandler"] = clickHandler;
+                }
+                else
+                {
+                    warnings.Add(
+                        $"Ignored Button.Click: {clickHandlerError}");
+                }
+
                 continue;
             }
 
@@ -7993,6 +8118,26 @@ public partial class MainWindowViewModel : ViewModelBase
                 else
                 {
                     warnings.Add($"Ignored {tagName}.{name}: {imageError}");
+                }
+
+                continue;
+            }
+
+            if (DesignerButtonRuntime.IsSupportedProperty(tagName, name))
+            {
+                if (DesignerButtonRuntime.TryNormalizeProperty(
+                        tagName,
+                        name,
+                        attr.Value,
+                        out var canonicalName,
+                        out var normalizedValue,
+                        out var buttonError))
+                {
+                    map[canonicalName] = normalizedValue;
+                }
+                else
+                {
+                    warnings.Add($"Ignored {tagName}.{name}: {buttonError}");
                 }
 
                 continue;
@@ -8229,6 +8374,11 @@ public partial class MainWindowViewModel : ViewModelBase
             return true;
         }
 
+        if (DesignerButtonRuntime.IsSupportedProperty(tagName, propertyName))
+        {
+            return true;
+        }
+
         if (propertyName is "Opacity" or "Classes")
         {
             return true;
@@ -8242,7 +8392,7 @@ public partial class MainWindowViewModel : ViewModelBase
 
         return tagName switch
         {
-            "Button" => propertyName == "Content",
+            "Button" => false,
             "TextBox" => propertyName is "Text" or "Watermark" or "PasswordChar"
                 or "RevealPassword" or "AcceptsReturn" or "AcceptsTab" or "TextWrapping"
                 or "TextAlignment" or "IsReadOnly" or "MaxLength" or "MinLines"
@@ -9405,12 +9555,7 @@ public partial class MainWindowViewModel : ViewModelBase
                 sb.Append(indent);
                 sb.Append("<Button");
                 AppendCanvasLayoutAttributes(sb, element);
-                AppendAttribute(sb, "Content", button.Content?.ToString() ?? string.Empty);
-                if (button.Tag is ButtonClickHandlerMetadata clickHandler
-                    && !string.IsNullOrWhiteSpace(clickHandler.HandlerName))
-                {
-                    AppendAttribute(sb, "Click", clickHandler.HandlerName);
-                }
+                AppendButtonAttributes(sb, button);
                 sb.AppendLine(" />");
                 break;
 
@@ -10858,6 +11003,21 @@ public partial class MainWindowViewModel : ViewModelBase
         foreach (var attribute in DesignerImageRuntime.GetAxamlAttributes(visual))
         {
             if (!boundProperties.Contains(attribute.Name))
+            {
+                AppendAttribute(sb, attribute.Name, attribute.Value);
+            }
+        }
+    }
+
+    private static void AppendButtonAttributes(StringBuilder sb, Control visual)
+    {
+        var boundProperties = DesignerBindingRuntime.ReadBindings(visual)
+            .Select(binding => binding.PropertyName)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        foreach (var attribute in DesignerButtonRuntime.GetAxamlAttributes(visual))
+        {
+            if (string.Equals(attribute.Name, "Click", StringComparison.Ordinal)
+                || !boundProperties.Contains(attribute.Name))
             {
                 AppendAttribute(sb, attribute.Name, attribute.Value);
             }

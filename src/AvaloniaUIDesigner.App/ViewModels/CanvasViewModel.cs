@@ -2178,17 +2178,7 @@ public partial class CanvasViewModel : ViewModelBase
 
         if (visual is Button button)
         {
-            if (properties.TryGetValue("Content", out var content))
-            {
-                button.Content = content;
-            }
-
-            if (properties.TryGetValue("__clickHandler", out var clickHandler)
-                && !string.IsNullOrWhiteSpace(clickHandler))
-            {
-                button.Tag = new ButtonClickHandlerMetadata(clickHandler);
-            }
-
+            DesignerButtonRuntime.Apply(button, properties);
             return;
         }
 

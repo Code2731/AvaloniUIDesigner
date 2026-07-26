@@ -40,6 +40,7 @@ dotnet run --project src/AvaloniaUIDesigner.App/AvaloniaUIDesigner.App.csproj
 - **Toggle & Choice Behavior 속성**: CheckBox·RadioButton·ToggleSwitch·ToggleButton의 checked/unchecked/indeterminate 상태, three-state, ClickMode, 콘텐츠 정렬과 Radio 그룹·Switch On/Off 문구를 편집하고 Undo/Redo, 복제, Preview, Binding, Draft·Full·UserControl AXAML 왕복에 보존
 - **Disclosure & Scrolling 속성**: Expander의 header·expanded 상태·전개 방향·콘텐츠 정렬과 ScrollViewer의 양축 scrollbar·auto-hide·chaining·deferred/focus scrolling·snap 정책을 편집하고 실제 중첩 Content, Undo/Redo, 복제, Preview, Binding, Draft·Full·UserControl AXAML 왕복에 보존
 - **Image Source & Rendering 속성**: Image의 로컬 Source 선택·해제, Stretch·StretchDirection, bitmap interpolation·edge·blending 모드를 원자적으로 편집하고 Undo/Redo, 복제, Preview, Source Binding, Draft·Full·UserControl AXAML 왕복에 보존
+- **Button Actions & Commands 속성**: Button의 Content·ClickMode·HotKey·Window 기본/취소 동작·CommandParameter·Click 핸들러를 통합 편집하고 Command Binding, Undo/Redo, 복제, Preview, Draft·Full·UserControl AXAML 왕복에 보존
 - **문서 루트 속성**: Window/UserControl 루트 종류와 Window 제목·리사이즈·시작 위치, 루트 Min/Max 크기를 편집하고 Undo/Redo, Preview, Draft·Full AXAML 왕복에 보존
 - **벡터 Shape 편집**: Rectangle, Ellipse, Line, Path의 Fill·Stroke·대시·끝점·결합 스타일과 반지름·점 좌표를 편집하고, 검증된 Path geometry를 리소스·Undo/Redo·복제·미리보기·AXAML 왕복에 보존
 - **요소 선택**: 배치된 요소 클릭 시 파란 외곽선
@@ -80,6 +81,7 @@ dotnet run --project src/AvaloniaUIDesigner.App/AvaloniaUIDesigner.App.csproj
 22. `Edit > Edit Toggle & Choice Behavior...`에서 CheckBox·RadioButton·ToggleSwitch·ToggleButton의 상태·클릭·타입별 콘텐츠 편집
 23. `Edit > Edit Disclosure & Scrolling...`에서 Expander의 전개 동작과 ScrollViewer의 scrollbar·snap 정책 편집
 24. `Edit > Edit Image Source & Rendering...`에서 Image의 파일, 배율, 보간, edge, blending 동작 편집
+25. `Edit > Edit Button Actions & Commands...`에서 Button의 포인터·키보드 활성화, Window 기본/취소 역할, command data와 Click 이벤트 편집
 
 DataGrid가 포함된 생성 AXAML을 다른 프로젝트에서 사용할 때는 같은 Avalonia 버전의 `Avalonia.Controls.DataGrid` 패키지와 `avares://Avalonia.Controls.DataGrid/Themes/Fluent.xaml` 스타일 include가 필요합니다.
 
@@ -112,6 +114,8 @@ Toggle & Choice Behavior 편집기의 Indeterminate 상태는 three-state가 활
 Disclosure & Scrolling 편집기는 `Edit Content...` 또는 Content 할당으로 구성한 실제 자식 계층을 변경하지 않고 컨테이너 동작만 편집합니다. Expander는 Down·Up·Left·Right 방향과 콘텐츠 정렬을 지원하며 IsExpanded Binding이 있으면 정적 값을 중복 출력하지 않습니다. ScrollViewer는 축마다 Disabled·Auto·Hidden·Visible scrollbar를 선택하고, 부모로의 scroll chaining과 thumb drag 중 deferred scrolling, 포커스 이동 시 bring-into-view를 제어합니다. Snap points는 축마다 None·Mandatory·MandatorySingle 타입과 Near·Center·Far 정렬을 설정합니다.
 
 Image Source & Rendering 편집기는 로컬 파일 경로와 `file://` URI를 지원하며 빈 Source를 적용하면 현재 이미지를 해제합니다. 존재하지 않거나 디코딩할 수 없는 파일은 기존 Source와 렌더링 상태를 변경하지 않지만, 가져온 AXAML에서 파일을 찾을 수 없는 경우에는 Source 메타데이터를 보존해 프로젝트 이동 후 다시 연결할 수 있습니다. Stretch와 StretchDirection 외에 bitmap interpolation 품질, antialias/aliased edge, compositing blending 모드를 설정할 수 있고 Source Binding이 있으면 생성 AXAML은 정적 Source를 중복 출력하지 않습니다.
+
+Button Actions & Commands 편집기는 Release·Press ClickMode와 Avalonia key gesture 형식의 HotKey를 지원하고, host Window의 기본·취소 동작을 지정합니다. CommandParameter는 정적 문자열로 설정하거나 `Edit Bindings...`에서 ViewModel 경로에 연결할 수 있으며 Command 자체도 Binding으로 선언합니다. Content나 CommandParameter에 Binding이 있으면 생성 AXAML은 정적 값을 중복 출력하지 않고, Click 핸들러와 Command는 같은 Button에 함께 선언할 수 있습니다. 기존 `Edit Click Handler...` 명령은 같은 이벤트 메타데이터를 편집합니다.
 
 문서 루트 편집기에서 선택한 종류는 일반 저장과 Full AXAML 복사에 반영됩니다. UserControl은 Window 전용 속성을 사용하지 않으며, `File > Export UserControl AXAML...`은 현재 문서 종류와 관계없이 재사용 가능한 UserControl을 생성합니다.
 

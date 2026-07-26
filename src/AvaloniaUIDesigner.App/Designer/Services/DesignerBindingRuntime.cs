@@ -31,7 +31,7 @@ public static class DesignerBindingRuntime
         var properties = new List<string> { "IsEnabled", "IsVisible", "Opacity" };
         properties.AddRange(targetType switch
         {
-            "Button" => ["Content"],
+            "Button" => ["Content", "Command", "CommandParameter"],
             "TextBox" => ["Text", "Watermark"],
             "TextBlock" => ["Text"],
             "Label" => ["Content"],

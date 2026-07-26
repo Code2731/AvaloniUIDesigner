@@ -626,6 +626,14 @@ public sealed class AxamlDocumentSerializer : IDesignerSerializer
             return;
         }
 
+        if (properties.TryGetValue("__clickHandler", out var clickHandler)
+            && !string.IsNullOrWhiteSpace(clickHandler))
+        {
+            sb.Append(" Click=\"");
+            sb.Append(EscapeXmlAttribute(clickHandler));
+            sb.Append("\"");
+        }
+
         foreach (var attribute in DesignerAccessibilityRuntime.GetAxamlAttributes(properties))
         {
             sb.Append(" ");
