@@ -1070,6 +1070,19 @@ public partial class MainWindow : Window
         await ShowAxamlSourceEditorDialogAsync(Vm.ExportFullAxaml());
     }
 
+    private async void OnEditSampleDataMenuClicked(
+        object? sender,
+        Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        FlushPendingPropertyHistory();
+        if (Vm is null)
+        {
+            return;
+        }
+
+        await ShowSampleDataEditorDialogAsync(Vm.GetSampleDataEditorText());
+    }
+
     private void OnZoomInMenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
         Vm?.Canvas.ZoomIn();
@@ -2726,6 +2739,99 @@ public partial class MainWindow : Window
         dialog.Content = content;
 
         return await dialog.ShowDialog<IReadOnlyList<string>?>(this);
+    }
+
+    private async Task ShowSampleDataEditorDialogAsync(string source)
+    {
+        if (Vm is null)
+        {
+            return;
+        }
+
+        var editor = new TextBox
+        {
+            Text = source,
+            AcceptsReturn = true,
+            AcceptsTab = true,
+            FontFamily = new Avalonia.Media.FontFamily("Consolas"),
+            FontSize = 13,
+            TextWrapping = Avalonia.Media.TextWrapping.NoWrap,
+        };
+        ScrollViewer.SetHorizontalScrollBarVisibility(editor, ScrollBarVisibility.Auto);
+        ScrollViewer.SetVerticalScrollBarVisibility(editor, ScrollBarVisibility.Auto);
+        var resultText = new TextBlock
+        {
+            Text = "JSON properties resolve binding paths such as User.Name. Arrays can preview ItemsSource bindings.",
+            Foreground = Avalonia.Media.Brushes.SlateGray,
+            TextWrapping = Avalonia.Media.TextWrapping.Wrap,
+        };
+        var dialog = new Window
+        {
+            Title = "Edit Sample DataContext",
+            Width = 760,
+            Height = 620,
+            MinWidth = 560,
+            MinHeight = 400,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner,
+        };
+        var validateButton = new Button { Content = "Validate", MinWidth = 84 };
+        validateButton.Click += (_, _) =>
+        {
+            var isValid = Vm.TryValidateSampleDataJson(editor.Text ?? string.Empty, out var result);
+            resultText.Foreground = isValid
+                ? Avalonia.Media.Brushes.SeaGreen
+                : Avalonia.Media.Brushes.IndianRed;
+            resultText.Text = result;
+        };
+        var clearButton = new Button
+        {
+            Content = "Clear Sample",
+            MinWidth = 100,
+            IsEnabled = Vm.HasSampleData,
+        };
+        clearButton.Click += (_, _) =>
+        {
+            if (!Vm.TrySetSampleDataJson(string.Empty, out var result))
+            {
+                resultText.Foreground = Avalonia.Media.Brushes.IndianRed;
+                resultText.Text = result;
+                return;
+            }
+
+            dialog.Close();
+        };
+        var applyButton = new Button { Content = "Apply", MinWidth = 84 };
+        applyButton.Click += (_, _) =>
+        {
+            if (!Vm.TrySetSampleDataJson(editor.Text ?? string.Empty, out var result))
+            {
+                resultText.Foreground = Avalonia.Media.Brushes.IndianRed;
+                resultText.Text = result;
+                return;
+            }
+
+            dialog.Close();
+        };
+        var cancelButton = new Button { Content = "Cancel", MinWidth = 84 };
+        cancelButton.Click += (_, _) => dialog.Close();
+        var buttons = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            Spacing = 8,
+            HorizontalAlignment = HorizontalAlignment.Right,
+            Children = { cancelButton, clearButton, validateButton, applyButton },
+        };
+        var content = new Grid
+        {
+            Margin = new Thickness(16),
+            RowDefinitions = new RowDefinitions("Auto,*,Auto"),
+            RowSpacing = 10,
+            Children = { resultText, editor, buttons },
+        };
+        Grid.SetRow(editor, 1);
+        Grid.SetRow(buttons, 2);
+        dialog.Content = content;
+        await dialog.ShowDialog(this);
     }
 
     private async Task ShowAxamlSourceEditorDialogAsync(string source)

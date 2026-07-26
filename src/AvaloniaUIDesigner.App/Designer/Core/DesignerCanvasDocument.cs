@@ -34,7 +34,8 @@ public sealed record DesignerCanvasDocument(
     IReadOnlyList<DesignerElementSnapshot> Elements,
     DesignerCanvasSettings? Settings = null,
     IReadOnlyDictionary<string, string>? ColorResources = null,
-    IReadOnlyList<DesignerStyleDefinition>? Styles = null);
+    IReadOnlyList<DesignerStyleDefinition>? Styles = null,
+    string? SampleDataJson = null);
 
 public sealed record DesignerStyleDefinition(
     string TargetType,

@@ -107,6 +107,19 @@ public sealed class PreviewWindow : Window
             }
         }
 
+        if (DesignerSampleDataRuntime.TryParse(
+                document.SampleDataJson ?? string.Empty,
+                out var sampleData,
+                out _)
+            && sampleData is not null)
+        {
+            canvas.DataContext = sampleData.Root;
+            foreach (var control in controlsByName.Values)
+            {
+                DesignerSampleDataRuntime.Apply(control, sampleData.Root);
+            }
+        }
+
         return canvas;
 
         void AddContainerChildren(Control parent, DesignerElementSnapshot parentSnapshot)

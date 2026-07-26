@@ -23,6 +23,15 @@ public sealed class AxamlDocumentSerializer : IDesignerSerializer
         sb.Append(EscapeXmlAttribute(settings.Background));
         sb.AppendLine("\">");
 
+        if (document.SampleDataJson is not null)
+        {
+            var encodedSampleData = Convert.ToBase64String(
+                Encoding.UTF8.GetBytes(document.SampleDataJson));
+            sb.Append("  <!-- AvaloniaUIDesigner: SampleDataBase64=");
+            sb.Append(encodedSampleData);
+            sb.AppendLine(" -->");
+        }
+
         if (document.ColorResources is { Count: > 0 })
         {
             sb.AppendLine("  <Canvas.Resources>");

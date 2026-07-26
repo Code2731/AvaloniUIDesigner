@@ -217,6 +217,8 @@ public partial class MainWindowViewModel : ViewModelBase
     private string? _currentDocumentPath;
     private DesignerCanvasDocument _lastSavedSnapshot = new(Array.Empty<DesignerElementSnapshot>());
     private List<DesignerElementSnapshot>? _clipboardSnapshots;
+    private string? _sampleDataJson;
+    private DesignerSampleObject? _sampleDataRoot;
 
     public MainWindowViewModel()
         : this(new BuiltInComponentCatalog(), new DefaultControlRenderer(), new AxamlDocumentSerializer())
@@ -263,6 +265,8 @@ public partial class MainWindowViewModel : ViewModelBase
     public string? CurrentDocumentPath => _currentDocumentPath;
     public string WindowTitle => $"Avalonia UI Designer - {GetDisplayDocumentName()}{(IsDirty ? "*" : string.Empty)}";
     public bool HasStylePreviewOptions => StylePreviewOptions.Count > 1;
+    public bool HasSampleData => _sampleDataRoot is not null;
+    public string SampleDataJson => _sampleDataJson ?? string.Empty;
 
     [ObservableProperty]
     private string _statusText = "Ready";
@@ -2548,10 +2552,73 @@ public partial class MainWindowViewModel : ViewModelBase
 
         BeginCanvasMutation(HistoryActionType.EditProperty, "Updated control bindings.");
         DesignerBindingRuntime.ReplaceBindings(target.Visual, definitions);
+        RefreshSampleDataPreview();
         CommitCanvasMutation();
         StatusText = definitions.Count == 0
             ? $"Cleared bindings from {target.DisplayName}."
             : $"Updated {definitions.Count} binding(s) on {target.DisplayName}.";
+        return true;
+    }
+
+    public string GetSampleDataEditorText()
+        => _sampleDataJson ?? """
+        {
+          "User": {
+            "Name": "Ada Lovelace",
+            "Email": "ada@example.com"
+          },
+          "CanEdit": true,
+          "Progress": 72,
+          "Items": [
+            { "Name": "Alpha", "Status": "Ready" },
+            { "Name": "Beta", "Status": "Review" }
+          ]
+        }
+        """;
+
+    public bool TryValidateSampleDataJson(string json, out string result)
+    {
+        if (!DesignerSampleDataRuntime.TryParse(json, out var document, out result))
+        {
+            return false;
+        }
+
+        result = document is null
+            ? "Sample data is empty; applying it will clear the current sample DataContext."
+            : $"Sample data JSON is valid ({document.Root.Count} top-level propert{(document.Root.Count == 1 ? "y" : "ies")}).";
+        return true;
+    }
+
+    public bool TrySetSampleDataJson(string json, out string result)
+    {
+        if (!DesignerSampleDataRuntime.TryParse(json, out var document, out result))
+        {
+            return false;
+        }
+
+        var canonical = document?.Json;
+        if (string.Equals(_sampleDataJson, canonical, StringComparison.Ordinal))
+        {
+            result = document is null
+                ? "Sample data is already clear."
+                : "Sample data is unchanged.";
+            StatusText = result;
+            return true;
+        }
+
+        BeginCanvasMutation(HistoryActionType.EditSampleData, "Updated sample DataContext.");
+        ClearSampleDataPreview();
+        _sampleDataJson = canonical;
+        _sampleDataRoot = document?.Root;
+        var applied = RefreshSampleDataPreview();
+        CommitCanvasMutation();
+        OnPropertyChanged(nameof(HasSampleData));
+        OnPropertyChanged(nameof(SampleDataJson));
+
+        result = document is null
+            ? "Cleared sample DataContext."
+            : FormatSampleApplyResult(applied);
+        StatusText = result;
         return true;
     }
 
@@ -3780,6 +3847,11 @@ public partial class MainWindowViewModel : ViewModelBase
 
         sb.AppendLine($"  <Canvas Width=\"{settings.Width:0.###}\" Height=\"{settings.Height:0.###}\" Background=\"{EscapeXmlAttribute(settings.Background)}\">");
         sb.AppendLine($"    <!-- {DesignerMetadataPrefix} GridSize={settings.GridSize.ToString("0.###", CultureInfo.InvariantCulture)}; IsGridVisible={settings.IsGridVisible}; SnapToGrid={settings.SnapToGrid} -->");
+        if (_sampleDataJson is not null)
+        {
+            var encodedSampleData = Convert.ToBase64String(Encoding.UTF8.GetBytes(_sampleDataJson));
+            sb.AppendLine($"    <!-- {DesignerMetadataPrefix} SampleDataBase64={encodedSampleData} -->");
+        }
 
         foreach (var element in Canvas.Elements.Where(element => !HasValidContainerParent(element)))
         {
@@ -3904,6 +3976,15 @@ public partial class MainWindowViewModel : ViewModelBase
                 return false;
             }
 
+            if (!string.Equals(
+                    current.SampleDataJson,
+                    parsed.SampleDataJson,
+                    StringComparison.Ordinal))
+            {
+                result = "Validation failed: sample DataContext does not round-trip.";
+                return false;
+            }
+
             foreach (var pair in currentByName)
             {
                 if (!HaveSameBindings(pair.Value, parsedByName[pair.Key]))
@@ -3955,6 +4036,15 @@ public partial class MainWindowViewModel : ViewModelBase
                 result = "Validation failed: UserControl export does not preserve document styles.";
                 return false;
             }
+
+            if (!string.Equals(
+                    userControl.SampleDataJson,
+                    current.SampleDataJson,
+                    StringComparison.Ordinal))
+            {
+                result = "Validation failed: UserControl export does not preserve sample DataContext.";
+                return false;
+            }
         }
         catch (Exception ex)
         {
@@ -3983,6 +4073,11 @@ public partial class MainWindowViewModel : ViewModelBase
 
         var pending = _pendingMutation;
         _pendingMutation = null;
+
+        if (_sampleDataRoot is not null)
+        {
+            RefreshSampleDataPreview();
+        }
 
         var after = CaptureDocument();
         if (AreSameDocument(pending.Before, after))
@@ -4143,6 +4238,7 @@ public partial class MainWindowViewModel : ViewModelBase
         _isSyncingSelection = true;
         try
         {
+            ClearSampleDataPreview();
             var settings = document.Settings ?? new DesignerCanvasSettings();
             Canvas.SetArtboard(settings.Width, settings.Height, settings.Background);
             Canvas.SetGridSize(settings.GridSize);
@@ -4166,6 +4262,16 @@ public partial class MainWindowViewModel : ViewModelBase
 
             Canvas.SetColorResources(_colorResources);
             Canvas.SetDocumentStyles(_documentStyles);
+            if (!DesignerSampleDataRuntime.TryParse(
+                    document.SampleDataJson ?? string.Empty,
+                    out var sampleData,
+                    out _))
+            {
+                sampleData = null;
+            }
+
+            _sampleDataJson = sampleData?.Json;
+            _sampleDataRoot = sampleData?.Root;
             foreach (var snapshot in document.Elements)
             {
                 Canvas.AddElementFromSnapshot(
@@ -4177,6 +4283,7 @@ public partial class MainWindowViewModel : ViewModelBase
             Canvas.NormalizeContainerRelationships();
             ObjectTree.RebuildFrom(Canvas.Elements);
             Canvas.Select(null);
+            RefreshSampleDataPreview();
         }
         finally
         {
@@ -4184,6 +4291,8 @@ public partial class MainWindowViewModel : ViewModelBase
         }
 
         RefreshStylePreviewOptions();
+        OnPropertyChanged(nameof(HasSampleData));
+        OnPropertyChanged(nameof(SampleDataJson));
     }
 
     private DesignerCanvasDocument CaptureDocument()
@@ -4223,7 +4332,8 @@ public partial class MainWindowViewModel : ViewModelBase
             snapshots,
             CaptureCanvasSettings(),
             new Dictionary<string, string>(_colorResources, StringComparer.Ordinal),
-            CloneStyles(_documentStyles));
+            CloneStyles(_documentStyles),
+            _sampleDataJson);
     }
 
     private DesignerCanvasSettings CaptureCanvasSettings()
@@ -4347,6 +4457,28 @@ public partial class MainWindowViewModel : ViewModelBase
 
     private IReadOnlyDictionary<string, string>? CaptureVisualProperties(Control visual)
     {
+        var reapplySample = _sampleDataRoot is not null
+            && DesignerSampleDataRuntime.IsApplied(visual);
+        if (reapplySample)
+        {
+            DesignerSampleDataRuntime.Clear(visual);
+        }
+
+        try
+        {
+            return CaptureVisualPropertiesWithoutSample(visual);
+        }
+        finally
+        {
+            if (reapplySample && _sampleDataRoot is not null)
+            {
+                DesignerSampleDataRuntime.Apply(visual, _sampleDataRoot);
+            }
+        }
+    }
+
+    private IReadOnlyDictionary<string, string>? CaptureVisualPropertiesWithoutSample(Control visual)
+    {
         var properties = CaptureVisualPropertiesCore(visual);
         var toolTip = ToolTip.GetTip(visual)?.ToString();
         var automationName = AutomationProperties.GetName(visual);
@@ -4415,6 +4547,45 @@ public partial class MainWindowViewModel : ViewModelBase
         }
 
         return result;
+    }
+
+    private void ClearSampleDataPreview()
+    {
+        foreach (var element in Canvas.Elements)
+        {
+            DesignerSampleDataRuntime.Clear(element.Visual);
+        }
+    }
+
+    private DesignerSampleApplyResult RefreshSampleDataPreview()
+    {
+        var result = new DesignerSampleApplyResult(0, 0, 0);
+        foreach (var element in Canvas.Elements)
+        {
+            DesignerSampleDataRuntime.Clear(element.Visual);
+            if (_sampleDataRoot is not null)
+            {
+                result += DesignerSampleDataRuntime.Apply(element.Visual, _sampleDataRoot);
+            }
+        }
+
+        return result;
+    }
+
+    private static string FormatSampleApplyResult(DesignerSampleApplyResult result)
+    {
+        var message = $"Applied sample DataContext to {result.AppliedCount} binding(s).";
+        if (result.MissingPathCount > 0)
+        {
+            message += $" {result.MissingPathCount} path(s) were not found.";
+        }
+
+        if (result.ConversionFailureCount > 0)
+        {
+            message += $" {result.ConversionFailureCount} value(s) could not be converted.";
+        }
+
+        return message;
     }
 
     private IReadOnlyCollection<string> GetStyleManagedPropertyNames(Control visual)
@@ -5001,6 +5172,11 @@ public partial class MainWindowViewModel : ViewModelBase
             return false;
         }
 
+        if (!string.Equals(left.SampleDataJson, right.SampleDataJson, StringComparison.Ordinal))
+        {
+            return false;
+        }
+
         for (var i = 0; i < left.Elements.Count; i++)
         {
             var a = left.Elements[i];
@@ -5385,7 +5561,8 @@ public partial class MainWindowViewModel : ViewModelBase
             snapshots,
             ReadCanvasSettings(parseRoot, warnings),
             colorResources,
-            ReadDocumentStyles(root, parseRoot, colorResources, warnings));
+            ReadDocumentStyles(root, parseRoot, colorResources, warnings),
+            ReadSampleDataJson(parseRoot, warnings));
     }
 
     private static IReadOnlyDictionary<string, string> ReadColorResources(
@@ -5540,6 +5717,36 @@ public partial class MainWindowViewModel : ViewModelBase
             ReadDesignerDouble(metadata, "GridSize", 8),
             ReadDesignerBoolean(metadata, "IsGridVisible", true),
             ReadDesignerBoolean(metadata, "SnapToGrid", true));
+    }
+
+    private static string? ReadSampleDataJson(XElement canvas, ICollection<string> warnings)
+    {
+        var metadata = canvas.Nodes()
+            .OfType<XComment>()
+            .Select(ReadDesignerMetadata)
+            .FirstOrDefault(values => values.ContainsKey("SampleDataBase64"));
+        if (metadata is null || !metadata.TryGetValue("SampleDataBase64", out var encoded))
+        {
+            return null;
+        }
+
+        try
+        {
+            var json = Encoding.UTF8.GetString(Convert.FromBase64String(encoded));
+            if (DesignerSampleDataRuntime.TryParse(json, out var document, out var error)
+                && document is not null)
+            {
+                return document.Json;
+            }
+
+            warnings.Add($"Ignored invalid sample data metadata: {error}");
+        }
+        catch (FormatException)
+        {
+            warnings.Add("Ignored invalid sample data metadata: Base64 payload is malformed.");
+        }
+
+        return null;
     }
 
     private static IReadOnlyDictionary<string, string> ReadDesignerMetadata(XComment comment)
@@ -6008,6 +6215,7 @@ public partial class MainWindowViewModel : ViewModelBase
             HistoryActionType.TransformElement => "move/resize element",
             HistoryActionType.EditProperty => "edit properties",
             HistoryActionType.EditAxamlSource => "edit AXAML source",
+            HistoryActionType.EditSampleData => "edit sample data",
             HistoryActionType.LoadDocument => "load document",
             HistoryActionType.NewDocument => "new document",
             _ => "change",
@@ -8438,6 +8646,7 @@ public partial class MainWindowViewModel : ViewModelBase
         TransformElement,
         EditProperty,
         EditAxamlSource,
+        EditSampleData,
         LoadDocument,
         NewDocument,
     }
