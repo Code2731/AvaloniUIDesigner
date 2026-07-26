@@ -2143,6 +2143,12 @@ public partial class CanvasViewModel : ViewModelBase
             return;
         }
 
+        if (visual is ToggleButton toggleButton)
+        {
+            DesignerToggleRuntime.Apply(toggleButton, properties);
+            return;
+        }
+
         if (visual is Button button)
         {
             if (properties.TryGetValue("Content", out var content))
@@ -2216,75 +2222,6 @@ public partial class CanvasViewModel : ViewModelBase
                 && Enum.TryParse<Stretch>(stretch, ignoreCase: true, out var parsedStretch))
             {
                 image.Stretch = parsedStretch;
-            }
-
-            return;
-        }
-
-        if (visual is CheckBox checkBox)
-        {
-            if (properties.TryGetValue("Content", out var content))
-            {
-                checkBox.Content = content;
-            }
-
-            if (properties.TryGetValue("IsChecked", out var isChecked)
-                && bool.TryParse(isChecked, out var parsedIsChecked))
-            {
-                checkBox.IsChecked = parsedIsChecked;
-            }
-
-            return;
-        }
-
-        if (visual is RadioButton radioButton)
-        {
-            if (properties.TryGetValue("Content", out var content))
-            {
-                radioButton.Content = content;
-            }
-
-            if (properties.TryGetValue("IsChecked", out var isChecked)
-                && bool.TryParse(isChecked, out var parsedIsChecked))
-            {
-                radioButton.IsChecked = parsedIsChecked;
-            }
-
-            if (properties.TryGetValue("GroupName", out var groupName))
-            {
-                radioButton.GroupName = groupName;
-            }
-
-            return;
-        }
-
-        if (visual is ToggleSwitch toggleSwitch)
-        {
-            if (properties.TryGetValue("Content", out var content))
-            {
-                toggleSwitch.Content = content;
-            }
-
-            if (properties.TryGetValue("IsChecked", out var isChecked)
-                && bool.TryParse(isChecked, out var parsedIsChecked))
-            {
-                toggleSwitch.IsChecked = parsedIsChecked;
-            }
-
-            return;
-        }
-
-        if (visual is Avalonia.Controls.Primitives.ToggleButton toggleButton)
-        {
-            if (properties.TryGetValue("Content", out var content))
-            {
-                toggleButton.Content = content;
-            }
-
-            if (properties.TryGetValue("IsChecked", out var isChecked)
-                && bool.TryParse(isChecked, out var parsedIsChecked))
-            {
-                toggleButton.IsChecked = parsedIsChecked;
             }
 
             return;

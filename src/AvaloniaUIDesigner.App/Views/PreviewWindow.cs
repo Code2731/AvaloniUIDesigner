@@ -460,6 +460,9 @@ public sealed class PreviewWindow : Window
             case Shape shape:
                 ApplyShapeProperties(shape, properties, colorResources);
                 break;
+            case ToggleButton toggleButton:
+                DesignerToggleRuntime.Apply(toggleButton, properties);
+                break;
             case Button button when properties.TryGetValue("Content", out var content):
                 button.Content = content;
                 break;
@@ -505,59 +508,6 @@ public sealed class PreviewWindow : Window
                 break;
             case Image image:
                 ApplyImageProperties(image, properties);
-                break;
-            case CheckBox checkBox:
-                if (properties.TryGetValue("Content", out var checkBoxContent))
-                {
-                    checkBox.Content = checkBoxContent;
-                }
-
-                if (properties.TryGetValue("IsChecked", out var isChecked)
-                    && bool.TryParse(isChecked, out var parsedIsChecked))
-                {
-                    checkBox.IsChecked = parsedIsChecked;
-                }
-                break;
-            case RadioButton radioButton:
-                if (properties.TryGetValue("Content", out var radioButtonContent))
-                {
-                    radioButton.Content = radioButtonContent;
-                }
-
-                if (properties.TryGetValue("IsChecked", out var radioButtonIsChecked)
-                    && bool.TryParse(radioButtonIsChecked, out var parsedRadioButtonIsChecked))
-                {
-                    radioButton.IsChecked = parsedRadioButtonIsChecked;
-                }
-
-                if (properties.TryGetValue("GroupName", out var radioButtonGroupName))
-                {
-                    radioButton.GroupName = radioButtonGroupName;
-                }
-                break;
-            case ToggleSwitch toggleSwitch:
-                if (properties.TryGetValue("Content", out var toggleSwitchContent))
-                {
-                    toggleSwitch.Content = toggleSwitchContent;
-                }
-
-                if (properties.TryGetValue("IsChecked", out var toggleSwitchIsChecked)
-                    && bool.TryParse(toggleSwitchIsChecked, out var parsedToggleSwitchIsChecked))
-                {
-                    toggleSwitch.IsChecked = parsedToggleSwitchIsChecked;
-                }
-                break;
-            case Avalonia.Controls.Primitives.ToggleButton toggleButton:
-                if (properties.TryGetValue("Content", out var toggleButtonContent))
-                {
-                    toggleButton.Content = toggleButtonContent;
-                }
-
-                if (properties.TryGetValue("IsChecked", out var toggleButtonIsChecked)
-                    && bool.TryParse(toggleButtonIsChecked, out var parsedToggleButtonIsChecked))
-                {
-                    toggleButton.IsChecked = parsedToggleButtonIsChecked;
-                }
                 break;
             case ComboBox comboBox:
                 ApplyComboBoxProperties(comboBox, properties);

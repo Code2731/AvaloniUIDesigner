@@ -755,6 +755,19 @@ public partial class MainWindow : Window
         await ShowDateTimePropertiesDialogAsync(state);
     }
 
+    private async void OnEditTogglePropertiesMenuClicked(
+        object? sender,
+        Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        FlushPendingPropertyHistory();
+        if (Vm is null || !Vm.TryGetSelectedToggleProperties(out var state))
+        {
+            return;
+        }
+
+        await ShowTogglePropertiesDialogAsync(state);
+    }
+
     private async void OnEditGridDefinitionsMenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
         FlushPendingPropertyHistory();
@@ -1792,6 +1805,11 @@ public partial class MainWindow : Window
 
     private static bool IsUndoTrackedVisualProperty(Control control, string propertyName)
     {
+        if (DesignerToggleRuntime.IsSupportedProperty(control.GetType().Name, propertyName))
+        {
+            return true;
+        }
+
         if (DesignerDateTimeRuntime.IsSupportedProperty(control.GetType().Name, propertyName))
         {
             return true;
@@ -4618,6 +4636,165 @@ public partial class MainWindow : Window
                 ColumnSpacing = 12,
                 RowSpacing = 10,
             };
+
+        static void AddField(Grid owner, string label, Control editor, int row, int column)
+        {
+            var field = new StackPanel
+            {
+                Spacing = 4,
+                Children =
+                {
+                    new TextBlock { Text = label },
+                    editor,
+                },
+            };
+            Grid.SetRow(field, row);
+            Grid.SetColumn(field, column);
+            owner.Children.Add(field);
+        }
+    }
+
+    private async Task ShowTogglePropertiesDialogAsync(ToggleEditorState state)
+    {
+        if (Vm is null)
+        {
+            return;
+        }
+
+        var isRadioButton = state.ControlKind == nameof(DesignerToggleControlKind.RadioButton);
+        var isToggleSwitch = state.ControlKind == nameof(DesignerToggleControlKind.ToggleSwitch);
+        var contentEditor = new TextBox { Text = state.Content };
+        var stateEditor = new ComboBox
+        {
+            ItemsSource = DesignerToggleRuntime.StateNames,
+            SelectedItem = state.State,
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+        };
+        var threeStateEditor = new CheckBox
+        {
+            Content = "Enable indeterminate state",
+            IsChecked = state.IsThreeState,
+        };
+        var clickModeEditor = new ComboBox
+        {
+            ItemsSource = DesignerToggleRuntime.ClickModeNames,
+            SelectedItem = state.ClickMode,
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+        };
+        var groupNameEditor = new TextBox
+        {
+            Text = state.GroupName,
+            IsEnabled = isRadioButton,
+            Watermark = isRadioButton ? "Radio group name" : "RadioButton only",
+        };
+        var onContentEditor = new TextBox
+        {
+            Text = state.OnContent,
+            IsEnabled = isToggleSwitch,
+            Watermark = isToggleSwitch ? "Checked label" : "ToggleSwitch only",
+        };
+        var offContentEditor = new TextBox
+        {
+            Text = state.OffContent,
+            IsEnabled = isToggleSwitch,
+            Watermark = isToggleSwitch ? "Unchecked label" : "ToggleSwitch only",
+        };
+        var horizontalAlignmentEditor = new ComboBox
+        {
+            ItemsSource = DesignerToggleRuntime.HorizontalAlignmentNames,
+            SelectedItem = state.HorizontalContentAlignment,
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+        };
+        var verticalAlignmentEditor = new ComboBox
+        {
+            ItemsSource = DesignerToggleRuntime.VerticalAlignmentNames,
+            SelectedItem = state.VerticalContentAlignment,
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+        };
+        var fields = new Grid
+        {
+            ColumnDefinitions = new ColumnDefinitions("*,*"),
+            RowDefinitions = new RowDefinitions("Auto,Auto,Auto,Auto"),
+            ColumnSpacing = 12,
+            RowSpacing = 10,
+        };
+        AddField(fields, "Content", contentEditor, 0, 0);
+        AddField(fields, "State", stateEditor, 0, 1);
+        AddField(fields, "Click mode", clickModeEditor, 1, 0);
+        AddField(fields, "Radio group", groupNameEditor, 1, 1);
+        AddField(fields, "On content", onContentEditor, 2, 0);
+        AddField(fields, "Off content", offContentEditor, 2, 1);
+        AddField(fields, "Horizontal content alignment", horizontalAlignmentEditor, 3, 0);
+        AddField(fields, "Vertical content alignment", verticalAlignmentEditor, 3, 1);
+
+        var errorText = new TextBlock
+        {
+            Foreground = Avalonia.Media.Brushes.IndianRed,
+            TextWrapping = Avalonia.Media.TextWrapping.Wrap,
+        };
+        var dialog = new Window
+        {
+            Title = $"Edit Toggle & Choice Behavior - {state.ControlName}",
+            Width = 720,
+            Height = 590,
+            MinWidth = 620,
+            MinHeight = 520,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner,
+        };
+        var applyButton = new Button { Content = "Apply", MinWidth = 84 };
+        applyButton.Click += (_, _) =>
+        {
+            var input = new DesignerToggleEditorInput(
+                contentEditor.Text ?? string.Empty,
+                stateEditor.SelectedItem?.ToString() ?? string.Empty,
+                threeStateEditor.IsChecked == true,
+                clickModeEditor.SelectedItem?.ToString() ?? string.Empty,
+                groupNameEditor.Text ?? string.Empty,
+                onContentEditor.Text ?? string.Empty,
+                offContentEditor.Text ?? string.Empty,
+                horizontalAlignmentEditor.SelectedItem?.ToString() ?? string.Empty,
+                verticalAlignmentEditor.SelectedItem?.ToString() ?? string.Empty);
+            if (!Vm.SetSelectedToggleProperties(input))
+            {
+                errorText.Text = Vm.StatusText;
+                return;
+            }
+
+            dialog.Close();
+        };
+        var cancelButton = new Button { Content = "Cancel", MinWidth = 84 };
+        cancelButton.Click += (_, _) => dialog.Close();
+        var buttons = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            Spacing = 8,
+            HorizontalAlignment = HorizontalAlignment.Right,
+            Children = { cancelButton, applyButton },
+        };
+        var content = new Grid
+        {
+            Margin = new Thickness(16),
+            RowDefinitions = new RowDefinitions("Auto,Auto,Auto,*,Auto,Auto"),
+            RowSpacing = 12,
+            Children =
+            {
+                new TextBlock
+                {
+                    Text = $"Configure {state.ControlKind} state, activation, and type-specific content.",
+                    TextWrapping = Avalonia.Media.TextWrapping.Wrap,
+                },
+                fields,
+                threeStateEditor,
+                errorText,
+                buttons,
+            },
+        };
+        Grid.SetRow(fields, 1);
+        Grid.SetRow(threeStateEditor, 2);
+        Grid.SetRow(errorText, 4);
+        Grid.SetRow(buttons, 5);
+        dialog.Content = content;
+        await dialog.ShowDialog(this);
 
         static void AddField(Grid owner, string label, Control editor, int row, int column)
         {

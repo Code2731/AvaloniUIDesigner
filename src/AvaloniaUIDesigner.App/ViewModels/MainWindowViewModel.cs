@@ -217,6 +217,19 @@ public sealed record DateTimeEditorState(
     string ClockIdentifier,
     bool UseSeconds);
 
+public sealed record ToggleEditorState(
+    string ControlName,
+    string ControlKind,
+    string Content,
+    string State,
+    bool IsThreeState,
+    string ClickMode,
+    string GroupName,
+    string OnContent,
+    string OffContent,
+    string HorizontalContentAlignment,
+    string VerticalContentAlignment);
+
 public sealed record GridDefinitionEditorState(
     string ControlName,
     string RowDefinitions,
@@ -4215,6 +4228,99 @@ public partial class MainWindowViewModel : ViewModelBase
     private static string FormatDate(DateTime? value)
         => value?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) ?? string.Empty;
 
+    public bool TryGetSelectedToggleProperties(out ToggleEditorState state)
+    {
+        var target = Canvas.SelectedElement;
+        if (target is null || target.IsLocked || !DesignerToggleRuntime.IsSupportedControl(target.Visual))
+        {
+            state = default!;
+            StatusText = target switch
+            {
+                null => "Select a CheckBox, RadioButton, ToggleSwitch, or ToggleButton before editing toggle behavior.",
+                { IsLocked: true } => "Unlock the selected control before editing toggle behavior.",
+                _ => "Toggle behavior editing is available for CheckBox, RadioButton, ToggleSwitch, and ToggleButton controls.",
+            };
+            return false;
+        }
+
+        if (!DesignerToggleRuntime.TryRead(target.Visual, out var values, out var error))
+        {
+            state = default!;
+            StatusText = $"Toggle behavior cannot be edited. {error}";
+            return false;
+        }
+
+        state = CreateToggleEditorState(target.DisplayName, values);
+        return true;
+    }
+
+    public bool SetSelectedToggleProperties(DesignerToggleEditorInput input)
+    {
+        var target = Canvas.SelectedElement;
+        if (target is null || target.IsLocked || !DesignerToggleRuntime.IsSupportedControl(target.Visual))
+        {
+            StatusText = "Select an unlocked CheckBox, RadioButton, ToggleSwitch, or ToggleButton before editing toggle behavior.";
+            return false;
+        }
+
+        if (!DesignerToggleRuntime.TryParseValues(target.Visual, input, out var values, out var error))
+        {
+            StatusText = $"Toggle behavior was not changed. {error}";
+            return false;
+        }
+
+        if (!DesignerToggleRuntime.TryRead(target.Visual, out var current, out error))
+        {
+            StatusText = $"Toggle behavior was not changed. {error}";
+            return false;
+        }
+
+        if (current == values)
+        {
+            StatusText = "Toggle behavior is unchanged.";
+            return true;
+        }
+
+        BeginCanvasMutation(HistoryActionType.EditProperty, "Updated toggle behavior.");
+        DesignerToggleRuntime.Apply(target.Visual, values);
+        foreach (var propertyName in new[]
+                 {
+                     "Content",
+                     "IsChecked",
+                     "IsThreeState",
+                     "ClickMode",
+                     "GroupName",
+                     "OnContent",
+                     "OffContent",
+                     "HorizontalContentAlignment",
+                     "VerticalContentAlignment",
+                 })
+        {
+            DesignerStyleApplicationMetadata.ClearApplied(target.Visual, propertyName);
+        }
+
+        Canvas.RefreshDocumentStyles(target.Visual);
+        CommitCanvasMutation();
+        StatusText = $"Updated toggle behavior for {target.DisplayName}.";
+        return true;
+    }
+
+    private static ToggleEditorState CreateToggleEditorState(
+        string controlName,
+        DesignerToggleValues values)
+        => new(
+            controlName,
+            values.Kind.ToString(),
+            values.Content,
+            DesignerToggleRuntime.ToState(values.IsChecked).ToString(),
+            values.IsThreeState,
+            values.ClickMode.ToString(),
+            values.GroupName,
+            values.OnContent,
+            values.OffContent,
+            values.HorizontalContentAlignment.ToString(),
+            values.VerticalContentAlignment.ToString());
+
     public bool TryGetSelectedToolTip(out string controlName, out string toolTip)
     {
         var target = Canvas.SelectedElement;
@@ -5839,6 +5945,7 @@ public partial class MainWindowViewModel : ViewModelBase
         DesignerTextInputRuntime.Capture(visual, result);
         DesignerSelectionRuntime.Capture(visual, result);
         DesignerDateTimeRuntime.Capture(visual, result);
+        DesignerToggleRuntime.Capture(visual, result);
         foreach (var pair in DesignerResourceReferenceMetadata.GetReferences(visual))
         {
             result[pair.Key] = DesignerResourceReferenceMetadata.FormatExpression(pair.Value);
@@ -5973,6 +6080,18 @@ public partial class MainWindowViewModel : ViewModelBase
 
     private static IReadOnlyDictionary<string, string>? CaptureVisualPropertiesCore(Control visual)
     {
+        if (visual is ToggleButton toggleButton)
+        {
+            var properties = DesignerToggleRuntime.GetAxamlAttributes(toggleButton)
+                .ToDictionary(
+                    attribute => attribute.Name,
+                    attribute => attribute.Value,
+                    StringComparer.Ordinal);
+            properties["Opacity"] =
+                toggleButton.Opacity.ToString("0.###", CultureInfo.InvariantCulture);
+            return properties;
+        }
+
         if (visual is Button button)
         {
             return new Dictionary<string, string>
@@ -6087,47 +6206,6 @@ public partial class MainWindowViewModel : ViewModelBase
             }
 
             return properties;
-        }
-
-        if (visual is CheckBox checkBox)
-        {
-            return new Dictionary<string, string>
-            {
-                ["Content"] = checkBox.Content?.ToString() ?? string.Empty,
-                ["IsChecked"] = (checkBox.IsChecked ?? false).ToString(),
-                ["Opacity"] = checkBox.Opacity.ToString("0.###", CultureInfo.InvariantCulture),
-            };
-        }
-
-        if (visual is RadioButton radioButton)
-        {
-            return new Dictionary<string, string>
-            {
-                ["Content"] = radioButton.Content?.ToString() ?? string.Empty,
-                ["IsChecked"] = (radioButton.IsChecked ?? false).ToString(),
-                ["GroupName"] = radioButton.GroupName ?? string.Empty,
-                ["Opacity"] = radioButton.Opacity.ToString("0.###", CultureInfo.InvariantCulture),
-            };
-        }
-
-        if (visual is ToggleSwitch toggleSwitch)
-        {
-            return new Dictionary<string, string>
-            {
-                ["Content"] = toggleSwitch.Content?.ToString() ?? string.Empty,
-                ["IsChecked"] = (toggleSwitch.IsChecked ?? false).ToString(),
-                ["Opacity"] = toggleSwitch.Opacity.ToString("0.###", CultureInfo.InvariantCulture),
-            };
-        }
-
-        if (visual is Avalonia.Controls.Primitives.ToggleButton toggleButton)
-        {
-            return new Dictionary<string, string>
-            {
-                ["Content"] = toggleButton.Content?.ToString() ?? string.Empty,
-                ["IsChecked"] = (toggleButton.IsChecked ?? false).ToString(),
-                ["Opacity"] = toggleButton.Opacity.ToString("0.###", CultureInfo.InvariantCulture),
-            };
         }
 
         if (visual is ComboBox comboBox)
@@ -7607,6 +7685,26 @@ public partial class MainWindowViewModel : ViewModelBase
                 continue;
             }
 
+            if (DesignerToggleRuntime.IsSupportedProperty(tagName, name))
+            {
+                if (DesignerToggleRuntime.TryNormalizeProperty(
+                        tagName,
+                        name,
+                        attr.Value,
+                        out var canonicalName,
+                        out var normalizedValue,
+                        out var toggleError))
+                {
+                    map[canonicalName] = normalizedValue;
+                }
+                else
+                {
+                    warnings.Add($"Ignored {tagName}.{name}: {toggleError}");
+                }
+
+                continue;
+            }
+
             if (DesignerTypographyRuntime.IsSupportedProperty(tagName, name))
             {
                 if (DesignerTypographyRuntime.TryNormalizeProperty(
@@ -7723,6 +7821,15 @@ public partial class MainWindowViewModel : ViewModelBase
             DesignerDateTimeRuntime.RemoveConstraintProperties(tagName, map);
         }
 
+        if (!DesignerToggleRuntime.TryValidateProperties(
+                tagName,
+                map,
+                out var toggleConstraintError))
+        {
+            warnings.Add($"Ignored {tagName} toggle constraints: {toggleConstraintError}");
+            DesignerToggleRuntime.RemoveConstraintProperties(map);
+        }
+
         if (string.Equals(element.Name.LocalName, "Grid", StringComparison.OrdinalIgnoreCase))
         {
             map.TryAdd("RowDefinitions", string.Empty);
@@ -7814,6 +7921,11 @@ public partial class MainWindowViewModel : ViewModelBase
             return true;
         }
 
+        if (DesignerToggleRuntime.IsSupportedProperty(tagName, propertyName))
+        {
+            return true;
+        }
+
         if (propertyName is "Opacity" or "Classes")
         {
             return true;
@@ -7843,9 +7955,7 @@ public partial class MainWindowViewModel : ViewModelBase
                 || propertyName is "StartPoint" or "EndPoint",
             "Path" => IsSupportedShapeProperty(propertyName)
                 || propertyName == "Data",
-            "CheckBox" or "ToggleSwitch" => propertyName is "Content" or "IsChecked",
-            "ToggleButton" => propertyName is "Content" or "IsChecked",
-            "RadioButton" => propertyName is "Content" or "IsChecked" or "GroupName",
+            "CheckBox" or "RadioButton" or "ToggleSwitch" or "ToggleButton" => false,
             "ComboBox" or "ListBox" or "TreeView" => false,
             "Menu" => false,
             "DataGrid" => propertyName is "AutoGenerateColumns" or "GridLinesVisibility" or "IsReadOnly",
@@ -9057,8 +9167,7 @@ public partial class MainWindowViewModel : ViewModelBase
                 sb.Append(indent);
                 sb.Append("<CheckBox");
                 AppendCanvasLayoutAttributes(sb, element);
-                AppendAttribute(sb, "Content", checkBox.Content?.ToString() ?? string.Empty);
-                AppendAttribute(sb, "IsChecked", (checkBox.IsChecked ?? false).ToString());
+                AppendToggleAttributes(sb, checkBox);
                 sb.AppendLine(" />");
                 break;
 
@@ -9066,13 +9175,7 @@ public partial class MainWindowViewModel : ViewModelBase
                 sb.Append(indent);
                 sb.Append("<RadioButton");
                 AppendCanvasLayoutAttributes(sb, element);
-                AppendAttribute(sb, "Content", radioButton.Content?.ToString() ?? string.Empty);
-                AppendAttribute(sb, "IsChecked", (radioButton.IsChecked ?? false).ToString());
-                if (!string.IsNullOrWhiteSpace(radioButton.GroupName))
-                {
-                    AppendAttribute(sb, "GroupName", radioButton.GroupName);
-                }
-
+                AppendToggleAttributes(sb, radioButton);
                 sb.AppendLine(" />");
                 break;
 
@@ -9080,8 +9183,7 @@ public partial class MainWindowViewModel : ViewModelBase
                 sb.Append(indent);
                 sb.Append("<ToggleSwitch");
                 AppendCanvasLayoutAttributes(sb, element);
-                AppendAttribute(sb, "Content", toggleSwitch.Content?.ToString() ?? string.Empty);
-                AppendAttribute(sb, "IsChecked", (toggleSwitch.IsChecked ?? false).ToString());
+                AppendToggleAttributes(sb, toggleSwitch);
                 sb.AppendLine(" />");
                 break;
 
@@ -9089,8 +9191,7 @@ public partial class MainWindowViewModel : ViewModelBase
                 sb.Append(indent);
                 sb.Append("<ToggleButton");
                 AppendCanvasLayoutAttributes(sb, element);
-                AppendAttribute(sb, "Content", toggleButton.Content?.ToString() ?? string.Empty);
-                AppendAttribute(sb, "IsChecked", (toggleButton.IsChecked ?? false).ToString());
+                AppendToggleAttributes(sb, toggleButton);
                 sb.AppendLine(" />");
                 break;
 
@@ -10414,6 +10515,20 @@ public partial class MainWindowViewModel : ViewModelBase
             .Select(binding => binding.PropertyName)
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
         foreach (var attribute in DesignerDateTimeRuntime.GetAxamlAttributes(visual))
+        {
+            if (!boundProperties.Contains(attribute.Name))
+            {
+                AppendAttribute(sb, attribute.Name, attribute.Value);
+            }
+        }
+    }
+
+    private static void AppendToggleAttributes(StringBuilder sb, Control visual)
+    {
+        var boundProperties = DesignerBindingRuntime.ReadBindings(visual)
+            .Select(binding => binding.PropertyName)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        foreach (var attribute in DesignerToggleRuntime.GetAxamlAttributes(visual))
         {
             if (!boundProperties.Contains(attribute.Name))
             {
