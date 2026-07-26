@@ -327,6 +327,7 @@ public partial class CanvasViewModel : ViewModelBase
             element.CanvasChildTop = snapshot.CanvasChildTop;
             element.TabIndex = snapshot.TabIndex;
             element.TabHeader = snapshot.TabHeader;
+            element.SplitViewSlot = snapshot.SplitViewSlot;
             element.ParentName = snapshot.ParentName;
         }
         finally
@@ -494,6 +495,7 @@ public partial class CanvasViewModel : ViewModelBase
             child.CanvasChildTop = 0;
             child.TabIndex = -1;
             child.TabHeader = null;
+            child.SplitViewSlot = DesignerSplitViewSlot.Content;
             child.IsVisibleOnArtboard = true;
         }
 
@@ -559,6 +561,11 @@ public partial class CanvasViewModel : ViewModelBase
                 {
                     ResetContainerRelationship(element);
                     continue;
+                }
+
+                if (parent.Visual is not SplitView)
+                {
+                    element.SplitViewSlot = DesignerSplitViewSlot.Content;
                 }
 
                 if (parent.Visual is Grid)
@@ -676,6 +683,19 @@ public partial class CanvasViewModel : ViewModelBase
                         ? headers[element.TabIndex]
                         : null;
                 }
+                else if (parent.Visual is SplitView)
+                {
+                    element.ParentLayout = DesignerParentLayoutKind.SplitView;
+                    element.StackPanelIndex = -1;
+                    element.DockPanelIndex = -1;
+                    element.WrapPanelIndex = -1;
+                    element.UniformGridIndex = -1;
+                    element.CanvasChildIndex = -1;
+                    element.CanvasChildLeft = 0;
+                    element.CanvasChildTop = 0;
+                    element.TabIndex = -1;
+                    element.TabHeader = null;
+                }
                 else
                 {
                     element.ParentLayout = DesignerParentLayoutKind.Content;
@@ -722,6 +742,23 @@ public partial class CanvasViewModel : ViewModelBase
                     }
 
                     child.TabHeader = headers[child.TabIndex];
+                }
+            }
+
+            foreach (var splitParent in containers.Values.Where(parent => parent.Visual is SplitView))
+            {
+                var occupiedSlots = new HashSet<DesignerSplitViewSlot>();
+                foreach (var child in GetDirectChildren(splitParent)
+                             .OrderBy(candidate => candidate.SplitViewSlot)
+                             .ThenBy(Elements.IndexOf))
+                {
+                    if (!child.IsSplitViewChild || !occupiedSlots.Add(child.SplitViewSlot))
+                    {
+                        ResetContainerRelationship(child);
+                        continue;
+                    }
+
+                    ClearBuiltInSplitViewSlot((SplitView)splitParent.Visual, child.SplitViewSlot);
                 }
             }
         }
@@ -1085,6 +1122,58 @@ public partial class CanvasViewModel : ViewModelBase
         return promoted;
     }
 
+    public DesignElement? SetSplitViewChild(
+        DesignElement parent,
+        DesignElement child,
+        DesignerSplitViewSlot slot)
+    {
+        if (parent.Visual is not SplitView splitView || ReferenceEquals(parent, child))
+        {
+            return null;
+        }
+
+        var replaced = GetDirectChildren(parent).FirstOrDefault(existing =>
+            !ReferenceEquals(existing, child)
+            && existing.IsSplitViewChild
+            && existing.SplitViewSlot == slot);
+        _isReflowingContainerChildren = true;
+        try
+        {
+            if (replaced is not null)
+            {
+                ResetContainerRelationship(replaced);
+            }
+
+            child.GridRow = 0;
+            child.GridColumn = 0;
+            child.GridRowSpan = 1;
+            child.GridColumnSpan = 1;
+            child.StackPanelIndex = -1;
+            child.StackPanelItemSize = 40;
+            child.DockPanelIndex = -1;
+            child.DockPanelDock = DesignerDockSide.Left;
+            child.DockPanelItemSize = 40;
+            child.WrapPanelIndex = -1;
+            child.UniformGridIndex = -1;
+            child.CanvasChildIndex = -1;
+            child.CanvasChildLeft = 0;
+            child.CanvasChildTop = 0;
+            child.TabIndex = -1;
+            child.TabHeader = null;
+            child.SplitViewSlot = slot;
+            child.ParentLayout = DesignerParentLayoutKind.SplitView;
+            child.ParentName = parent.DisplayName;
+            ClearBuiltInSplitViewSlot(splitView, slot);
+            ReflowContainerTreeCore(parent);
+        }
+        finally
+        {
+            _isReflowingContainerChildren = false;
+        }
+
+        return replaced;
+    }
+
     public bool MoveElementsToFront(IEnumerable<DesignElement> elements)
     {
         var moving = Elements.Where(elements.Contains).ToList();
@@ -1372,6 +1461,10 @@ public partial class CanvasViewModel : ViewModelBase
         else if (parent.Visual is TabControl tabControl)
         {
             ReflowTabControlChildrenCore(parent, tabControl);
+        }
+        else if (parent.Visual is SplitView splitView)
+        {
+            ReflowSplitViewChildrenCore(parent, splitView);
         }
         else if (parent.Visual is Grid)
         {
@@ -1737,6 +1830,79 @@ public partial class CanvasViewModel : ViewModelBase
         }
     }
 
+    private void ReflowSplitViewChildrenCore(DesignElement parent, SplitView splitView)
+    {
+        var children = GetDirectChildren(parent)
+            .Where(child => child.IsSplitViewChild)
+            .OrderBy(child => child.SplitViewSlot)
+            .ThenBy(Elements.IndexOf)
+            .ToList();
+        if (children.Count == 0)
+        {
+            return;
+        }
+
+        var isCompact = splitView.DisplayMode is
+            SplitViewDisplayMode.CompactInline or SplitViewDisplayMode.CompactOverlay;
+        var paneLength = splitView.IsPaneOpen
+            ? splitView.OpenPaneLength
+            : isCompact
+                ? splitView.CompactPaneLength
+                : 0;
+        paneLength = double.IsFinite(paneLength) ? Math.Max(0, paneLength) : 0;
+        var isInline = splitView.DisplayMode is
+            SplitViewDisplayMode.Inline or SplitViewDisplayMode.CompactInline;
+        var parentBounds = new Rect(parent.X, parent.Y, parent.Width, parent.Height);
+        Rect paneBounds;
+        Rect contentBounds;
+        switch (splitView.PanePlacement)
+        {
+            case SplitViewPanePlacement.Right:
+            {
+                var width = Math.Min(paneLength, parent.Width);
+                paneBounds = new Rect(parentBounds.Right - width, parent.Y, Math.Max(10, width), parent.Height);
+                contentBounds = isInline
+                    ? new Rect(parent.X, parent.Y, Math.Max(10, parent.Width - width), parent.Height)
+                    : parentBounds;
+                break;
+            }
+            case SplitViewPanePlacement.Top:
+            {
+                var height = Math.Min(paneLength, parent.Height);
+                paneBounds = new Rect(parent.X, parent.Y, parent.Width, Math.Max(10, height));
+                contentBounds = isInline
+                    ? new Rect(parent.X, parent.Y + height, parent.Width, Math.Max(10, parent.Height - height))
+                    : parentBounds;
+                break;
+            }
+            case SplitViewPanePlacement.Bottom:
+            {
+                var height = Math.Min(paneLength, parent.Height);
+                paneBounds = new Rect(parent.X, parentBounds.Bottom - height, parent.Width, Math.Max(10, height));
+                contentBounds = isInline
+                    ? new Rect(parent.X, parent.Y, parent.Width, Math.Max(10, parent.Height - height))
+                    : parentBounds;
+                break;
+            }
+            default:
+            {
+                var width = Math.Min(paneLength, parent.Width);
+                paneBounds = new Rect(parent.X, parent.Y, Math.Max(10, width), parent.Height);
+                contentBounds = isInline
+                    ? new Rect(parent.X + width, parent.Y, Math.Max(10, parent.Width - width), parent.Height)
+                    : parentBounds;
+                break;
+            }
+        }
+
+        foreach (var child in children)
+        {
+            SetElementBounds(
+                child,
+                child.SplitViewSlot == DesignerSplitViewSlot.Pane ? paneBounds : contentBounds);
+        }
+    }
+
     private static void SetElementBounds(DesignElement element, Rect bounds)
     {
         element.X = bounds.X;
@@ -1780,6 +1946,7 @@ public partial class CanvasViewModel : ViewModelBase
         child.CanvasChildTop = 0;
         child.TabIndex = -1;
         child.TabHeader = null;
+        child.SplitViewSlot = DesignerSplitViewSlot.Content;
         child.IsVisibleOnArtboard = true;
     }
 
@@ -1807,6 +1974,7 @@ public partial class CanvasViewModel : ViewModelBase
             or nameof(DesignElement.CanvasChildTop)
             or nameof(DesignElement.TabIndex)
             or nameof(DesignElement.TabHeader)
+            or nameof(DesignElement.SplitViewSlot)
             or nameof(DesignElement.ParentLayout))
         {
             ReflowContainerChild(element);
@@ -1854,7 +2022,7 @@ public partial class CanvasViewModel : ViewModelBase
 
     private static bool IsDesignerContainer(Control visual)
         => visual is Grid or StackPanel or DockPanel or WrapPanel or UniformGrid or Canvas
-            or TabControl or Border or ScrollViewer or Expander;
+            or TabControl or SplitView or Border or ScrollViewer or Expander;
 
     private static bool IsContentContainer(Control visual)
         => visual is Border or ScrollViewer or Expander;
@@ -1910,6 +2078,18 @@ public partial class CanvasViewModel : ViewModelBase
             case Expander expander:
                 expander.Content = null;
                 break;
+        }
+    }
+
+    private static void ClearBuiltInSplitViewSlot(SplitView splitView, DesignerSplitViewSlot slot)
+    {
+        if (slot == DesignerSplitViewSlot.Pane)
+        {
+            splitView.Pane = null;
+        }
+        else
+        {
+            splitView.Content = null;
         }
     }
 
@@ -2335,6 +2515,66 @@ public partial class CanvasViewModel : ViewModelBase
                 && int.TryParse(selectedIndex, NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsedSelectedIndex))
             {
                 tabControl.SelectedIndex = Math.Clamp(parsedSelectedIndex, -1, tabControl.Items.Count - 1);
+            }
+
+            return;
+        }
+
+        if (visual is SplitView splitView)
+        {
+            if (properties.TryGetValue("DisplayMode", out var displayMode)
+                && Enum.TryParse<SplitViewDisplayMode>(displayMode, true, out var parsedDisplayMode))
+            {
+                splitView.DisplayMode = parsedDisplayMode;
+            }
+
+            if (properties.TryGetValue("IsPaneOpen", out var isPaneOpen)
+                && bool.TryParse(isPaneOpen, out var parsedIsPaneOpen))
+            {
+                splitView.IsPaneOpen = parsedIsPaneOpen;
+            }
+
+            if (properties.TryGetValue("OpenPaneLength", out var openPaneLength)
+                && double.TryParse(openPaneLength, NumberStyles.Number, CultureInfo.InvariantCulture, out var parsedOpenPaneLength))
+            {
+                splitView.OpenPaneLength = Math.Max(0, parsedOpenPaneLength);
+            }
+
+            if (properties.TryGetValue("CompactPaneLength", out var compactPaneLength)
+                && double.TryParse(compactPaneLength, NumberStyles.Number, CultureInfo.InvariantCulture, out var parsedCompactPaneLength))
+            {
+                splitView.CompactPaneLength = Math.Max(0, parsedCompactPaneLength);
+            }
+
+            if (properties.TryGetValue("PanePlacement", out var panePlacement)
+                && Enum.TryParse<SplitViewPanePlacement>(panePlacement, true, out var parsedPanePlacement))
+            {
+                splitView.PanePlacement = parsedPanePlacement;
+            }
+
+            if (properties.TryGetValue("UseLightDismissOverlayMode", out var useLightDismiss)
+                && bool.TryParse(useLightDismiss, out var parsedUseLightDismiss))
+            {
+                splitView.UseLightDismissOverlayMode = parsedUseLightDismiss;
+            }
+
+            if (properties.TryGetValue("PaneBackground", out var paneBackground))
+            {
+                TrySetAppearanceBrush(
+                    splitView,
+                    "PaneBackground",
+                    value => splitView.PaneBackground = value,
+                    paneBackground);
+            }
+
+            if (properties.TryGetValue("__paneText", out var paneText))
+            {
+                splitView.Pane = new TextBlock { Text = paneText, Margin = new Thickness(12) };
+            }
+
+            if (properties.TryGetValue("__contentText", out var splitContentText))
+            {
+                splitView.Content = new TextBlock { Text = splitContentText, Margin = new Thickness(16) };
             }
 
             return;

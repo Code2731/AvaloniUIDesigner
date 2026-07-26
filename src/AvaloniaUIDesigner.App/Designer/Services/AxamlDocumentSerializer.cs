@@ -182,6 +182,50 @@ public sealed class AxamlDocumentSerializer : IDesignerSerializer
             return;
         }
 
+        if (string.Equals(element.TypeName, "Avalonia.Controls.SplitView", StringComparison.Ordinal))
+        {
+            sb.AppendLine(">");
+            childrenByParent.TryGetValue(element.DisplayName, out var splitChildren);
+            var paneChild = splitChildren?.FirstOrDefault(child =>
+                child.ParentLayout == DesignerParentLayoutKind.SplitView
+                && child.SplitViewSlot == DesignerSplitViewSlot.Pane);
+            var contentChild = splitChildren?.FirstOrDefault(child =>
+                child.ParentLayout == DesignerParentLayoutKind.SplitView
+                && child.SplitViewSlot == DesignerSplitViewSlot.Content);
+
+            sb.Append(indent);
+            sb.AppendLine("  <SplitView.Pane>");
+            if (paneChild is not null)
+            {
+                AppendElement(sb, paneChild, indent + "    ", childrenByParent, element);
+            }
+            else
+            {
+                sb.Append(indent);
+                sb.Append("    <TextBlock Text=\"");
+                sb.Append(EscapeXmlAttribute(ReadInternalText(element, "__paneText", "Navigation pane")));
+                sb.AppendLine("\" />");
+            }
+
+            sb.Append(indent);
+            sb.AppendLine("  </SplitView.Pane>");
+            if (contentChild is not null)
+            {
+                AppendElement(sb, contentChild, indent + "  ", childrenByParent, element);
+            }
+            else
+            {
+                sb.Append(indent);
+                sb.Append("  <TextBlock Text=\"");
+                sb.Append(EscapeXmlAttribute(ReadInternalText(element, "__contentText", "Main content")));
+                sb.AppendLine("\" />");
+            }
+
+            sb.Append(indent);
+            sb.AppendLine("</SplitView>");
+            return;
+        }
+
         if (!childrenByParent.TryGetValue(element.DisplayName, out var children) || children.Count == 0)
         {
             sb.AppendLine(" />");
@@ -272,9 +316,19 @@ public sealed class AxamlDocumentSerializer : IDesignerSerializer
                 StringComparison.Ordinal)
             || string.Equals(element.TypeName, "Avalonia.Controls.Canvas", StringComparison.Ordinal)
             || string.Equals(element.TypeName, "Avalonia.Controls.TabControl", StringComparison.Ordinal)
+            || string.Equals(element.TypeName, "Avalonia.Controls.SplitView", StringComparison.Ordinal)
             || string.Equals(element.TypeName, "Avalonia.Controls.Border", StringComparison.Ordinal)
             || string.Equals(element.TypeName, "Avalonia.Controls.ScrollViewer", StringComparison.Ordinal)
             || string.Equals(element.TypeName, "Avalonia.Controls.Expander", StringComparison.Ordinal);
+
+    private static string ReadInternalText(
+        DesignerElementSnapshot element,
+        string propertyName,
+        string fallback)
+        => element.VisualProperties is not null
+            && element.VisualProperties.TryGetValue(propertyName, out var value)
+                ? value
+                : fallback;
 
     private static IReadOnlyList<string> ReadTabHeaders(DesignerElementSnapshot element)
     {

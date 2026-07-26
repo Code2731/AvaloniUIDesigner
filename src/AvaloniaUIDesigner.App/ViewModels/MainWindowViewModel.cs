@@ -139,6 +139,20 @@ public sealed record TabControlAssignmentEditorState(
     string SelectedParentName,
     int TabIndex);
 
+public sealed record SplitViewParentOption(
+    string DisplayName,
+    string? PaneChildName,
+    string? ContentChildName)
+{
+    public override string ToString() => DisplayName;
+}
+
+public sealed record SplitViewAssignmentEditorState(
+    string ControlName,
+    IReadOnlyList<SplitViewParentOption> Parents,
+    string SelectedParentName,
+    DesignerSplitViewSlot Slot);
+
 public sealed record ContentParentOption(string DisplayName, string ContainerType)
 {
     public override string ToString() => $"{DisplayName} ({ContainerType})";
@@ -1208,6 +1222,7 @@ public partial class MainWindowViewModel : ViewModelBase
         target.CanvasChildTop = 0;
         target.TabIndex = -1;
         target.TabHeader = null;
+        target.SplitViewSlot = DesignerSplitViewSlot.Content;
         target.ParentLayout = DesignerParentLayoutKind.Grid;
         target.ParentName = parent.DisplayName;
         Canvas.MoveElementsToFront([target]);
@@ -1247,6 +1262,7 @@ public partial class MainWindowViewModel : ViewModelBase
         target.CanvasChildTop = 0;
         target.TabIndex = -1;
         target.TabHeader = null;
+        target.SplitViewSlot = DesignerSplitViewSlot.Content;
         target.IsVisibleOnArtboard = true;
         target.ParentLayout = DesignerParentLayoutKind.None;
         Canvas.NormalizeContainerRelationships();
@@ -2066,6 +2082,109 @@ public partial class MainWindowViewModel : ViewModelBase
 
     private static TabControlAssignmentEditorState EmptyTabControlAssignmentState()
         => new(string.Empty, Array.Empty<TabControlParentOption>(), string.Empty, 0);
+
+    public bool TryGetSelectedSplitViewAssignment(out SplitViewAssignmentEditorState state)
+    {
+        if (Canvas.SelectedElement is not { IsLocked: false } target)
+        {
+            state = EmptySplitViewAssignmentState();
+            StatusText = "Select an unlocked control to assign it to a SplitView slot.";
+            return false;
+        }
+
+        var parents = Canvas.Elements
+            .Where(element => !ReferenceEquals(element, target)
+                && !element.IsLocked
+                && element.Visual is SplitView)
+            .Where(element => !IsDescendantOf(element, target))
+            .Select(element => new SplitViewParentOption(
+                element.DisplayName,
+                Canvas.Elements.FirstOrDefault(child =>
+                    !ReferenceEquals(child, target)
+                    && child.IsSplitViewChild
+                    && child.SplitViewSlot == DesignerSplitViewSlot.Pane
+                    && string.Equals(
+                        child.ParentName,
+                        element.DisplayName,
+                        StringComparison.OrdinalIgnoreCase))?.DisplayName,
+                Canvas.Elements.FirstOrDefault(child =>
+                    !ReferenceEquals(child, target)
+                    && child.IsSplitViewChild
+                    && child.SplitViewSlot == DesignerSplitViewSlot.Content
+                    && string.Equals(
+                        child.ParentName,
+                        element.DisplayName,
+                        StringComparison.OrdinalIgnoreCase))?.DisplayName))
+            .ToList();
+        if (parents.Count == 0)
+        {
+            state = EmptySplitViewAssignmentState();
+            StatusText = "Place an unlocked SplitView before assigning a control.";
+            return false;
+        }
+
+        var selectedParent = parents.FirstOrDefault(parent => string.Equals(
+                parent.DisplayName,
+                target.ParentName,
+                StringComparison.OrdinalIgnoreCase))
+            ?? parents[0];
+        var selectedSlot = target.IsSplitViewChild
+            && string.Equals(target.ParentName, selectedParent.DisplayName, StringComparison.OrdinalIgnoreCase)
+                ? target.SplitViewSlot
+                : selectedParent.ContentChildName is null
+                    ? DesignerSplitViewSlot.Content
+                    : DesignerSplitViewSlot.Pane;
+        state = new SplitViewAssignmentEditorState(
+            target.DisplayName,
+            parents,
+            selectedParent.DisplayName,
+            selectedSlot);
+        return true;
+    }
+
+    public bool SetSelectedSplitViewAssignment(string parentName, DesignerSplitViewSlot slot)
+    {
+        if (Canvas.SelectedElement is not { IsLocked: false } target)
+        {
+            StatusText = "Select an unlocked control to assign it to a SplitView slot.";
+            return false;
+        }
+
+        var parent = Canvas.Elements.FirstOrDefault(element =>
+            !ReferenceEquals(element, target)
+            && !element.IsLocked
+            && element.Visual is SplitView
+            && string.Equals(element.DisplayName, parentName, StringComparison.OrdinalIgnoreCase));
+        if (parent is null || IsDescendantOf(parent, target))
+        {
+            StatusText = $"SplitView '{parentName}' is not available.";
+            return false;
+        }
+
+        BeginCanvasMutation(HistoryActionType.EditProperty, "Assigned control to SplitView slot.");
+        var replaced = Canvas.SetSplitViewChild(parent, target, slot);
+        var splitChildren = Canvas.Elements
+            .Where(child => child.IsSplitViewChild
+                && string.Equals(child.ParentName, parent.DisplayName, StringComparison.OrdinalIgnoreCase))
+            .OrderBy(child => child.SplitViewSlot == DesignerSplitViewSlot.Content ? 0 : 1)
+            .ToList();
+        Canvas.MoveElementsToFrontInOrder(splitChildren);
+        Canvas.NormalizeContainerRelationships();
+        ObjectTree.RebuildFrom(Canvas.Elements);
+        ObjectTree.SelectByElement(target);
+        CommitCanvasMutation();
+        StatusText = replaced is null
+            ? $"Assigned {target.DisplayName} to {parent.DisplayName} {slot}."
+            : $"Assigned {target.DisplayName} to {parent.DisplayName} {slot}; moved {replaced.DisplayName} to the Canvas root.";
+        return true;
+    }
+
+    private static SplitViewAssignmentEditorState EmptySplitViewAssignmentState()
+        => new(
+            string.Empty,
+            Array.Empty<SplitViewParentOption>(),
+            string.Empty,
+            DesignerSplitViewSlot.Content);
 
     public bool TryGetSelectedContentAssignment(out ContentAssignmentEditorState state)
     {
@@ -3623,7 +3742,8 @@ public partial class MainWindowViewModel : ViewModelBase
                 e.CanvasChildLeft,
                 e.CanvasChildTop,
                 e.TabIndex,
-                e.TabHeader))
+                e.TabHeader,
+                e.SplitViewSlot))
             .ToList();
 
         return new DesignerCanvasDocument(
@@ -3748,7 +3868,8 @@ public partial class MainWindowViewModel : ViewModelBase
             element.CanvasChildLeft,
             element.CanvasChildTop,
             element.TabIndex,
-            element.TabHeader);
+            element.TabHeader,
+            element.SplitViewSlot);
     }
 
     private IReadOnlyDictionary<string, string>? CaptureVisualProperties(Control visual)
@@ -4074,6 +4195,36 @@ public partial class MainWindowViewModel : ViewModelBase
             };
         }
 
+        if (visual is SplitView splitView)
+        {
+            var properties = new Dictionary<string, string>
+            {
+                ["DisplayMode"] = splitView.DisplayMode.ToString(),
+                ["IsPaneOpen"] = splitView.IsPaneOpen.ToString(),
+                ["OpenPaneLength"] = splitView.OpenPaneLength.ToString("0.###", CultureInfo.InvariantCulture),
+                ["CompactPaneLength"] = splitView.CompactPaneLength.ToString("0.###", CultureInfo.InvariantCulture),
+                ["PanePlacement"] = splitView.PanePlacement.ToString(),
+                ["UseLightDismissOverlayMode"] = splitView.UseLightDismissOverlayMode.ToString(),
+                ["Opacity"] = splitView.Opacity.ToString("0.###", CultureInfo.InvariantCulture),
+            };
+            if (splitView.PaneBackground is { } paneBackground)
+            {
+                properties["PaneBackground"] = FormatBrushValue(paneBackground);
+            }
+
+            if (splitView.Pane is TextBlock paneText)
+            {
+                properties["__paneText"] = paneText.Text ?? string.Empty;
+            }
+
+            if (splitView.Content is TextBlock contentText)
+            {
+                properties["__contentText"] = contentText.Text ?? string.Empty;
+            }
+
+            return properties;
+        }
+
         if (visual is Expander expander)
         {
             return new Dictionary<string, string>
@@ -4263,6 +4414,11 @@ public partial class MainWindowViewModel : ViewModelBase
             VerticalAlignment = VerticalAlignment.Center,
         };
 
+    private static string ReadTextContent(object? content, string fallback)
+        => content is TextBlock textBlock
+            ? textBlock.Text ?? fallback
+            : content?.ToString() ?? fallback;
+
     private static bool AreSameDocument(DesignerCanvasDocument left, DesignerCanvasDocument right)
     {
         if (left.Settings != right.Settings)
@@ -4315,6 +4471,7 @@ public partial class MainWindowViewModel : ViewModelBase
                 || a.CanvasChildTop != b.CanvasChildTop
                 || a.TabIndex != b.TabIndex
                 || !string.Equals(a.TabHeader, b.TabHeader, StringComparison.Ordinal)
+                || a.SplitViewSlot != b.SplitViewSlot
                 || !DictionaryEquals(a.VisualProperties, b.VisualProperties))
             {
                 return false;
@@ -4375,7 +4532,8 @@ public partial class MainWindowViewModel : ViewModelBase
             XElement container,
             DesignerElementSnapshot? parent,
             int forcedTabIndex = -1,
-            string? forcedTabHeader = null)
+            string? forcedTabHeader = null,
+            DesignerSplitViewSlot? forcedSplitViewSlot = null)
         {
             var nextIsLocked = false;
             var stackPanelIndex = 0;
@@ -4404,6 +4562,32 @@ public partial class MainWindowViewModel : ViewModelBase
                 }
 
                 var tagName = child.Name.LocalName;
+                if (string.Equals(
+                        parent?.TypeName,
+                        "Avalonia.Controls.SplitView",
+                        StringComparison.Ordinal)
+                    && string.Equals(tagName, "SplitView.Pane", StringComparison.OrdinalIgnoreCase))
+                {
+                    ReadElementNodes(
+                        child,
+                        parent,
+                        forcedSplitViewSlot: DesignerSplitViewSlot.Pane);
+                    continue;
+                }
+
+                if (string.Equals(
+                        parent?.TypeName,
+                        "Avalonia.Controls.SplitView",
+                        StringComparison.Ordinal)
+                    && string.Equals(tagName, "SplitView.Content", StringComparison.OrdinalIgnoreCase))
+                {
+                    ReadElementNodes(
+                        child,
+                        parent,
+                        forcedSplitViewSlot: DesignerSplitViewSlot.Content);
+                    continue;
+                }
+
                 if (string.Equals(
                         parent?.TypeName,
                         "Avalonia.Controls.TabControl",
@@ -4459,6 +4643,16 @@ public partial class MainWindowViewModel : ViewModelBase
                     continue;
                 }
 
+                if (string.Equals(
+                        parent?.TypeName,
+                        "Avalonia.Controls.SplitView",
+                        StringComparison.Ordinal)
+                    && string.Equals(tagName, "TextBlock", StringComparison.OrdinalIgnoreCase)
+                    && !hasExplicitName)
+                {
+                    continue;
+                }
+
                 if (!TryResolveTypeName(tagName, out var typeName))
                 {
                     warnings.Add($"Unsupported control <{tagName}> was imported as a placeholder.");
@@ -4497,6 +4691,10 @@ public partial class MainWindowViewModel : ViewModelBase
                         parent?.TypeName,
                         "Avalonia.Controls.TabControl",
                         StringComparison.Ordinal);
+                var isSplitViewChild = string.Equals(
+                    parent?.TypeName,
+                    "Avalonia.Controls.SplitView",
+                    StringComparison.Ordinal);
                 var dockSide = Enum.TryParse<DesignerDockSide>(
                     child.Attribute("DockPanel.Dock")?.Value,
                     ignoreCase: true,
@@ -4517,6 +4715,8 @@ public partial class MainWindowViewModel : ViewModelBase
                     "Avalonia.Controls.Canvas" => DesignerParentLayoutKind.Canvas,
                     "Avalonia.Controls.TabControl" when isTabControlChild
                         => DesignerParentLayoutKind.TabControl,
+                    "Avalonia.Controls.SplitView" when isSplitViewChild
+                        => DesignerParentLayoutKind.SplitView,
                     "Avalonia.Controls.Border"
                         or "Avalonia.Controls.ScrollViewer"
                         or "Avalonia.Controls.Expander" => DesignerParentLayoutKind.Content,
@@ -4556,7 +4756,10 @@ public partial class MainWindowViewModel : ViewModelBase
                     isCanvasChild ? ReadDouble(child, "Canvas.Left", 0) : 0,
                     isCanvasChild ? ReadDouble(child, "Canvas.Top", 0) : 0,
                     isTabControlChild ? forcedTabIndex : -1,
-                    isTabControlChild ? forcedTabHeader : null);
+                    isTabControlChild ? forcedTabHeader : null,
+                    isSplitViewChild
+                        ? forcedSplitViewSlot ?? DesignerSplitViewSlot.Content
+                        : DesignerSplitViewSlot.Content);
                 snapshots.Add(snapshot);
                 nextIsLocked = false;
 
@@ -4567,6 +4770,7 @@ public partial class MainWindowViewModel : ViewModelBase
                     || string.Equals(typeName, "Avalonia.Controls.Primitives.UniformGrid", StringComparison.Ordinal)
                     || string.Equals(typeName, "Avalonia.Controls.Canvas", StringComparison.Ordinal)
                     || string.Equals(typeName, "Avalonia.Controls.TabControl", StringComparison.Ordinal)
+                    || string.Equals(typeName, "Avalonia.Controls.SplitView", StringComparison.Ordinal)
                     || string.Equals(typeName, "Avalonia.Controls.Border", StringComparison.Ordinal)
                     || string.Equals(typeName, "Avalonia.Controls.ScrollViewer", StringComparison.Ordinal)
                     || string.Equals(typeName, "Avalonia.Controls.Expander", StringComparison.Ordinal))
@@ -4934,6 +5138,27 @@ public partial class MainWindowViewModel : ViewModelBase
         {
             map["__tabs"] = SerializeTabHeaders(element);
         }
+        else if (string.Equals(element.Name.LocalName, "SplitView", StringComparison.OrdinalIgnoreCase))
+        {
+            var paneHost = element.Elements().FirstOrDefault(child =>
+                string.Equals(child.Name.LocalName, "SplitView.Pane", StringComparison.OrdinalIgnoreCase));
+            map["__paneText"] = paneHost?.DescendantsAndSelf()
+                .FirstOrDefault(child => string.Equals(
+                    child.Name.LocalName,
+                    "TextBlock",
+                    StringComparison.OrdinalIgnoreCase))?
+                .Attribute("Text")?.Value ?? string.Empty;
+            var contentHost = element.Elements().FirstOrDefault(child =>
+                string.Equals(child.Name.LocalName, "SplitView.Content", StringComparison.OrdinalIgnoreCase));
+            var contentText = contentHost?.DescendantsAndSelf()
+                    .FirstOrDefault(child => string.Equals(
+                        child.Name.LocalName,
+                        "TextBlock",
+                        StringComparison.OrdinalIgnoreCase))
+                ?? element.Elements().FirstOrDefault(child =>
+                    string.Equals(child.Name.LocalName, "TextBlock", StringComparison.OrdinalIgnoreCase));
+            map["__contentText"] = contentText?.Attribute("Text")?.Value ?? string.Empty;
+        }
         else if (string.Equals(element.Name.LocalName, "Expander", StringComparison.OrdinalIgnoreCase)
             || string.Equals(element.Name.LocalName, "ScrollViewer", StringComparison.OrdinalIgnoreCase))
         {
@@ -4984,6 +5209,9 @@ public partial class MainWindowViewModel : ViewModelBase
             "TimePicker" => propertyName == "SelectedTime",
             "NumericUpDown" => propertyName is "Minimum" or "Maximum" or "Increment" or "Value",
             "TabControl" => propertyName == "SelectedIndex",
+            "SplitView" => propertyName is "DisplayMode" or "IsPaneOpen" or "OpenPaneLength"
+                or "CompactPaneLength" or "PanePlacement" or "PaneBackground"
+                or "UseLightDismissOverlayMode",
             "Expander" => propertyName is "Header" or "IsExpanded",
             "ScrollViewer" => false,
             "Border" => propertyName is "Background" or "BorderBrush" or "BorderThickness" or "CornerRadius",
@@ -6242,6 +6470,63 @@ public partial class MainWindowViewModel : ViewModelBase
                 sb.AppendLine("</TabControl>");
                 break;
 
+            case SplitView splitView:
+                sb.Append(indent);
+                sb.Append("<SplitView");
+                AppendCanvasLayoutAttributes(sb, element);
+                AppendAttribute(sb, "DisplayMode", splitView.DisplayMode.ToString());
+                AppendAttribute(sb, "IsPaneOpen", splitView.IsPaneOpen.ToString());
+                AppendAttribute(
+                    sb,
+                    "OpenPaneLength",
+                    splitView.OpenPaneLength.ToString("0.###", CultureInfo.InvariantCulture));
+                AppendAttribute(
+                    sb,
+                    "CompactPaneLength",
+                    splitView.CompactPaneLength.ToString("0.###", CultureInfo.InvariantCulture));
+                AppendAttribute(sb, "PanePlacement", splitView.PanePlacement.ToString());
+                AppendAttribute(
+                    sb,
+                    "UseLightDismissOverlayMode",
+                    splitView.UseLightDismissOverlayMode.ToString());
+                if (splitView.PaneBackground is { } paneBackground)
+                {
+                    AppendAttribute(sb, "PaneBackground", FormatBrushValue(paneBackground));
+                }
+
+                sb.AppendLine(">");
+                sb.Append(indent);
+                sb.AppendLine("  <SplitView.Pane>");
+                if (GetDesignerSplitViewChild(element, DesignerSplitViewSlot.Pane) is { } paneChild)
+                {
+                    WriteDesignerChildAxaml(sb, paneChild, indent + "    ");
+                }
+                else
+                {
+                    sb.Append(indent);
+                    sb.Append("    <TextBlock");
+                    AppendAttribute(sb, "Text", ReadTextContent(splitView.Pane, "Navigation pane"));
+                    sb.AppendLine(" />");
+                }
+
+                sb.Append(indent);
+                sb.AppendLine("  </SplitView.Pane>");
+                if (GetDesignerSplitViewChild(element, DesignerSplitViewSlot.Content) is { } splitContentChild)
+                {
+                    WriteDesignerChildAxaml(sb, splitContentChild, indent + "  ");
+                }
+                else
+                {
+                    sb.Append(indent);
+                    sb.Append("  <TextBlock");
+                    AppendAttribute(sb, "Text", ReadTextContent(splitView.Content, "Main content"));
+                    sb.AppendLine(" />");
+                }
+
+                sb.Append(indent);
+                sb.AppendLine("</SplitView>");
+                break;
+
             case Expander expander:
                 sb.Append(indent);
                 sb.Append("<Expander");
@@ -6681,6 +6966,10 @@ public partial class MainWindowViewModel : ViewModelBase
         {
             // TabItem content owns its child's layout.
         }
+        else if (TryGetSplitViewParent(element, out _))
+        {
+            // SplitView Pane and Content own their child layout.
+        }
         else
         {
             AppendAttribute(sb, "Canvas.Left", element.X.ToString("0.###", CultureInfo.InvariantCulture));
@@ -6740,6 +7029,7 @@ public partial class MainWindowViewModel : ViewModelBase
             || TryGetUniformGridParent(element, out _)
             || TryGetCanvasParent(element, out _)
             || TryGetTabControlParent(element, out _)
+            || TryGetSplitViewParent(element, out _)
             || TryGetContentParent(element, out _);
 
     private bool TryGetStackPanelParent(DesignElement element, out StackPanel stackPanel)
@@ -6841,6 +7131,19 @@ public partial class MainWindowViewModel : ViewModelBase
         return parent is not null;
     }
 
+    private bool TryGetSplitViewParent(DesignElement element, out DesignElement parent)
+    {
+        parent = element.ParentName is null
+            ? null!
+            : Canvas.Elements.FirstOrDefault(candidate =>
+                candidate.Visual is SplitView
+                && string.Equals(
+                    candidate.DisplayName,
+                    element.ParentName,
+                    StringComparison.OrdinalIgnoreCase))!;
+        return parent is not null;
+    }
+
     private DesignElement? GetDesignerContentChild(DesignElement parent)
         => Canvas.Elements.FirstOrDefault(child =>
             child.IsContentChild
@@ -6853,6 +7156,17 @@ public partial class MainWindowViewModel : ViewModelBase
         => Canvas.Elements.FirstOrDefault(child =>
             child.IsTabControlChild
             && child.TabIndex == tabIndex
+            && string.Equals(
+                child.ParentName,
+                parent.DisplayName,
+                StringComparison.OrdinalIgnoreCase));
+
+    private DesignElement? GetDesignerSplitViewChild(
+        DesignElement parent,
+        DesignerSplitViewSlot slot)
+        => Canvas.Elements.FirstOrDefault(child =>
+            child.IsSplitViewChild
+            && child.SplitViewSlot == slot
             && string.Equals(
                 child.ParentName,
                 parent.DisplayName,

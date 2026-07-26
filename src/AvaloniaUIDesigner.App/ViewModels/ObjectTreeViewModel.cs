@@ -1,5 +1,6 @@
 using System.Collections.ObjectModel;
 using System.Linq;
+using AvaloniaUIDesigner.App.Designer.Core;
 using CommunityToolkit.Mvvm.ComponentModel;
 
 namespace AvaloniaUIDesigner.App.ViewModels;
@@ -114,6 +115,7 @@ public partial class ObjectTreeViewModel : ViewModelBase
                         or Avalonia.Controls.Primitives.UniformGrid
                         or Avalonia.Controls.Canvas
                         or Avalonia.Controls.TabControl
+                        or Avalonia.Controls.SplitView
                         or Avalonia.Controls.Border
                         or Avalonia.Controls.ScrollViewer
                         or Avalonia.Controls.Expander)
@@ -202,6 +204,20 @@ public partial class ObjectTreeViewModel : ViewModelBase
             {
                 var ordered = parent.Children
                     .OrderBy(node => node.Element?.TabIndex ?? int.MaxValue)
+                    .ToList();
+                parent.Children.Clear();
+                foreach (var child in ordered)
+                {
+                    parent.Children.Add(child);
+                }
+            }
+
+            foreach (var parent in _allChildren.Where(node =>
+                         node.Element?.Visual is Avalonia.Controls.SplitView
+                         && node.Children.Count > 1))
+            {
+                var ordered = parent.Children
+                    .OrderBy(node => node.Element?.SplitViewSlot ?? DesignerSplitViewSlot.Content)
                     .ToList();
                 parent.Children.Clear();
                 foreach (var child in ordered)

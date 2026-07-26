@@ -52,6 +52,12 @@ public partial class MainWindow : Window
         double Left,
         double Top);
     private sealed record TabControlAssignmentOptions(string ParentName, int TabIndex);
+    private sealed record SplitViewAssignmentOptions(string ParentName, DesignerSplitViewSlot Slot);
+    private sealed record SplitViewSlotChoice(DesignerSplitViewSlot Slot, string? ChildName)
+    {
+        public override string ToString()
+            => string.IsNullOrWhiteSpace(ChildName) ? Slot.ToString() : $"{Slot} ({ChildName})";
+    }
     private sealed record ContentAssignmentOptions(string ParentName);
 
     private const double HandleHalf = 5;
@@ -773,6 +779,23 @@ public partial class MainWindow : Window
         if (updated is not null)
         {
             Vm.SetSelectedTabControlAssignment(updated.ParentName, updated.TabIndex);
+        }
+    }
+
+    private async void OnAssignToSplitViewMenuClicked(
+        object? sender,
+        Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        FlushPendingPropertyHistory();
+        if (Vm is null || !Vm.TryGetSelectedSplitViewAssignment(out var state))
+        {
+            return;
+        }
+
+        var updated = await ShowSplitViewAssignmentDialogAsync(state);
+        if (updated is not null)
+        {
+            Vm.SetSelectedSplitViewAssignment(updated.ParentName, updated.Slot);
         }
     }
 
@@ -1521,6 +1544,14 @@ public partial class MainWindow : Window
             Vm?.Canvas.ReflowContainerChildren(_boundElement);
         }
 
+        if (control is SplitView
+            && e.Property.Name is "DisplayMode" or "IsPaneOpen" or "OpenPaneLength"
+                or "CompactPaneLength" or "PanePlacement"
+            && _boundElement is not null)
+        {
+            Vm?.Canvas.ReflowContainerChildren(_boundElement);
+        }
+
         if (control is Border
             && e.Property.Name == "BorderThickness"
             && _boundElement is not null)
@@ -1642,6 +1673,13 @@ public partial class MainWindow : Window
         if (control is TabControl)
         {
             return propertyName == "SelectedIndex";
+        }
+
+        if (control is SplitView)
+        {
+            return propertyName is "DisplayMode" or "IsPaneOpen" or "OpenPaneLength"
+                or "CompactPaneLength" or "PanePlacement" or "PaneBackground"
+                or "UseLightDismissOverlayMode";
         }
 
         if (control is Expander)
@@ -3405,6 +3443,106 @@ public partial class MainWindow : Window
         dialog.Content = content;
 
         return await dialog.ShowDialog<TabControlAssignmentOptions?>(this);
+    }
+
+    private async Task<SplitViewAssignmentOptions?> ShowSplitViewAssignmentDialogAsync(
+        SplitViewAssignmentEditorState state)
+    {
+        var initialParent = state.Parents.First(parent => string.Equals(
+            parent.DisplayName,
+            state.SelectedParentName,
+            StringComparison.OrdinalIgnoreCase));
+        var parentSelector = new ComboBox
+        {
+            ItemsSource = state.Parents,
+            SelectedItem = initialParent,
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+        };
+        var slotSelector = new ComboBox
+        {
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+        };
+        var dialog = new Window
+        {
+            Title = $"Assign to SplitView - {state.ControlName}",
+            Width = 460,
+            Height = 300,
+            MinWidth = 400,
+            MinHeight = 270,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner,
+        };
+
+        void UpdateSlots()
+        {
+            if (parentSelector.SelectedItem is not SplitViewParentOption parent)
+            {
+                slotSelector.ItemsSource = null;
+                return;
+            }
+
+            var slots = new[]
+            {
+                new SplitViewSlotChoice(DesignerSplitViewSlot.Pane, parent.PaneChildName),
+                new SplitViewSlotChoice(DesignerSplitViewSlot.Content, parent.ContentChildName),
+            };
+            slotSelector.ItemsSource = slots;
+            var preferredSlot = ReferenceEquals(parent, initialParent)
+                ? state.Slot
+                : parent.ContentChildName is null
+                    ? DesignerSplitViewSlot.Content
+                    : DesignerSplitViewSlot.Pane;
+            slotSelector.SelectedItem = slots.First(slot => slot.Slot == preferredSlot);
+        }
+
+        parentSelector.SelectionChanged += (_, _) => UpdateSlots();
+        UpdateSlots();
+
+        var assignButton = new Button { Content = "Assign", MinWidth = 84 };
+        assignButton.Click += (_, _) =>
+        {
+            if (parentSelector.SelectedItem is SplitViewParentOption parent
+                && slotSelector.SelectedItem is SplitViewSlotChoice slot)
+            {
+                dialog.Close(new SplitViewAssignmentOptions(parent.DisplayName, slot.Slot));
+            }
+        };
+        var cancelButton = new Button { Content = "Cancel", MinWidth = 84 };
+        cancelButton.Click += (_, _) => dialog.Close(null);
+        var buttons = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            Spacing = 8,
+            HorizontalAlignment = HorizontalAlignment.Right,
+            Children = { cancelButton, assignButton },
+        };
+        var fields = new StackPanel
+        {
+            Spacing = 6,
+            Children =
+            {
+                new TextBlock { Text = "Parent SplitView" },
+                parentSelector,
+                new TextBlock { Text = "Slot" },
+                slotSelector,
+                new TextBlock
+                {
+                    Text = "Pane and Content each accept one designer child. Assigning to an occupied slot moves its current child back to the Canvas root.",
+                    Foreground = Avalonia.Media.Brushes.Gray,
+                    TextWrapping = Avalonia.Media.TextWrapping.Wrap,
+                },
+            },
+        };
+        var content = new Grid
+        {
+            Margin = new Thickness(16),
+            RowDefinitions = new RowDefinitions("*,Auto"),
+            RowSpacing = 12,
+            Children = { fields, buttons },
+        };
+        Grid.SetRow(buttons, 1);
+        dialog.Content = content;
+
+        return await dialog.ShowDialog<SplitViewAssignmentOptions?>(this);
     }
 
     private async Task<ContentAssignmentOptions?> ShowContentAssignmentDialogAsync(

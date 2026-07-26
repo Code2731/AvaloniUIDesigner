@@ -73,6 +73,7 @@ public sealed class PreviewWindow : Window
                     StringComparison.Ordinal)
                 || string.Equals(element.TypeName, "Avalonia.Controls.Canvas", StringComparison.Ordinal)
                 || string.Equals(element.TypeName, "Avalonia.Controls.TabControl", StringComparison.Ordinal)
+                || string.Equals(element.TypeName, "Avalonia.Controls.SplitView", StringComparison.Ordinal)
                 || string.Equals(element.TypeName, "Avalonia.Controls.Border", StringComparison.Ordinal)
                 || string.Equals(element.TypeName, "Avalonia.Controls.ScrollViewer", StringComparison.Ordinal)
                 || string.Equals(element.TypeName, "Avalonia.Controls.Expander", StringComparison.Ordinal))
@@ -123,6 +124,8 @@ public sealed class PreviewWindow : Window
                                 ? children.OrderBy(child => child.CanvasChildIndex).ToList()
                                 : parent is TabControl
                                     ? children.OrderBy(child => child.TabIndex).ToList()
+                                    : parent is SplitView
+                                        ? children.OrderBy(child => child.SplitViewSlot).ToList()
                 : children;
             if (parent is Panel panel)
             {
@@ -200,6 +203,17 @@ public sealed class PreviewWindow : Window
                         tabs[childSnapshot.TabIndex].Content = child;
                         break;
                     }
+                    case SplitView splitView:
+                        if (childSnapshot.SplitViewSlot == DesignerSplitViewSlot.Pane)
+                        {
+                            splitView.Pane = child;
+                        }
+                        else
+                        {
+                            splitView.Content = child;
+                        }
+
+                        break;
                     case Border border:
                         border.Child = child;
                         break;
@@ -258,6 +272,17 @@ public sealed class PreviewWindow : Window
                 Value = 50,
             },
             "Avalonia.Controls.TabControl" => CreateDefaultTabControl(),
+            "Avalonia.Controls.SplitView" => new SplitView
+            {
+                DisplayMode = SplitViewDisplayMode.Inline,
+                IsPaneOpen = true,
+                OpenPaneLength = 140,
+                CompactPaneLength = 48,
+                PanePlacement = SplitViewPanePlacement.Left,
+                PaneBackground = Brush.Parse("#E2E8F0"),
+                Pane = new TextBlock { Text = "Navigation pane", Margin = new Thickness(12) },
+                Content = new TextBlock { Text = "Main content", Margin = new Thickness(16) },
+            },
             "Avalonia.Controls.Expander" => new Expander
             {
                 Header = "Advanced options",
@@ -577,6 +602,9 @@ public sealed class PreviewWindow : Window
                 break;
             case TabControl tabControl:
                 ApplyTabControlProperties(tabControl, properties);
+                break;
+            case SplitView splitView:
+                ApplySplitViewProperties(splitView, properties, colorResources);
                 break;
             case Expander expander:
                 ApplyExpanderProperties(expander, properties);
@@ -951,6 +979,66 @@ public sealed class PreviewWindow : Window
             Header = header,
             Content = new TextBlock { Text = $"{header} content", Margin = new Thickness(12) },
         };
+
+    private static void ApplySplitViewProperties(
+        SplitView splitView,
+        IReadOnlyDictionary<string, string> properties,
+        IReadOnlyDictionary<string, string> colorResources)
+    {
+        if (properties.TryGetValue("DisplayMode", out var displayMode)
+            && Enum.TryParse<SplitViewDisplayMode>(displayMode, true, out var parsedDisplayMode))
+        {
+            splitView.DisplayMode = parsedDisplayMode;
+        }
+
+        if (properties.TryGetValue("IsPaneOpen", out var isPaneOpen)
+            && bool.TryParse(isPaneOpen, out var parsedIsPaneOpen))
+        {
+            splitView.IsPaneOpen = parsedIsPaneOpen;
+        }
+
+        if (properties.TryGetValue("OpenPaneLength", out var openPaneLength)
+            && double.TryParse(openPaneLength, NumberStyles.Float, CultureInfo.InvariantCulture, out var parsedOpenPaneLength))
+        {
+            splitView.OpenPaneLength = Math.Max(0, parsedOpenPaneLength);
+        }
+
+        if (properties.TryGetValue("CompactPaneLength", out var compactPaneLength)
+            && double.TryParse(compactPaneLength, NumberStyles.Float, CultureInfo.InvariantCulture, out var parsedCompactPaneLength))
+        {
+            splitView.CompactPaneLength = Math.Max(0, parsedCompactPaneLength);
+        }
+
+        if (properties.TryGetValue("PanePlacement", out var panePlacement)
+            && Enum.TryParse<SplitViewPanePlacement>(panePlacement, true, out var parsedPanePlacement))
+        {
+            splitView.PanePlacement = parsedPanePlacement;
+        }
+
+        if (properties.TryGetValue("UseLightDismissOverlayMode", out var useLightDismiss)
+            && bool.TryParse(useLightDismiss, out var parsedUseLightDismiss))
+        {
+            splitView.UseLightDismissOverlayMode = parsedUseLightDismiss;
+        }
+
+        if (properties.TryGetValue("PaneBackground", out var paneBackground))
+        {
+            TrySetBorderBrush(
+                value => splitView.PaneBackground = value,
+                paneBackground,
+                colorResources);
+        }
+
+        if (properties.TryGetValue("__paneText", out var paneText))
+        {
+            splitView.Pane = new TextBlock { Text = paneText, Margin = new Thickness(12) };
+        }
+
+        if (properties.TryGetValue("__contentText", out var contentText))
+        {
+            splitView.Content = new TextBlock { Text = contentText, Margin = new Thickness(16) };
+        }
+    }
 
     private static void ApplyExpanderProperties(Expander expander, IReadOnlyDictionary<string, string> properties)
     {

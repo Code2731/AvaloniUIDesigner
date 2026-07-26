@@ -42,6 +42,7 @@ public partial class DesignElement : ViewModelBase
     [NotifyPropertyChangedFor(nameof(IsUniformGridChild))]
     [NotifyPropertyChangedFor(nameof(IsCanvasChild))]
     [NotifyPropertyChangedFor(nameof(IsTabControlChild))]
+    [NotifyPropertyChangedFor(nameof(IsSplitViewChild))]
     [NotifyPropertyChangedFor(nameof(IsContentChild))]
     [NotifyPropertyChangedFor(nameof(GridCellLabel))]
     [NotifyPropertyChangedFor(nameof(StackPanelItemLabel))]
@@ -50,6 +51,7 @@ public partial class DesignElement : ViewModelBase
     [NotifyPropertyChangedFor(nameof(UniformGridItemLabel))]
     [NotifyPropertyChangedFor(nameof(CanvasItemLabel))]
     [NotifyPropertyChangedFor(nameof(TabItemLabel))]
+    [NotifyPropertyChangedFor(nameof(SplitViewItemLabel))]
     [NotifyPropertyChangedFor(nameof(ContainerLayoutLabel))]
     private string? _parentName;
 
@@ -87,6 +89,7 @@ public partial class DesignElement : ViewModelBase
     [NotifyPropertyChangedFor(nameof(IsUniformGridChild))]
     [NotifyPropertyChangedFor(nameof(IsCanvasChild))]
     [NotifyPropertyChangedFor(nameof(IsTabControlChild))]
+    [NotifyPropertyChangedFor(nameof(IsSplitViewChild))]
     [NotifyPropertyChangedFor(nameof(IsContentChild))]
     [NotifyPropertyChangedFor(nameof(GridCellLabel))]
     [NotifyPropertyChangedFor(nameof(StackPanelItemLabel))]
@@ -95,6 +98,7 @@ public partial class DesignElement : ViewModelBase
     [NotifyPropertyChangedFor(nameof(UniformGridItemLabel))]
     [NotifyPropertyChangedFor(nameof(CanvasItemLabel))]
     [NotifyPropertyChangedFor(nameof(TabItemLabel))]
+    [NotifyPropertyChangedFor(nameof(SplitViewItemLabel))]
     [NotifyPropertyChangedFor(nameof(ContainerLayoutLabel))]
     private DesignerParentLayoutKind _parentLayout;
 
@@ -138,6 +142,10 @@ public partial class DesignElement : ViewModelBase
     private string? _tabHeader;
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(SplitViewItemLabel))]
+    private DesignerSplitViewSlot _splitViewSlot = DesignerSplitViewSlot.Content;
+
+    [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(HasStylePreviewState))]
     private string? _stylePreviewStateLabel;
 
@@ -163,6 +171,8 @@ public partial class DesignElement : ViewModelBase
     public bool IsCanvasChild => IsContainerChild && ParentLayout == DesignerParentLayoutKind.Canvas;
 
     public bool IsTabControlChild => IsContainerChild && ParentLayout == DesignerParentLayoutKind.TabControl;
+
+    public bool IsSplitViewChild => IsContainerChild && ParentLayout == DesignerParentLayoutKind.SplitView;
 
     public bool IsContentChild => IsContainerChild && ParentLayout == DesignerParentLayoutKind.Content;
 
@@ -205,6 +215,9 @@ public partial class DesignElement : ViewModelBase
         => IsTabControlChild
             ? $"TAB #{TabIndex + 1} {TabHeader}"
             : string.Empty;
+
+    public string SplitViewItemLabel
+        => IsSplitViewChild ? $"SPLIT {SplitViewSlot.ToString().ToUpperInvariant()}" : string.Empty;
 
     public string ContainerLayoutLabel
         => IsContentChild ? "CONTENT" : string.Empty;

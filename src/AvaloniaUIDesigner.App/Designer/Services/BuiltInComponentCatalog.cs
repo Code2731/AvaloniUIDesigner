@@ -146,6 +146,30 @@ public sealed class BuiltInComponentCatalog : IComponentCatalog
                 },
             }),
         new(
+            DisplayName: "SplitView",
+            AvaloniaTypeName: "Avalonia.Controls.SplitView",
+            DefaultWidth: 420,
+            DefaultHeight: 240,
+            VisualFactory: static () => new SplitView
+            {
+                DisplayMode = SplitViewDisplayMode.Inline,
+                IsPaneOpen = true,
+                OpenPaneLength = 140,
+                CompactPaneLength = 48,
+                PanePlacement = SplitViewPanePlacement.Left,
+                PaneBackground = Brush.Parse("#E2E8F0"),
+                Pane = new TextBlock
+                {
+                    Text = "Navigation pane",
+                    Margin = new Thickness(12),
+                },
+                Content = new TextBlock
+                {
+                    Text = "Main content",
+                    Margin = new Thickness(16),
+                },
+            }),
+        new(
             DisplayName: "Expander",
             AvaloniaTypeName: "Avalonia.Controls.Expander",
             DefaultWidth: 260,

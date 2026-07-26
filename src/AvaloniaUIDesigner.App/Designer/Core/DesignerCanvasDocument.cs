@@ -13,6 +13,7 @@ public enum DesignerParentLayoutKind
     Canvas,
     Content,
     TabControl,
+    SplitView,
 }
 
 public enum DesignerDockSide
@@ -21,6 +22,12 @@ public enum DesignerDockSide
     Top,
     Right,
     Bottom,
+}
+
+public enum DesignerSplitViewSlot
+{
+    Pane,
+    Content,
 }
 
 public sealed record DesignerCanvasDocument(
@@ -72,4 +79,5 @@ public sealed record DesignerElementSnapshot(
     double CanvasChildLeft = 0,
     double CanvasChildTop = 0,
     int TabIndex = -1,
-    string? TabHeader = null);
+    string? TabHeader = null,
+    DesignerSplitViewSlot SplitViewSlot = DesignerSplitViewSlot.Content);
