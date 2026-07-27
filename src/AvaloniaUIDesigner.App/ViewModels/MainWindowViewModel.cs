@@ -527,6 +527,7 @@ public partial class MainWindowViewModel : ViewModelBase
     private string? _sampleDataJson;
     private DesignerSampleObject? _sampleDataRoot;
     private DesignerRootSettings _rootSettings = new();
+    private DesignElement? _standaloneAxamlElement;
 
     public MainWindowViewModel()
         : this(new BuiltInComponentCatalog(), new DefaultControlRenderer(), new AxamlDocumentSerializer())
@@ -6352,6 +6353,62 @@ public partial class MainWindowViewModel : ViewModelBase
 
     public string ExportUserControlAxaml() => ExportAxamlDocument(DesignerRootKind.UserControl);
 
+    public bool TryExportSelectedAxaml(
+        out string controlName,
+        out string axaml,
+        out string error)
+    {
+        var selected = Canvas.SelectedElement;
+        if (selected is null)
+        {
+            controlName = string.Empty;
+            axaml = string.Empty;
+            error = "Select a control before exporting selected AXAML.";
+            return false;
+        }
+
+        controlName = selected.DisplayName;
+        error = string.Empty;
+        axaml = string.Empty;
+
+        try
+        {
+            var sb = new StringBuilder();
+            sb.AppendLine("<UserControl xmlns=\"https://github.com/avaloniaui\"");
+            sb.AppendLine("        xmlns:x=\"http://schemas.microsoft.com/winfx/2006/xaml\"");
+            sb.AppendLine("        xmlns:collections=\"clr-namespace:Avalonia.Collections;assembly=Avalonia.Base\"");
+            sb.AppendLine($"        Width=\"{FormatRootNumber(selected.Width)}\" Height=\"{FormatRootNumber(selected.Height)}\">");
+            sb.AppendLine("  <!-- Selected control AXAML; provide the host DataContext for bindings. -->");
+            AppendColorResourcesAxaml(sb, "UserControl", "  ");
+            AppendDocumentStylesAxaml(sb, "UserControl", "  ");
+            if (selected.IsLocked)
+            {
+                sb.AppendLine($"  <!-- {DesignerMetadataPrefix} IsLocked=true -->");
+            }
+
+            _standaloneAxamlElement = selected;
+            try
+            {
+                WriteTopLevelElementAxaml(sb, selected, "  ");
+            }
+            finally
+            {
+                _standaloneAxamlElement = null;
+            }
+
+            sb.AppendLine("</UserControl>");
+            axaml = sb.ToString();
+            return true;
+        }
+        catch (Exception exception)
+        {
+            _standaloneAxamlElement = null;
+            axaml = string.Empty;
+            error = exception.Message;
+            return false;
+        }
+    }
+
     private string ExportAxamlDocument(DesignerRootKind rootKind)
     {
         var settings = CaptureCanvasSettings();
@@ -11540,7 +11597,12 @@ public partial class MainWindowViewModel : ViewModelBase
     private void AppendCanvasLayoutAttributes(StringBuilder sb, DesignElement element)
     {
         AppendAttribute(sb, "x:Name", element.DisplayName);
-        if (HasValidGridParent(element))
+        if (ReferenceEquals(element, _standaloneAxamlElement))
+        {
+            AppendAttribute(sb, "Width", FormatRootNumber(element.Width));
+            AppendAttribute(sb, "Height", FormatRootNumber(element.Height));
+        }
+        else if (HasValidGridParent(element))
         {
             if (element.GridRow > 0)
             {

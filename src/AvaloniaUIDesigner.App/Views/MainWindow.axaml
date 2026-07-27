@@ -38,6 +38,8 @@
                 <MenuItem Header="Save" Click="OnSaveMenuClicked"/>
                 <MenuItem Header="Save As..." Click="OnSaveAsMenuClicked"/>
                 <MenuItem Header="Copy AXAML to Clipboard" Click="OnCopyAxamlMenuClicked"/>
+                <MenuItem Header="Copy Selected AXAML" Click="OnCopySelectedAxamlMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
+                <MenuItem Header="Export Selected AXAML..." Click="OnExportSelectedAxamlMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
                 <MenuItem Header="Copy UserControl AXAML" Click="OnCopyUserControlAxamlMenuClicked"/>
                 <MenuItem Header="Export UserControl AXAML..." Click="OnExportUserControlAxamlMenuClicked"/>
                 <MenuItem Header="Validate AXAML" Click="OnValidateAxamlMenuClicked"/>
@@ -380,6 +382,7 @@
                                             <Border.ContextMenu>
                                                 <ContextMenu>
                                                     <MenuItem Header="Copy" Click="OnCopyMenuClicked"/>
+                                                    <MenuItem Header="Copy Selected AXAML" Click="OnCopySelectedAxamlMenuClicked"/>
                                                     <MenuItem Header="Cut" Click="OnCutMenuClicked"/>
                                                     <MenuItem Header="Duplicate" Click="OnDuplicateMenuClicked"/>
                                                     <MenuItem Header="Rename..." Click="OnRenameSelectedControlMenuClicked"/>

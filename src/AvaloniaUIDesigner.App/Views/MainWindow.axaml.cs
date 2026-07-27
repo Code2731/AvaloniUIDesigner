@@ -255,6 +255,83 @@ public partial class MainWindow : Window
         await CopyAxamlToClipboardAsync(Vm.ExportFullAxaml(), "Copied Window AXAML to clipboard.");
     }
 
+    private async void OnCopySelectedAxamlMenuClicked(
+        object? sender,
+        Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        if (Vm is null)
+        {
+            return;
+        }
+
+        FlushPendingPropertyHistory();
+        if (!Vm.TryExportSelectedAxaml(out var controlName, out var axaml, out var error))
+        {
+            Vm.StatusText = $"Could not export selected AXAML: {error}";
+            return;
+        }
+
+        await CopyAxamlToClipboardAsync(
+            axaml,
+            $"Copied {controlName} AXAML to clipboard.");
+    }
+
+    private async void OnExportSelectedAxamlMenuClicked(
+        object? sender,
+        Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        if (Vm is null)
+        {
+            return;
+        }
+
+        FlushPendingPropertyHistory();
+        if (!Vm.TryExportSelectedAxaml(out var controlName, out var axaml, out var error))
+        {
+            Vm.StatusText = $"Could not export selected AXAML: {error}";
+            return;
+        }
+
+        var file = await StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
+        {
+            Title = "Export Selected AXAML",
+            SuggestedFileName = $"{controlName}.axaml",
+            DefaultExtension = "axaml",
+            FileTypeChoices =
+            [
+                new FilePickerFileType("AXAML") { Patterns = ["*.axaml", "*.xaml"] }
+            ]
+        });
+
+        if (file is null)
+        {
+            return;
+        }
+
+        try
+        {
+            var localPath = file.TryGetLocalPath();
+            if (!string.IsNullOrWhiteSpace(localPath))
+            {
+                await AtomicFileWriter.WriteAllTextAsync(localPath, axaml);
+            }
+            else
+            {
+                await using var stream = await file.OpenWriteAsync();
+                stream.SetLength(0);
+                using var writer = new StreamWriter(stream);
+                await writer.WriteAsync(axaml);
+                await writer.FlushAsync();
+            }
+
+            Vm.StatusText = $"Exported {controlName} AXAML to {file.Name}.";
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        {
+            Vm.StatusText = $"Could not export {file.Name}: {exception.Message}";
+        }
+    }
+
     private async void OnCopyUserControlAxamlMenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
         if (Vm is null)

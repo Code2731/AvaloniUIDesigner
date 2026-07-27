@@ -49,6 +49,7 @@ dotnet run --project src/AvaloniaUIDesigner.App/AvaloniaUIDesigner.App.csproj
 - **Disclosure & Scrolling 속성**: Expander의 header·expanded 상태·전개 방향·콘텐츠 정렬과 ScrollViewer의 양축 scrollbar·auto-hide·chaining·deferred/focus scrolling·snap 정책을 편집하고 실제 중첩 Content, Undo/Redo, 복제, Preview, Binding, Draft·Full·UserControl AXAML 왕복에 보존
 - **Image Source & Rendering 속성**: Image의 로컬 Source 선택·해제, Stretch·StretchDirection, bitmap interpolation·edge·blending 모드를 원자적으로 편집하고 Undo/Redo, 복제, Preview, Source Binding, Draft·Full·UserControl AXAML 왕복에 보존
 - **Button Actions & Commands 속성**: Button의 Content·ClickMode·HotKey·Window 기본/취소 동작·CommandParameter·Click 핸들러를 통합 편집하고 Command Binding, Undo/Redo, 복제, Preview, Draft·Full·UserControl AXAML 왕복에 보존
+- **선택 요소 AXAML 재사용**: 선택한 컨트롤을 하위 계층·리소스·스타일·바인딩·컨트롤 전용 선언과 함께 독립 UserControl AXAML로 클립보드 복사하거나 파일로 내보냄
 - **문서 루트 속성**: Window/UserControl 루트 종류와 Window 제목·리사이즈·시작 위치, 루트 Min/Max 크기를 편집하고 Undo/Redo, Preview, Draft·Full AXAML 왕복에 보존
 - **벡터 Shape 편집**: Rectangle, Ellipse, Line, Path의 Fill·Stroke·대시·끝점·결합 스타일과 반지름·점 좌표를 편집하고, 검증된 Path geometry를 리소스·Undo/Redo·복제·미리보기·AXAML 왕복에 보존
 - **요소 선택**: 배치된 요소 클릭 시 파란 외곽선
@@ -96,10 +97,13 @@ dotnet run --project src/AvaloniaUIDesigner.App/AvaloniaUIDesigner.App.csproj
 29. `Edit > Edit TabControl Behavior...`에서 TabControl 탭 스트립 위치와 선택 콘텐츠 정렬 편집
 30. `Edit > Edit Image Source & Rendering...`에서 Image의 파일, 배율, 보간, edge, blending 동작 편집
 31. `Edit > Edit Button Actions & Commands...`에서 Button의 포인터·키보드 활성화, Window 기본/취소 역할, command data와 Click 이벤트 편집
+32. `File > Copy Selected AXAML`로 선택 컨트롤을 클립보드에 복사하거나 `File > Export Selected AXAML...`로 독립 UserControl AXAML 파일로 내보냄
 
 DataGrid가 포함된 생성 AXAML을 다른 프로젝트에서 사용할 때는 같은 Avalonia 버전의 `Avalonia.Controls.DataGrid` 패키지와 `avares://Avalonia.Controls.DataGrid/Themes/Fluent.xaml` 스타일 include가 필요합니다.
 
 DataGrid Behavior 편집기는 열 정의와 분리된 표 동작을 관리합니다. `HeadersVisibility`, `GridLinesVisibility`, `SelectionMode`, `ClipboardCopyMode`, 열 조작 허용 여부, `FrozenColumnCount`, 행·열 크기, `ColumnWidth`와 축별 scrollbar를 원자적으로 검증하며, `RowHeight=Auto` 같은 Avalonia의 `NaN` 기본값과 `MaxColumnWidth=Infinity`도 AXAML에서 안전하게 보존합니다.
+
+선택 AXAML 내보내기는 선택 컨트롤을 독립 `UserControl` 루트로 감싸며, 선택 루트의 디자인 surface 좌표는 제거하고 크기·이름·스타일·바인딩은 유지합니다. 선택 컨트롤이 컨테이너이면 현재 하위 계층과 DataGrid 열, Menu/TreeView/ItemsControl 항목도 함께 출력하며, 동적 리소스와 문서 스타일을 사용하는 경우 필요한 선언도 포함합니다. 바인딩의 실제 DataContext와 이벤트 핸들러가 있는 코드 영역은 호스트 프로젝트에서 연결해야 합니다.
 
 바인딩 편집기는 선택 타입에서 지원하는 속성을 대화상자에 표시합니다. 생성 AXAML은 ViewModel 타입을 알 수 없는 디자이너 문서가 compiled-bindings 설정과 독립적으로 컴파일되도록 `ReflectionBinding`을 사용합니다.
 
