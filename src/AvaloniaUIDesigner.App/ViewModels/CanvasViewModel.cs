@@ -2199,6 +2199,18 @@ public partial class CanvasViewModel : ViewModelBase
             return;
         }
 
+        if (visual is SelectableTextBlock selectableTextBlock
+            && visual.GetType() == typeof(SelectableTextBlock))
+        {
+            if (properties.TryGetValue("Text", out var text))
+            {
+                selectableTextBlock.Text = text;
+            }
+
+            DesignerSelectableTextBlockRuntime.Apply(selectableTextBlock, properties);
+            return;
+        }
+
         if (visual is TextBlock textBlock)
         {
             if (properties.TryGetValue("Text", out var text))

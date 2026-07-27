@@ -30,6 +30,7 @@ public static class DesignerTypographyRuntime
     [
         "Button",
         "TextBox",
+        "SelectableTextBlock",
         "Label",
         "CheckBox",
         "RadioButton",

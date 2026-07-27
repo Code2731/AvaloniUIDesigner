@@ -755,6 +755,19 @@ public partial class MainWindow : Window
         await ShowMaskedTextBoxPropertiesDialogAsync(state);
     }
 
+    private async void OnEditSelectableTextBlockPropertiesMenuClicked(
+        object? sender,
+        Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        FlushPendingPropertyHistory();
+        if (Vm is null || !Vm.TryGetSelectedSelectableTextBlockProperties(out var state))
+        {
+            return;
+        }
+
+        await ShowSelectableTextBlockPropertiesDialogAsync(state);
+    }
+
     private async void OnEditDateTimePropertiesMenuClicked(
         object? sender,
         Avalonia.Interactivity.RoutedEventArgs e)
@@ -4228,6 +4241,119 @@ public partial class MainWindow : Window
             Grid.SetRow(field, row);
             Grid.SetColumn(field, column);
             owner.Children.Add(field);
+        }
+    }
+
+    private async Task ShowSelectableTextBlockPropertiesDialogAsync(
+        SelectableTextBlockEditorState state)
+    {
+        if (Vm is null)
+        {
+            return;
+        }
+
+        var textEditor = new TextBox
+        {
+            Text = state.Text,
+            AcceptsReturn = true,
+            TextWrapping = Avalonia.Media.TextWrapping.Wrap,
+            MinHeight = 72,
+        };
+        var selectionBrushEditor = new TextBox
+        {
+            Text = state.SelectionBrush,
+            Watermark = "Example: #663B82F6 or Transparent",
+        };
+        var selectionForegroundEditor = new TextBox
+        {
+            Text = state.SelectionForegroundBrush,
+            Watermark = "Example: #FFFFFFFF or Transparent",
+        };
+        var errorText = new TextBlock
+        {
+            Foreground = Avalonia.Media.Brushes.IndianRed,
+            TextWrapping = Avalonia.Media.TextWrapping.Wrap,
+        };
+        var fields = new Grid
+        {
+            RowDefinitions = new RowDefinitions("Auto,Auto,Auto"),
+            RowSpacing = 10,
+            Children =
+            {
+                CreateField("Text", textEditor, 0),
+                CreateField("Selection brush", selectionBrushEditor, 1),
+                CreateField("Selection foreground", selectionForegroundEditor, 2),
+            },
+        };
+        var dialog = new Window
+        {
+            Title = $"Edit SelectableTextBlock - {state.ControlName}",
+            Width = 680,
+            Height = 460,
+            MinWidth = 560,
+            MinHeight = 380,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner,
+        };
+        var applyButton = new Button { Content = "Apply", MinWidth = 84 };
+        applyButton.Click += (_, _) =>
+        {
+            var input = new DesignerSelectableTextBlockEditorInput(
+                textEditor.Text ?? string.Empty,
+                selectionBrushEditor.Text ?? string.Empty,
+                selectionForegroundEditor.Text ?? string.Empty);
+            if (!Vm.SetSelectedSelectableTextBlockProperties(input))
+            {
+                errorText.Text = Vm.StatusText;
+                return;
+            }
+
+            dialog.Close();
+        };
+        var cancelButton = new Button { Content = "Cancel", MinWidth = 84 };
+        cancelButton.Click += (_, _) => dialog.Close();
+        var buttons = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            Spacing = 8,
+            HorizontalAlignment = HorizontalAlignment.Right,
+            Children = { cancelButton, applyButton },
+        };
+        var content = new Grid
+        {
+            Margin = new Thickness(16),
+            RowDefinitions = new RowDefinitions("Auto,*,Auto,Auto"),
+            RowSpacing = 12,
+            Children =
+            {
+                new TextBlock
+                {
+                    Text = "Configure selectable text content and solid selection colors. SelectionStart and SelectionEnd remain runtime interaction state and are not persisted in the document.",
+                    TextWrapping = Avalonia.Media.TextWrapping.Wrap,
+                },
+                fields,
+                errorText,
+                buttons,
+            },
+        };
+        Grid.SetRow(fields, 1);
+        Grid.SetRow(errorText, 2);
+        Grid.SetRow(buttons, 3);
+        dialog.Content = content;
+        await dialog.ShowDialog(this);
+
+        static Control CreateField(string label, Control editor, int row)
+        {
+            var field = new StackPanel
+            {
+                Spacing = 4,
+                Children =
+                {
+                    new TextBlock { Text = label },
+                    editor,
+                },
+            };
+            Grid.SetRow(field, row);
+            return field;
         }
     }
 

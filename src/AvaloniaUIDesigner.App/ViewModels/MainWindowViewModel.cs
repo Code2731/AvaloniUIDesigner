@@ -177,6 +177,12 @@ public sealed record MaskedTextBoxEditorState(
     string PromptChar,
     bool HidePromptOnLeave);
 
+public sealed record SelectableTextBlockEditorState(
+    string ControlName,
+    string Text,
+    string SelectionBrush,
+    string SelectionForegroundBrush);
+
 public sealed record SelectionEditorState(
     string ControlName,
     string ControlKind,
@@ -4188,6 +4194,87 @@ public partial class MainWindowViewModel : ViewModelBase
         return true;
     }
 
+    public bool TryGetSelectedSelectableTextBlockProperties(
+        out SelectableTextBlockEditorState state)
+    {
+        var target = Canvas.SelectedElement;
+        if (target is null
+            || target.IsLocked
+            || !DesignerSelectableTextBlockRuntime.IsSupportedControl(target.Visual))
+        {
+            state = default!;
+            StatusText = target switch
+            {
+                null => "Select a SelectableTextBlock before editing selection styling.",
+                { IsLocked: true } => "Unlock the selected SelectableTextBlock before editing selection styling.",
+                _ => "Selection styling editing is available for SelectableTextBlock controls.",
+            };
+            return false;
+        }
+
+        if (!DesignerSelectableTextBlockRuntime.TryRead(target.Visual, out var values, out var error))
+        {
+            state = default!;
+            StatusText = $"SelectableTextBlock cannot be edited. {error}";
+            return false;
+        }
+
+        state = new SelectableTextBlockEditorState(
+            target.DisplayName,
+            values.Text,
+            values.SelectionBrush,
+            values.SelectionForegroundBrush);
+        return true;
+    }
+
+    public bool SetSelectedSelectableTextBlockProperties(
+        DesignerSelectableTextBlockEditorInput input)
+    {
+        var target = Canvas.SelectedElement;
+        if (target is null
+            || target.IsLocked
+            || !DesignerSelectableTextBlockRuntime.IsSupportedControl(target.Visual))
+        {
+            StatusText = "Select an unlocked SelectableTextBlock before editing selection styling.";
+            return false;
+        }
+
+        if (!DesignerSelectableTextBlockRuntime.TryRead(target.Visual, out var current, out var error))
+        {
+            StatusText = $"SelectableTextBlock was not changed. {error}";
+            return false;
+        }
+
+        if (!DesignerSelectableTextBlockRuntime.TryParseValues(
+                target.Visual,
+                input,
+                out var values,
+                out error))
+        {
+            StatusText = $"SelectableTextBlock was not changed. {error}";
+            return false;
+        }
+
+        if (current == values)
+        {
+            StatusText = "SelectableTextBlock selection styling is unchanged.";
+            return true;
+        }
+
+        BeginCanvasMutation(HistoryActionType.EditProperty, "Updated SelectableTextBlock selection styling.");
+        DesignerSelectableTextBlockRuntime.Apply((SelectableTextBlock)target.Visual, values);
+        DesignerStyleApplicationMetadata.ClearApplied(target.Visual, "Text");
+        foreach (var attribute in DesignerSelectableTextBlockRuntime.GetAxamlAttributes(target.Visual))
+        {
+            DesignerStyleApplicationMetadata.ClearApplied(target.Visual, attribute.Name);
+        }
+
+        Canvas.RefreshDocumentStyles(target.Visual);
+        CommitCanvasMutation();
+        StatusText = $"Updated selection styling for {target.DisplayName}.";
+        return true;
+    }
+
     public bool TryGetSelectedSelectionProperties(out SelectionEditorState state)
     {
         var target = Canvas.SelectedElement;
@@ -6665,6 +6752,7 @@ public partial class MainWindowViewModel : ViewModelBase
         DesignerRangeRuntime.Capture(visual, result);
         DesignerTextInputRuntime.Capture(visual, result);
         DesignerMaskedTextBoxRuntime.Capture(visual, result);
+        DesignerSelectableTextBlockRuntime.Capture(visual, result);
         DesignerSelectionRuntime.Capture(visual, result);
         DesignerDateTimeRuntime.Capture(visual, result);
         DesignerColorPickerRuntime.Capture(visual, result);
@@ -6846,6 +6934,16 @@ public partial class MainWindowViewModel : ViewModelBase
             properties["__items"] = SerializeAutoCompleteBoxItems(autoCompleteBox);
             properties["Opacity"] = autoCompleteBox.Opacity.ToString("0.###", CultureInfo.InvariantCulture);
             return properties;
+        }
+
+        if (visual is SelectableTextBlock selectableTextBlock
+            && visual.GetType() == typeof(SelectableTextBlock))
+        {
+            return new Dictionary<string, string>
+            {
+                ["Text"] = selectableTextBlock.Text ?? string.Empty,
+                ["Opacity"] = selectableTextBlock.Opacity.ToString("0.###", CultureInfo.InvariantCulture),
+            };
         }
 
         if (visual is TextBlock textBlock)
@@ -8419,6 +8517,26 @@ public partial class MainWindowViewModel : ViewModelBase
                 continue;
             }
 
+            if (DesignerSelectableTextBlockRuntime.IsSupportedProperty(tagName, name))
+            {
+                if (DesignerSelectableTextBlockRuntime.TryNormalizeProperty(
+                        tagName,
+                        name,
+                        attr.Value,
+                        out var canonicalName,
+                        out var normalizedValue,
+                        out var selectableTextBlockError))
+                {
+                    map[canonicalName] = normalizedValue;
+                }
+                else
+                {
+                    warnings.Add($"Ignored {tagName}.{name}: {selectableTextBlockError}");
+                }
+
+                continue;
+            }
+
             if (DesignerSelectionRuntime.IsSupportedProperty(tagName, name))
             {
                 if (DesignerSelectionRuntime.TryNormalizeProperty(
@@ -8681,6 +8799,15 @@ public partial class MainWindowViewModel : ViewModelBase
             DesignerMaskedTextBoxRuntime.RemoveProperties(tagName, map);
         }
 
+        if (!DesignerSelectableTextBlockRuntime.TryValidateProperties(
+                tagName,
+                map,
+                out var selectableTextBlockConstraintError))
+        {
+            warnings.Add($"Ignored {tagName} selection brush properties: {selectableTextBlockConstraintError}");
+            DesignerSelectableTextBlockRuntime.RemoveProperties(tagName, map);
+        }
+
         var hasItemsSourceBinding = bindings.Any(binding =>
             string.Equals(binding.PropertyName, "ItemsSource", StringComparison.Ordinal));
         int? staticItemCount = hasItemsSourceBinding
@@ -8841,6 +8968,11 @@ public partial class MainWindowViewModel : ViewModelBase
             return true;
         }
 
+        if (DesignerSelectableTextBlockRuntime.IsSupportedProperty(tagName, propertyName))
+        {
+            return true;
+        }
+
         if (DesignerToggleRuntime.IsSupportedProperty(tagName, propertyName))
         {
             return true;
@@ -8880,7 +9012,7 @@ public partial class MainWindowViewModel : ViewModelBase
                 or "TextAlignment" or "IsReadOnly" or "MaxLength" or "MinLines"
                 or "MaxLines" or "UseFloatingWatermark" or "IsUndoEnabled" or "UndoLimit"
                 or "ClearSelectionOnLostFocus" or "IsInactiveSelectionHighlightEnabled",
-            "TextBlock" => propertyName is "Text" or "FontSize" or "FontWeight" or "Background" or "Foreground",
+            "TextBlock" or "SelectableTextBlock" => propertyName is "Text" or "FontSize" or "FontWeight" or "Background" or "Foreground",
             "Label" => propertyName is "Content" or "Target",
             "Image" => false,
             "Rectangle" => IsSupportedShapeProperty(propertyName)
@@ -8924,7 +9056,7 @@ public partial class MainWindowViewModel : ViewModelBase
     }
 
     private static bool SupportsTemplatedAppearance(string tagName)
-        => tagName is "Button" or "TextBox" or "MaskedTextBox" or "AutoCompleteBox" or "Label" or "CheckBox" or "RadioButton"
+        => tagName is "Button" or "TextBox" or "MaskedTextBox" or "AutoCompleteBox" or "SelectableTextBlock" or "Label" or "CheckBox" or "RadioButton"
             or "ToggleSwitch" or "ToggleButton" or "ComboBox" or "ListBox" or "ItemsControl" or "TreeView" or "Menu" or "Slider"
             or "ProgressBar" or "DatePicker" or "CalendarDatePicker"
             or "Calendar" or "ColorPicker" or "TimePicker"
@@ -10088,6 +10220,23 @@ public partial class MainWindowViewModel : ViewModelBase
                 sb.Append("<TextBox");
                 AppendCanvasLayoutAttributes(sb, element);
                 AppendTextInputAttributes(sb, textBox, skipBoundProperties: true);
+                sb.AppendLine(" />");
+                break;
+
+            case SelectableTextBlock selectableTextBlock when selectableTextBlock.GetType() == typeof(SelectableTextBlock):
+                sb.Append(indent);
+                sb.Append("<SelectableTextBlock");
+                AppendCanvasLayoutAttributes(sb, element);
+                if (!DesignerBindingRuntime.HasBinding(selectableTextBlock, "Text"))
+                {
+                    AppendAttribute(sb, "Text", selectableTextBlock.Text ?? string.Empty);
+                }
+
+                foreach (var attribute in DesignerSelectableTextBlockRuntime.GetAxamlAttributes(selectableTextBlock))
+                {
+                    AppendAttribute(sb, attribute.Name, attribute.Value);
+                }
+
                 sb.AppendLine(" />");
                 break;
 

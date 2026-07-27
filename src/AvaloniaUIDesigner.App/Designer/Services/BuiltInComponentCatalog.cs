@@ -57,6 +57,17 @@ public sealed class BuiltInComponentCatalog : IComponentCatalog
             DefaultHeight: 24,
             VisualFactory: static () => new TextBlock { Text = "Text" }),
         new(
+            DisplayName: "SelectableTextBlock",
+            AvaloniaTypeName: "Avalonia.Controls.SelectableTextBlock",
+            DefaultWidth: 260,
+            DefaultHeight: 32,
+            VisualFactory: static () => new SelectableTextBlock
+            {
+                Text = "Select and copy this text",
+                SelectionBrush = Brush.Parse("#663B82F6"),
+                SelectionForegroundBrush = Brushes.White,
+            }),
+        new(
             DisplayName: "Label",
             AvaloniaTypeName: "Avalonia.Controls.Label",
             DefaultWidth: 160,

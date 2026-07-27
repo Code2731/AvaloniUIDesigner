@@ -35,7 +35,7 @@ public static class DesignerBindingRuntime
             "TextBox" => ["Text", "Watermark"],
             "MaskedTextBox" => ["Text", "Watermark"],
             "AutoCompleteBox" => ["Text", "Watermark"],
-            "TextBlock" => ["Text"],
+            "TextBlock" or "SelectableTextBlock" => ["Text"],
             "Label" => ["Content"],
             "Image" => ["Source"],
             "CheckBox" or "RadioButton" or "ToggleSwitch" or "ToggleButton"

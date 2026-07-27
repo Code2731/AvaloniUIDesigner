@@ -286,6 +286,12 @@ public sealed class PreviewWindow : Window
                 Watermark = "Search...",
                 ItemsSource = new[] { "Alpha", "Beta", "Gamma" },
             },
+            "Avalonia.Controls.SelectableTextBlock" => new SelectableTextBlock
+            {
+                Text = "Select and copy this text",
+                SelectionBrush = Brush.Parse("#663B82F6"),
+                SelectionForegroundBrush = Brushes.White,
+            },
             "Avalonia.Controls.TextBlock" => new TextBlock { Text = "Text" },
             "Avalonia.Controls.Label" => new Label { Content = "Label" },
             "Avalonia.Controls.Image" => new Image { Stretch = Stretch.Uniform },
@@ -482,6 +488,14 @@ public sealed class PreviewWindow : Window
                 break;
             case Button button:
                 DesignerButtonRuntime.Apply(button, properties);
+                break;
+            case SelectableTextBlock selectableTextBlock when selectableTextBlock.GetType() == typeof(SelectableTextBlock):
+                if (properties.TryGetValue("Text", out var selectableText))
+                {
+                    selectableTextBlock.Text = selectableText;
+                }
+
+                DesignerSelectableTextBlockRuntime.Apply(selectableTextBlock, properties);
                 break;
             case TextBlock textBlock:
                 if (properties.TryGetValue("Text", out var textBlockText))
