@@ -27,6 +27,7 @@ dotnet run --project src/AvaloniaUIDesigner.App/AvaloniaUIDesigner.App.csproj
 - **DataGrid 열 설계**: Text·CheckBox 열의 Header·Binding·Width·ReadOnly를 편집하고 샘플 행, Undo/Redo, 복제, 미리보기, AXAML 왕복에 보존
 - **DataGrid Behavior 속성**: 헤더·그리드선·선택·클립보드, 열 조작, 읽기 전용, 고정 열, 행·열 크기, 스크롤 정책을 전용 편집기로 검증하고 열 정의·Undo/Redo·Preview·Binding·AXAML 왕복에 보존
 - **GridSplitter Behavior 속성**: GridSplitter를 Toolbox에서 배치하고 행/열 방향·인접 track 동작·미리보기·키보드/드래그 증분을 편집해 Grid 셀 배치·Undo/Redo·Preview·Binding·AXAML 왕복에 보존
+- **Canvas 그룹화**: 다중 선택한 같은 root 또는 같은 Canvas의 형제 컨트롤을 실제 Canvas 그룹으로 묶고 해제하며, bounding box·로컬 좌표·z-order·Object Tree·Undo/Redo·Preview·AXAML 왕복을 보존
 - **데이터 바인딩**: 선택 컨트롤의 지원 속성에 Path·Mode·Fallback을 여러 개 선언하고, 디자인 샘플을 유지한 채 ReflectionBinding·Undo/Redo·복제·미리보기·AXAML 왕복에 보존
 - **샘플 DataContext**: 문서 단위 JSON을 바인딩 Path에 연결해 Text·상태·숫자·선택·ItemsSource를 캔버스와 Preview에서 확인하고, 원래 디자인 값·Undo/Redo·AXAML 왕복에 보존
 - **공통 레이아웃 속성**: Margin·Padding·수평/수직 정렬·Min/Max 크기를 편집하고 컨테이너 자식, Undo/Redo, 복제, Preview, AXAML 왕복에 보존
@@ -102,6 +103,7 @@ dotnet run --project src/AvaloniaUIDesigner.App/AvaloniaUIDesigner.App.csproj
 32. `File > Copy Selected AXAML`로 선택 컨트롤을 클립보드에 복사하거나 `File > Export Selected AXAML...`로 독립 UserControl AXAML 파일로 내보냄
 33. ContentControl은 `Edit > Edit Content...`에서 fallback 텍스트를 편집하거나 `Assign as Container Content...`에서 단일 디자이너 자식을 할당
 34. GridSplitter는 `Edit > Edit GridSplitter Behavior...`에서 방향·resize behavior·preview·keyboard/drag 증분을 편집하고 `Assign to Grid Cell...`로 Grid에 배치
+35. 같은 root 또는 같은 Canvas 안의 형제 컨트롤을 여러 개 선택한 뒤 `Edit > Group Selected into Canvas`로 묶고, Canvas 그룹을 선택해 `Edit > Ungroup Selected Canvas`로 해제
 
 DataGrid가 포함된 생성 AXAML을 다른 프로젝트에서 사용할 때는 같은 Avalonia 버전의 `Avalonia.Controls.DataGrid` 패키지와 `avares://Avalonia.Controls.DataGrid/Themes/Fluent.xaml` 스타일 include가 필요합니다.
 
@@ -154,6 +156,8 @@ Disclosure & Scrolling 편집기는 `Edit Content...` 또는 Content 할당으�
 ContentControl은 Toolbox에서 배치한 뒤 `Edit > Edit Content...`로 fallback TextBlock을 편집하거나 `Assign as Container Content...`로 실제 단일 자식을 연결합니다. 디자이너 자식이 연결되면 fallback 텍스트는 중복 출력하지 않으며, Content Binding이 있으면 정적 콘텐츠도 출력하지 않습니다. 두 모드는 Canvas·Object Tree·Undo/Redo·Preview·Draft·Full·UserControl AXAML 왕복에서 같은 계층으로 유지됩니다.
 
 GridSplitter Behavior 편집기는 `ResizeDirection`의 Auto·Columns·Rows, `ResizeBehavior`의 BasedOnAlignment·CurrentAndNext·PreviousAndCurrent·PreviousAndNext, `ShowsPreview`, `KeyboardIncrement`, `DragIncrement`를 검증합니다. 실제 splitter는 `Assign to Grid Cell...`로 Grid 행/열에 배치하며, 생성 AXAML은 Grid attached properties와 GridSplitter 동작 속성을 함께 보존합니다.
+
+Canvas 그룹화는 같은 부모를 공유하는 형제 컨트롤만 대상으로 합니다. root 컨트롤을 묶으면 bounding box 위치에 새 Canvas가 생성되고, Canvas 자식을 묶으면 원래 Canvas 안에 중첩됩니다. 그룹을 해제해도 자식의 화면 좌표와 형제 z-order를 유지하며, 서로 다른 Grid·StackPanel·Content 슬롯을 섞는 작업은 레이아웃 좌표 손실을 막기 위해 거부합니다.
 
 Image Source & Rendering 편집기는 로컬 파일 경로와 `file://` URI를 지원하며 빈 Source를 적용하면 현재 이미지를 해제합니다. 존재하지 않거나 디코딩할 수 없는 파일은 기존 Source와 렌더링 상태를 변경하지 않지만, 가져온 AXAML에서 파일을 찾을 수 없는 경우에는 Source 메타데이터를 보존해 프로젝트 이동 후 다시 연결할 수 있습니다. Stretch와 StretchDirection 외에 bitmap interpolation 품질, antialias/aliased edge, compositing blending 모드를 설정할 수 있고 Source Binding이 있으면 생성 AXAML은 정적 Source를 중복 출력하지 않습니다.
 

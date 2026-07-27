@@ -1617,6 +1617,18 @@ public partial class MainWindow : Window
         Vm?.ArrangeSelectedElements(action);
     }
 
+    private void OnGroupSelectedMenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        FlushPendingPropertyHistory();
+        Vm?.GroupSelectedElements();
+    }
+
+    private void OnUngroupSelectedMenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        FlushPendingPropertyHistory();
+        Vm?.UngroupSelectedCanvas();
+    }
+
     private void CenterSelectedElementsOnArtboard(bool horizontally, bool vertically)
     {
         FlushPendingPropertyHistory();

@@ -6039,6 +6039,70 @@ public partial class MainWindowViewModel : ViewModelBase
         StatusText = $"{DescribeLayoutAction(action)} {targets.Count} control(s)";
     }
 
+    public bool GroupSelectedElements()
+    {
+        var targets = Canvas.SelectedElements.ToList();
+        BeginCanvasMutation(HistoryActionType.TransformElement, "Grouped selected controls into a Canvas.");
+        if (!Canvas.TryCreateCanvasGroup(targets, out var group, out var error)
+            || group is null)
+        {
+            _pendingMutation = null;
+            StatusText = error;
+            return false;
+        }
+
+        _isSyncingSelection = true;
+        try
+        {
+            ObjectTree.RebuildFrom(Canvas.Elements);
+            Canvas.Select(group);
+            ObjectTree.SelectByElement(group);
+        }
+        finally
+        {
+            _isSyncingSelection = false;
+        }
+
+        RefreshStylePreviewOptions();
+        CommitCanvasMutation();
+        StatusText = $"Grouped {targets.Count} control(s) into {group.DisplayName}.";
+        return true;
+    }
+
+    public bool UngroupSelectedCanvas()
+    {
+        if (Canvas.SelectedElement is not { } target)
+        {
+            StatusText = "Select a Canvas group to ungroup.";
+            return false;
+        }
+
+        BeginCanvasMutation(HistoryActionType.TransformElement, "Ungrouped Canvas control.");
+        if (!Canvas.TryUngroupCanvas(target, out var children, out var error))
+        {
+            _pendingMutation = null;
+            StatusText = error;
+            return false;
+        }
+
+        _isSyncingSelection = true;
+        try
+        {
+            ObjectTree.RebuildFrom(Canvas.Elements);
+            Canvas.SelectMany(children);
+            ObjectTree.SelectByElement(Canvas.SelectedElement);
+        }
+        finally
+        {
+            _isSyncingSelection = false;
+        }
+
+        RefreshStylePreviewOptions();
+        CommitCanvasMutation();
+        StatusText = $"Ungrouped {children.Count} control(s).";
+        return true;
+    }
+
     public void CenterSelectedElementsOnArtboard(bool horizontally, bool vertically)
     {
         var targets = Canvas.SelectedElements.Where(element => !element.IsLocked).ToList();

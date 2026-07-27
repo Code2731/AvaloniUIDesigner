@@ -190,6 +190,9 @@
                     <MenuItem Header="Make Same Height" Click="OnMakeSameHeightMenuClicked"/>
                     <MenuItem Header="Make Same Size" Click="OnMakeSameSizeMenuClicked"/>
                 </MenuItem>
+                <Separator/>
+                <MenuItem Header="Group Selected into Canvas" Click="OnGroupSelectedMenuClicked" IsEnabled="{Binding Canvas.HasMultipleSelection}"/>
+                <MenuItem Header="Ungroup Selected Canvas" Click="OnUngroupSelectedMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
             </MenuItem>
             <MenuItem Header="View">
                 <MenuItem Header="Preview" Click="OnPreviewMenuClicked"/>
@@ -453,6 +456,9 @@
                                                         <MenuItem Header="Make Same Height" Click="OnMakeSameHeightMenuClicked"/>
                                                         <MenuItem Header="Make Same Size" Click="OnMakeSameSizeMenuClicked"/>
                                                     </MenuItem>
+                                                    <Separator/>
+                                                    <MenuItem Header="Group Selected into Canvas" Click="OnGroupSelectedMenuClicked"/>
+                                                    <MenuItem Header="Ungroup Selected Canvas" Click="OnUngroupSelectedMenuClicked"/>
                                                 </ContextMenu>
                                             </Border.ContextMenu>
                                             <Grid>

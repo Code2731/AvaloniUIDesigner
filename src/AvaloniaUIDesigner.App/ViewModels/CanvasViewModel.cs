@@ -1005,22 +1005,12 @@ public partial class CanvasViewModel : ViewModelBase
             for (var index = 0; index < orderedChildren.Count; index++)
             {
                 var child = orderedChildren[index];
-                child.GridRow = 0;
-                child.GridColumn = 0;
-                child.GridRowSpan = 1;
-                child.GridColumnSpan = 1;
-                child.StackPanelIndex = -1;
-                child.StackPanelItemSize = 40;
-                child.DockPanelIndex = -1;
-                child.DockPanelDock = DesignerDockSide.Left;
-                child.DockPanelItemSize = 40;
-                child.WrapPanelIndex = -1;
-                child.UniformGridIndex = -1;
-                child.CanvasChildIndex = index;
-                child.TabIndex = -1;
-                child.TabHeader = null;
-                child.ParentLayout = DesignerParentLayoutKind.Canvas;
-                child.ParentName = parent.DisplayName;
+                SetCanvasChildRelationship(
+                    child,
+                    parent,
+                    index,
+                    child.CanvasChildLeft,
+                    child.CanvasChildTop);
             }
 
             ReflowContainerTreeCore(parent);
@@ -1029,6 +1019,239 @@ public partial class CanvasViewModel : ViewModelBase
         {
             _isReflowingContainerChildren = false;
         }
+    }
+
+    public bool TryCreateCanvasGroup(
+        IEnumerable<DesignElement> requested,
+        out DesignElement? group,
+        out string error)
+    {
+        group = null;
+        error = string.Empty;
+
+        var targets = requested
+            .Where(Elements.Contains)
+            .Distinct()
+            .ToList();
+        if (targets.Count < 2)
+        {
+            error = "Select at least two controls to group.";
+            return false;
+        }
+
+        if (targets.Any(element => element.IsLocked))
+        {
+            error = "Locked controls cannot be grouped.";
+            return false;
+        }
+
+        var parentName = targets[0].ParentName;
+        if (targets.Any(element => !string.Equals(
+                element.ParentName,
+                parentName,
+                StringComparison.OrdinalIgnoreCase)))
+        {
+            error = "Group controls must share the same parent.";
+            return false;
+        }
+
+        var parent = parentName is null
+            ? null
+            : Elements.FirstOrDefault(element => string.Equals(
+                element.DisplayName,
+                parentName,
+                StringComparison.OrdinalIgnoreCase));
+        if (parentName is not null && parent?.Visual is not Canvas)
+        {
+            error = "Only controls on the root or inside the same Canvas can be grouped.";
+            return false;
+        }
+
+        if (parent is null && targets.Any(element => element.IsContainerChild))
+        {
+            error = "The selected controls have an invalid parent relationship.";
+            return false;
+        }
+
+        var orderedTargets = parent is null
+            ? targets.OrderBy(Elements.IndexOf).ToList()
+            : targets
+                .OrderBy(element => element.CanvasChildIndex)
+                .ThenBy(Elements.IndexOf)
+                .ToList();
+        var left = orderedTargets.Min(element => element.X);
+        var top = orderedTargets.Min(element => element.Y);
+        var right = orderedTargets.Max(element => element.X + element.Width);
+        var bottom = orderedTargets.Max(element => element.Y + element.Height);
+        var width = Math.Max(10, right - left);
+        var height = Math.Max(10, bottom - top);
+        var groupName = BuildUniqueDisplayName("Group");
+        var groupVisual = new Canvas { Background = Brushes.Transparent };
+        group = new DesignElement(
+            groupName,
+            "Avalonia.Controls.Canvas",
+            groupVisual,
+            left,
+            top,
+            width,
+            height);
+        group.PropertyChanged += OnDesignElementPropertyChanged;
+
+        var insertIndex = Math.Max(0, targets.Min(Elements.IndexOf));
+        Elements.Insert(Math.Min(insertIndex, Elements.Count), group);
+        var originalSiblings = parent is null
+            ? new List<DesignElement>()
+            : GetDirectChildren(parent)
+                .OrderBy(child => child.CanvasChildIndex)
+                .ThenBy(Elements.IndexOf)
+                .ToList();
+        var originalGroupIndex = parent is null
+            ? 0
+            : orderedTargets
+                .Select(child => originalSiblings.IndexOf(child))
+                .Where(index => index >= 0)
+                .DefaultIfEmpty(originalSiblings.Count)
+                .Min();
+        _isReflowingContainerChildren = true;
+        try
+        {
+            foreach (var (child, index) in orderedTargets.Select((child, index) => (child, index)))
+            {
+                SetCanvasChildRelationship(
+                    child,
+                    group,
+                    index,
+                    child.X - left,
+                    child.Y - top);
+            }
+
+            if (parent is not null)
+            {
+                var siblings = originalSiblings
+                    .Where(child => !targets.Contains(child))
+                    .ToList();
+                var groupIndex = Math.Clamp(
+                    originalSiblings.Take(originalGroupIndex).Count(child => !targets.Contains(child)),
+                    0,
+                    siblings.Count);
+                siblings.Insert(groupIndex, group);
+                SetCanvasChildRelationship(
+                    group,
+                    parent,
+                    groupIndex,
+                    left - parent.X,
+                    top - parent.Y);
+                SetCanvasChildOrder(parent, siblings);
+            }
+        }
+        finally
+        {
+            _isReflowingContainerChildren = false;
+        }
+
+        NormalizeContainerRelationships();
+        ReflowContainerChildren();
+        ResolveLabelTargets();
+        return true;
+    }
+
+    public bool TryUngroupCanvas(
+        DesignElement requested,
+        out IReadOnlyList<DesignElement> children,
+        out string error)
+    {
+        children = Array.Empty<DesignElement>();
+        error = string.Empty;
+        if (!Elements.Contains(requested)
+            || requested.IsLocked
+            || requested.Visual is not Canvas)
+        {
+            error = "Select an unlocked Canvas group to ungroup.";
+            return false;
+        }
+
+        var groupChildren = GetDirectChildren(requested)
+            .Where(child => child.IsCanvasChild)
+            .OrderBy(child => child.CanvasChildIndex)
+            .ThenBy(Elements.IndexOf)
+            .ToList();
+        if (groupChildren.Count == 0)
+        {
+            error = "The selected Canvas has no direct children to ungroup.";
+            return false;
+        }
+
+        var parent = FindParent(requested);
+        if (parent is not null && parent.Visual is not Canvas)
+        {
+            error = "Only a root Canvas group or a group inside another Canvas can be ungrouped.";
+            return false;
+        }
+
+        var groupIndex = Elements.IndexOf(requested);
+        var formerParentChildren = parent is null
+            ? null
+            : GetDirectChildren(parent)
+                .Where(child => !ReferenceEquals(child, requested))
+                .OrderBy(child => child.CanvasChildIndex)
+                .ThenBy(Elements.IndexOf)
+                .ToList();
+
+        _isReflowingContainerChildren = true;
+        try
+        {
+            Elements.Remove(requested);
+            if (parent is null)
+            {
+                foreach (var child in groupChildren)
+                {
+                    Elements.Remove(child);
+                    ResetContainerRelationship(child);
+                }
+
+                var insertionIndex = Math.Clamp(groupIndex, 0, Elements.Count);
+                foreach (var child in groupChildren)
+                {
+                    Elements.Insert(insertionIndex++, child);
+                }
+            }
+            else
+            {
+                var parentIndex = formerParentChildren?.Count ?? 0;
+                if (formerParentChildren is not null)
+                {
+                    parentIndex = Math.Clamp(requested.CanvasChildIndex, 0, formerParentChildren.Count);
+                    foreach (var child in groupChildren)
+                    {
+                        SetCanvasChildRelationship(
+                            child,
+                            parent,
+                            parentIndex++,
+                            child.X - parent.X,
+                            child.Y - parent.Y);
+                    }
+
+                    formerParentChildren.InsertRange(
+                        Math.Clamp(requested.CanvasChildIndex, 0, formerParentChildren.Count),
+                        groupChildren);
+                    SetCanvasChildOrder(parent, formerParentChildren);
+                }
+            }
+        }
+        finally
+        {
+            _isReflowingContainerChildren = false;
+        }
+
+        if (requested.Visual is Canvas groupVisual)
+        {
+            groupVisual.Children.Clear();
+        }
+        NormalizeContainerRelationships();
+        ReflowContainerChildren();
+        ResolveLabelTargets();
+        children = groupChildren;
+        return true;
     }
 
     public DesignElement? SetTabControlChild(
@@ -1955,6 +2178,34 @@ public partial class CanvasViewModel : ViewModelBase
                 element.DisplayName,
                 child.ParentName,
                 StringComparison.OrdinalIgnoreCase));
+
+    private static void SetCanvasChildRelationship(
+        DesignElement child,
+        DesignElement parent,
+        int index,
+        double left,
+        double top)
+    {
+        child.GridRow = 0;
+        child.GridColumn = 0;
+        child.GridRowSpan = 1;
+        child.GridColumnSpan = 1;
+        child.StackPanelIndex = -1;
+        child.StackPanelItemSize = 40;
+        child.DockPanelIndex = -1;
+        child.DockPanelDock = DesignerDockSide.Left;
+        child.DockPanelItemSize = 40;
+        child.WrapPanelIndex = -1;
+        child.UniformGridIndex = -1;
+        child.CanvasChildIndex = index;
+        child.CanvasChildLeft = left;
+        child.CanvasChildTop = top;
+        child.TabIndex = -1;
+        child.TabHeader = null;
+        child.SplitViewSlot = DesignerSplitViewSlot.Content;
+        child.ParentLayout = DesignerParentLayoutKind.Canvas;
+        child.ParentName = parent.DisplayName;
+    }
 
     private static void ResetContainerRelationship(DesignElement child)
     {
