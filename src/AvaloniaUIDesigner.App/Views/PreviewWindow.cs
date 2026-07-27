@@ -96,6 +96,7 @@ public sealed class PreviewWindow : Window
                 || string.Equals(element.TypeName, "Avalonia.Controls.SplitView", StringComparison.Ordinal)
                 || string.Equals(element.TypeName, "Avalonia.Controls.Border", StringComparison.Ordinal)
                 || string.Equals(element.TypeName, "Avalonia.Controls.ContentControl", StringComparison.Ordinal)
+                || string.Equals(element.TypeName, "Avalonia.Controls.UserControl", StringComparison.Ordinal)
                 || string.Equals(element.TypeName, "Avalonia.Controls.ScrollViewer", StringComparison.Ordinal)
                 || string.Equals(element.TypeName, "Avalonia.Controls.Expander", StringComparison.Ordinal))
             .ToDictionary(element => element.DisplayName, StringComparer.OrdinalIgnoreCase);
@@ -251,7 +252,8 @@ public sealed class PreviewWindow : Window
                     case Border border:
                         border.Child = child;
                         break;
-                    case ContentControl contentControl when contentControl.GetType() == typeof(ContentControl):
+                    case ContentControl contentControl when contentControl.GetType() == typeof(ContentControl)
+                        || contentControl is UserControl:
                         contentControl.Content = child;
                         break;
                     case ScrollViewer scrollViewer:
@@ -382,6 +384,14 @@ public sealed class PreviewWindow : Window
                 Content = new TextBlock
                 {
                     Text = "ContentControl content",
+                    Margin = new Thickness(8),
+                },
+            },
+            "Avalonia.Controls.UserControl" => new UserControl
+            {
+                Content = new TextBlock
+                {
+                    Text = "UserControl content",
                     Margin = new Thickness(8),
                 },
             },
@@ -615,7 +625,8 @@ public sealed class PreviewWindow : Window
             case Border border:
                 ApplyBorderProperties(border, properties, colorResources);
                 break;
-            case ContentControl contentControl when contentControl.GetType() == typeof(ContentControl):
+            case ContentControl contentControl when contentControl.GetType() == typeof(ContentControl)
+                || contentControl is UserControl:
                 ApplyContentControlProperties(contentControl, properties);
                 break;
             case GridSplitter gridSplitter:

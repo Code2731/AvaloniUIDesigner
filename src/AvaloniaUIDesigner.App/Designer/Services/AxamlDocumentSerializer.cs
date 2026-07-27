@@ -383,7 +383,12 @@ public sealed class AxamlDocumentSerializer : IDesignerSerializer
             return;
         }
 
-        if (string.Equals(element.TypeName, "Avalonia.Controls.ContentControl", StringComparison.Ordinal))
+        var isUserControl = string.Equals(
+            element.TypeName,
+            "Avalonia.Controls.UserControl",
+            StringComparison.Ordinal);
+        if (isUserControl
+            || string.Equals(element.TypeName, "Avalonia.Controls.ContentControl", StringComparison.Ordinal))
         {
             childrenByParent.TryGetValue(element.DisplayName, out var contentChildren);
             if ((contentChildren is null || contentChildren.Count == 0)
@@ -408,12 +413,14 @@ public sealed class AxamlDocumentSerializer : IDesignerSerializer
                 sb.Append(EscapeXmlAttribute(ReadInternalText(
                     element,
                     "__contentText",
-                    "ContentControl content")));
+                    isUserControl ? "UserControl content" : "ContentControl content")));
                 sb.AppendLine("\" />");
             }
 
             sb.Append(indent);
-            sb.AppendLine("</ContentControl>");
+            sb.Append("</");
+            sb.Append(isUserControl ? "UserControl" : "ContentControl");
+            sb.AppendLine(">");
             return;
         }
 
@@ -510,6 +517,7 @@ public sealed class AxamlDocumentSerializer : IDesignerSerializer
             || string.Equals(element.TypeName, "Avalonia.Controls.SplitView", StringComparison.Ordinal)
             || string.Equals(element.TypeName, "Avalonia.Controls.Border", StringComparison.Ordinal)
             || string.Equals(element.TypeName, "Avalonia.Controls.ContentControl", StringComparison.Ordinal)
+            || string.Equals(element.TypeName, "Avalonia.Controls.UserControl", StringComparison.Ordinal)
             || string.Equals(element.TypeName, "Avalonia.Controls.ScrollViewer", StringComparison.Ordinal)
             || string.Equals(element.TypeName, "Avalonia.Controls.Expander", StringComparison.Ordinal);
 

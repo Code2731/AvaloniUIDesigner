@@ -2303,11 +2303,11 @@ public partial class CanvasViewModel : ViewModelBase
 
     private static bool IsDesignerContainer(Control visual)
         => visual is Grid or StackPanel or DockPanel or WrapPanel or UniformGrid or Canvas
-            or TabControl or SplitView or Border or ScrollViewer or Expander
+            or TabControl or SplitView or Border or ScrollViewer or Expander or UserControl
             || visual.GetType() == typeof(ContentControl);
 
     private static bool IsContentContainer(Control visual)
-        => visual is Border or ScrollViewer or Expander
+        => visual is Border or ScrollViewer or Expander or UserControl
             || visual.GetType() == typeof(ContentControl);
 
     private int FindFirstAvailableTabIndex(
@@ -2355,7 +2355,8 @@ public partial class CanvasViewModel : ViewModelBase
             case Border border:
                 border.Child = null;
                 break;
-            case ContentControl contentControl when visual.GetType() == typeof(ContentControl):
+            case ContentControl contentControl when visual.GetType() == typeof(ContentControl)
+                || visual is UserControl:
                 contentControl.Content = null;
                 break;
             case ScrollViewer scrollViewer:
@@ -2720,7 +2721,7 @@ public partial class CanvasViewModel : ViewModelBase
         }
 
         if (visual is ContentControl contentControl
-            && visual.GetType() == typeof(ContentControl))
+            && (visual.GetType() == typeof(ContentControl) || visual is UserControl))
         {
             if (properties.TryGetValue("__contentText", out var contentText))
             {

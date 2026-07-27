@@ -21,7 +21,7 @@ dotnet run --project src/AvaloniaUIDesigner.App/AvaloniaUIDesigner.App.csproj
 - 4-Pane 레이아웃 (Toolbox / Canvas / Object Tree / Property Inspector)
 - **Toolbox**: 내장 컨트롤, 복합 프리셋, JSON 컴포넌트 팩
 - **배치**: 클릭-투-플레이스와 드래그 앤 드롭으로 실제 Avalonia 컨트롤 생성
-- **컨테이너 편집**: Grid 셀, StackPanel 순서·주축 크기, DockPanel 순서·방향·크기·LastChildFill, WrapPanel 순서·방향·항목 크기·간격·정렬, UniformGrid 순서·행·열·첫 열·간격, 중첩 Canvas 로컬 좌표·직접 변형·z-order, TabControl 탭 정의·탭별 단일 자식·활성 페이지·TabStripPlacement·콘텐츠 정렬, SplitView Pane·Content 슬롯·Inline/Overlay·배치 방향, Border·ContentControl·ScrollViewer·Expander의 단일 Content 자식을 편집하고 재귀 Object Tree·AXAML·미리보기에 보존
+- **컨테이너 편집**: Grid 셀, StackPanel 순서·주축 크기, DockPanel 순서·방향·크기·LastChildFill, WrapPanel 순서·방향·항목 크기·간격·정렬, UniformGrid 순서·행·열·첫 열·간격, 중첩 Canvas 로컬 좌표·직접 변형·z-order, TabControl 탭 정의·탭별 단일 자식·활성 페이지·TabStripPlacement·콘텐츠 정렬, SplitView Pane·Content 슬롯·Inline/Overlay·배치 방향, Border·ContentControl·UserControl·ScrollViewer·Expander의 단일 Content 자식을 편집하고 재귀 Object Tree·AXAML·미리보기에 보존
 - **계층 항목 편집**: TreeView 항목을 `[-]`(펼침), `[+]`(접힘), 두 칸 들여쓰기 문법으로 편집하고 Undo/Redo, 복제, 미리보기, AXAML 왕복에 보존
 - **메뉴 구조 편집**: Menu 항목을 두 칸 들여쓰기로 중첩하고 `---` 구분선, `[x]/[ ]` 체크, `(x)/( )` 라디오와 `{Group}`, `| Ctrl+N` 표시·실행 단축키를 편집해 Undo/Redo, 복제, 미리보기, AXAML 왕복에 보존
 - **DataGrid 열 설계**: Text·CheckBox 열의 Header·Binding·Width·ReadOnly를 편집하고 샘플 행, Undo/Redo, 복제, 미리보기, AXAML 왕복에 보존
@@ -49,7 +49,7 @@ dotnet run --project src/AvaloniaUIDesigner.App/AvaloniaUIDesigner.App.csproj
 - **ColorPicker 속성**: ColorPicker의 색상·색상 모델·스펙트럼·알파·팔레트·입력 표시 정책과 팔레트 열 수를 원자적으로 편집하고 Undo/Redo, 복제, Preview, Color Binding, Draft·Full·UserControl AXAML 왕복에 보존
 - **Toggle & Choice Behavior 속성**: CheckBox·RadioButton·ToggleSwitch·ToggleButton의 checked/unchecked/indeterminate 상태, three-state, ClickMode, 콘텐츠 정렬과 Radio 그룹·Switch On/Off 문구를 편집하고 Undo/Redo, 복제, Preview, Binding, Draft·Full·UserControl AXAML 왕복에 보존
 - **Disclosure & Scrolling 속성**: Expander의 header·expanded 상태·전개 방향·콘텐츠 정렬과 ScrollViewer의 양축 scrollbar·auto-hide·chaining·deferred/focus scrolling·snap 정책을 편집하고 실제 중첩 Content, Undo/Redo, 복제, Preview, Binding, Draft·Full·UserControl AXAML 왕복에 보존
-- **ContentControl 계층**: ContentControl을 Toolbox에서 배치하고 단일 디자이너 자식 또는 fallback TextBlock 콘텐츠를 편집하며, Content Binding·Undo/Redo·Preview·Draft·Full·UserControl AXAML 왕복에 보존
+- **ContentControl·UserControl 계층**: ContentControl과 UserControl을 Toolbox에서 배치하고 단일 디자이너 자식 또는 fallback TextBlock 콘텐츠를 편집하며, Content Binding·Undo/Redo·Preview·Draft·Full·UserControl AXAML 왕복에 보존
 - **Image Source & Rendering 속성**: Image의 로컬 Source 선택·해제, Stretch·StretchDirection, bitmap interpolation·edge·blending 모드를 원자적으로 편집하고 Undo/Redo, 복제, Preview, Source Binding, Draft·Full·UserControl AXAML 왕복에 보존
 - **Button Actions & Commands 속성**: Button의 Content·ClickMode·HotKey·Window 기본/취소 동작·CommandParameter·Click 핸들러를 통합 편집하고 Command Binding, Undo/Redo, 복제, Preview, Draft·Full·UserControl AXAML 왕복에 보존
 - **선택 요소 AXAML 재사용**: 선택한 컨트롤을 하위 계층·리소스·스타일·바인딩·컨트롤 전용 선언과 함께 독립 UserControl AXAML로 클립보드 복사하거나 파일로 내보냄
@@ -101,9 +101,10 @@ dotnet run --project src/AvaloniaUIDesigner.App/AvaloniaUIDesigner.App.csproj
 30. `Edit > Edit Image Source & Rendering...`에서 Image의 파일, 배율, 보간, edge, blending 동작 편집
 31. `Edit > Edit Button Actions & Commands...`에서 Button의 포인터·키보드 활성화, Window 기본/취소 역할, command data와 Click 이벤트 편집
 32. `File > Copy Selected AXAML`로 선택 컨트롤을 클립보드에 복사하거나 `File > Export Selected AXAML...`로 독립 UserControl AXAML 파일로 내보냄
-33. ContentControl은 `Edit > Edit Content...`에서 fallback 텍스트를 편집하거나 `Assign as Container Content...`에서 단일 디자이너 자식을 할당
+33. ContentControl과 UserControl은 `Edit > Edit Content...`에서 fallback 텍스트를 편집하거나 `Assign as Container Content...`에서 단일 디자이너 자식을 할당
 34. GridSplitter는 `Edit > Edit GridSplitter Behavior...`에서 방향·resize behavior·preview·keyboard/drag 증분을 편집하고 `Assign to Grid Cell...`로 Grid에 배치
 35. 같은 root 또는 같은 Canvas 안의 형제 컨트롤을 여러 개 선택한 뒤 `Edit > Group Selected into Canvas`로 묶고, Canvas 그룹을 선택해 `Edit > Ungroup Selected Canvas`로 해제
+36. UserControl은 기존 Window/UserControl 문서 안에 중첩 배치할 수 있으며, 단일 Content 자식·fallback 텍스트·Content Binding을 각각 Preview와 생성 AXAML에서 같은 `<UserControl>` 계층으로 확인
 
 DataGrid가 포함된 생성 AXAML을 다른 프로젝트에서 사용할 때는 같은 Avalonia 버전의 `Avalonia.Controls.DataGrid` 패키지와 `avares://Avalonia.Controls.DataGrid/Themes/Fluent.xaml` 스타일 include가 필요합니다.
 
@@ -153,7 +154,7 @@ Toggle & Choice Behavior 편집기의 Indeterminate 상태는 three-state가 활
 
 Disclosure & Scrolling 편집기는 `Edit Content...` 또는 Content 할당으로 구성한 실제 자식 계층을 변경하지 않고 컨테이너 동작만 편집합니다. Expander는 Down·Up·Left·Right 방향과 콘텐츠 정렬을 지원하며 IsExpanded Binding이 있으면 정적 값을 중복 출력하지 않습니다. ScrollViewer는 축마다 Disabled·Auto·Hidden·Visible scrollbar를 선택하고, 부모로의 scroll chaining과 thumb drag 중 deferred scrolling, 포커스 이동 시 bring-into-view를 제어합니다. Snap points는 축마다 None·Mandatory·MandatorySingle 타입과 Near·Center·Far 정렬을 설정합니다.
 
-ContentControl은 Toolbox에서 배치한 뒤 `Edit > Edit Content...`로 fallback TextBlock을 편집하거나 `Assign as Container Content...`로 실제 단일 자식을 연결합니다. 디자이너 자식이 연결되면 fallback 텍스트는 중복 출력하지 않으며, Content Binding이 있으면 정적 콘텐츠도 출력하지 않습니다. 두 모드는 Canvas·Object Tree·Undo/Redo·Preview·Draft·Full·UserControl AXAML 왕복에서 같은 계층으로 유지됩니다.
+ContentControl과 UserControl은 Toolbox에서 배치한 뒤 `Edit > Edit Content...`로 fallback TextBlock을 편집하거나 `Assign as Container Content...`로 실제 단일 자식을 연결합니다. UserControl은 ContentControl과 구별되는 `<UserControl>` 태그를 유지하면서도 같은 단일 Content 슬롯 규칙을 사용합니다. 디자이너 자식이 연결되면 fallback 텍스트는 중복 출력하지 않으며, Content Binding이 있으면 정적 콘텐츠도 출력하지 않습니다. 두 모드는 Canvas·Object Tree·Undo/Redo·Preview·Draft·Full·UserControl AXAML 왕복에서 같은 계층으로 유지됩니다.
 
 GridSplitter Behavior 편집기는 `ResizeDirection`의 Auto·Columns·Rows, `ResizeBehavior`의 BasedOnAlignment·CurrentAndNext·PreviousAndCurrent·PreviousAndNext, `ShowsPreview`, `KeyboardIncrement`, `DragIncrement`를 검증합니다. 실제 splitter는 `Assign to Grid Cell...`로 Grid 행/열에 배치하며, 생성 AXAML은 Grid attached properties와 GridSplitter 동작 속성을 함께 보존합니다.
 

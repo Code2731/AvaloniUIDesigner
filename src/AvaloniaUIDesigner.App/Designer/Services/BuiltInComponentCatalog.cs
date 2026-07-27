@@ -342,6 +342,19 @@ public sealed class BuiltInComponentCatalog : IComponentCatalog
                 },
             }),
         new(
+            DisplayName: "UserControl",
+            AvaloniaTypeName: "Avalonia.Controls.UserControl",
+            DefaultWidth: 260,
+            DefaultHeight: 140,
+            VisualFactory: static () => new UserControl
+            {
+                Content = new TextBlock
+                {
+                    Text = "UserControl content",
+                    Margin = new Thickness(8),
+                },
+            }),
+        new(
             DisplayName: "Grid",
             AvaloniaTypeName: "Avalonia.Controls.Grid",
             DefaultWidth: 240,

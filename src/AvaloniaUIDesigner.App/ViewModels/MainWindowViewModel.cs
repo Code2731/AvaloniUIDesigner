@@ -2717,7 +2717,7 @@ public partial class MainWindowViewModel : ViewModelBase
         if (parents.Count == 0)
         {
             state = EmptyContentAssignmentState();
-            StatusText = "Place an unlocked root Border, ContentControl, ScrollViewer, or Expander first.";
+            StatusText = "Place an unlocked root Border, ContentControl, UserControl, ScrollViewer, or Expander first.";
             return false;
         }
 
@@ -3795,7 +3795,7 @@ public partial class MainWindowViewModel : ViewModelBase
         {
             controlName = string.Empty;
             content = string.Empty;
-            StatusText = "Select an unlocked Expander, ContentControl, ScrollViewer, or Border to edit its content.";
+            StatusText = "Select an unlocked Expander, ContentControl, UserControl, ScrollViewer, or Border to edit its content.";
             return false;
         }
 
@@ -3824,7 +3824,7 @@ public partial class MainWindowViewModel : ViewModelBase
         var target = Canvas.SelectedElement;
         if (target is null || target.IsLocked || !IsDesignerContentContainer(target.Visual))
         {
-            StatusText = "Select an unlocked Expander, ContentControl, ScrollViewer, or Border to edit its content.";
+            StatusText = "Select an unlocked Expander, ContentControl, UserControl, ScrollViewer, or Border to edit its content.";
             return;
         }
 
@@ -3854,7 +3854,7 @@ public partial class MainWindowViewModel : ViewModelBase
             SetExpanderContent(targetExpander, content);
         }
         else if (target.Visual is ContentControl targetContentControl
-            && target.Visual.GetType() == typeof(ContentControl))
+            && (target.Visual.GetType() == typeof(ContentControl) || target.Visual is UserControl))
         {
             SetContentControlContent(targetContentControl, content);
         }
@@ -7768,7 +7768,7 @@ public partial class MainWindowViewModel : ViewModelBase
         }
 
         if (visual is ContentControl contentControl
-            && visual.GetType() == typeof(ContentControl))
+            && (visual.GetType() == typeof(ContentControl) || visual is UserControl))
         {
             return new Dictionary<string, string>
             {
@@ -8228,6 +8228,7 @@ public partial class MainWindowViewModel : ViewModelBase
                 var parentUsesTextFallback = parent?.TypeName is
                     "Avalonia.Controls.Border"
                     or "Avalonia.Controls.ContentControl"
+                    or "Avalonia.Controls.UserControl"
                     or "Avalonia.Controls.ScrollViewer"
                     or "Avalonia.Controls.Expander";
                 var hasExplicitName = child.Attributes().Any(attribute =>
@@ -8322,6 +8323,7 @@ public partial class MainWindowViewModel : ViewModelBase
                         => DesignerParentLayoutKind.SplitView,
                     "Avalonia.Controls.Border"
                         or "Avalonia.Controls.ContentControl"
+                        or "Avalonia.Controls.UserControl"
                         or "Avalonia.Controls.ScrollViewer"
                         or "Avalonia.Controls.Expander" => DesignerParentLayoutKind.Content,
                     _ => DesignerParentLayoutKind.None,
@@ -8377,6 +8379,7 @@ public partial class MainWindowViewModel : ViewModelBase
                     || string.Equals(typeName, "Avalonia.Controls.SplitView", StringComparison.Ordinal)
                     || string.Equals(typeName, "Avalonia.Controls.Border", StringComparison.Ordinal)
                     || string.Equals(typeName, "Avalonia.Controls.ContentControl", StringComparison.Ordinal)
+                    || string.Equals(typeName, "Avalonia.Controls.UserControl", StringComparison.Ordinal)
                     || string.Equals(typeName, "Avalonia.Controls.ScrollViewer", StringComparison.Ordinal)
                     || string.Equals(typeName, "Avalonia.Controls.Expander", StringComparison.Ordinal))
                 {
@@ -11369,9 +11372,10 @@ public partial class MainWindowViewModel : ViewModelBase
                 sb.AppendLine("</ScrollViewer>");
                 break;
 
-            case ContentControl contentControl when contentControl.GetType() == typeof(ContentControl):
+            case ContentControl contentControl when contentControl.GetType() == typeof(ContentControl)
+                || contentControl is UserControl:
                 sb.Append(indent);
-                sb.Append("<ContentControl");
+                sb.Append(contentControl is UserControl ? "<UserControl" : "<ContentControl");
                 AppendCanvasLayoutAttributes(sb, element);
                 var contentControlChild = GetDesignerContentChild(element);
                 if (contentControlChild is null
@@ -11396,7 +11400,8 @@ public partial class MainWindowViewModel : ViewModelBase
                 }
 
                 sb.Append(indent);
-                sb.AppendLine("</ContentControl>");
+                sb.Append(contentControl is UserControl ? "</UserControl>" : "</ContentControl>");
+                sb.AppendLine();
                 break;
 
             case Border border:
@@ -12021,7 +12026,7 @@ public partial class MainWindowViewModel : ViewModelBase
     }
 
     private static bool IsDesignerContentContainer(Control visual)
-        => visual is Border or ScrollViewer or Expander
+        => visual is Border or ScrollViewer or Expander or UserControl
             || visual.GetType() == typeof(ContentControl);
 
     private bool TryGetDockPanelParent(
