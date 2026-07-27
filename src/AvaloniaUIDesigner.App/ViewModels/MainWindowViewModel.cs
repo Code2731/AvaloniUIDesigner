@@ -521,6 +521,7 @@ public partial class MainWindowViewModel : ViewModelBase
     private readonly IComponentCatalog _componentCatalog;
     private readonly IDesignerSerializer _serializer;
     private readonly ComponentPackLoader _componentPackLoader = new();
+    private readonly ToolboxPresetPackLoader _toolboxPresetPackLoader = new();
     private readonly Stack<HistoryEntry> _undoStack = new();
     private readonly Stack<HistoryEntry> _redoStack = new();
     private readonly Dictionary<string, string> _colorResources = new(StringComparer.Ordinal);
@@ -664,6 +665,30 @@ public partial class MainWindowViewModel : ViewModelBase
         return true;
     }
 
+    public bool TryLoadToolboxPresetPack(string json, out string result)
+    {
+        if (!_toolboxPresetPackLoader.TryLoad(
+                json,
+                displayName => Toolbox.FindItemByDisplayName(displayName) is null,
+                typeName => _componentCatalog.TryGet(typeName, out _),
+                out var pack,
+                out var error))
+        {
+            result = error;
+            return false;
+        }
+
+        if (!Toolbox.TryAddPresets(pack.Presets, out error))
+        {
+            result = error;
+            return false;
+        }
+
+        result = $"Loaded {pack.Presets.Count} Toolbox preset(s) from {pack.Name}.";
+        StatusText = result;
+        return true;
+    }
+
     public bool TryGetSelectedComponentPackDefaults(
         out string packName,
         out string displayName,
@@ -702,6 +727,51 @@ public partial class MainWindowViewModel : ViewModelBase
         }
 
         displayName = $"Preset: {targets[0].DisplayName} Layout";
+        return true;
+    }
+
+    public bool TryGetSelectedToolboxPresetExportDefaults(out string displayName)
+    {
+        if (Toolbox.SelectedItem is not { IsPreset: true } preset)
+        {
+            displayName = string.Empty;
+            StatusText = "Select a Toolbox preset to export.";
+            return false;
+        }
+
+        displayName = preset.DisplayName;
+        return true;
+    }
+
+    public bool TryExportSelectedToolboxPreset(out string json, out string error)
+    {
+        json = string.Empty;
+        error = string.Empty;
+        if (Toolbox.SelectedItem is not { IsPreset: true } preset
+            || preset.PresetElements is not { Count: > 0 } elements)
+        {
+            error = "Select a Toolbox preset to export.";
+            return false;
+        }
+
+        var document = new ToolboxPresetPackDocument
+        {
+            Name = preset.DisplayName,
+            Presets =
+            [
+                new ToolboxPresetDefinition
+                {
+                    DisplayName = preset.DisplayName,
+                    AvaloniaTypeName = preset.AvaloniaTypeName,
+                    Elements = elements.ToList(),
+                }
+            ],
+        };
+        json = JsonSerializer.Serialize(document, new JsonSerializerOptions
+        {
+            WriteIndented = true,
+            PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+        });
         return true;
     }
 

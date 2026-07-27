@@ -138,6 +138,39 @@ public partial class MainWindow : Window
         }
     }
 
+    private async void OnLoadToolboxPresetPackMenuClicked(
+        object? sender,
+        Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        if (Vm is null)
+        {
+            return;
+        }
+
+        var files = await StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
+        {
+            Title = "Load Toolbox Preset Pack",
+            AllowMultiple = false,
+            FileTypeFilter =
+            [
+                new FilePickerFileType("Toolbox Preset JSON") { Patterns = ["*.toolbox-preset.json", "*.json"] }
+            ]
+        });
+
+        if (files.Count == 0)
+        {
+            return;
+        }
+
+        await using var stream = await files[0].OpenReadAsync();
+        using var reader = new StreamReader(stream);
+        var json = await reader.ReadToEndAsync();
+        if (!Vm.TryLoadToolboxPresetPack(json, out var result))
+        {
+            Vm.StatusText = $"Could not load Toolbox preset pack: {result}";
+        }
+    }
+
     private async void OnExportSelectedComponentPackMenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
         FlushPendingPropertyHistory();
@@ -196,6 +229,61 @@ public partial class MainWindow : Window
             }
 
             Vm.StatusText = $"Exported {options.DisplayName} component pack to {file.Name}.";
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        {
+            Vm.StatusText = $"Could not export {file.Name}: {exception.Message}";
+        }
+    }
+
+    private async void OnExportSelectedToolboxPresetMenuClicked(
+        object? sender,
+        Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        FlushPendingPropertyHistory();
+        if (Vm is null || !Vm.TryGetSelectedToolboxPresetExportDefaults(out var displayName))
+        {
+            return;
+        }
+
+        if (!Vm.TryExportSelectedToolboxPreset(out var json, out var error))
+        {
+            Vm.StatusText = $"Could not export Toolbox preset: {error}";
+            return;
+        }
+
+        var file = await StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
+        {
+            Title = "Export Toolbox Preset",
+            SuggestedFileName = "toolbox-preset.toolbox-preset.json",
+            DefaultExtension = "json",
+            FileTypeChoices =
+            [
+                new FilePickerFileType("Toolbox Preset JSON") { Patterns = ["*.toolbox-preset.json", "*.json"] }
+            ]
+        });
+        if (file is null)
+        {
+            return;
+        }
+
+        try
+        {
+            var localPath = file.TryGetLocalPath();
+            if (!string.IsNullOrWhiteSpace(localPath))
+            {
+                await AtomicFileWriter.WriteAllTextAsync(localPath, json);
+            }
+            else
+            {
+                await using var stream = await file.OpenWriteAsync();
+                stream.SetLength(0);
+                using var writer = new StreamWriter(stream);
+                await writer.WriteAsync(json);
+                await writer.FlushAsync();
+            }
+
+            Vm.StatusText = $"Exported {displayName} Toolbox preset to {file.Name}.";
         }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
         {

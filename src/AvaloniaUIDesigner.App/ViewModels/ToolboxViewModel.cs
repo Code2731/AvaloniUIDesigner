@@ -68,38 +68,49 @@ public partial class ToolboxViewModel : ViewModelBase
     }
 
     public bool TryAddPreset(ToolboxItem preset, out string error)
+        => TryAddPresets(new[] { preset }, out error);
+
+    public bool TryAddPresets(IEnumerable<ToolboxItem> presets, out string error)
     {
         error = string.Empty;
-        var displayName = preset.DisplayName.Trim();
-        if (!preset.IsPreset)
+        var normalizedPresets = new List<ToolboxItem>();
+        var names = new HashSet<string>(
+            _allItems.Select(item => item.DisplayName),
+            System.StringComparer.OrdinalIgnoreCase);
+        foreach (var preset in presets)
         {
-            error = "The Toolbox preset must contain at least one control.";
-            return false;
+            var displayName = preset.DisplayName.Trim();
+            if (!preset.IsPreset)
+            {
+                error = "The Toolbox preset must contain at least one control.";
+                return false;
+            }
+
+            if (string.IsNullOrWhiteSpace(displayName))
+            {
+                error = "Toolbox preset name is required.";
+                return false;
+            }
+
+            if (!names.Add(displayName))
+            {
+                error = $"A Toolbox item named '{displayName}' already exists.";
+                return false;
+            }
+
+            normalizedPresets.Add(string.Equals(
+                    preset.DisplayName,
+                    displayName,
+                    System.StringComparison.Ordinal)
+                ? preset
+                : preset with { DisplayName = displayName });
         }
 
-        if (string.IsNullOrWhiteSpace(displayName))
-        {
-            error = "Toolbox preset name is required.";
-            return false;
-        }
-
-        if (_allItems.Any(item => string.Equals(
-                item.DisplayName,
-                displayName,
-                System.StringComparison.OrdinalIgnoreCase)))
-        {
-            error = $"A Toolbox item named '{displayName}' already exists.";
-            return false;
-        }
-
-        var normalizedPreset = string.Equals(preset.DisplayName, displayName, System.StringComparison.Ordinal)
-            ? preset
-            : preset with { DisplayName = displayName };
-        _allItems.Add(normalizedPreset);
+        _allItems.AddRange(normalizedPresets);
         ApplyFilter();
-        if (Items.Contains(normalizedPreset))
+        if (normalizedPresets.Count == 1 && Items.Contains(normalizedPresets[0]))
         {
-            SelectedItem = normalizedPreset;
+            SelectedItem = normalizedPresets[0];
         }
 
         return true;
@@ -110,7 +121,10 @@ public partial class ToolboxViewModel : ViewModelBase
         : $"{Items.Count} of {_allItems.Count} controls";
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsPresetSelected))]
     private ToolboxItem? _selectedItem;
+
+    public bool IsPresetSelected => SelectedItem?.IsPreset == true;
 
     [ObservableProperty]
     private string _searchText = string.Empty;

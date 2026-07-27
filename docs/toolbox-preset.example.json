@@ -1,0 +1,33 @@
+{
+  "name": "Login Row Preset",
+  "presets": [
+    {
+      "displayName": "Preset: Login Row",
+      "avaloniaTypeName": "Preset.Selection",
+      "elements": [
+        {
+          "displayName": "EmailLabel",
+          "typeName": "Avalonia.Controls.TextBlock",
+          "x": 0,
+          "y": 0,
+          "width": 180,
+          "height": 24,
+          "visualProperties": {
+            "Text": "Email"
+          }
+        },
+        {
+          "displayName": "EmailInput",
+          "typeName": "Avalonia.Controls.TextBox",
+          "x": 196,
+          "y": 0,
+          "width": 220,
+          "height": 32,
+          "visualProperties": {
+            "Watermark": "name@example.com"
+          }
+        }
+      ]
+    }
+  ]
+}
