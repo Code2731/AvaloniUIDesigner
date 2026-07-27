@@ -833,6 +833,19 @@ public partial class MainWindow : Window
         await ShowContainerBehaviorPropertiesDialogAsync(state);
     }
 
+    private async void OnEditSplitViewPropertiesMenuClicked(
+        object? sender,
+        Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        FlushPendingPropertyHistory();
+        if (Vm is null || !Vm.TryGetSelectedSplitViewProperties(out var state))
+        {
+            return;
+        }
+
+        await ShowSplitViewPropertiesDialogAsync(state);
+    }
+
     private async void OnEditImagePropertiesMenuClicked(
         object? sender,
         Avalonia.Interactivity.RoutedEventArgs e)
@@ -4353,6 +4366,157 @@ public partial class MainWindow : Window
                 },
             };
             Grid.SetRow(field, row);
+            return field;
+        }
+    }
+
+    private async Task ShowSplitViewPropertiesDialogAsync(SplitViewEditorState state)
+    {
+        if (Vm is null)
+        {
+            return;
+        }
+
+        var displayModeEditor = new ComboBox
+        {
+            ItemsSource = DesignerSplitViewRuntime.DisplayModeNames,
+            SelectedItem = state.DisplayMode,
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+        };
+        var panePlacementEditor = new ComboBox
+        {
+            ItemsSource = DesignerSplitViewRuntime.PanePlacementNames,
+            SelectedItem = state.PanePlacement,
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+        };
+        var openPaneLengthEditor = new TextBox
+        {
+            Text = state.OpenPaneLength,
+            Watermark = "Finite non-negative number",
+        };
+        var compactPaneLengthEditor = new TextBox
+        {
+            Text = state.CompactPaneLength,
+            Watermark = "Finite non-negative number",
+        };
+        var paneBackgroundEditor = new TextBox
+        {
+            Text = state.PaneBackground,
+            Watermark = "Example: #E2E8F0 or Transparent; blank clears",
+        };
+        var paneOpenEditor = new CheckBox
+        {
+            Content = "Pane open",
+            IsChecked = state.IsPaneOpen,
+        };
+        var lightDismissEditor = new CheckBox
+        {
+            Content = "Use light-dismiss overlay",
+            IsChecked = state.UseLightDismissOverlayMode,
+        };
+        var errorText = new TextBlock
+        {
+            Foreground = Avalonia.Media.Brushes.IndianRed,
+            TextWrapping = Avalonia.Media.TextWrapping.Wrap,
+        };
+        var fields = new Grid
+        {
+            ColumnDefinitions = new ColumnDefinitions("*,*"),
+            RowDefinitions = new RowDefinitions("Auto,Auto,Auto"),
+            ColumnSpacing = 12,
+            RowSpacing = 10,
+            Children =
+            {
+                CreateField("Display mode", displayModeEditor, 0, 0),
+                CreateField("Pane placement", panePlacementEditor, 0, 1),
+                CreateField("Open pane length", openPaneLengthEditor, 1, 0),
+                CreateField("Compact pane length", compactPaneLengthEditor, 1, 1),
+                CreateField("Pane background", paneBackgroundEditor, 2, 0),
+            },
+        };
+        Grid.SetColumnSpan(fields.Children[^1], 2);
+        var switches = new WrapPanel
+        {
+            Orientation = Orientation.Horizontal,
+            ItemSpacing = 18,
+            LineSpacing = 8,
+            Children = { paneOpenEditor, lightDismissEditor },
+        };
+        var dialog = new Window
+        {
+            Title = $"Edit SplitView Pane Behavior - {state.ControlName}",
+            Width = 720,
+            Height = 500,
+            MinWidth = 600,
+            MinHeight = 420,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner,
+        };
+        var applyButton = new Button { Content = "Apply", MinWidth = 84 };
+        applyButton.Click += (_, _) =>
+        {
+            var input = new DesignerSplitViewEditorInput(
+                displayModeEditor.SelectedItem?.ToString() ?? string.Empty,
+                paneOpenEditor.IsChecked == true,
+                openPaneLengthEditor.Text ?? string.Empty,
+                compactPaneLengthEditor.Text ?? string.Empty,
+                panePlacementEditor.SelectedItem?.ToString() ?? string.Empty,
+                lightDismissEditor.IsChecked == true,
+                paneBackgroundEditor.Text ?? string.Empty);
+            if (!Vm.SetSelectedSplitViewProperties(input))
+            {
+                errorText.Text = Vm.StatusText;
+                return;
+            }
+
+            dialog.Close();
+        };
+        var cancelButton = new Button { Content = "Cancel", MinWidth = 84 };
+        cancelButton.Click += (_, _) => dialog.Close();
+        var buttons = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            Spacing = 8,
+            HorizontalAlignment = HorizontalAlignment.Right,
+            Children = { cancelButton, applyButton },
+        };
+        var content = new Grid
+        {
+            Margin = new Thickness(16),
+            RowDefinitions = new RowDefinitions("Auto,Auto,Auto,*,Auto,Auto"),
+            RowSpacing = 12,
+            Children =
+            {
+                new TextBlock
+                {
+                    Text = "Configure SplitView pane presentation. Pane background accepts a solid color or Transparent; Pane and Content children are edited separately with Assign to SplitView.",
+                    TextWrapping = Avalonia.Media.TextWrapping.Wrap,
+                },
+                fields,
+                switches,
+                errorText,
+                buttons,
+            },
+        };
+        Grid.SetRow(fields, 1);
+        Grid.SetRow(switches, 2);
+        Grid.SetRow(errorText, 4);
+        Grid.SetRow(buttons, 5);
+        dialog.Content = content;
+        await dialog.ShowDialog(this);
+
+        static Control CreateField(string label, Control editor, int row, int column)
+        {
+            var field = new StackPanel
+            {
+                Spacing = 4,
+                Children =
+                {
+                    new TextBlock { Text = label },
+                    editor,
+                },
+            };
+            Grid.SetRow(field, row);
+            Grid.SetColumn(field, column);
             return field;
         }
     }

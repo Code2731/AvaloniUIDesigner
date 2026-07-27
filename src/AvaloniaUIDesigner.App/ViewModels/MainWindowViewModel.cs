@@ -183,6 +183,16 @@ public sealed record SelectableTextBlockEditorState(
     string SelectionBrush,
     string SelectionForegroundBrush);
 
+public sealed record SplitViewEditorState(
+    string ControlName,
+    string DisplayMode,
+    bool IsPaneOpen,
+    string OpenPaneLength,
+    string CompactPaneLength,
+    string PanePlacement,
+    bool UseLightDismissOverlayMode,
+    string PaneBackground);
+
 public sealed record SelectionEditorState(
     string ControlName,
     string ControlKind,
@@ -4275,6 +4285,96 @@ public partial class MainWindowViewModel : ViewModelBase
         return true;
     }
 
+    public bool TryGetSelectedSplitViewProperties(out SplitViewEditorState state)
+    {
+        var target = Canvas.SelectedElement;
+        if (target is null
+            || target.IsLocked
+            || !DesignerSplitViewRuntime.IsSupportedControl(target.Visual))
+        {
+            state = default!;
+            StatusText = target switch
+            {
+                null => "Select a SplitView before editing pane behavior.",
+                { IsLocked: true } => "Unlock the selected SplitView before editing pane behavior.",
+                _ => "Pane behavior editing is available for SplitView controls.",
+            };
+            return false;
+        }
+
+        if (!DesignerSplitViewRuntime.TryRead(target.Visual, out var values, out var error))
+        {
+            state = default!;
+            StatusText = $"SplitView cannot be edited. {error}";
+            return false;
+        }
+
+        state = CreateSplitViewEditorState(target.DisplayName, values);
+        return true;
+    }
+
+    public bool SetSelectedSplitViewProperties(DesignerSplitViewEditorInput input)
+    {
+        var target = Canvas.SelectedElement;
+        if (target is null
+            || target.IsLocked
+            || target.Visual is not SplitView splitView)
+        {
+            StatusText = "Select an unlocked SplitView before editing pane behavior.";
+            return false;
+        }
+
+        if (!DesignerSplitViewRuntime.TryRead(splitView, out var current, out var error))
+        {
+            StatusText = $"SplitView was not changed. {error}";
+            return false;
+        }
+
+        if (!DesignerSplitViewRuntime.TryParseValues(
+                splitView,
+                input,
+                out var values,
+                out error))
+        {
+            StatusText = $"SplitView was not changed. {error}";
+            return false;
+        }
+
+        if (current == values)
+        {
+            StatusText = "SplitView pane behavior is unchanged.";
+            return true;
+        }
+
+        BeginCanvasMutation(HistoryActionType.EditProperty, "Updated SplitView pane behavior.");
+        DesignerSplitViewRuntime.Apply(splitView, values);
+        DesignerResourceReferenceMetadata.SetReference(splitView, "PaneBackground", null);
+        Canvas.ReflowContainerChildren(target);
+        foreach (var attribute in DesignerSplitViewRuntime.GetAxamlAttributes(splitView))
+        {
+            DesignerStyleApplicationMetadata.ClearApplied(splitView, attribute.Name);
+        }
+
+        DesignerStyleApplicationMetadata.ClearApplied(splitView, "PaneBackground");
+        Canvas.RefreshDocumentStyles(splitView);
+        CommitCanvasMutation();
+        StatusText = $"Updated pane behavior for {target.DisplayName}.";
+        return true;
+    }
+
+    private static SplitViewEditorState CreateSplitViewEditorState(
+        string controlName,
+        DesignerSplitViewValues values)
+        => new(
+            controlName,
+            values.DisplayMode.ToString(),
+            values.IsPaneOpen,
+            values.OpenPaneLength.ToString("0.###", CultureInfo.InvariantCulture),
+            values.CompactPaneLength.ToString("0.###", CultureInfo.InvariantCulture),
+            values.PanePlacement.ToString(),
+            values.UseLightDismissOverlayMode,
+            values.PaneBackground);
+
     public bool TryGetSelectedSelectionProperties(out SelectionEditorState state)
     {
         var target = Canvas.SelectedElement;
@@ -6753,6 +6853,7 @@ public partial class MainWindowViewModel : ViewModelBase
         DesignerTextInputRuntime.Capture(visual, result);
         DesignerMaskedTextBoxRuntime.Capture(visual, result);
         DesignerSelectableTextBlockRuntime.Capture(visual, result);
+        DesignerSplitViewRuntime.Capture(visual, result);
         DesignerSelectionRuntime.Capture(visual, result);
         DesignerDateTimeRuntime.Capture(visual, result);
         DesignerColorPickerRuntime.Capture(visual, result);
@@ -8537,6 +8638,26 @@ public partial class MainWindowViewModel : ViewModelBase
                 continue;
             }
 
+            if (DesignerSplitViewRuntime.IsSupportedProperty(tagName, name))
+            {
+                if (DesignerSplitViewRuntime.TryNormalizeProperty(
+                        tagName,
+                        name,
+                        attr.Value,
+                        out var canonicalName,
+                        out var normalizedValue,
+                        out var splitViewError))
+                {
+                    map[canonicalName] = normalizedValue;
+                }
+                else
+                {
+                    warnings.Add($"Ignored {tagName}.{name}: {splitViewError}");
+                }
+
+                continue;
+            }
+
             if (DesignerSelectionRuntime.IsSupportedProperty(tagName, name))
             {
                 if (DesignerSelectionRuntime.TryNormalizeProperty(
@@ -8806,6 +8927,15 @@ public partial class MainWindowViewModel : ViewModelBase
         {
             warnings.Add($"Ignored {tagName} selection brush properties: {selectableTextBlockConstraintError}");
             DesignerSelectableTextBlockRuntime.RemoveProperties(tagName, map);
+        }
+
+        if (!DesignerSplitViewRuntime.TryValidateProperties(
+                tagName,
+                map,
+                out var splitViewConstraintError))
+        {
+            warnings.Add($"Ignored {tagName} pane properties: {splitViewConstraintError}");
+            DesignerSplitViewRuntime.RemoveProperties(tagName, map);
         }
 
         var hasItemsSourceBinding = bindings.Any(binding =>

@@ -2396,6 +2396,8 @@ public partial class CanvasViewModel : ViewModelBase
 
         if (visual is SplitView splitView)
         {
+            DesignerSplitViewRuntime.Apply(splitView, properties);
+
             if (properties.TryGetValue("DisplayMode", out var displayMode)
                 && Enum.TryParse<SplitViewDisplayMode>(displayMode, true, out var parsedDisplayMode))
             {

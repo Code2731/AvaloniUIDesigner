@@ -842,6 +842,8 @@ public sealed class PreviewWindow : Window
         IReadOnlyDictionary<string, string> properties,
         IReadOnlyDictionary<string, string> colorResources)
     {
+        DesignerSplitViewRuntime.Apply(splitView, properties);
+
         if (properties.TryGetValue("DisplayMode", out var displayMode)
             && Enum.TryParse<SplitViewDisplayMode>(displayMode, true, out var parsedDisplayMode))
         {
