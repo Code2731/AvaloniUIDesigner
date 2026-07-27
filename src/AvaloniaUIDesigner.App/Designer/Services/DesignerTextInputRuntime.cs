@@ -284,7 +284,8 @@ public static class DesignerTextInputRuntime
     }
 
     public static bool IsSupportedProperty(string tagName, string propertyName)
-        => string.Equals(tagName, "TextBox", StringComparison.OrdinalIgnoreCase)
+        => (string.Equals(tagName, "TextBox", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(tagName, "MaskedTextBox", StringComparison.OrdinalIgnoreCase))
             && Array.Exists(
                 PropertyNames,
                 candidate => string.Equals(candidate, propertyName.Trim(), StringComparison.OrdinalIgnoreCase));

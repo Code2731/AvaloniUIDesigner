@@ -33,6 +33,7 @@ public static class DesignerBindingRuntime
         {
             "Button" => ["Content", "Command", "CommandParameter"],
             "TextBox" => ["Text", "Watermark"],
+            "MaskedTextBox" => ["Text", "Watermark"],
             "AutoCompleteBox" => ["Text", "Watermark"],
             "TextBlock" => ["Text"],
             "Label" => ["Content"],

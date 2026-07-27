@@ -30,6 +30,17 @@ public sealed class BuiltInComponentCatalog : IComponentCatalog
             DefaultHeight: 32,
             VisualFactory: static () => new TextBox { Watermark = "Type here" }),
         new(
+            DisplayName: "MaskedTextBox",
+            AvaloniaTypeName: "Avalonia.Controls.MaskedTextBox",
+            DefaultWidth: 180,
+            DefaultHeight: 32,
+            VisualFactory: static () => new MaskedTextBox
+            {
+                Mask = "000-0000",
+                Text = "5551234",
+                Watermark = "Phone number",
+            }),
+        new(
             DisplayName: "AutoCompleteBox",
             AvaloniaTypeName: "Avalonia.Controls.AutoCompleteBox",
             DefaultWidth: 220,

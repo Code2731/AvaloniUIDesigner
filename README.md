@@ -35,6 +35,7 @@ dotnet run --project src/AvaloniaUIDesigner.App/AvaloniaUIDesigner.App.csproj
 - **Visual Effects 속성**: None·Blur·Drop Shadow 모드와 반경·오프셋·색상·불투명도를 편집하고 Undo/Redo, 복제, Preview, Draft·Full·UserControl AXAML 왕복에 보존
 - **Range & Value 속성**: Slider의 step·tick·방향, ProgressBar의 indeterminate·진행 텍스트, NumericUpDown의 increment·format·spinner 정책을 검증된 범위/값과 함께 편집하고 Undo/Redo, 복제, Preview, Draft·Full·UserControl AXAML 왕복에 보존
 - **Text Input 속성**: TextBox의 디자인 텍스트·watermark·multiline/tab·wrapping/alignment·read-only·길이/줄 제한·password·floating watermark·undo/selection 정책을 통합 편집하고 Undo/Redo, 복제, Preview, Binding, Draft·Full·UserControl AXAML 왕복에 보존
+- **MaskedTextBox 속성**: MaskedTextBox의 .NET mask·PromptChar·prompt 숨김 정책을 전용 편집기로 검증하고 Undo/Redo, 복제, Preview, Text Binding, Draft·Full·UserControl AXAML 왕복에 보존
 - **AutoCompleteBox 속성**: Text·watermark·자동 완성·최소 접두사·populate 지연·FilterMode·drop-down 높이/열림 상태와 정적 suggestion을 편집하고 Undo/Redo, 복제, Preview, Text Binding, Draft·Full·UserControl AXAML 왕복에 보존합니다. AsyncPopulator와 selector delegate는 코드 영역으로 남깁니다.
 - **Selection Behavior 속성**: ComboBox·ListBox·TreeView의 선택·검색·자동 스크롤 정책과 ComboBox editable/placeholder/drop-down 표현, ListBox·TreeView 다중 선택 모드를 편집하고 Undo/Redo, 복제, Preview, Binding, Draft·Full·UserControl AXAML 왕복에 보존
 - **Date & Time Input 속성**: DatePicker의 날짜 범위·구성 요소·표시 형식, CalendarDatePicker의 표시 범위·선택 형식·watermark, Calendar의 선택·표시 모드·표시 범위·첫 요일·탭 범위 선택, TimePicker의 시간·증분·12/24시간·초 표시를 원자적으로 편집하고 Undo/Redo, 복제, Preview, Binding, Draft·Full·UserControl AXAML 왕복에 보존
@@ -77,15 +78,16 @@ dotnet run --project src/AvaloniaUIDesigner.App/AvaloniaUIDesigner.App.csproj
 16. `Edit > Edit Interaction & Rendering...`에서 표시·입력 참여·클리핑·RTL·포인터 커서 편집
 17. `Edit > Edit Visual Effects...`에서 선택 컨트롤의 Blur 또는 Drop Shadow 편집
 18. `Edit > Edit Range & Value...`에서 Slider·ProgressBar·NumericUpDown의 범위와 타입별 동작 편집
-19. `Edit > Edit Text Input...`에서 TextBox의 입력·multiline·password·undo 정책 편집
-20. `Edit > Edit AutoCompleteBox...`에서 입력·자동 완성·filter·지연·drop-down 정책 편집
-21. `Edit > Edit Selection Behavior...`에서 ComboBox·ListBox·TreeView의 선택·검색·다중 선택 정책 편집
-22. `Edit > Edit Date & Time Input...`에서 DatePicker·CalendarDatePicker·Calendar·TimePicker의 값·범위·선택 모드·표시 형식 편집
-23. `Edit > Edit ColorPicker...`에서 색상, 색상 모델, 스펙트럼, 알파, 팔레트와 입력 표시 정책 편집
-24. `Edit > Edit Toggle & Choice Behavior...`에서 CheckBox·RadioButton·ToggleSwitch·ToggleButton의 상태·클릭·타입별 콘텐츠 편집
-25. `Edit > Edit Disclosure & Scrolling...`에서 Expander의 전개 동작과 ScrollViewer의 scrollbar·snap 정책 편집
-26. `Edit > Edit Image Source & Rendering...`에서 Image의 파일, 배율, 보간, edge, blending 동작 편집
-27. `Edit > Edit Button Actions & Commands...`에서 Button의 포인터·키보드 활성화, Window 기본/취소 역할, command data와 Click 이벤트 편집
+19. `Edit > Edit Text Input...`에서 TextBox와 MaskedTextBox의 공통 입력·multiline·password·undo 정책 편집
+20. `Edit > Edit MaskedTextBox...`에서 Mask·PromptChar·prompt 숨김 정책 편집
+21. `Edit > Edit AutoCompleteBox...`에서 입력·자동 완성·filter·지연·drop-down 정책 편집
+22. `Edit > Edit Selection Behavior...`에서 ComboBox·ListBox·TreeView의 선택·검색·다중 선택 정책 편집
+23. `Edit > Edit Date & Time Input...`에서 DatePicker·CalendarDatePicker·Calendar·TimePicker의 값·범위·선택 모드·표시 형식 편집
+24. `Edit > Edit ColorPicker...`에서 색상, 색상 모델, 스펙트럼, 알파, 팔레트와 입력 표시 정책 편집
+25. `Edit > Edit Toggle & Choice Behavior...`에서 CheckBox·RadioButton·ToggleSwitch·ToggleButton의 상태·클릭·타입별 콘텐츠 편집
+26. `Edit > Edit Disclosure & Scrolling...`에서 Expander의 전개 동작과 ScrollViewer의 scrollbar·snap 정책 편집
+27. `Edit > Edit Image Source & Rendering...`에서 Image의 파일, 배율, 보간, edge, blending 동작 편집
+28. `Edit > Edit Button Actions & Commands...`에서 Button의 포인터·키보드 활성화, Window 기본/취소 역할, command data와 Click 이벤트 편집
 
 DataGrid가 포함된 생성 AXAML을 다른 프로젝트에서 사용할 때는 같은 Avalonia 버전의 `Avalonia.Controls.DataGrid` 패키지와 `avares://Avalonia.Controls.DataGrid/Themes/Fluent.xaml` 스타일 include가 필요합니다.
 
@@ -108,6 +110,8 @@ Visual Effects 편집기는 레이아웃 슬롯과 독립적인 Avalonia `Visual
 Range & Value 편집기는 `Minimum < Maximum`과 범위 안의 `Value`를 원자적으로 검증해 부분 적용을 막습니다. Slider는 Small/LargeChange, 방향 반전, tick 배치와 snap을 지원하고 ProgressBar는 Orientation, IsIndeterminate, 진행 텍스트와 composite format을 지원합니다. NumericUpDown은 빈 Value를 `null`로 처리하며 Increment, .NET 숫자 format, 범위 clip, spin 허용, spinner 표시·위치를 편집합니다. `{`로 시작하는 진행 텍스트 format은 Avalonia XAML의 markup extension과 충돌하지 않도록 출력 시 `{}` 접두사로 이스케이프되고 가져올 때 원문으로 복원됩니다.
 
 Text Input 편집기에서 MaxLength·MinLines·MaxLines의 `0`은 제한 없음 또는 자동 크기를 의미하며, MinLines와 MaxLines가 모두 양수이면 최소 줄 수가 최대 줄 수를 넘을 수 없습니다. `Toggle Multiline TextBox` 명령과 Typography의 TextWrapping·TextAlignment는 같은 TextBox 값에 동기화됩니다. PasswordChar를 설정하면 디자이너는 입력된 디자인 텍스트를 즉시 비우고 스냅샷·Preview·AXAML에 정적 Text를 기록하지 않으며, 런타임 Text Binding은 그대로 보존할 수 있습니다.
+
+MaskedTextBox 편집기는 .NET `MaskedTextProvider`로 Mask를 검증하고, `0`·`9`·`L`·`?` 같은 mask token과 literal 문자를 그대로 AXAML에 보존합니다. 공통 Text Input 편집기에서 inherited TextBox 속성을 함께 조정할 수 있으며, `Text`가 Binding이면 정적 텍스트를 중복 출력하지 않습니다.
 
 AutoCompleteBox 편집기는 정적 `ItemsSource` suggestion을 `Edit Items / Columns...`에서 관리하고, `MinimumPopulateDelay`를 밀리초 또는 invariant TimeSpan으로 입력받습니다. AXAML은 `AvaloniaList<Object>` property element로 정적 suggestions를 보존하며, `Text`가 Binding이면 디자인 텍스트를 중복 출력하지 않습니다. `AsyncPopulator`, `ItemSelector`, `TextSelector`는 임의 델리게이트를 생성하지 않고 원본 코드에서 연결하도록 남깁니다.
 

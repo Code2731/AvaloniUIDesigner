@@ -275,6 +275,12 @@ public sealed class PreviewWindow : Window
         {
             "Avalonia.Controls.Button" => new Button { Content = "Button" },
             "Avalonia.Controls.TextBox" => new TextBox { Watermark = "Type here" },
+            "Avalonia.Controls.MaskedTextBox" => new MaskedTextBox
+            {
+                Mask = "000-0000",
+                Text = "5551234",
+                Watermark = "Phone number",
+            },
             "Avalonia.Controls.AutoCompleteBox" => new AutoCompleteBox
             {
                 Watermark = "Search...",
@@ -545,6 +551,9 @@ public sealed class PreviewWindow : Window
                 break;
             case AutoCompleteBox autoCompleteBox:
                 ApplyAutoCompleteBoxProperties(autoCompleteBox, properties);
+                break;
+            case MaskedTextBox maskedTextBox:
+                DesignerMaskedTextBoxRuntime.Apply(maskedTextBox, properties);
                 break;
             case TimePicker timePicker:
                 ApplyTimePickerProperties(timePicker, properties);

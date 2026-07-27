@@ -171,6 +171,12 @@ public sealed record TextInputEditorState(
     bool ClearSelectionOnLostFocus,
     bool IsInactiveSelectionHighlightEnabled);
 
+public sealed record MaskedTextBoxEditorState(
+    string ControlName,
+    string Mask,
+    string PromptChar,
+    bool HidePromptOnLeave);
+
 public sealed record SelectionEditorState(
     string ControlName,
     string ControlKind,
@@ -4093,6 +4099,76 @@ public partial class MainWindowViewModel : ViewModelBase
             values.ClearSelectionOnLostFocus,
             values.IsInactiveSelectionHighlightEnabled);
 
+    public bool TryGetSelectedMaskedTextBoxProperties(out MaskedTextBoxEditorState state)
+    {
+        var target = Canvas.SelectedElement;
+        if (target is null || target.IsLocked || !DesignerMaskedTextBoxRuntime.IsSupportedControl(target.Visual))
+        {
+            state = default!;
+            StatusText = target switch
+            {
+                null => "Select a MaskedTextBox before editing mask behavior.",
+                { IsLocked: true } => "Unlock the selected MaskedTextBox before editing mask behavior.",
+                _ => "Mask editing is available for MaskedTextBox controls.",
+            };
+            return false;
+        }
+
+        if (!DesignerMaskedTextBoxRuntime.TryRead(target.Visual, out var values, out var error))
+        {
+            state = default!;
+            StatusText = $"MaskedTextBox cannot be edited. {error}";
+            return false;
+        }
+
+        state = new MaskedTextBoxEditorState(
+            target.DisplayName,
+            values.Mask,
+            values.PromptChar.ToString(),
+            values.HidePromptOnLeave);
+        return true;
+    }
+
+    public bool SetSelectedMaskedTextBoxProperties(DesignerMaskedTextBoxEditorInput input)
+    {
+        var target = Canvas.SelectedElement;
+        if (target is null || target.IsLocked || !DesignerMaskedTextBoxRuntime.IsSupportedControl(target.Visual))
+        {
+            StatusText = "Select an unlocked MaskedTextBox before editing mask behavior.";
+            return false;
+        }
+
+        if (!DesignerMaskedTextBoxRuntime.TryRead(target.Visual, out var current, out var error))
+        {
+            StatusText = $"MaskedTextBox was not changed. {error}";
+            return false;
+        }
+
+        if (!DesignerMaskedTextBoxRuntime.TryParseValues(input, current, out var values, out error))
+        {
+            StatusText = $"MaskedTextBox was not changed. {error}";
+            return false;
+        }
+
+        if (current == values)
+        {
+            StatusText = "MaskedTextBox mask behavior is unchanged.";
+            return true;
+        }
+
+        BeginCanvasMutation(HistoryActionType.EditProperty, "Updated MaskedTextBox mask behavior.");
+        DesignerMaskedTextBoxRuntime.Apply((MaskedTextBox)target.Visual, values);
+        foreach (var attribute in DesignerMaskedTextBoxRuntime.GetAxamlAttributes(target.Visual))
+        {
+            DesignerStyleApplicationMetadata.ClearApplied(target.Visual, attribute.Name);
+        }
+
+        Canvas.RefreshDocumentStyles(target.Visual);
+        CommitCanvasMutation();
+        StatusText = $"Updated mask behavior for {target.DisplayName}.";
+        return true;
+    }
+
     public bool TryGetSelectedSelectionProperties(out SelectionEditorState state)
     {
         var target = Canvas.SelectedElement;
@@ -6569,6 +6645,7 @@ public partial class MainWindowViewModel : ViewModelBase
         DesignerEffectRuntime.Capture(visual, result);
         DesignerRangeRuntime.Capture(visual, result);
         DesignerTextInputRuntime.Capture(visual, result);
+        DesignerMaskedTextBoxRuntime.Capture(visual, result);
         DesignerSelectionRuntime.Capture(visual, result);
         DesignerDateTimeRuntime.Capture(visual, result);
         DesignerColorPickerRuntime.Capture(visual, result);
@@ -8294,6 +8371,26 @@ public partial class MainWindowViewModel : ViewModelBase
                 continue;
             }
 
+            if (DesignerMaskedTextBoxRuntime.IsSupportedProperty(tagName, name))
+            {
+                if (DesignerMaskedTextBoxRuntime.TryNormalizeProperty(
+                        tagName,
+                        name,
+                        attr.Value,
+                        out var canonicalName,
+                        out var normalizedValue,
+                        out var maskedTextBoxError))
+                {
+                    map[canonicalName] = normalizedValue;
+                }
+                else
+                {
+                    warnings.Add($"Ignored {tagName}.{name}: {maskedTextBoxError}");
+                }
+
+                continue;
+            }
+
             if (DesignerSelectionRuntime.IsSupportedProperty(tagName, name))
             {
                 if (DesignerSelectionRuntime.TryNormalizeProperty(
@@ -8539,11 +8636,21 @@ public partial class MainWindowViewModel : ViewModelBase
             DesignerRangeRuntime.RemoveProperties(tagName, map);
         }
 
-        if (string.Equals(tagName, "TextBox", StringComparison.OrdinalIgnoreCase)
+        if ((string.Equals(tagName, "TextBox", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(tagName, "MaskedTextBox", StringComparison.OrdinalIgnoreCase))
             && !DesignerTextInputRuntime.TryValidateProperties(map, out var textInputConstraintError))
         {
-            warnings.Add($"Ignored TextBox line constraints: {textInputConstraintError}");
+            warnings.Add($"Ignored {tagName} line constraints: {textInputConstraintError}");
             DesignerTextInputRuntime.RemoveLineProperties(map);
+        }
+
+        if (!DesignerMaskedTextBoxRuntime.TryValidateProperties(
+                tagName,
+                map,
+                out var maskedTextBoxConstraintError))
+        {
+            warnings.Add($"Ignored {tagName} mask properties: {maskedTextBoxConstraintError}");
+            DesignerMaskedTextBoxRuntime.RemoveProperties(tagName, map);
         }
 
         var hasItemsSourceBinding = bindings.Any(binding =>
@@ -8695,7 +8802,12 @@ public partial class MainWindowViewModel : ViewModelBase
             return true;
         }
 
-            if (DesignerAutoCompleteBoxRuntime.IsSupportedProperty(tagName, propertyName))
+        if (DesignerAutoCompleteBoxRuntime.IsSupportedProperty(tagName, propertyName))
+        {
+            return true;
+        }
+
+        if (DesignerMaskedTextBoxRuntime.IsSupportedProperty(tagName, propertyName))
         {
             return true;
         }
@@ -8734,7 +8846,7 @@ public partial class MainWindowViewModel : ViewModelBase
         return tagName switch
         {
             "Button" => false,
-            "TextBox" => propertyName is "Text" or "Watermark" or "PasswordChar"
+            "TextBox" or "MaskedTextBox" => propertyName is "Text" or "Watermark" or "PasswordChar"
                 or "RevealPassword" or "AcceptsReturn" or "AcceptsTab" or "TextWrapping"
                 or "TextAlignment" or "IsReadOnly" or "MaxLength" or "MinLines"
                 or "MaxLines" or "UseFloatingWatermark" or "IsUndoEnabled" or "UndoLimit"
@@ -8783,7 +8895,7 @@ public partial class MainWindowViewModel : ViewModelBase
     }
 
     private static bool SupportsTemplatedAppearance(string tagName)
-        => tagName is "Button" or "TextBox" or "AutoCompleteBox" or "Label" or "CheckBox" or "RadioButton"
+        => tagName is "Button" or "TextBox" or "MaskedTextBox" or "AutoCompleteBox" or "Label" or "CheckBox" or "RadioButton"
             or "ToggleSwitch" or "ToggleButton" or "ComboBox" or "ListBox" or "TreeView" or "Menu" or "Slider"
             or "ProgressBar" or "DatePicker" or "CalendarDatePicker"
             or "Calendar" or "ColorPicker" or "TimePicker"
@@ -9930,6 +10042,15 @@ public partial class MainWindowViewModel : ViewModelBase
                 sb.Append("<Button");
                 AppendCanvasLayoutAttributes(sb, element);
                 AppendButtonAttributes(sb, button);
+                sb.AppendLine(" />");
+                break;
+
+            case MaskedTextBox maskedTextBox:
+                sb.Append(indent);
+                sb.Append("<MaskedTextBox");
+                AppendCanvasLayoutAttributes(sb, element);
+                AppendTextInputAttributes(sb, maskedTextBox, skipBoundProperties: true);
+                AppendMaskedTextBoxAttributes(sb, maskedTextBox);
                 sb.AppendLine(" />");
                 break;
 
@@ -11353,6 +11474,20 @@ public partial class MainWindowViewModel : ViewModelBase
             var isWrittenByCommonTypography = skipBoundProperties
                 && attribute.Name is "TextWrapping" or "TextAlignment";
             if (!boundProperties.Contains(attribute.Name) && !isWrittenByCommonTypography)
+            {
+                AppendAttribute(sb, attribute.Name, attribute.Value);
+            }
+        }
+    }
+
+    private static void AppendMaskedTextBoxAttributes(StringBuilder sb, Control visual)
+    {
+        var boundProperties = DesignerBindingRuntime.ReadBindings(visual)
+            .Select(binding => binding.PropertyName)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        foreach (var attribute in DesignerMaskedTextBoxRuntime.GetAxamlAttributes(visual))
+        {
+            if (!boundProperties.Contains(attribute.Name))
             {
                 AppendAttribute(sb, attribute.Name, attribute.Value);
             }

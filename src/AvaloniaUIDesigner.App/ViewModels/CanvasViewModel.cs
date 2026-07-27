@@ -2175,6 +2175,12 @@ public partial class CanvasViewModel : ViewModelBase
             return;
         }
 
+        if (visual is MaskedTextBox maskedTextBox)
+        {
+            DesignerMaskedTextBoxRuntime.Apply(maskedTextBox, properties);
+            return;
+        }
+
         if (visual is Shape shape)
         {
             ApplyShapeProperties(shape, properties);

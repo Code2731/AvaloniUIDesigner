@@ -742,6 +742,19 @@ public partial class MainWindow : Window
         await ShowSelectionPropertiesDialogAsync(state);
     }
 
+    private async void OnEditMaskedTextBoxPropertiesMenuClicked(
+        object? sender,
+        Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        FlushPendingPropertyHistory();
+        if (Vm is null || !Vm.TryGetSelectedMaskedTextBoxProperties(out var state))
+        {
+            return;
+        }
+
+        await ShowMaskedTextBoxPropertiesDialogAsync(state);
+    }
+
     private async void OnEditDateTimePropertiesMenuClicked(
         object? sender,
         Avalonia.Interactivity.RoutedEventArgs e)
@@ -4215,6 +4228,118 @@ public partial class MainWindow : Window
             Grid.SetRow(field, row);
             Grid.SetColumn(field, column);
             owner.Children.Add(field);
+        }
+    }
+
+    private async Task ShowMaskedTextBoxPropertiesDialogAsync(MaskedTextBoxEditorState state)
+    {
+        if (Vm is null)
+        {
+            return;
+        }
+
+        var maskEditor = new TextBox
+        {
+            Text = state.Mask,
+            Watermark = "Example: 000-0000 or 00/00/0000",
+        };
+        var promptCharEditor = new TextBox
+        {
+            Text = state.PromptChar,
+            Watermark = "Exactly one character",
+        };
+        var hidePromptEditor = new CheckBox
+        {
+            Content = "Hide prompt characters when leaving the field",
+            IsChecked = state.HidePromptOnLeave,
+        };
+        var errorText = new TextBlock
+        {
+            Foreground = Avalonia.Media.Brushes.IndianRed,
+            TextWrapping = Avalonia.Media.TextWrapping.Wrap,
+        };
+        var fields = new Grid
+        {
+            ColumnDefinitions = new ColumnDefinitions("*,*"),
+            RowDefinitions = new RowDefinitions("Auto"),
+            ColumnSpacing = 12,
+            Children =
+            {
+                CreateField("Mask", maskEditor, 0),
+                CreateField("Prompt character", promptCharEditor, 1),
+            },
+        };
+        var dialog = new Window
+        {
+            Title = $"Edit MaskedTextBox - {state.ControlName}",
+            Width = 680,
+            Height = 340,
+            MinWidth = 560,
+            MinHeight = 280,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner,
+        };
+        var applyButton = new Button { Content = "Apply", MinWidth = 84 };
+        applyButton.Click += (_, _) =>
+        {
+            var input = new DesignerMaskedTextBoxEditorInput(
+                maskEditor.Text ?? string.Empty,
+                promptCharEditor.Text ?? string.Empty,
+                hidePromptEditor.IsChecked == true);
+            if (!Vm.SetSelectedMaskedTextBoxProperties(input))
+            {
+                errorText.Text = Vm.StatusText;
+                return;
+            }
+
+            dialog.Close();
+        };
+        var cancelButton = new Button { Content = "Cancel", MinWidth = 84 };
+        cancelButton.Click += (_, _) => dialog.Close();
+        var buttons = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            Spacing = 8,
+            HorizontalAlignment = HorizontalAlignment.Right,
+            Children = { cancelButton, applyButton },
+        };
+        var content = new Grid
+        {
+            Margin = new Thickness(16),
+            RowDefinitions = new RowDefinitions("Auto,Auto,Auto,*,Auto"),
+            RowSpacing = 12,
+            Children =
+            {
+                new TextBlock
+                {
+                    Text = "Mask syntax follows .NET MaskedTextProvider. Common tokens: 0 required digit, 9 optional digit, L required letter, ? optional letter, and literals such as '-' or '/'.",
+                    TextWrapping = Avalonia.Media.TextWrapping.Wrap,
+                },
+                fields,
+                hidePromptEditor,
+                errorText,
+                buttons,
+            },
+        };
+        Grid.SetRow(fields, 1);
+        Grid.SetRow(hidePromptEditor, 2);
+        Grid.SetRow(errorText, 3);
+        Grid.SetRow(buttons, 4);
+        dialog.Content = content;
+        await dialog.ShowDialog(this);
+
+        static Control CreateField(string label, Control editor, int column)
+        {
+            var field = new StackPanel
+            {
+                Spacing = 4,
+                Children =
+                {
+                    new TextBlock { Text = label },
+                    editor,
+                },
+            };
+            Grid.SetColumn(field, column);
+            return field;
         }
     }
 
