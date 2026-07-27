@@ -67,6 +67,44 @@ public partial class ToolboxViewModel : ViewModelBase
         ApplyFilter();
     }
 
+    public bool TryAddPreset(ToolboxItem preset, out string error)
+    {
+        error = string.Empty;
+        var displayName = preset.DisplayName.Trim();
+        if (!preset.IsPreset)
+        {
+            error = "The Toolbox preset must contain at least one control.";
+            return false;
+        }
+
+        if (string.IsNullOrWhiteSpace(displayName))
+        {
+            error = "Toolbox preset name is required.";
+            return false;
+        }
+
+        if (_allItems.Any(item => string.Equals(
+                item.DisplayName,
+                displayName,
+                System.StringComparison.OrdinalIgnoreCase)))
+        {
+            error = $"A Toolbox item named '{displayName}' already exists.";
+            return false;
+        }
+
+        var normalizedPreset = string.Equals(preset.DisplayName, displayName, System.StringComparison.Ordinal)
+            ? preset
+            : preset with { DisplayName = displayName };
+        _allItems.Add(normalizedPreset);
+        ApplyFilter();
+        if (Items.Contains(normalizedPreset))
+        {
+            SelectedItem = normalizedPreset;
+        }
+
+        return true;
+    }
+
     public string SearchResultText => string.IsNullOrWhiteSpace(SearchText)
         ? $"{Items.Count} controls"
         : $"{Items.Count} of {_allItems.Count} controls";

@@ -32,6 +32,7 @@
                 </MenuItem>
                 <MenuItem Header="Load Component Pack..." Click="OnLoadComponentPackMenuClicked"/>
                 <MenuItem Header="Export Selected as Component Pack..." Click="OnExportSelectedComponentPackMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
+                <MenuItem Header="Add Selection to Toolbox..." Click="OnAddSelectionToToolboxMenuClicked" IsEnabled="{Binding Canvas.HasMultipleSelection}"/>
                 <MenuItem Header="Open..." Click="OnOpenMenuClicked"/>
                 <MenuItem Header="Open Recent" x:Name="OpenRecentMenu"/>
                 <Separator/>

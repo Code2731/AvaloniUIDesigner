@@ -203,6 +203,32 @@ public partial class MainWindow : Window
         }
     }
 
+    private async void OnAddSelectionToToolboxMenuClicked(
+        object? sender,
+        Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        FlushPendingPropertyHistory();
+        if (Vm is null || !Vm.TryGetSelectedToolboxPresetDefaults(out var displayName))
+        {
+            return;
+        }
+
+        var updatedName = await ShowTextEditorDialogAsync(
+            "Add Selection to Toolbox",
+            displayName,
+            "Name the reusable root-control layout preset.",
+            multiline: false);
+        if (updatedName is null)
+        {
+            return;
+        }
+
+        if (!Vm.TryAddSelectedAsToolboxPreset(updatedName, out var error))
+        {
+            Vm.StatusText = $"Could not add Toolbox preset: {error}";
+        }
+    }
+
     private async Task HandleOpenCommandAsync()
     {
         if (Vm is null)

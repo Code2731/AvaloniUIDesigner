@@ -20,6 +20,7 @@ dotnet run --project src/AvaloniaUIDesigner.App/AvaloniaUIDesigner.App.csproj
 
 - 4-Pane 레이아웃 (Toolbox / Canvas / Object Tree / Property Inspector)
 - **Toolbox**: 내장 컨트롤, 복합 프리셋, JSON 컴포넌트 팩
+- **선택 영역 Toolbox 프리셋**: 여러 root 컨트롤을 상대 좌표·현재 속성과 함께 현재 세션의 Toolbox에 등록하고 반복 배치
 - **배치**: 클릭-투-플레이스와 드래그 앤 드롭으로 실제 Avalonia 컨트롤 생성
 - **컨테이너 편집**: Grid 셀, StackPanel 순서·주축 크기, DockPanel 순서·방향·크기·LastChildFill, WrapPanel 순서·방향·항목 크기·간격·정렬, UniformGrid 순서·행·열·첫 열·간격, 중첩 Canvas 로컬 좌표·직접 변형·z-order, TabControl 탭 정의·탭별 단일 자식·활성 페이지·TabStripPlacement·콘텐츠 정렬, SplitView Pane·Content 슬롯·Inline/Overlay·배치 방향, Border·ContentControl·UserControl·ScrollViewer·Expander의 단일 Content 자식을 편집하고 재귀 Object Tree·AXAML·미리보기에 보존
 - **계층 항목 편집**: TreeView 항목을 `[-]`(펼침), `[+]`(접힘), 두 칸 들여쓰기 문법으로 편집하고 Undo/Redo, 복제, 미리보기, AXAML 왕복에 보존
@@ -107,6 +108,7 @@ dotnet run --project src/AvaloniaUIDesigner.App/AvaloniaUIDesigner.App.csproj
 35. 같은 root 또는 같은 Canvas 안의 형제 컨트롤을 여러 개 선택한 뒤 `Edit > Group Selected into Canvas`로 묶고, Canvas 그룹을 선택해 `Edit > Ungroup Selected Canvas`로 해제
 36. UserControl은 기존 Window/UserControl 문서 안에 중첩 배치할 수 있으며, 단일 Content 자식·fallback 텍스트·Content Binding을 각각 Preview와 생성 AXAML에서 같은 `<UserControl>` 계층으로 확인
 37. 여러 root 컨트롤 또는 같은 Canvas의 형제 컨트롤을 선택해 `Edit > Arrange`에서 정렬·분배·크기 맞춤을 실행하고, `Center on Artboard`로 root 컨트롤을 아트보드 중앙에 배치
+38. 여러 root 컨트롤을 선택해 `File > Add Selection to Toolbox...`에서 이름을 지정하면 상대 배치와 시각 속성을 세션 프리셋으로 저장하고, 이후 Toolbox에서 반복 배치
 
 DataGrid가 포함된 생성 AXAML을 다른 프로젝트에서 사용할 때는 같은 Avalonia 버전의 `Avalonia.Controls.DataGrid` 패키지와 `avares://Avalonia.Controls.DataGrid/Themes/Fluent.xaml` 스타일 include가 필요합니다.
 
@@ -163,6 +165,8 @@ GridSplitter Behavior 편집기는 `ResizeDirection`의 Auto·Columns·Rows, `Re
 Canvas 그룹화는 같은 부모를 공유하는 형제 컨트롤만 대상으로 합니다. root 컨트롤을 묶으면 bounding box 위치에 새 Canvas가 생성되고, Canvas 자식을 묶으면 원래 Canvas 안에 중첩됩니다. 그룹을 해제해도 자식의 화면 좌표와 형제 z-order를 유지하며, 서로 다른 Grid·StackPanel·Content 슬롯을 섞는 작업은 레이아웃 좌표 손실을 막기 위해 거부합니다.
 
 다중 선택 Arrange는 root 요소 또는 같은 Canvas의 직접 자식만 대상으로 합니다. Grid·StackPanel·DockPanel·WrapPanel·UniformGrid·TabControl·SplitView·Content 자식은 부모가 좌표와 크기를 관리하므로 정렬을 거부하고, 해당 컨테이너의 전용 할당·순서 편집기를 사용하도록 안내합니다. Canvas 형제의 정렬은 `Canvas.Left`·`Canvas.Top` 로컬 좌표를 갱신하므로 부모를 이동해도 정렬 결과가 유지됩니다.
+
+선택 영역 Toolbox 프리셋은 두 개 이상의 root 컨트롤을 선택한 뒤 `File > Add Selection to Toolbox...`에서 등록합니다. 선택 영역의 좌상단을 기준으로 상대 좌표를 저장하고, 등록 시점의 크기·시각 속성·텍스트·콘텐츠를 함께 복원합니다. 등록된 프리셋은 현재 세션의 Toolbox 검색 결과에 즉시 나타나며, 배치 후 모든 컨트롤을 다중 선택한 상태로 유지합니다. Grid·StackPanel·DockPanel·WrapPanel·UniformGrid·TabControl·SplitView·Content 등 부모 레이아웃이 관리하는 자식은 현재 프리셋 배치 경로가 계층 메타데이터를 복원하지 않으므로 등록을 거부합니다. 장기 재사용이 필요한 레이아웃은 `File > Export UserControl AXAML...`로 소스에 내보내세요.
 
 Image Source & Rendering 편집기는 로컬 파일 경로와 `file://` URI를 지원하며 빈 Source를 적용하면 현재 이미지를 해제합니다. 존재하지 않거나 디코딩할 수 없는 파일은 기존 Source와 렌더링 상태를 변경하지 않지만, 가져온 AXAML에서 파일을 찾을 수 없는 경우에는 Source 메타데이터를 보존해 프로젝트 이동 후 다시 연결할 수 있습니다. Stretch와 StretchDirection 외에 bitmap interpolation 품질, antialias/aliased edge, compositing blending 모드를 설정할 수 있고 Source Binding이 있으면 생성 AXAML은 정적 Source를 중복 출력하지 않습니다.
 

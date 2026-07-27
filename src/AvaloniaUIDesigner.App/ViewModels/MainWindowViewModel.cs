@@ -631,6 +631,7 @@ public partial class MainWindowViewModel : ViewModelBase
             }
 
             ObjectTree.SelectByElement(Canvas.SelectedElement);
+            Canvas.SelectMany(elements);
             CommitCanvasMutation();
             StatusText = $"Placed {item.DisplayName} ({elements.Count} control(s))";
             return;
@@ -680,6 +681,92 @@ public partial class MainWindowViewModel : ViewModelBase
         displayName = target.DisplayName;
         packName = $"{displayName} Components";
         namePrefix = target.DisplayName;
+        return true;
+    }
+
+    public bool TryGetSelectedToolboxPresetDefaults(out string displayName)
+    {
+        var targets = Canvas.SelectedElements.ToList();
+        if (targets.Count < 2)
+        {
+            displayName = string.Empty;
+            StatusText = "Select at least two root controls to add a Toolbox preset.";
+            return false;
+        }
+
+        if (targets.Any(element => element.IsContainerChild))
+        {
+            displayName = string.Empty;
+            StatusText = "Only root controls can be added to a Toolbox preset.";
+            return false;
+        }
+
+        displayName = $"Preset: {targets[0].DisplayName} Layout";
+        return true;
+    }
+
+    public bool TryAddSelectedAsToolboxPreset(string proposedDisplayName, out string error)
+    {
+        error = string.Empty;
+        var targets = Canvas.SelectedElements.ToList();
+        if (targets.Count < 2)
+        {
+            error = "Select at least two root controls to add a Toolbox preset.";
+            StatusText = error;
+            return false;
+        }
+
+        if (targets.Any(element => element.IsContainerChild))
+        {
+            error = "Only root controls can be added to a Toolbox preset.";
+            StatusText = error;
+            return false;
+        }
+
+        var displayName = proposedDisplayName.Trim();
+        if (string.IsNullOrWhiteSpace(displayName))
+        {
+            error = "Toolbox preset name is required.";
+            StatusText = error;
+            return false;
+        }
+
+        var left = targets.Min(element => element.X);
+        var top = targets.Min(element => element.Y);
+        var snapshots = targets
+            .OrderBy(element => element.Y)
+            .ThenBy(element => element.X)
+            .Select(element => CreateSnapshot(
+                element,
+                element.DisplayName,
+                element.X - left,
+                element.Y - top) with
+            {
+                ParentName = null,
+                ParentLayout = DesignerParentLayoutKind.None,
+                GridRow = 0,
+                GridColumn = 0,
+                GridRowSpan = 1,
+                GridColumnSpan = 1,
+                StackPanelIndex = -1,
+                DockPanelIndex = -1,
+                WrapPanelIndex = -1,
+                UniformGridIndex = -1,
+                CanvasChildIndex = -1,
+                CanvasChildLeft = 0,
+                CanvasChildTop = 0,
+                TabIndex = -1,
+                TabHeader = null,
+            })
+            .ToList();
+        var preset = new ToolboxItem(displayName, "Preset.Selection", snapshots);
+        if (!Toolbox.TryAddPreset(preset, out error))
+        {
+            StatusText = error;
+            return false;
+        }
+
+        StatusText = $"Added Toolbox preset '{displayName}' ({snapshots.Count} control(s)).";
         return true;
     }
 
