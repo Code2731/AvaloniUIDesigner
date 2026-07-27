@@ -22,6 +22,7 @@ dotnet run --project src/AvaloniaUIDesigner.App/AvaloniaUIDesigner.App.csproj
 - **Toolbox**: 내장 컨트롤, 복합 프리셋, JSON 컴포넌트 팩
 - **선택 영역 Toolbox 프리셋**: 여러 root 컨트롤을 상대 좌표·현재 속성과 함께 Toolbox에 등록하고 JSON 팩으로 저장·불러오기
 - **배치**: 클릭-투-플레이스와 드래그 앤 드롭으로 실제 Avalonia 컨트롤 생성
+- **계층 클립보드**: 컨테이너를 선택해 복사·잘라내기·붙여넣기·복제하면 내부 자식 계층과 부모별 배치 메타데이터를 함께 보존하고, 붙여넣은 부모 이름을 새 이름으로 재매핑
 - **컨테이너 편집**: Grid 셀, StackPanel 순서·주축 크기, DockPanel 순서·방향·크기·LastChildFill, WrapPanel 순서·방향·항목 크기·간격·정렬, UniformGrid 순서·행·열·첫 열·간격, 중첩 Canvas 로컬 좌표·직접 변형·z-order, TabControl 탭 정의·탭별 단일 자식·활성 페이지·TabStripPlacement·콘텐츠 정렬, SplitView Pane·Content 슬롯·Inline/Overlay·배치 방향, Border·ContentControl·UserControl·ScrollViewer·Expander의 단일 Content 자식을 편집하고 재귀 Object Tree·AXAML·미리보기에 보존
 - **계층 항목 편집**: TreeView 항목을 `[-]`(펼침), `[+]`(접힘), 두 칸 들여쓰기 문법으로 편집하고 Undo/Redo, 복제, 미리보기, AXAML 왕복에 보존
 - **메뉴 구조 편집**: Menu 항목을 두 칸 들여쓰기로 중첩하고 `---` 구분선, `[x]/[ ]` 체크, `(x)/( )` 라디오와 `{Group}`, `| Ctrl+N` 표시·실행 단축키를 편집해 Undo/Redo, 복제, 미리보기, AXAML 왕복에 보존
@@ -168,6 +169,8 @@ Canvas 그룹화는 같은 부모를 공유하는 형제 컨트롤만 대상으�
 다중 선택 Arrange는 root 요소 또는 같은 Canvas의 직접 자식만 대상으로 합니다. Grid·StackPanel·DockPanel·WrapPanel·UniformGrid·TabControl·SplitView·Content 자식은 부모가 좌표와 크기를 관리하므로 정렬을 거부하고, 해당 컨테이너의 전용 할당·순서 편집기를 사용하도록 안내합니다. Canvas 형제의 정렬은 `Canvas.Left`·`Canvas.Top` 로컬 좌표를 갱신하므로 부모를 이동해도 정렬 결과가 유지됩니다.
 
 선택 영역 Toolbox 프리셋은 두 개 이상의 root 컨트롤 또는 같은 Canvas의 직접 형제 컨트롤을 선택한 뒤 `File > Add Selection to Toolbox...`에서 등록합니다. 선택 영역의 좌상단을 기준으로 상대 좌표를 저장하고, root 선택은 컨트롤 목록으로, Canvas 형제 선택은 bounding box Canvas와 로컬 자식 계층으로 보존합니다. 등록 시점의 크기·시각 속성·텍스트·콘텐츠도 함께 복원하며, 배치 후 생성된 Canvas와 자식 컨트롤을 모두 선택합니다. 등록된 프리셋은 현재 세션의 Toolbox 검색 결과에 즉시 나타나며, `File > Export Selected Toolbox Preset...`으로 `*.toolbox-preset.json` 팩을 저장할 수 있습니다. `File > Load Toolbox Preset Pack...`은 JSON 문법·중복 이름·지원 타입·bounds·root/Canvas 계층을 검증한 뒤 일괄 등록하므로 실패한 팩이 Toolbox를 부분적으로 변경하지 않습니다. Grid·StackPanel·DockPanel·WrapPanel·UniformGrid·TabControl·SplitView·Content 자식은 현재 프리셋 배치 경로가 부모 전용 메타데이터를 복원하지 않으므로 등록을 거부합니다. 예시는 [toolbox-preset.example.json](docs/toolbox-preset.example.json)을 참고하세요.
+
+컨테이너를 단독 선택한 상태에서 `Edit > Copy`, `Cut`, `Paste`, `Duplicate`를 실행하면 선택된 컨테이너의 모든 하위 요소를 하나의 계층으로 처리합니다. Canvas의 로컬 좌표와 Grid·StackPanel·TabControl·Content 등의 부모 배치 메타데이터를 유지하며, 계층 밖의 부모를 참조하는 자식은 기존 부모 참조를 유지합니다. 잘라내기는 잠긴 하위 요소가 포함된 계층을 거부해 부분 삭제를 방지합니다.
 
 Image Source & Rendering 편집기는 로컬 파일 경로와 `file://` URI를 지원하며 빈 Source를 적용하면 현재 이미지를 해제합니다. 존재하지 않거나 디코딩할 수 없는 파일은 기존 Source와 렌더링 상태를 변경하지 않지만, 가져온 AXAML에서 파일을 찾을 수 없는 경우에는 Source 메타데이터를 보존해 프로젝트 이동 후 다시 연결할 수 있습니다. Stretch와 StretchDirection 외에 bitmap interpolation 품질, antialias/aliased edge, compositing blending 모드를 설정할 수 있고 Source Binding이 있으면 생성 AXAML은 정적 Source를 중복 출력하지 않습니다.
 

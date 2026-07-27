@@ -6554,35 +6554,22 @@ public partial class MainWindowViewModel : ViewModelBase
 
     public void DuplicateSelectedElement()
     {
-        var targets = Canvas.SelectedElements.ToList();
-        if (targets.Count == 0)
+        var selected = Canvas.SelectedElements.ToList();
+        if (selected.Count == 0)
         {
             StatusText = "No selected element to duplicate.";
             return;
         }
 
         BeginCanvasMutation(HistoryActionType.DuplicateElement, "Duplicated control.");
-
-        var nameMap = targets.ToDictionary(
-            target => target.DisplayName,
-            target => BuildDuplicateDisplayName(target.DisplayName),
-            StringComparer.OrdinalIgnoreCase);
+        var targets = CollectSelectionSubtree(selected);
+        var snapshots = CaptureElementSnapshots(targets);
+        var nameMap = BuildDuplicateNameMap(snapshots);
         var duplicates = new List<DesignElement>();
-        foreach (var target in targets)
+        foreach (var snapshot in CreateDuplicatedSnapshots(snapshots, nameMap))
         {
-            var duplicatedSnapshot = CreateSnapshot(
-                target,
-                nameMap[target.DisplayName],
-                target.X + 16,
-                target.Y + 16) with
-            {
-                ParentName = target.ParentName is not null
-                    && nameMap.TryGetValue(target.ParentName, out var duplicateParentName)
-                        ? duplicateParentName
-                        : target.ParentName,
-            };
             var duplicated = Canvas.AddElementFromSnapshot(
-                duplicatedSnapshot,
+                snapshot,
                 select: false,
                 deferContainerReflow: true);
             duplicates.Add(duplicated);
@@ -6603,45 +6590,50 @@ public partial class MainWindowViewModel : ViewModelBase
 
         CommitCanvasMutation();
 
-        StatusText = $"Duplicated {targets.Count} control(s)";
+        StatusText = $"Duplicated {duplicates.Count} control(s)";
     }
 
     public void CopySelectedElement()
     {
-        var targets = Canvas.SelectedElements.ToList();
-        if (targets.Count == 0)
+        var selected = Canvas.SelectedElements.ToList();
+        if (selected.Count == 0)
         {
             StatusText = "No selected element to copy.";
             return;
         }
 
-        _clipboardSnapshots = targets
-            .Select(target => CreateSnapshot(target, target.DisplayName, target.X, target.Y))
-            .ToList();
+        _clipboardSnapshots = CaptureElementSnapshots(CollectSelectionSubtree(selected));
         OnPropertyChanged(nameof(CanPaste));
-        StatusText = $"Copied {targets.Count} control(s)";
+        StatusText = $"Copied {_clipboardSnapshots.Count} control(s)";
     }
 
     public void CutSelectedElement()
     {
-        var targets = Canvas.SelectedElements.Where(element => !element.IsLocked).ToList();
-        if (targets.Count == 0)
+        var selected = Canvas.SelectedElements.Where(element => !element.IsLocked).ToList();
+        if (selected.Count == 0)
         {
             StatusText = "No unlocked controls to cut.";
             return;
         }
 
-        _clipboardSnapshots = targets.Select(element => CreateSnapshot(element, element.DisplayName, element.X, element.Y)).ToList();
+        var targets = CollectSelectionSubtree(selected);
+        if (targets.Any(element => element.IsLocked))
+        {
+            StatusText = "Cannot cut a hierarchy that contains locked controls.";
+            return;
+        }
+
+        _clipboardSnapshots = CaptureElementSnapshots(targets);
         OnPropertyChanged(nameof(CanPaste));
         BeginCanvasMutation(HistoryActionType.RemoveElement, "Cut control.");
-        foreach (var target in targets)
+        foreach (var target in targets.OrderByDescending(GetElementDepth).ToList())
         {
             Canvas.RemoveElement(target);
         }
 
         ObjectTree.RebuildFrom(Canvas.Elements);
         CommitCanvasMutation();
-        StatusText = $"Cut {targets.Count} control(s)";
+        StatusText = $"Cut {_clipboardSnapshots.Count} control(s)";
     }
 
     public void PasteElement()
@@ -6654,30 +6646,15 @@ public partial class MainWindowViewModel : ViewModelBase
 
         BeginCanvasMutation(HistoryActionType.PasteElement, "Pasted control.");
 
-        var pastedSnapshots = new List<DesignerElementSnapshot>();
+        var nameMap = BuildDuplicateNameMap(_clipboardSnapshots);
+        var pastedSnapshots = CreateDuplicatedSnapshots(_clipboardSnapshots, nameMap);
         var pastedElements = new List<DesignElement>();
-        var nameMap = _clipboardSnapshots.ToDictionary(
-            snapshot => snapshot.DisplayName,
-            snapshot => BuildDuplicateDisplayName(snapshot.DisplayName),
-            StringComparer.OrdinalIgnoreCase);
-        foreach (var snapshot in _clipboardSnapshots)
+        foreach (var pastedSnapshot in pastedSnapshots)
         {
-            var pastedSnapshot = snapshot with
-            {
-                DisplayName = nameMap[snapshot.DisplayName],
-                X = snapshot.X + 16,
-                Y = snapshot.Y + 16,
-                VisualProperties = CloneProperties(snapshot.VisualProperties),
-                ParentName = snapshot.ParentName is not null
-                    && nameMap.TryGetValue(snapshot.ParentName, out var pastedParentName)
-                        ? pastedParentName
-                        : snapshot.ParentName,
-            };
             var pasted = Canvas.AddElementFromSnapshot(
                 pastedSnapshot,
                 select: false,
                 deferContainerReflow: true);
-            pastedSnapshots.Add(pastedSnapshot);
             pastedElements.Add(pasted);
         }
 
@@ -7550,6 +7527,85 @@ public partial class MainWindowViewModel : ViewModelBase
 
         return properties;
     }
+
+    private List<DesignElement> CollectSelectionSubtree(IReadOnlyList<DesignElement> selected)
+    {
+        var roots = selected
+            .Where(candidate => !selected.Any(ancestor =>
+                !ReferenceEquals(candidate, ancestor)
+                && IsDescendantOf(candidate, ancestor)))
+            .ToHashSet();
+
+        return Canvas.Elements
+            .Where(element => roots.Any(root =>
+                ReferenceEquals(element, root)
+                || IsDescendantOf(element, root)))
+            .OrderBy(GetElementDepth)
+            .ThenBy(Canvas.Elements.IndexOf)
+            .ToList();
+    }
+
+    private int GetElementDepth(DesignElement element)
+    {
+        var depth = 0;
+        var current = element;
+        var visited = new HashSet<DesignElement>();
+        while (current.ParentName is not null && visited.Add(current))
+        {
+            var parent = Canvas.Elements.FirstOrDefault(candidate => string.Equals(
+                candidate.DisplayName,
+                current.ParentName,
+                StringComparison.OrdinalIgnoreCase));
+            if (parent is null)
+            {
+                break;
+            }
+
+            depth++;
+            current = parent;
+        }
+
+        return depth;
+    }
+
+    private List<DesignerElementSnapshot> CaptureElementSnapshots(
+        IEnumerable<DesignElement> elements)
+        => elements
+            .Select(element => CreateSnapshot(
+                element,
+                element.DisplayName,
+                element.X,
+                element.Y))
+            .ToList();
+
+    private Dictionary<string, string> BuildDuplicateNameMap(
+        IEnumerable<DesignerElementSnapshot> snapshots)
+    {
+        var nameMap = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var snapshot in snapshots)
+        {
+            nameMap[snapshot.DisplayName] = BuildDuplicateDisplayName(snapshot.DisplayName);
+        }
+
+        return nameMap;
+    }
+
+    private static List<DesignerElementSnapshot> CreateDuplicatedSnapshots(
+        IReadOnlyList<DesignerElementSnapshot> snapshots,
+        IReadOnlyDictionary<string, string> nameMap)
+        => snapshots
+            .Select(snapshot => snapshot with
+            {
+                DisplayName = nameMap[snapshot.DisplayName],
+                X = snapshot.X + 16,
+                Y = snapshot.Y + 16,
+                VisualProperties = CloneProperties(snapshot.VisualProperties),
+                ParentName = snapshot.ParentName is not null
+                    && nameMap.TryGetValue(snapshot.ParentName, out var duplicateParentName)
+                        ? duplicateParentName
+                        : snapshot.ParentName,
+            })
+            .ToList();
 
     private DesignerElementSnapshot CreateSnapshot(
         DesignElement element,
