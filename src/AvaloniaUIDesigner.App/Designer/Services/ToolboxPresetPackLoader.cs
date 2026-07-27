@@ -68,6 +68,7 @@ public sealed class ToolboxPresetPackLoader
                 return false;
             }
 
+            var elementNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             foreach (var element in definition.Elements)
             {
                 if (element is null)
@@ -89,10 +90,17 @@ public sealed class ToolboxPresetPackLoader
                     return false;
                 }
 
-                if (element.ParentName is not null
-                    || element.ParentLayout != DesignerParentLayoutKind.None)
+                if (!elementNames.Add(element.DisplayName))
                 {
-                    error = $"Toolbox preset '{displayName}' can contain root controls only.";
+                    error = $"Toolbox preset '{displayName}' contains duplicate control name '{element.DisplayName}'.";
+                    return false;
+                }
+
+                var hasParent = !string.IsNullOrWhiteSpace(element.ParentName);
+                if ((!hasParent && element.ParentLayout != DesignerParentLayoutKind.None)
+                    || (hasParent && element.ParentLayout != DesignerParentLayoutKind.Canvas))
+                {
+                    error = $"Toolbox preset '{displayName}' supports root controls and direct Canvas children only.";
                     return false;
                 }
 
@@ -106,6 +114,30 @@ public sealed class ToolboxPresetPackLoader
                     || element.Height > 2160)
                 {
                     error = $"Toolbox preset '{displayName}' contains a control with invalid bounds.";
+                    return false;
+                }
+            }
+
+            var rootElements = definition.Elements
+                .Where(element => string.IsNullOrWhiteSpace(element.ParentName))
+                .ToList();
+            foreach (var child in definition.Elements.Where(element => !string.IsNullOrWhiteSpace(element.ParentName)))
+            {
+                var parent = rootElements.FirstOrDefault(element => string.Equals(
+                    element.DisplayName,
+                    child.ParentName,
+                    StringComparison.OrdinalIgnoreCase));
+                if (parent?.TypeName != "Avalonia.Controls.Canvas")
+                {
+                    error = $"Toolbox preset '{displayName}' can contain root controls or direct Canvas children only, and children must reference a root Canvas.";
+                    return false;
+                }
+
+                if (child.CanvasChildIndex < 0
+                    || !double.IsFinite(child.CanvasChildLeft)
+                    || !double.IsFinite(child.CanvasChildTop))
+                {
+                    error = $"Toolbox preset '{displayName}' contains invalid Canvas child coordinates.";
                     return false;
                 }
             }

@@ -712,17 +712,10 @@ public partial class MainWindowViewModel : ViewModelBase
     public bool TryGetSelectedToolboxPresetDefaults(out string displayName)
     {
         var targets = Canvas.SelectedElements.ToList();
-        if (targets.Count < 2)
+        if (!TryValidateToolboxPresetSelection(targets, out _, out var error))
         {
             displayName = string.Empty;
-            StatusText = "Select at least two root controls to add a Toolbox preset.";
-            return false;
-        }
-
-        if (targets.Any(element => element.IsContainerChild))
-        {
-            displayName = string.Empty;
-            StatusText = "Only root controls can be added to a Toolbox preset.";
+            StatusText = error;
             return false;
         }
 
@@ -779,16 +772,8 @@ public partial class MainWindowViewModel : ViewModelBase
     {
         error = string.Empty;
         var targets = Canvas.SelectedElements.ToList();
-        if (targets.Count < 2)
+        if (!TryValidateToolboxPresetSelection(targets, out var canvasParent, out error))
         {
-            error = "Select at least two root controls to add a Toolbox preset.";
-            StatusText = error;
-            return false;
-        }
-
-        if (targets.Any(element => element.IsContainerChild))
-        {
-            error = "Only root controls can be added to a Toolbox preset.";
             StatusText = error;
             return false;
         }
@@ -803,15 +788,25 @@ public partial class MainWindowViewModel : ViewModelBase
 
         var left = targets.Min(element => element.X);
         var top = targets.Min(element => element.Y);
-        var snapshots = targets
-            .OrderBy(element => element.Y)
-            .ThenBy(element => element.X)
-            .Select(element => CreateSnapshot(
-                element,
-                element.DisplayName,
-                element.X - left,
-                element.Y - top) with
+        var right = targets.Max(element => element.X + element.Width);
+        var bottom = targets.Max(element => element.Y + element.Height);
+        var snapshots = new List<DesignerElementSnapshot>();
+        if (canvasParent is not null)
+        {
+            var groupName = $"{displayName} Canvas";
+            while (targets.Any(element => string.Equals(
+                       element.DisplayName,
+                       groupName,
+                       StringComparison.OrdinalIgnoreCase)))
             {
+                groupName += " Canvas";
+            }
+
+            snapshots.Add(CreateSnapshot(canvasParent, groupName, 0, 0) with
+            {
+                Width = Math.Max(10, right - left),
+                Height = Math.Max(10, bottom - top),
+                IsLocked = false,
                 ParentName = null,
                 ParentLayout = DesignerParentLayoutKind.None,
                 GridRow = 0,
@@ -827,8 +822,67 @@ public partial class MainWindowViewModel : ViewModelBase
                 CanvasChildTop = 0,
                 TabIndex = -1,
                 TabHeader = null,
-            })
-            .ToList();
+            });
+
+            var childIndex = 0;
+            foreach (var target in targets
+                         .OrderBy(element => element.CanvasChildIndex)
+                         .ThenBy(element => element.X)
+                         .ThenBy(element => element.Y))
+            {
+                snapshots.Add(CreateSnapshot(
+                    target,
+                    target.DisplayName,
+                    target.X - left,
+                    target.Y - top) with
+                {
+                    ParentName = groupName,
+                    ParentLayout = DesignerParentLayoutKind.Canvas,
+                    CanvasChildIndex = childIndex++,
+                    CanvasChildLeft = target.X - left,
+                    CanvasChildTop = target.Y - top,
+                    GridRow = 0,
+                    GridColumn = 0,
+                    GridRowSpan = 1,
+                    GridColumnSpan = 1,
+                    StackPanelIndex = -1,
+                    DockPanelIndex = -1,
+                    WrapPanelIndex = -1,
+                    UniformGridIndex = -1,
+                    TabIndex = -1,
+                    TabHeader = null,
+                });
+            }
+        }
+        else
+        {
+            snapshots.AddRange(targets
+                .OrderBy(element => element.Y)
+                .ThenBy(element => element.X)
+                .Select(element => CreateSnapshot(
+                    element,
+                    element.DisplayName,
+                    element.X - left,
+                    element.Y - top) with
+                {
+                    ParentName = null,
+                    ParentLayout = DesignerParentLayoutKind.None,
+                    GridRow = 0,
+                    GridColumn = 0,
+                    GridRowSpan = 1,
+                    GridColumnSpan = 1,
+                    StackPanelIndex = -1,
+                    DockPanelIndex = -1,
+                    WrapPanelIndex = -1,
+                    UniformGridIndex = -1,
+                    CanvasChildIndex = -1,
+                    CanvasChildLeft = 0,
+                    CanvasChildTop = 0,
+                    TabIndex = -1,
+                    TabHeader = null,
+                }));
+        }
+
         var preset = new ToolboxItem(displayName, "Preset.Selection", snapshots);
         if (!Toolbox.TryAddPreset(preset, out error))
         {
@@ -836,7 +890,56 @@ public partial class MainWindowViewModel : ViewModelBase
             return false;
         }
 
-        StatusText = $"Added Toolbox preset '{displayName}' ({snapshots.Count} control(s)).";
+        StatusText = $"Added Toolbox preset '{displayName}' ({targets.Count} control(s)).";
+        return true;
+    }
+
+    private bool TryValidateToolboxPresetSelection(
+        IReadOnlyList<DesignElement> targets,
+        out DesignElement? canvasParent,
+        out string error)
+    {
+        canvasParent = null;
+        error = string.Empty;
+        if (targets.Count < 2)
+        {
+            error = "Select at least two root controls or siblings inside the same Canvas.";
+            return false;
+        }
+
+        var parentName = targets[0].ParentName;
+        if (targets.Any(element => !string.Equals(
+                element.ParentName,
+                parentName,
+                StringComparison.OrdinalIgnoreCase)))
+        {
+            error = "Toolbox presets require root controls or siblings inside the same Canvas.";
+            return false;
+        }
+
+        if (string.IsNullOrWhiteSpace(parentName))
+        {
+            if (targets.Any(element => element.IsContainerChild))
+            {
+                error = "The selected controls have an invalid parent relationship.";
+                return false;
+            }
+
+            return true;
+        }
+
+        canvasParent = Canvas.Elements.FirstOrDefault(element => string.Equals(
+            element.DisplayName,
+            parentName,
+            StringComparison.OrdinalIgnoreCase));
+        if (canvasParent?.Visual is not Avalonia.Controls.Canvas
+            || targets.Any(element => element.ParentLayout != DesignerParentLayoutKind.Canvas))
+        {
+            canvasParent = null;
+            error = "Only siblings directly inside the same Canvas can be added as a nested Toolbox preset.";
+            return false;
+        }
+
         return true;
     }
 

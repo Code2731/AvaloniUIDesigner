@@ -294,7 +294,8 @@ public partial class CanvasViewModel : ViewModelBase
     public DesignElement AddElementFromSnapshot(
         DesignerElementSnapshot snapshot,
         bool select = false,
-        bool deferContainerReflow = false)
+        bool deferContainerReflow = false,
+        bool preserveDisplayName = true)
     {
         var (visual, defaultWidth, defaultHeight) = CreateVisualByType(snapshot.TypeName, snapshot.DisplayName);
         var width = snapshot.Width > 0 ? snapshot.Width : defaultWidth;
@@ -312,7 +313,7 @@ public partial class CanvasViewModel : ViewModelBase
             width,
             height,
             select,
-            preserveDisplayName: true);
+            preserveDisplayName);
         _isReflowingContainerChildren = true;
         try
         {
@@ -367,22 +368,67 @@ public partial class CanvasViewModel : ViewModelBase
         }
 
         var placed = new List<DesignElement>();
-        foreach (var snapshot in preset.PresetElements)
+        var sourceNameToPlacedName = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        var roots = preset.PresetElements
+            .Where(snapshot => string.IsNullOrWhiteSpace(snapshot.ParentName))
+            .ToList();
+        var children = preset.PresetElements
+            .Where(snapshot => !string.IsNullOrWhiteSpace(snapshot.ParentName))
+            .OrderBy(snapshot => snapshot.CanvasChildIndex)
+            .ToList();
+
+        foreach (var snapshot in roots)
         {
-            var (visual, defaultWidth, defaultHeight) = CreateVisualByType(snapshot.TypeName, snapshot.DisplayName);
-            ApplyVisualProperties(visual, snapshot.VisualProperties);
-            RefreshDocumentStyles(visual);
-            placed.Add(AddElement(
-                snapshot.DisplayName,
-                snapshot.TypeName,
-                visual,
-                SnapPosition(x + snapshot.X),
-                SnapPosition(y + snapshot.Y),
-                snapshot.Width > 0 ? snapshot.Width : defaultWidth,
-                snapshot.Height > 0 ? snapshot.Height : defaultHeight,
-                select: false));
+            var placedSnapshot = snapshot with
+            {
+                X = SnapPosition(x + snapshot.X),
+                Y = SnapPosition(y + snapshot.Y),
+                ParentName = null,
+                ParentLayout = DesignerParentLayoutKind.None,
+            };
+            var element = AddElementFromSnapshot(
+                placedSnapshot,
+                select: false,
+                deferContainerReflow: true,
+                preserveDisplayName: false);
+            placed.Add(element);
+            sourceNameToPlacedName[snapshot.DisplayName] = element.DisplayName;
         }
 
+        foreach (var snapshot in children)
+        {
+            if (string.IsNullOrWhiteSpace(snapshot.ParentName)
+                || !sourceNameToPlacedName.TryGetValue(snapshot.ParentName, out var parentName)
+                || Elements.FirstOrDefault(element => string.Equals(
+                    element.DisplayName,
+                    parentName,
+                    StringComparison.OrdinalIgnoreCase)) is not { } parent
+                || parent.Visual is not Canvas)
+            {
+                continue;
+            }
+
+            var childX = SnapPosition(parent.X + snapshot.X);
+            var childY = SnapPosition(parent.Y + snapshot.Y);
+            var placedSnapshot = snapshot with
+            {
+                X = childX,
+                Y = childY,
+                ParentName = parent.DisplayName,
+                ParentLayout = DesignerParentLayoutKind.Canvas,
+                CanvasChildLeft = childX - parent.X,
+                CanvasChildTop = childY - parent.Y,
+            };
+            var element = AddElementFromSnapshot(
+                placedSnapshot,
+                select: false,
+                deferContainerReflow: true,
+                preserveDisplayName: false);
+            placed.Add(element);
+        }
+
+        NormalizeContainerRelationships();
+        ReflowContainerChildren();
         ResolveLabelTargets();
         SelectMany(placed);
         return placed;
