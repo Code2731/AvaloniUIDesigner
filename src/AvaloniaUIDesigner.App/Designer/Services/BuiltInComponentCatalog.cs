@@ -30,6 +30,16 @@ public sealed class BuiltInComponentCatalog : IComponentCatalog
             DefaultHeight: 32,
             VisualFactory: static () => new TextBox { Watermark = "Type here" }),
         new(
+            DisplayName: "AutoCompleteBox",
+            AvaloniaTypeName: "Avalonia.Controls.AutoCompleteBox",
+            DefaultWidth: 220,
+            DefaultHeight: 32,
+            VisualFactory: static () => new AutoCompleteBox
+            {
+                Watermark = "Search...",
+                ItemsSource = new[] { "Alpha", "Beta", "Gamma" },
+            }),
+        new(
             DisplayName: "TextBlock",
             AvaloniaTypeName: "Avalonia.Controls.TextBlock",
             DefaultWidth: 160,

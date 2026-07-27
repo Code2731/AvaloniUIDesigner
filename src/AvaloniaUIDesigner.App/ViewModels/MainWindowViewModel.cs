@@ -241,6 +241,17 @@ public sealed record ColorPickerEditorState(
     bool IsHexInputVisible,
     string PaletteColumnCount);
 
+public sealed record AutoCompleteBoxEditorState(
+    string ControlName,
+    string Text,
+    string Watermark,
+    bool IsTextCompletionEnabled,
+    string MinimumPrefixLength,
+    string MinimumPopulateDelay,
+    string FilterMode,
+    string MaxDropDownHeight,
+    bool IsDropDownOpen);
+
 public sealed record ToggleEditorState(
     string ControlName,
     string ControlKind,
@@ -2686,7 +2697,7 @@ public partial class MainWindowViewModel : ViewModelBase
         if (target is null)
         {
             state = EmptyItemsEditorState();
-            StatusText = "Select a ComboBox, ListBox, TreeView, Menu, TabControl, or DataGrid to edit its items or columns.";
+            StatusText = "Select a ComboBox, AutoCompleteBox, ListBox, TreeView, Menu, TabControl, or DataGrid to edit its items or columns.";
             return false;
         }
 
@@ -2699,6 +2710,12 @@ public partial class MainWindowViewModel : ViewModelBase
 
         switch (target.Visual)
         {
+            case AutoCompleteBox autoCompleteBox:
+                state = new ItemsEditorState(
+                    target.DisplayName,
+                    ReadAutoCompleteBoxItems(autoCompleteBox),
+                    ItemsEditorMode.Flat);
+                return true;
             case ComboBox comboBox:
                 state = new ItemsEditorState(
                     target.DisplayName,
@@ -2737,7 +2754,7 @@ public partial class MainWindowViewModel : ViewModelBase
                 return true;
             default:
                 state = EmptyItemsEditorState();
-                StatusText = "Item and column editing is available for ComboBox, ListBox, TreeView, Menu, TabControl, and DataGrid controls.";
+                StatusText = "Item and column editing is available for ComboBox, AutoCompleteBox, ListBox, TreeView, Menu, TabControl, and DataGrid controls.";
                 return false;
         }
     }
@@ -3274,7 +3291,7 @@ public partial class MainWindowViewModel : ViewModelBase
         var target = Canvas.SelectedElement;
         if (target is null || target.IsLocked)
         {
-            StatusText = "Select an unlocked ComboBox, ListBox, TreeView, Menu, TabControl, or DataGrid to edit its items or columns.";
+            StatusText = "Select an unlocked ComboBox, AutoCompleteBox, ListBox, TreeView, Menu, TabControl, or DataGrid to edit its items or columns.";
             return;
         }
 
@@ -3351,6 +3368,18 @@ public partial class MainWindowViewModel : ViewModelBase
 
         switch (target.Visual)
         {
+            case AutoCompleteBox autoCompleteBox:
+                if (ReadAutoCompleteBoxItems(autoCompleteBox).SequenceEqual(updatedItems, StringComparer.Ordinal))
+                {
+                    StatusText = "AutoCompleteBox items are unchanged.";
+                    return;
+                }
+
+                BeginCanvasMutation(HistoryActionType.EditProperty, "Updated AutoCompleteBox items.");
+                autoCompleteBox.ItemsSource = updatedItems;
+                CommitCanvasMutation();
+                StatusText = $"Updated {updatedItems.Count} AutoCompleteBox item(s).";
+                return;
             case ComboBox comboBox:
                 if (ReadItems(comboBox).SequenceEqual(updatedItems, StringComparer.Ordinal))
                 {
@@ -4330,6 +4359,93 @@ public partial class MainWindowViewModel : ViewModelBase
         Canvas.RefreshDocumentStyles(target.Visual);
         CommitCanvasMutation();
         StatusText = $"Updated color picker behavior for {target.DisplayName}.";
+        return true;
+    }
+
+    public bool TryGetSelectedAutoCompleteBoxProperties(out AutoCompleteBoxEditorState state)
+    {
+        var target = Canvas.SelectedElement;
+        if (target is null || target.IsLocked || !DesignerAutoCompleteBoxRuntime.IsSupportedControl(target.Visual))
+        {
+            state = default!;
+            StatusText = target switch
+            {
+                null => "Select an AutoCompleteBox before editing autocomplete behavior.",
+                { IsLocked: true } => "Unlock the selected AutoCompleteBox before editing autocomplete behavior.",
+                _ => "Autocomplete editing is available for AutoCompleteBox controls.",
+            };
+            return false;
+        }
+
+        if (!DesignerAutoCompleteBoxRuntime.TryRead(target.Visual, out var values, out var error))
+        {
+            state = default!;
+            StatusText = $"AutoCompleteBox cannot be edited. {error}";
+            return false;
+        }
+
+        state = new AutoCompleteBoxEditorState(
+            target.DisplayName,
+            values.Text,
+            values.Watermark,
+            values.IsTextCompletionEnabled,
+            values.MinimumPrefixLength.ToString(CultureInfo.InvariantCulture),
+            values.MinimumPopulateDelay.ToString("c", CultureInfo.InvariantCulture),
+            values.FilterMode.ToString(),
+            double.IsPositiveInfinity(values.MaxDropDownHeight)
+                ? "Infinity"
+                : values.MaxDropDownHeight.ToString("0.###", CultureInfo.InvariantCulture),
+            values.IsDropDownOpen);
+        return true;
+    }
+
+    public bool SetSelectedAutoCompleteBoxProperties(DesignerAutoCompleteBoxEditorInput input)
+    {
+        var target = Canvas.SelectedElement;
+        if (target is null || target.IsLocked || !DesignerAutoCompleteBoxRuntime.IsSupportedControl(target.Visual))
+        {
+            StatusText = "Select an unlocked AutoCompleteBox before editing autocomplete behavior.";
+            return false;
+        }
+
+        if (!DesignerAutoCompleteBoxRuntime.TryRead(target.Visual, out var current, out var error))
+        {
+            StatusText = $"AutoCompleteBox was not changed. {error}";
+            return false;
+        }
+
+        if (!DesignerAutoCompleteBoxRuntime.TryParseValues(input, current, out var values, out error))
+        {
+            StatusText = $"AutoCompleteBox was not changed. {error}";
+            return false;
+        }
+
+        if (current == values)
+        {
+            StatusText = "AutoCompleteBox is unchanged.";
+            return true;
+        }
+
+        BeginCanvasMutation(HistoryActionType.EditProperty, "Updated AutoCompleteBox behavior.");
+        DesignerAutoCompleteBoxRuntime.Apply((AutoCompleteBox)target.Visual, values);
+        foreach (var propertyName in new[]
+                 {
+                     "Text",
+                     "Watermark",
+                     "IsTextCompletionEnabled",
+                     "MinimumPrefixLength",
+                     "MinimumPopulateDelay",
+                     "FilterMode",
+                     "MaxDropDownHeight",
+                     "IsDropDownOpen",
+                 })
+        {
+            DesignerStyleApplicationMetadata.ClearApplied(target.Visual, propertyName);
+        }
+
+        Canvas.RefreshDocumentStyles(target.Visual);
+        CommitCanvasMutation();
+        StatusText = $"Updated autocomplete behavior for {target.DisplayName}.";
         return true;
     }
 
@@ -5736,6 +5852,7 @@ public partial class MainWindowViewModel : ViewModelBase
         var sb = new StringBuilder();
         sb.AppendLine($"<{rootElementName} xmlns=\"https://github.com/avaloniaui\"");
         sb.AppendLine("        xmlns:x=\"http://schemas.microsoft.com/winfx/2006/xaml\"");
+        sb.AppendLine("        xmlns:collections=\"clr-namespace:Avalonia.Collections;assembly=Avalonia.Base\"");
         sb.Append($"        Width=\"{FormatRootNumber(settings.Width)}\" Height=\"{FormatRootNumber(settings.Height)}\"");
         if (rootKind == DesignerRootKind.Window)
         {
@@ -6455,6 +6572,7 @@ public partial class MainWindowViewModel : ViewModelBase
         DesignerSelectionRuntime.Capture(visual, result);
         DesignerDateTimeRuntime.Capture(visual, result);
         DesignerColorPickerRuntime.Capture(visual, result);
+        DesignerAutoCompleteBoxRuntime.Capture(visual, result);
         DesignerToggleRuntime.Capture(visual, result);
         DesignerContainerBehaviorRuntime.Capture(visual, result);
         DesignerImageRuntime.Capture(visual, result);
@@ -6620,6 +6738,18 @@ public partial class MainWindowViewModel : ViewModelBase
                 ["TextWrapping"] = textBox.TextWrapping.ToString(),
                 ["Opacity"] = textBox.Opacity.ToString("0.###", CultureInfo.InvariantCulture),
             };
+        }
+
+        if (visual is AutoCompleteBox autoCompleteBox)
+        {
+            var properties = DesignerAutoCompleteBoxRuntime.GetAxamlAttributes(autoCompleteBox)
+                .ToDictionary(
+                    attribute => attribute.Name,
+                    attribute => attribute.Value,
+                    StringComparer.Ordinal);
+            properties["__items"] = SerializeAutoCompleteBoxItems(autoCompleteBox);
+            properties["Opacity"] = autoCompleteBox.Opacity.ToString("0.###", CultureInfo.InvariantCulture);
+            return properties;
         }
 
         if (visual is TextBlock textBlock)
@@ -8224,6 +8354,26 @@ public partial class MainWindowViewModel : ViewModelBase
                 continue;
             }
 
+            if (DesignerAutoCompleteBoxRuntime.IsSupportedProperty(tagName, name))
+            {
+                if (DesignerAutoCompleteBoxRuntime.TryNormalizeProperty(
+                        tagName,
+                        name,
+                        attr.Value,
+                        out var canonicalName,
+                        out var normalizedValue,
+                        out var autoCompleteBoxError))
+                {
+                    map[canonicalName] = normalizedValue;
+                }
+                else
+                {
+                    warnings.Add($"Ignored {tagName}.{name}: {autoCompleteBoxError}");
+                }
+
+                continue;
+            }
+
             if (DesignerToggleRuntime.IsSupportedProperty(tagName, name))
             {
                 if (DesignerToggleRuntime.TryNormalizeProperty(
@@ -8430,6 +8580,15 @@ public partial class MainWindowViewModel : ViewModelBase
             DesignerColorPickerRuntime.RemoveProperties(tagName, map);
         }
 
+        if (!DesignerAutoCompleteBoxRuntime.TryValidateProperties(
+                tagName,
+                map,
+                out var autoCompleteBoxConstraintError))
+        {
+            warnings.Add($"Ignored {tagName} autocomplete constraints: {autoCompleteBoxConstraintError}");
+            DesignerAutoCompleteBoxRuntime.RemoveProperties(tagName, map);
+        }
+
         if (!DesignerToggleRuntime.TryValidateProperties(
                 tagName,
                 map,
@@ -8445,7 +8604,8 @@ public partial class MainWindowViewModel : ViewModelBase
             map.TryAdd("ColumnDefinitions", string.Empty);
         }
         else if ((string.Equals(element.Name.LocalName, "ComboBox", StringComparison.OrdinalIgnoreCase)
-                || string.Equals(element.Name.LocalName, "ListBox", StringComparison.OrdinalIgnoreCase))
+                || string.Equals(element.Name.LocalName, "ListBox", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(element.Name.LocalName, "AutoCompleteBox", StringComparison.OrdinalIgnoreCase))
             && !hasItemsSourceBinding)
         {
             map["__items"] = SerializeItems(element);
@@ -8535,6 +8695,11 @@ public partial class MainWindowViewModel : ViewModelBase
             return true;
         }
 
+            if (DesignerAutoCompleteBoxRuntime.IsSupportedProperty(tagName, propertyName))
+        {
+            return true;
+        }
+
         if (DesignerToggleRuntime.IsSupportedProperty(tagName, propertyName))
         {
             return true;
@@ -8618,7 +8783,7 @@ public partial class MainWindowViewModel : ViewModelBase
     }
 
     private static bool SupportsTemplatedAppearance(string tagName)
-        => tagName is "Button" or "TextBox" or "Label" or "CheckBox" or "RadioButton"
+        => tagName is "Button" or "TextBox" or "AutoCompleteBox" or "Label" or "CheckBox" or "RadioButton"
             or "ToggleSwitch" or "ToggleButton" or "ComboBox" or "ListBox" or "TreeView" or "Menu" or "Slider"
             or "ProgressBar" or "DatePicker" or "CalendarDatePicker"
             or "Calendar" or "ColorPicker" or "TimePicker"
@@ -9647,6 +9812,17 @@ public partial class MainWindowViewModel : ViewModelBase
         return JsonSerializer.Serialize(items);
     }
 
+    private static string SerializeItemsControl(ItemsControl itemsControl)
+        => JsonSerializer.Serialize(ReadItems(itemsControl));
+
+    private static string SerializeAutoCompleteBoxItems(AutoCompleteBox autoCompleteBox)
+        => JsonSerializer.Serialize(ReadAutoCompleteBoxItems(autoCompleteBox));
+
+    private static IReadOnlyList<string> ReadAutoCompleteBoxItems(AutoCompleteBox autoCompleteBox)
+        => autoCompleteBox.ItemsSource is System.Collections.IEnumerable source
+            ? source.Cast<object?>().Select(item => item?.ToString() ?? string.Empty).ToList()
+            : [];
+
     private static string SerializeStackPanelChildren(XElement stackPanelElement)
     {
         var children = new List<StackPanelChildSnapshot>();
@@ -9702,8 +9878,27 @@ public partial class MainWindowViewModel : ViewModelBase
 
     private static string SerializeItems(XElement itemsControlElement)
     {
-        var items = itemsControlElement.Elements()
+        var itemElements = itemsControlElement.Elements()
             .Where(element => !element.Name.LocalName.Contains('.', StringComparison.Ordinal))
+            .ToList();
+        if (itemElements.Count == 0)
+        {
+            itemElements = itemsControlElement.Elements()
+                .Where(element => string.Equals(
+                    element.Name.LocalName,
+                    $"{itemsControlElement.Name.LocalName}.Items",
+                    StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(
+                        element.Name.LocalName,
+                        $"{itemsControlElement.Name.LocalName}.ItemsSource",
+                        StringComparison.OrdinalIgnoreCase))
+                .SelectMany(element => element
+                    .Descendants()
+                    .Where(child => string.Equals(child.Name.LocalName, "String", StringComparison.OrdinalIgnoreCase)))
+                .ToList();
+        }
+
+        var items = itemElements
             .Select(element => element.Attribute("Content")?.Value ?? element.Value)
             .ToList();
 
@@ -9814,6 +10009,38 @@ public partial class MainWindowViewModel : ViewModelBase
                 AppendCanvasLayoutAttributes(sb, element);
                 AppendToggleAttributes(sb, toggleButton);
                 sb.AppendLine(" />");
+                break;
+
+            case AutoCompleteBox autoCompleteBox:
+                sb.Append(indent);
+                sb.Append("<AutoCompleteBox");
+                AppendCanvasLayoutAttributes(sb, element);
+                AppendAutoCompleteBoxAttributes(sb, autoCompleteBox);
+                if (DesignerBindingRuntime.HasBinding(autoCompleteBox, "ItemsSource"))
+                {
+                    sb.AppendLine(" />");
+                    break;
+                }
+
+                sb.AppendLine(">");
+                sb.Append(indent);
+                sb.AppendLine("  <AutoCompleteBox.ItemsSource>");
+                sb.Append(indent);
+                sb.AppendLine("    <collections:AvaloniaList x:TypeArguments=\"x:Object\">");
+                foreach (var item in ReadAutoCompleteBoxItems(autoCompleteBox))
+                {
+                    sb.Append(indent);
+                    sb.Append("    <x:String>");
+                    sb.Append(EscapeXmlAttribute(item?.ToString() ?? string.Empty));
+                    sb.AppendLine("</x:String>");
+                }
+
+                sb.Append(indent);
+                sb.AppendLine("    </collections:AvaloniaList>");
+                sb.Append(indent);
+                sb.AppendLine("  </AutoCompleteBox.ItemsSource>");
+                sb.Append(indent);
+                sb.AppendLine("</AutoCompleteBox>");
                 break;
 
             case ComboBox comboBox:
@@ -11166,6 +11393,20 @@ public partial class MainWindowViewModel : ViewModelBase
             .Select(binding => binding.PropertyName)
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
         foreach (var attribute in DesignerColorPickerRuntime.GetAxamlAttributes(visual))
+        {
+            if (!boundProperties.Contains(attribute.Name))
+            {
+                AppendAttribute(sb, attribute.Name, attribute.Value);
+            }
+        }
+    }
+
+    private static void AppendAutoCompleteBoxAttributes(StringBuilder sb, Control visual)
+    {
+        var boundProperties = DesignerBindingRuntime.ReadBindings(visual)
+            .Select(binding => binding.PropertyName)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        foreach (var attribute in DesignerAutoCompleteBoxRuntime.GetAxamlAttributes(visual))
         {
             if (!boundProperties.Contains(attribute.Name))
             {

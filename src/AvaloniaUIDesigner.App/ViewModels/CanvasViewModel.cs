@@ -2164,6 +2164,17 @@ public partial class CanvasViewModel : ViewModelBase
         DesignerTextInputRuntime.Apply(visual, properties);
         ApplyTemplatedAppearanceProperties(visual, properties);
 
+        if (visual is AutoCompleteBox autoCompleteBox)
+        {
+            if (properties.TryGetValue("__items", out var itemsJson))
+            {
+                RestoreAutoCompleteBoxItems(autoCompleteBox, itemsJson);
+            }
+
+            DesignerAutoCompleteBoxRuntime.Apply(autoCompleteBox, properties);
+            return;
+        }
+
         if (visual is Shape shape)
         {
             ApplyShapeProperties(shape, properties);
@@ -2824,6 +2835,26 @@ public partial class CanvasViewModel : ViewModelBase
         {
             comboBox.Items.Add(item);
         }
+    }
+
+    private static void RestoreAutoCompleteBoxItems(AutoCompleteBox autoCompleteBox, string json)
+    {
+        List<string>? items;
+        try
+        {
+            items = JsonSerializer.Deserialize<List<string>>(json);
+        }
+        catch
+        {
+            return;
+        }
+
+        if (items is null)
+        {
+            return;
+        }
+
+        autoCompleteBox.ItemsSource = items;
     }
 
     private static void RestoreListBoxItems(ListBox listBox, string json)

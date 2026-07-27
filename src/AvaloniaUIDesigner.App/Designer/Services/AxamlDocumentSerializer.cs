@@ -15,7 +15,7 @@ public sealed class AxamlDocumentSerializer : IDesignerSerializer
     {
         var sb = new StringBuilder();
         var settings = document.Settings ?? new DesignerCanvasSettings();
-        sb.Append("<Canvas xmlns=\"https://github.com/avaloniaui\" xmlns:x=\"http://schemas.microsoft.com/winfx/2006/xaml\" Width=\"");
+        sb.Append("<Canvas xmlns=\"https://github.com/avaloniaui\" xmlns:x=\"http://schemas.microsoft.com/winfx/2006/xaml\" xmlns:collections=\"clr-namespace:Avalonia.Collections;assembly=Avalonia.Base\" Width=\"");
         sb.Append(ToInvariantString(settings.Width));
         sb.Append("\" Height=\"");
         sb.Append(ToInvariantString(settings.Height));
@@ -224,6 +224,41 @@ public sealed class AxamlDocumentSerializer : IDesignerSerializer
             AppendTreeItems(sb, ReadTreeItems(element), indent + "  ");
             sb.Append(indent);
             sb.AppendLine("</TreeView>");
+            return;
+        }
+
+        if (string.Equals(element.TypeName, "Avalonia.Controls.AutoCompleteBox", StringComparison.Ordinal))
+        {
+            if (HasBinding(element, "ItemsSource"))
+            {
+                sb.AppendLine(" />");
+                return;
+            }
+
+            sb.AppendLine(">");
+            var items = ReadFlatItems(element);
+            if (items.Count > 0)
+            {
+                sb.Append(indent);
+                sb.AppendLine("  <AutoCompleteBox.ItemsSource>");
+                sb.Append(indent);
+                sb.AppendLine("    <collections:AvaloniaList x:TypeArguments=\"x:Object\">");
+                foreach (var item in items)
+                {
+                    sb.Append(indent);
+                    sb.Append("      <x:String>");
+                    sb.Append(EscapeXmlAttribute(item));
+                    sb.AppendLine("</x:String>");
+                }
+
+                sb.Append(indent);
+                sb.AppendLine("    </collections:AvaloniaList>");
+                sb.Append(indent);
+                sb.AppendLine("  </AutoCompleteBox.ItemsSource>");
+            }
+
+            sb.Append(indent);
+            sb.AppendLine("</AutoCompleteBox>");
             return;
         }
 
@@ -705,6 +740,24 @@ public sealed class AxamlDocumentSerializer : IDesignerSerializer
         }
 
         return definitions;
+    }
+
+    private static IReadOnlyList<string> ReadFlatItems(DesignerElementSnapshot element)
+    {
+        if (element.VisualProperties is null
+            || !element.VisualProperties.TryGetValue("__items", out var json))
+        {
+            return [];
+        }
+
+        try
+        {
+            return JsonSerializer.Deserialize<List<string>>(json) ?? [];
+        }
+        catch (JsonException)
+        {
+            return [];
+        }
     }
 
     private static bool HasBinding(DesignerElementSnapshot element, string propertyName)

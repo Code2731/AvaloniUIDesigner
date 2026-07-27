@@ -767,6 +767,19 @@ public partial class MainWindow : Window
         await ShowColorPickerPropertiesDialogAsync(state);
     }
 
+    private async void OnEditAutoCompleteBoxPropertiesMenuClicked(
+        object? sender,
+        Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        FlushPendingPropertyHistory();
+        if (Vm is null || !Vm.TryGetSelectedAutoCompleteBoxProperties(out var state))
+        {
+            return;
+        }
+
+        await ShowAutoCompleteBoxPropertiesDialogAsync(state);
+    }
+
     private async void OnEditTogglePropertiesMenuClicked(
         object? sender,
         Avalonia.Interactivity.RoutedEventArgs e)
@@ -5084,6 +5097,141 @@ public partial class MainWindow : Window
 
             return panel;
         }
+
+        static void AddField(Grid owner, string label, Control editor, int row, int column)
+        {
+            var field = new StackPanel
+            {
+                Spacing = 4,
+                Children =
+                {
+                    new TextBlock { Text = label },
+                    editor,
+                },
+            };
+            Grid.SetRow(field, row);
+            Grid.SetColumn(field, column);
+            owner.Children.Add(field);
+        }
+    }
+
+    private async Task ShowAutoCompleteBoxPropertiesDialogAsync(AutoCompleteBoxEditorState state)
+    {
+        if (Vm is null)
+        {
+            return;
+        }
+
+        var textEditor = new TextBox { Text = state.Text };
+        var watermarkEditor = new TextBox { Text = state.Watermark, Watermark = "Search hint" };
+        var prefixEditor = new TextBox { Text = state.MinimumPrefixLength, Watermark = "0 or greater" };
+        var delayEditor = new TextBox { Text = state.MinimumPopulateDelay, Watermark = "milliseconds or hh:mm:ss" };
+        var filterModeEditor = new ComboBox
+        {
+            ItemsSource = DesignerAutoCompleteBoxRuntime.FilterModeNames,
+            SelectedItem = state.FilterMode,
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+        };
+        var maxHeightEditor = new TextBox { Text = state.MaxDropDownHeight, Watermark = "Infinity or pixels" };
+        var completionEditor = new CheckBox
+        {
+            Content = "Enable text completion",
+            IsChecked = state.IsTextCompletionEnabled,
+        };
+        var openEditor = new CheckBox
+        {
+            Content = "Open drop-down initially",
+            IsChecked = state.IsDropDownOpen,
+        };
+
+        var fields = new Grid
+        {
+            ColumnDefinitions = new ColumnDefinitions("*,*,*"),
+            RowDefinitions = new RowDefinitions("Auto,Auto"),
+            ColumnSpacing = 12,
+            RowSpacing = 10,
+        };
+        AddField(fields, "Text", textEditor, 0, 0);
+        AddField(fields, "Watermark", watermarkEditor, 0, 1);
+        AddField(fields, "Filter mode", filterModeEditor, 0, 2);
+        AddField(fields, "Minimum prefix", prefixEditor, 1, 0);
+        AddField(fields, "Populate delay", delayEditor, 1, 1);
+        AddField(fields, "Max drop-down height", maxHeightEditor, 1, 2);
+
+        var errorText = new TextBlock
+        {
+            Foreground = Avalonia.Media.Brushes.IndianRed,
+            TextWrapping = Avalonia.Media.TextWrapping.Wrap,
+        };
+        var dialog = new Window
+        {
+            Title = $"Edit AutoCompleteBox - {state.ControlName}",
+            Width = 760,
+            Height = 430,
+            MinWidth = 640,
+            MinHeight = 360,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner,
+        };
+        var applyButton = new Button { Content = "Apply", MinWidth = 84 };
+        applyButton.Click += (_, _) =>
+        {
+            var input = new DesignerAutoCompleteBoxEditorInput(
+                textEditor.Text ?? string.Empty,
+                watermarkEditor.Text ?? string.Empty,
+                completionEditor.IsChecked == true,
+                prefixEditor.Text ?? string.Empty,
+                delayEditor.Text ?? string.Empty,
+                filterModeEditor.SelectedItem?.ToString() ?? string.Empty,
+                maxHeightEditor.Text ?? string.Empty,
+                openEditor.IsChecked == true);
+            if (!Vm.SetSelectedAutoCompleteBoxProperties(input))
+            {
+                errorText.Text = Vm.StatusText;
+                return;
+            }
+
+            dialog.Close();
+        };
+        var cancelButton = new Button { Content = "Cancel", MinWidth = 84 };
+        cancelButton.Click += (_, _) => dialog.Close();
+        var buttons = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            Spacing = 8,
+            HorizontalAlignment = HorizontalAlignment.Right,
+            Children = { cancelButton, applyButton },
+        };
+        var options = new WrapPanel
+        {
+            Orientation = Orientation.Horizontal,
+            ItemSpacing = 18,
+            LineSpacing = 8,
+            Children = { completionEditor, openEditor },
+        };
+        var content = new Grid
+        {
+            Margin = new Thickness(16),
+            RowDefinitions = new RowDefinitions("Auto,Auto,Auto,*,Auto"),
+            RowSpacing = 12,
+            Children =
+            {
+                new TextBlock
+                {
+                    Text = "Configure static autocomplete behavior. AsyncPopulator and selector delegates remain code-owned and are not synthesized by the designer.",
+                    TextWrapping = Avalonia.Media.TextWrapping.Wrap,
+                },
+                fields,
+                options,
+                errorText,
+                buttons,
+            },
+        };
+        Grid.SetRow(fields, 1);
+        Grid.SetRow(options, 2);
+        Grid.SetRow(errorText, 3);
+        Grid.SetRow(buttons, 4);
+        dialog.Content = content;
+        await dialog.ShowDialog(this);
 
         static void AddField(Grid owner, string label, Control editor, int row, int column)
         {

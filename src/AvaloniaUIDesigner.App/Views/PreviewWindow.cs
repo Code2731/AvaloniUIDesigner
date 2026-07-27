@@ -275,6 +275,11 @@ public sealed class PreviewWindow : Window
         {
             "Avalonia.Controls.Button" => new Button { Content = "Button" },
             "Avalonia.Controls.TextBox" => new TextBox { Watermark = "Type here" },
+            "Avalonia.Controls.AutoCompleteBox" => new AutoCompleteBox
+            {
+                Watermark = "Search...",
+                ItemsSource = new[] { "Alpha", "Beta", "Gamma" },
+            },
             "Avalonia.Controls.TextBlock" => new TextBlock { Text = "Text" },
             "Avalonia.Controls.Label" => new Label { Content = "Label" },
             "Avalonia.Controls.Image" => new Image { Stretch = Stretch.Uniform },
@@ -538,6 +543,9 @@ public sealed class PreviewWindow : Window
             case ColorPicker colorPicker:
                 DesignerColorPickerRuntime.Apply(colorPicker, properties);
                 break;
+            case AutoCompleteBox autoCompleteBox:
+                ApplyAutoCompleteBoxProperties(autoCompleteBox, properties);
+                break;
             case TimePicker timePicker:
                 ApplyTimePickerProperties(timePicker, properties);
                 break;
@@ -724,6 +732,31 @@ public sealed class PreviewWindow : Window
 
     private static void ApplyTimePickerProperties(TimePicker timePicker, IReadOnlyDictionary<string, string> properties)
         => DesignerDateTimeRuntime.Apply(timePicker, properties);
+
+    private static void ApplyAutoCompleteBoxProperties(
+        AutoCompleteBox autoCompleteBox,
+        IReadOnlyDictionary<string, string> properties)
+    {
+        if (properties.TryGetValue("__items", out var itemsJson))
+        {
+            List<string>? items;
+            try
+            {
+                items = System.Text.Json.JsonSerializer.Deserialize<List<string>>(itemsJson);
+            }
+            catch
+            {
+                items = null;
+            }
+
+            if (items is not null)
+            {
+                autoCompleteBox.ItemsSource = items;
+            }
+        }
+
+        DesignerAutoCompleteBoxRuntime.Apply(autoCompleteBox, properties);
+    }
 
     private static TabControl CreateDefaultTabControl()
         => new()
