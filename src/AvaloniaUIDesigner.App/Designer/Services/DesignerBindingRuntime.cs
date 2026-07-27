@@ -32,6 +32,7 @@ public static class DesignerBindingRuntime
         properties.AddRange(targetType switch
         {
             "Button" => ["Content", "Command", "CommandParameter"],
+            "ContentControl" => ["Content"],
             "TextBox" => ["Text", "Watermark"],
             "MaskedTextBox" => ["Text", "Watermark"],
             "AutoCompleteBox" => ["Text", "Watermark"],

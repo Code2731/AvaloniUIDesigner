@@ -2052,10 +2052,12 @@ public partial class CanvasViewModel : ViewModelBase
 
     private static bool IsDesignerContainer(Control visual)
         => visual is Grid or StackPanel or DockPanel or WrapPanel or UniformGrid or Canvas
-            or TabControl or SplitView or Border or ScrollViewer or Expander;
+            or TabControl or SplitView or Border or ScrollViewer or Expander
+            || visual.GetType() == typeof(ContentControl);
 
     private static bool IsContentContainer(Control visual)
-        => visual is Border or ScrollViewer or Expander;
+        => visual is Border or ScrollViewer or Expander
+            || visual.GetType() == typeof(ContentControl);
 
     private int FindFirstAvailableTabIndex(
         DesignElement parent,
@@ -2101,6 +2103,9 @@ public partial class CanvasViewModel : ViewModelBase
         {
             case Border border:
                 border.Child = null;
+                break;
+            case ContentControl contentControl when visual.GetType() == typeof(ContentControl):
+                contentControl.Content = null;
                 break;
             case ScrollViewer scrollViewer:
                 scrollViewer.Content = null;
@@ -2452,6 +2457,21 @@ public partial class CanvasViewModel : ViewModelBase
             if (properties.TryGetValue("__contentText", out var contentText))
             {
                 SetExpanderContent(expander, contentText);
+            }
+
+            return;
+        }
+
+        if (visual is ContentControl contentControl
+            && visual.GetType() == typeof(ContentControl))
+        {
+            if (properties.TryGetValue("__contentText", out var contentText))
+            {
+                SetContentControlContent(contentControl, contentText);
+            }
+            else
+            {
+                contentControl.Content = null;
             }
 
             return;
@@ -2964,6 +2984,9 @@ public partial class CanvasViewModel : ViewModelBase
 
     private static void SetScrollViewerContent(ScrollViewer scrollViewer, string contentText)
         => scrollViewer.Content = new TextBlock { Text = contentText, Margin = new Thickness(8) };
+
+    private static void SetContentControlContent(ContentControl contentControl, string contentText)
+        => contentControl.Content = new TextBlock { Text = contentText, Margin = new Thickness(8) };
 
     private static void SetBorderContent(Border border, string contentText)
         => border.Child = new TextBlock

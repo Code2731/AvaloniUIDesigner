@@ -383,6 +383,40 @@ public sealed class AxamlDocumentSerializer : IDesignerSerializer
             return;
         }
 
+        if (string.Equals(element.TypeName, "Avalonia.Controls.ContentControl", StringComparison.Ordinal))
+        {
+            childrenByParent.TryGetValue(element.DisplayName, out var contentChildren);
+            if ((contentChildren is null || contentChildren.Count == 0)
+                && HasBinding(element, "Content"))
+            {
+                sb.AppendLine(" />");
+                return;
+            }
+
+            sb.AppendLine(">");
+            if (contentChildren is { Count: > 0 } contentChildList)
+            {
+                foreach (var child in contentChildList)
+                {
+                    AppendElement(sb, child, indent + "  ", childrenByParent, element);
+                }
+            }
+            else
+            {
+                sb.Append(indent);
+                sb.Append("  <TextBlock Text=\"");
+                sb.Append(EscapeXmlAttribute(ReadInternalText(
+                    element,
+                    "__contentText",
+                    "ContentControl content")));
+                sb.AppendLine("\" />");
+            }
+
+            sb.Append(indent);
+            sb.AppendLine("</ContentControl>");
+            return;
+        }
+
         if (!childrenByParent.TryGetValue(element.DisplayName, out var children) || children.Count == 0)
         {
             sb.AppendLine(" />");
@@ -475,6 +509,7 @@ public sealed class AxamlDocumentSerializer : IDesignerSerializer
             || string.Equals(element.TypeName, "Avalonia.Controls.TabControl", StringComparison.Ordinal)
             || string.Equals(element.TypeName, "Avalonia.Controls.SplitView", StringComparison.Ordinal)
             || string.Equals(element.TypeName, "Avalonia.Controls.Border", StringComparison.Ordinal)
+            || string.Equals(element.TypeName, "Avalonia.Controls.ContentControl", StringComparison.Ordinal)
             || string.Equals(element.TypeName, "Avalonia.Controls.ScrollViewer", StringComparison.Ordinal)
             || string.Equals(element.TypeName, "Avalonia.Controls.Expander", StringComparison.Ordinal);
 

@@ -329,6 +329,19 @@ public sealed class BuiltInComponentCatalog : IComponentCatalog
                 },
             }),
         new(
+            DisplayName: "ContentControl",
+            AvaloniaTypeName: "Avalonia.Controls.ContentControl",
+            DefaultWidth: 240,
+            DefaultHeight: 120,
+            VisualFactory: static () => new ContentControl
+            {
+                Content = new TextBlock
+                {
+                    Text = "ContentControl content",
+                    Margin = new Thickness(8),
+                },
+            }),
+        new(
             DisplayName: "Grid",
             AvaloniaTypeName: "Avalonia.Controls.Grid",
             DefaultWidth: 240,

@@ -95,6 +95,7 @@ public sealed class PreviewWindow : Window
                 || string.Equals(element.TypeName, "Avalonia.Controls.TabControl", StringComparison.Ordinal)
                 || string.Equals(element.TypeName, "Avalonia.Controls.SplitView", StringComparison.Ordinal)
                 || string.Equals(element.TypeName, "Avalonia.Controls.Border", StringComparison.Ordinal)
+                || string.Equals(element.TypeName, "Avalonia.Controls.ContentControl", StringComparison.Ordinal)
                 || string.Equals(element.TypeName, "Avalonia.Controls.ScrollViewer", StringComparison.Ordinal)
                 || string.Equals(element.TypeName, "Avalonia.Controls.Expander", StringComparison.Ordinal))
             .ToDictionary(element => element.DisplayName, StringComparer.OrdinalIgnoreCase);
@@ -250,6 +251,9 @@ public sealed class PreviewWindow : Window
                     case Border border:
                         border.Child = child;
                         break;
+                    case ContentControl contentControl when contentControl.GetType() == typeof(ContentControl):
+                        contentControl.Content = child;
+                        break;
                     case ScrollViewer scrollViewer:
                         scrollViewer.Content = child;
                         break;
@@ -371,6 +375,14 @@ public sealed class PreviewWindow : Window
                     Text = "Border content",
                     HorizontalAlignment = HorizontalAlignment.Center,
                     VerticalAlignment = VerticalAlignment.Center,
+                },
+            },
+            "Avalonia.Controls.ContentControl" => new ContentControl
+            {
+                Content = new TextBlock
+                {
+                    Text = "ContentControl content",
+                    Margin = new Thickness(8),
                 },
             },
             "Avalonia.Controls.Grid" => new Grid
@@ -593,6 +605,9 @@ public sealed class PreviewWindow : Window
                 break;
             case Border border:
                 ApplyBorderProperties(border, properties, colorResources);
+                break;
+            case ContentControl contentControl when contentControl.GetType() == typeof(ContentControl):
+                ApplyContentControlProperties(contentControl, properties);
                 break;
             case Grid grid:
                 DesignerGridDefinitionRuntime.TryApply(grid, properties, out _);
@@ -917,6 +932,14 @@ public sealed class PreviewWindow : Window
         if (properties.TryGetValue("__contentText", out var contentText))
         {
             scrollViewer.Content = new TextBlock { Text = contentText, Margin = new Thickness(8) };
+        }
+    }
+
+    private static void ApplyContentControlProperties(ContentControl contentControl, IReadOnlyDictionary<string, string> properties)
+    {
+        if (properties.TryGetValue("__contentText", out var contentText))
+        {
+            contentControl.Content = new TextBlock { Text = contentText, Margin = new Thickness(8) };
         }
     }
 

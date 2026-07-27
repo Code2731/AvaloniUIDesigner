@@ -2624,7 +2624,7 @@ public partial class MainWindowViewModel : ViewModelBase
             .Where(element => !ReferenceEquals(element, target)
                 && !element.IsContainerChild
                 && !element.IsLocked
-                && element.Visual is Border or ScrollViewer or Expander)
+                && IsDesignerContentContainer(element.Visual))
             .Where(element => !IsDescendantOf(element, target))
             .Select(element => new ContentParentOption(
                 element.DisplayName,
@@ -2633,7 +2633,7 @@ public partial class MainWindowViewModel : ViewModelBase
         if (parents.Count == 0)
         {
             state = EmptyContentAssignmentState();
-            StatusText = "Place an unlocked root Border, ScrollViewer, or Expander first.";
+            StatusText = "Place an unlocked root Border, ContentControl, ScrollViewer, or Expander first.";
             return false;
         }
 
@@ -2661,7 +2661,7 @@ public partial class MainWindowViewModel : ViewModelBase
             !ReferenceEquals(element, target)
             && !element.IsContainerChild
             && !element.IsLocked
-            && element.Visual is Border or ScrollViewer or Expander
+            && IsDesignerContentContainer(element.Visual)
             && string.Equals(element.DisplayName, parentName, StringComparison.OrdinalIgnoreCase));
         if (parent is null || IsDescendantOf(parent, target))
         {
@@ -3707,11 +3707,11 @@ public partial class MainWindowViewModel : ViewModelBase
     public bool TryGetSelectedExpanderContent(out string controlName, out string content)
     {
         var target = Canvas.SelectedElement;
-        if (target is null || target.IsLocked || target.Visual is not (Expander or ScrollViewer or Border))
+        if (target is null || target.IsLocked || !IsDesignerContentContainer(target.Visual))
         {
             controlName = string.Empty;
             content = string.Empty;
-            StatusText = "Select an unlocked Expander, ScrollViewer, or Border to edit its content.";
+            StatusText = "Select an unlocked Expander, ContentControl, ScrollViewer, or Border to edit its content.";
             return false;
         }
 
@@ -3729,6 +3729,7 @@ public partial class MainWindowViewModel : ViewModelBase
             Expander expander => ReadExpanderContent(expander),
             ScrollViewer scrollViewer => ReadScrollViewerContent(scrollViewer),
             Border border => ReadBorderContent(border),
+            ContentControl contentControl => ReadContentControlContent(contentControl),
             _ => string.Empty,
         };
         return true;
@@ -3737,9 +3738,9 @@ public partial class MainWindowViewModel : ViewModelBase
     public void SetSelectedExpanderContent(string content)
     {
         var target = Canvas.SelectedElement;
-        if (target is null || target.IsLocked || target.Visual is not (Expander or ScrollViewer or Border))
+        if (target is null || target.IsLocked || !IsDesignerContentContainer(target.Visual))
         {
-            StatusText = "Select an unlocked Expander, ScrollViewer, or Border to edit its content.";
+            StatusText = "Select an unlocked Expander, ContentControl, ScrollViewer, or Border to edit its content.";
             return;
         }
 
@@ -3754,6 +3755,7 @@ public partial class MainWindowViewModel : ViewModelBase
             Expander expander => ReadExpanderContent(expander),
             ScrollViewer scrollViewer => ReadScrollViewerContent(scrollViewer),
             Border border => ReadBorderContent(border),
+            ContentControl contentControl => ReadContentControlContent(contentControl),
             _ => string.Empty,
         };
         if (string.Equals(currentContent, content, StringComparison.Ordinal))
@@ -3766,6 +3768,11 @@ public partial class MainWindowViewModel : ViewModelBase
         if (target.Visual is Expander targetExpander)
         {
             SetExpanderContent(targetExpander, content);
+        }
+        else if (target.Visual is ContentControl targetContentControl
+            && target.Visual.GetType() == typeof(ContentControl))
+        {
+            SetContentControlContent(targetContentControl, content);
         }
         else if (target.Visual is ScrollViewer targetScrollViewer)
         {
@@ -7605,6 +7612,16 @@ public partial class MainWindowViewModel : ViewModelBase
             };
         }
 
+        if (visual is ContentControl contentControl
+            && visual.GetType() == typeof(ContentControl))
+        {
+            return new Dictionary<string, string>
+            {
+                ["__contentText"] = ReadContentControlContent(contentControl),
+                ["Opacity"] = contentControl.Opacity.ToString("0.###", CultureInfo.InvariantCulture),
+            };
+        }
+
         if (visual is Border border)
         {
             var properties = new Dictionary<string, string>
@@ -7763,6 +7780,14 @@ public partial class MainWindowViewModel : ViewModelBase
 
     private static void SetScrollViewerContent(ScrollViewer scrollViewer, string content)
         => scrollViewer.Content = new TextBlock { Text = content, Margin = new Thickness(8) };
+
+    private static string ReadContentControlContent(ContentControl contentControl)
+        => contentControl.Content is TextBlock textBlock
+            ? textBlock.Text ?? string.Empty
+            : contentControl.Content?.ToString() ?? string.Empty;
+
+    private static void SetContentControlContent(ContentControl contentControl, string content)
+        => contentControl.Content = new TextBlock { Text = content, Margin = new Thickness(8) };
 
     private static string ReadBorderContent(Border border)
         => border.Child is TextBlock textBlock
@@ -8047,6 +8072,7 @@ public partial class MainWindowViewModel : ViewModelBase
 
                 var parentUsesTextFallback = parent?.TypeName is
                     "Avalonia.Controls.Border"
+                    or "Avalonia.Controls.ContentControl"
                     or "Avalonia.Controls.ScrollViewer"
                     or "Avalonia.Controls.Expander";
                 var hasExplicitName = child.Attributes().Any(attribute =>
@@ -8140,6 +8166,7 @@ public partial class MainWindowViewModel : ViewModelBase
                     "Avalonia.Controls.SplitView" when isSplitViewChild
                         => DesignerParentLayoutKind.SplitView,
                     "Avalonia.Controls.Border"
+                        or "Avalonia.Controls.ContentControl"
                         or "Avalonia.Controls.ScrollViewer"
                         or "Avalonia.Controls.Expander" => DesignerParentLayoutKind.Content,
                     _ => DesignerParentLayoutKind.None,
@@ -8194,6 +8221,7 @@ public partial class MainWindowViewModel : ViewModelBase
                     || string.Equals(typeName, "Avalonia.Controls.TabControl", StringComparison.Ordinal)
                     || string.Equals(typeName, "Avalonia.Controls.SplitView", StringComparison.Ordinal)
                     || string.Equals(typeName, "Avalonia.Controls.Border", StringComparison.Ordinal)
+                    || string.Equals(typeName, "Avalonia.Controls.ContentControl", StringComparison.Ordinal)
                     || string.Equals(typeName, "Avalonia.Controls.ScrollViewer", StringComparison.Ordinal)
                     || string.Equals(typeName, "Avalonia.Controls.Expander", StringComparison.Ordinal))
                 {
@@ -11150,6 +11178,36 @@ public partial class MainWindowViewModel : ViewModelBase
                 sb.AppendLine("</ScrollViewer>");
                 break;
 
+            case ContentControl contentControl when contentControl.GetType() == typeof(ContentControl):
+                sb.Append(indent);
+                sb.Append("<ContentControl");
+                AppendCanvasLayoutAttributes(sb, element);
+                var contentControlChild = GetDesignerContentChild(element);
+                if (contentControlChild is null
+                    && (DesignerBindingRuntime.HasBinding(contentControl, "Content")
+                        || contentControl.Content is not TextBlock))
+                {
+                    sb.AppendLine(" />");
+                    break;
+                }
+
+                sb.AppendLine(">");
+                if (contentControlChild is not null)
+                {
+                    WriteDesignerChildAxaml(sb, contentControlChild, indent + "  ");
+                }
+                else
+                {
+                    sb.Append(indent);
+                    sb.Append("  <TextBlock");
+                    AppendAttribute(sb, "Text", ReadContentControlContent(contentControl));
+                    sb.AppendLine(" />");
+                }
+
+                sb.Append(indent);
+                sb.AppendLine("</ContentControl>");
+                break;
+
             case Border border:
                 sb.Append(indent);
                 sb.Append("<Border");
@@ -11755,13 +11813,17 @@ public partial class MainWindowViewModel : ViewModelBase
         parent = element.ParentName is null
             ? null!
             : Canvas.Elements.FirstOrDefault(candidate =>
-                candidate.Visual is (Border or ScrollViewer or Expander)
+                IsDesignerContentContainer(candidate.Visual)
                 && string.Equals(
                     candidate.DisplayName,
                     element.ParentName,
                     StringComparison.OrdinalIgnoreCase))!;
         return parent is not null;
     }
+
+    private static bool IsDesignerContentContainer(Control visual)
+        => visual is Border or ScrollViewer or Expander
+            || visual.GetType() == typeof(ContentControl);
 
     private bool TryGetDockPanelParent(
         DesignElement element,
