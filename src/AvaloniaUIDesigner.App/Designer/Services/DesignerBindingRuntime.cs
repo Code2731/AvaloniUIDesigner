@@ -41,6 +41,7 @@ public static class DesignerBindingRuntime
             "CheckBox" or "RadioButton" or "ToggleSwitch" or "ToggleButton"
                 => ["Content", "IsChecked"],
             "ComboBox" or "ListBox" => ["ItemsSource", "SelectedIndex", "SelectedItem"],
+            "ItemsControl" => ["ItemsSource"],
             "TreeView" => ["ItemsSource", "SelectedItem"],
             "DataGrid" => ["ItemsSource", "SelectedIndex", "SelectedItem", "IsReadOnly"],
             "Slider" or "ProgressBar" => ["Minimum", "Maximum", "Value"],

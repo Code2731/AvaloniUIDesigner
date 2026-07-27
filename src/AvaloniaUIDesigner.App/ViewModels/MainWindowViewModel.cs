@@ -2703,7 +2703,7 @@ public partial class MainWindowViewModel : ViewModelBase
         if (target is null)
         {
             state = EmptyItemsEditorState();
-            StatusText = "Select a ComboBox, AutoCompleteBox, ListBox, TreeView, Menu, TabControl, or DataGrid to edit its items or columns.";
+            StatusText = "Select a ComboBox, AutoCompleteBox, ListBox, ItemsControl, TreeView, Menu, TabControl, or DataGrid to edit its items or columns.";
             return false;
         }
 
@@ -2758,9 +2758,15 @@ public partial class MainWindowViewModel : ViewModelBase
                     ReadTabHeaders(tabControl),
                     ItemsEditorMode.Flat);
                 return true;
+            case ItemsControl itemsControl when itemsControl.GetType() == typeof(ItemsControl):
+                state = new ItemsEditorState(
+                    target.DisplayName,
+                    ReadItems(itemsControl),
+                    ItemsEditorMode.Flat);
+                return true;
             default:
                 state = EmptyItemsEditorState();
-                StatusText = "Item and column editing is available for ComboBox, AutoCompleteBox, ListBox, TreeView, Menu, TabControl, and DataGrid controls.";
+                StatusText = "Item and column editing is available for ComboBox, AutoCompleteBox, ListBox, ItemsControl, TreeView, Menu, TabControl, and DataGrid controls.";
                 return false;
         }
     }
@@ -3297,7 +3303,7 @@ public partial class MainWindowViewModel : ViewModelBase
         var target = Canvas.SelectedElement;
         if (target is null || target.IsLocked)
         {
-            StatusText = "Select an unlocked ComboBox, AutoCompleteBox, ListBox, TreeView, Menu, TabControl, or DataGrid to edit its items or columns.";
+            StatusText = "Select an unlocked ComboBox, AutoCompleteBox, ListBox, ItemsControl, TreeView, Menu, TabControl, or DataGrid to edit its items or columns.";
             return;
         }
 
@@ -3437,8 +3443,21 @@ public partial class MainWindowViewModel : ViewModelBase
                     : $"Updated {updatedItems.Count} TabControl tab(s); moved {promotedTabChildren.Count} orphaned child control(s) to the Canvas root.";
                 return;
 
+            case ItemsControl itemsControl when itemsControl.GetType() == typeof(ItemsControl):
+                if (ReadItems(itemsControl).SequenceEqual(updatedItems, StringComparer.Ordinal))
+                {
+                    StatusText = "ItemsControl items are unchanged.";
+                    return;
+                }
+
+                BeginCanvasMutation(HistoryActionType.EditProperty, "Updated ItemsControl items.");
+                ReplaceItems(itemsControl, updatedItems);
+                CommitCanvasMutation();
+                StatusText = $"Updated {updatedItems.Count} ItemsControl item(s).";
+                return;
+
             default:
-                StatusText = "Item and column editing is available for ComboBox, ListBox, TreeView, Menu, TabControl, and DataGrid controls.";
+                StatusText = "Item and column editing is available for ComboBox, ListBox, ItemsControl, TreeView, Menu, TabControl, and DataGrid controls.";
                 return;
         }
     }
@@ -7044,6 +7063,15 @@ public partial class MainWindowViewModel : ViewModelBase
             };
         }
 
+        if (visual is ItemsControl itemsControl && visual.GetType() == typeof(ItemsControl))
+        {
+            return new Dictionary<string, string>
+            {
+                ["__items"] = SerializeItemsControl(itemsControl),
+                ["Opacity"] = itemsControl.Opacity.ToString("0.###", CultureInfo.InvariantCulture),
+            };
+        }
+
         if (visual is SplitView splitView)
         {
             var properties = new Dictionary<string, string>
@@ -8712,6 +8740,7 @@ public partial class MainWindowViewModel : ViewModelBase
         }
         else if ((string.Equals(element.Name.LocalName, "ComboBox", StringComparison.OrdinalIgnoreCase)
                 || string.Equals(element.Name.LocalName, "ListBox", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(element.Name.LocalName, "ItemsControl", StringComparison.OrdinalIgnoreCase)
                 || string.Equals(element.Name.LocalName, "AutoCompleteBox", StringComparison.OrdinalIgnoreCase))
             && !hasItemsSourceBinding)
         {
@@ -8862,7 +8891,7 @@ public partial class MainWindowViewModel : ViewModelBase
             "Path" => IsSupportedShapeProperty(propertyName)
                 || propertyName == "Data",
             "CheckBox" or "RadioButton" or "ToggleSwitch" or "ToggleButton" => false,
-            "ComboBox" or "ListBox" or "TreeView" => false,
+            "ComboBox" or "ListBox" or "ItemsControl" or "TreeView" => false,
             "Menu" => false,
             "DataGrid" => propertyName is "AutoGenerateColumns" or "GridLinesVisibility" or "IsReadOnly",
             "Slider" => propertyName is "Minimum" or "Maximum" or "Value" or "SmallChange"
@@ -8896,7 +8925,7 @@ public partial class MainWindowViewModel : ViewModelBase
 
     private static bool SupportsTemplatedAppearance(string tagName)
         => tagName is "Button" or "TextBox" or "MaskedTextBox" or "AutoCompleteBox" or "Label" or "CheckBox" or "RadioButton"
-            or "ToggleSwitch" or "ToggleButton" or "ComboBox" or "ListBox" or "TreeView" or "Menu" or "Slider"
+            or "ToggleSwitch" or "ToggleButton" or "ComboBox" or "ListBox" or "ItemsControl" or "TreeView" or "Menu" or "Slider"
             or "ProgressBar" or "DatePicker" or "CalendarDatePicker"
             or "Calendar" or "ColorPicker" or "TimePicker"
             or "NumericUpDown" or "TabControl" or "Expander" or "ScrollViewer" or "DataGrid";
@@ -10214,6 +10243,40 @@ public partial class MainWindowViewModel : ViewModelBase
 
                 sb.Append(indent);
                 sb.AppendLine("</ListBox>");
+                break;
+
+            case ItemsControl itemsControl when itemsControl.GetType() == typeof(ItemsControl):
+                sb.Append(indent);
+                sb.Append("<ItemsControl");
+                AppendCanvasLayoutAttributes(sb, element);
+                if (DesignerBindingRuntime.HasBinding(itemsControl, "ItemsSource"))
+                {
+                    sb.AppendLine(" />");
+                    break;
+                }
+
+                var itemsControlItems = ReadItems(itemsControl);
+                if (itemsControlItems.Count == 0)
+                {
+                    sb.AppendLine(" />");
+                    break;
+                }
+
+                sb.AppendLine(">");
+                sb.Append(indent);
+                sb.AppendLine("  <ItemsControl.Items>");
+                foreach (var item in itemsControlItems)
+                {
+                    sb.Append(indent);
+                    sb.Append("    <x:String>");
+                    sb.Append(EscapeXmlAttribute(item));
+                    sb.AppendLine("</x:String>");
+                }
+
+                sb.Append(indent);
+                sb.AppendLine("  </ItemsControl.Items>");
+                sb.Append(indent);
+                sb.AppendLine("</ItemsControl>");
                 break;
 
             case TreeView treeView:

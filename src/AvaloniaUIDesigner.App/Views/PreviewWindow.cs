@@ -307,6 +307,10 @@ public sealed class PreviewWindow : Window
                 SelectedIndex = 0,
                 Items = { "Item 1", "Item 2", "Item 3" },
             },
+            "Avalonia.Controls.ItemsControl" => new ItemsControl
+            {
+                Items = { "Item 1", "Item 2", "Item 3" },
+            },
             "Avalonia.Controls.TreeView" => DesignerTreeItemRuntime.CreateDefaultTreeView(),
             "Avalonia.Controls.Menu" => DesignerMenuItemRuntime.CreateDefaultMenu(),
             "Avalonia.Controls.DataGrid" => DesignerDataGridRuntime.CreateDefaultDataGrid(),
@@ -560,6 +564,9 @@ public sealed class PreviewWindow : Window
                 break;
             case TabControl tabControl:
                 ApplyTabControlProperties(tabControl, properties);
+                break;
+            case ItemsControl itemsControl when itemsControl.GetType() == typeof(ItemsControl):
+                ApplyItemsControlProperties(itemsControl, properties);
                 break;
             case SplitView splitView:
                 ApplySplitViewProperties(splitView, properties, colorResources);
@@ -920,6 +927,37 @@ public sealed class PreviewWindow : Window
         }
 
         DesignerSelectionRuntime.Apply(listBox, properties);
+    }
+
+    private static void ApplyItemsControlProperties(
+        ItemsControl itemsControl,
+        IReadOnlyDictionary<string, string> properties)
+    {
+        if (properties.TryGetValue("__items", out var itemsJson))
+        {
+            List<string>? items;
+            try
+            {
+                items = JsonSerializer.Deserialize<List<string>>(itemsJson);
+            }
+            catch
+            {
+                items = null;
+            }
+
+            if (items is not null)
+            {
+                itemsControl.Items.Clear();
+                foreach (var item in items)
+                {
+                    itemsControl.Items.Add(item);
+                }
+            }
+        }
+        else if (DesignerBindingRuntime.HasBinding(itemsControl, "ItemsSource"))
+        {
+            itemsControl.Items.Clear();
+        }
     }
 
     private static void ApplyTreeViewProperties(

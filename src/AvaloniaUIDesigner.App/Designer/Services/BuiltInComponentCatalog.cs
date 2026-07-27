@@ -163,6 +163,15 @@ public sealed class BuiltInComponentCatalog : IComponentCatalog
                 Items = { "Item 1", "Item 2", "Item 3" },
             }),
         new(
+            DisplayName: "ItemsControl",
+            AvaloniaTypeName: "Avalonia.Controls.ItemsControl",
+            DefaultWidth: 220,
+            DefaultHeight: 120,
+            VisualFactory: static () => new ItemsControl
+            {
+                Items = { "Item 1", "Item 2", "Item 3" },
+            }),
+        new(
             DisplayName: "TreeView",
             AvaloniaTypeName: "Avalonia.Controls.TreeView",
             DefaultWidth: 240,

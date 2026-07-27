@@ -271,6 +271,39 @@ public sealed class AxamlDocumentSerializer : IDesignerSerializer
             return;
         }
 
+        if (string.Equals(element.TypeName, "Avalonia.Controls.ItemsControl", StringComparison.Ordinal))
+        {
+            if (HasBinding(element, "ItemsSource"))
+            {
+                sb.AppendLine(" />");
+                return;
+            }
+
+            var items = ReadFlatItems(element);
+            if (items.Count == 0)
+            {
+                sb.AppendLine(" />");
+                return;
+            }
+
+            sb.AppendLine(">");
+            sb.Append(indent);
+            sb.AppendLine("  <ItemsControl.Items>");
+            foreach (var item in items)
+            {
+                sb.Append(indent);
+                sb.Append("    <x:String>");
+                sb.Append(EscapeXmlAttribute(item));
+                sb.AppendLine("</x:String>");
+            }
+
+            sb.Append(indent);
+            sb.AppendLine("  </ItemsControl.Items>");
+            sb.Append(indent);
+            sb.AppendLine("</ItemsControl>");
+            return;
+        }
+
         if (string.Equals(element.TypeName, "Avalonia.Controls.TabControl", StringComparison.Ordinal))
         {
             sb.AppendLine(">");

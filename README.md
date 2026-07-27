@@ -35,6 +35,7 @@ dotnet run --project src/AvaloniaUIDesigner.App/AvaloniaUIDesigner.App.csproj
 - **Visual Effects 속성**: None·Blur·Drop Shadow 모드와 반경·오프셋·색상·불투명도를 편집하고 Undo/Redo, 복제, Preview, Draft·Full·UserControl AXAML 왕복에 보존
 - **Range & Value 속성**: Slider의 step·tick·방향, ProgressBar의 indeterminate·진행 텍스트, NumericUpDown의 increment·format·spinner 정책을 검증된 범위/값과 함께 편집하고 Undo/Redo, 복제, Preview, Draft·Full·UserControl AXAML 왕복에 보존
 - **Text Input 속성**: TextBox의 디자인 텍스트·watermark·multiline/tab·wrapping/alignment·read-only·길이/줄 제한·password·floating watermark·undo/selection 정책을 통합 편집하고 Undo/Redo, 복제, Preview, Binding, Draft·Full·UserControl AXAML 왕복에 보존
+- **ItemsControl 항목 편집**: 일반 ItemsControl의 정적 문자열 항목을 기존 항목 편집기로 관리하고 Undo/Redo, 복제, Preview, ItemsSource Binding, Draft·Full·UserControl AXAML 왕복에 보존
 - **MaskedTextBox 속성**: MaskedTextBox의 .NET mask·PromptChar·prompt 숨김 정책을 전용 편집기로 검증하고 Undo/Redo, 복제, Preview, Text Binding, Draft·Full·UserControl AXAML 왕복에 보존
 - **AutoCompleteBox 속성**: Text·watermark·자동 완성·최소 접두사·populate 지연·FilterMode·drop-down 높이/열림 상태와 정적 suggestion을 편집하고 Undo/Redo, 복제, Preview, Text Binding, Draft·Full·UserControl AXAML 왕복에 보존합니다. AsyncPopulator와 selector delegate는 코드 영역으로 남깁니다.
 - **Selection Behavior 속성**: ComboBox·ListBox·TreeView의 선택·검색·자동 스크롤 정책과 ComboBox editable/placeholder/drop-down 표현, ListBox·TreeView 다중 선택 모드를 편집하고 Undo/Redo, 복제, Preview, Binding, Draft·Full·UserControl AXAML 왕복에 보존
@@ -64,7 +65,7 @@ dotnet run --project src/AvaloniaUIDesigner.App/AvaloniaUIDesigner.App.csproj
 2. 중앙 Canvas 영역을 클릭 → 클릭 위치에 기본 크기로 생성
 3. 생성된 요소를 클릭하여 선택 → 8개 핸들로 이동/리사이즈
 4. 우측 하단 Properties 패널에서 속성 편집
-5. ComboBox, AutoCompleteBox, ListBox, TreeView, Menu, TabControl은 `Edit > Edit Items / Columns...`에서 항목 편집
+5. ComboBox, AutoCompleteBox, ListBox, ItemsControl, TreeView, Menu, TabControl은 `Edit > Edit Items / Columns...`에서 항목 편집
 6. Path는 `Edit > Edit Path Data...`에서 Avalonia geometry mini-language 편집
 7. DataGrid는 `Edit > Edit Items / Columns...`에서 `Type | Header | Binding | Width | ReadOnly` 형식으로 열 편집
 8. 선택 컨트롤은 `Edit > Edit Bindings...`에서 `Property | Path | Mode | Fallback` 형식으로 바인딩 편집
@@ -114,6 +115,8 @@ Text Input 편집기에서 MaxLength·MinLines·MaxLines의 `0`은 제한 없음
 MaskedTextBox 편집기는 .NET `MaskedTextProvider`로 Mask를 검증하고, `0`·`9`·`L`·`?` 같은 mask token과 literal 문자를 그대로 AXAML에 보존합니다. 공통 Text Input 편집기에서 inherited TextBox 속성을 함께 조정할 수 있으며, `Text`가 Binding이면 정적 텍스트를 중복 출력하지 않습니다.
 
 AutoCompleteBox 편집기는 정적 `ItemsSource` suggestion을 `Edit Items / Columns...`에서 관리하고, `MinimumPopulateDelay`를 밀리초 또는 invariant TimeSpan으로 입력받습니다. AXAML은 `AvaloniaList<Object>` property element로 정적 suggestions를 보존하며, `Text`가 Binding이면 디자인 텍스트를 중복 출력하지 않습니다. `AsyncPopulator`, `ItemSelector`, `TextSelector`는 임의 델리게이트를 생성하지 않고 원본 코드에서 연결하도록 남깁니다.
+
+ItemsControl은 문자열 항목을 `Edit Items / Columns...`에서 한 줄씩 편집합니다. 정적 `Items`는 `<ItemsControl.Items>`와 `x:String`으로 출력하고, `ItemsSource` Binding이 있으면 정적 항목을 중복 출력하지 않습니다. 복잡한 item template와 데이터 모델은 원본 AXAML 또는 ViewModel 영역에서 연결하도록 남깁니다.
 
 Selection Behavior 편집기의 SelectedIndex `-1`은 선택 없음을 의미하며 정적 항목 범위를 벗어날 수 없습니다. ListBox와 TreeView의 SelectionMode는 Multiple·Toggle·AlwaysSelected를 독립적으로 조합하고, 항목이 있는 ListBox에서 AlwaysSelected를 켜면 유효한 선택 인덱스가 필요합니다. Editable ComboBox는 선택된 항목이 있으면 Text를 해당 항목에서 파생하고, 자유 입력 Text를 설정하면 SelectedIndex를 `-1`로 사용합니다. 소스의 ItemsSource가 Binding이면 디자인 시점에 항목 수를 알 수 없으므로 상한 검증을 런타임 데이터에 맡깁니다.
 

@@ -2368,6 +2368,20 @@ public partial class CanvasViewModel : ViewModelBase
             return;
         }
 
+        if (visual is ItemsControl itemsControl && visual.GetType() == typeof(ItemsControl))
+        {
+            if (properties.TryGetValue("__items", out var itemsJson))
+            {
+                RestoreItemsControlItems(itemsControl, itemsJson);
+            }
+            else if (DesignerBindingRuntime.HasBinding(itemsControl, "ItemsSource"))
+            {
+                itemsControl.Items.Clear();
+            }
+
+            return;
+        }
+
         if (visual is SplitView splitView)
         {
             if (properties.TryGetValue("DisplayMode", out var displayMode)
@@ -2884,6 +2898,30 @@ public partial class CanvasViewModel : ViewModelBase
         foreach (var item in items)
         {
             listBox.Items.Add(item);
+        }
+    }
+
+    private static void RestoreItemsControlItems(ItemsControl itemsControl, string json)
+    {
+        List<string>? items;
+        try
+        {
+            items = JsonSerializer.Deserialize<List<string>>(json);
+        }
+        catch
+        {
+            return;
+        }
+
+        if (items is null)
+        {
+            return;
+        }
+
+        itemsControl.Items.Clear();
+        foreach (var item in items)
+        {
+            itemsControl.Items.Add(item);
         }
     }
 
