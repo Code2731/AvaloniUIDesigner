@@ -801,6 +801,8 @@ public sealed class PreviewWindow : Window
 
     private static void ApplyTabControlProperties(TabControl tabControl, IReadOnlyDictionary<string, string> properties)
     {
+        DesignerTabControlRuntime.Apply(tabControl, properties);
+
         if (properties.TryGetValue("__tabs", out var tabsJson))
         {
             List<string>? tabs;

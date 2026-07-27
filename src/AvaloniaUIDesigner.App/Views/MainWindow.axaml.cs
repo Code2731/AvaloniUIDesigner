@@ -846,6 +846,20 @@ public partial class MainWindow : Window
         await ShowSplitViewPropertiesDialogAsync(state);
     }
 
+    private async void OnEditTabControlBehaviorPropertiesMenuClicked(
+        object? sender,
+        Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        FlushPendingPropertyHistory();
+        if (Vm is null
+            || !Vm.TryGetSelectedTabControlBehaviorProperties(out var state))
+        {
+            return;
+        }
+
+        await ShowTabControlBehaviorPropertiesDialogAsync(state);
+    }
+
     private async void OnEditImagePropertiesMenuClicked(
         object? sender,
         Avalonia.Interactivity.RoutedEventArgs e)
@@ -4501,6 +4515,134 @@ public partial class MainWindow : Window
         Grid.SetRow(switches, 2);
         Grid.SetRow(errorText, 4);
         Grid.SetRow(buttons, 5);
+        dialog.Content = content;
+        await dialog.ShowDialog(this);
+
+        static Control CreateField(string label, Control editor, int row, int column)
+        {
+            var field = new StackPanel
+            {
+                Spacing = 4,
+                Children =
+                {
+                    new TextBlock { Text = label },
+                    editor,
+                },
+            };
+            Grid.SetRow(field, row);
+            Grid.SetColumn(field, column);
+            return field;
+        }
+    }
+
+    private async Task ShowTabControlBehaviorPropertiesDialogAsync(
+        TabControlBehaviorEditorState state)
+    {
+        if (Vm is null)
+        {
+            return;
+        }
+
+        var tabStripPlacementEditor = new ComboBox
+        {
+            ItemsSource = DesignerTabControlRuntime.TabStripPlacementNames,
+            SelectedItem = state.TabStripPlacement,
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+        };
+        var horizontalContentAlignmentEditor = new ComboBox
+        {
+            ItemsSource = DesignerTabControlRuntime.HorizontalAlignmentNames,
+            SelectedItem = state.HorizontalContentAlignment,
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+        };
+        var verticalContentAlignmentEditor = new ComboBox
+        {
+            ItemsSource = DesignerTabControlRuntime.VerticalAlignmentNames,
+            SelectedItem = state.VerticalContentAlignment,
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+        };
+        var errorText = new TextBlock
+        {
+            Foreground = Avalonia.Media.Brushes.IndianRed,
+            TextWrapping = Avalonia.Media.TextWrapping.Wrap,
+        };
+        var fields = new Grid
+        {
+            ColumnDefinitions = new ColumnDefinitions("*,*"),
+            RowDefinitions = new RowDefinitions("Auto,Auto"),
+            ColumnSpacing = 12,
+            RowSpacing = 10,
+            Children =
+            {
+                CreateField("Tab strip placement", tabStripPlacementEditor, 0, 0),
+                CreateField(
+                    "Horizontal content alignment",
+                    horizontalContentAlignmentEditor,
+                    0,
+                    1),
+                CreateField(
+                    "Vertical content alignment",
+                    verticalContentAlignmentEditor,
+                    1,
+                    0),
+            },
+        };
+        Grid.SetColumnSpan(fields.Children[^1], 2);
+        var dialog = new Window
+        {
+            Title = $"Edit TabControl Behavior - {state.ControlName}",
+            Width = 700,
+            Height = 390,
+            MinWidth = 580,
+            MinHeight = 340,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner,
+        };
+        var applyButton = new Button { Content = "Apply", MinWidth = 84 };
+        applyButton.Click += (_, _) =>
+        {
+            var input = new DesignerTabControlEditorInput(
+                tabStripPlacementEditor.SelectedItem?.ToString() ?? string.Empty,
+                horizontalContentAlignmentEditor.SelectedItem?.ToString()
+                    ?? string.Empty,
+                verticalContentAlignmentEditor.SelectedItem?.ToString()
+                    ?? string.Empty);
+            if (!Vm.SetSelectedTabControlBehaviorProperties(input))
+            {
+                errorText.Text = Vm.StatusText;
+                return;
+            }
+
+            dialog.Close();
+        };
+        var cancelButton = new Button { Content = "Cancel", MinWidth = 84 };
+        cancelButton.Click += (_, _) => dialog.Close();
+        var buttons = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            Spacing = 8,
+            HorizontalAlignment = HorizontalAlignment.Right,
+            Children = { cancelButton, applyButton },
+        };
+        var content = new Grid
+        {
+            Margin = new Thickness(16),
+            RowDefinitions = new RowDefinitions("Auto,*,Auto,Auto"),
+            RowSpacing = 12,
+            Children =
+            {
+                new TextBlock
+                {
+                    Text = "Configure the tab strip edge and the selected tab content alignment without changing tab headers or assigned children.",
+                    TextWrapping = Avalonia.Media.TextWrapping.Wrap,
+                },
+                fields,
+                errorText,
+                buttons,
+            },
+        };
+        Grid.SetRow(fields, 1);
+        Grid.SetRow(errorText, 2);
+        Grid.SetRow(buttons, 3);
         dialog.Content = content;
         await dialog.ShowDialog(this);
 

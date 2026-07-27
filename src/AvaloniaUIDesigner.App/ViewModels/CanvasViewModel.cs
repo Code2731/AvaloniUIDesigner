@@ -2366,6 +2366,8 @@ public partial class CanvasViewModel : ViewModelBase
 
         if (visual is TabControl tabControl)
         {
+            DesignerTabControlRuntime.Apply(tabControl, properties);
+
             if (properties.TryGetValue("__tabs", out var tabsJson))
             {
                 RestoreTabControlTabs(tabControl, tabsJson);

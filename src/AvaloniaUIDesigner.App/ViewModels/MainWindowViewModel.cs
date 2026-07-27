@@ -193,6 +193,12 @@ public sealed record SplitViewEditorState(
     bool UseLightDismissOverlayMode,
     string PaneBackground);
 
+public sealed record TabControlBehaviorEditorState(
+    string ControlName,
+    string TabStripPlacement,
+    string HorizontalContentAlignment,
+    string VerticalContentAlignment);
+
 public sealed record SelectionEditorState(
     string ControlName,
     string ControlKind,
@@ -4375,6 +4381,95 @@ public partial class MainWindowViewModel : ViewModelBase
             values.UseLightDismissOverlayMode,
             values.PaneBackground);
 
+    public bool TryGetSelectedTabControlBehaviorProperties(
+        out TabControlBehaviorEditorState state)
+    {
+        var target = Canvas.SelectedElement;
+        if (target is null
+            || target.IsLocked
+            || !DesignerTabControlRuntime.IsSupportedControl(target.Visual))
+        {
+            state = default!;
+            StatusText = target switch
+            {
+                null => "Select a TabControl before editing tab behavior.",
+                { IsLocked: true } => "Unlock the selected TabControl before editing tab behavior.",
+                _ => "Tab behavior editing is available for TabControl controls.",
+            };
+            return false;
+        }
+
+        if (!DesignerTabControlRuntime.TryRead(
+                target.Visual,
+                out var values,
+                out var error))
+        {
+            state = default!;
+            StatusText = $"TabControl behavior cannot be edited. {error}";
+            return false;
+        }
+
+        state = CreateTabControlBehaviorEditorState(target.DisplayName, values);
+        return true;
+    }
+
+    public bool SetSelectedTabControlBehaviorProperties(
+        DesignerTabControlEditorInput input)
+    {
+        var target = Canvas.SelectedElement;
+        if (target is null
+            || target.IsLocked
+            || target.Visual is not TabControl tabControl)
+        {
+            StatusText = "Select an unlocked TabControl before editing tab behavior.";
+            return false;
+        }
+
+        if (!DesignerTabControlRuntime.TryRead(tabControl, out var current, out var error))
+        {
+            StatusText = $"TabControl behavior was not changed. {error}";
+            return false;
+        }
+
+        if (!DesignerTabControlRuntime.TryParseValues(
+                tabControl,
+                input,
+                out var values,
+                out error))
+        {
+            StatusText = $"TabControl behavior was not changed. {error}";
+            return false;
+        }
+
+        if (current == values)
+        {
+            StatusText = "TabControl behavior is unchanged.";
+            return true;
+        }
+
+        BeginCanvasMutation(HistoryActionType.EditProperty, "Updated TabControl behavior.");
+        DesignerTabControlRuntime.Apply(tabControl, values);
+        Canvas.ReflowContainerChildren(target);
+        foreach (var attribute in DesignerTabControlRuntime.GetAxamlAttributes(tabControl))
+        {
+            DesignerStyleApplicationMetadata.ClearApplied(tabControl, attribute.Name);
+        }
+
+        Canvas.RefreshDocumentStyles(tabControl);
+        CommitCanvasMutation();
+        StatusText = $"Updated tab behavior for {target.DisplayName}.";
+        return true;
+    }
+
+    private static TabControlBehaviorEditorState CreateTabControlBehaviorEditorState(
+        string controlName,
+        DesignerTabControlValues values)
+        => new(
+            controlName,
+            values.TabStripPlacement.ToString(),
+            values.HorizontalContentAlignment.ToString(),
+            values.VerticalContentAlignment.ToString());
+
     public bool TryGetSelectedSelectionProperties(out SelectionEditorState state)
     {
         var target = Canvas.SelectedElement;
@@ -6854,6 +6949,7 @@ public partial class MainWindowViewModel : ViewModelBase
         DesignerMaskedTextBoxRuntime.Capture(visual, result);
         DesignerSelectableTextBlockRuntime.Capture(visual, result);
         DesignerSplitViewRuntime.Capture(visual, result);
+        DesignerTabControlRuntime.Capture(visual, result);
         DesignerSelectionRuntime.Capture(visual, result);
         DesignerDateTimeRuntime.Capture(visual, result);
         DesignerColorPickerRuntime.Capture(visual, result);
@@ -8658,6 +8754,26 @@ public partial class MainWindowViewModel : ViewModelBase
                 continue;
             }
 
+            if (DesignerTabControlRuntime.IsSupportedProperty(tagName, name))
+            {
+                if (DesignerTabControlRuntime.TryNormalizeProperty(
+                        tagName,
+                        name,
+                        attr.Value,
+                        out var canonicalName,
+                        out var normalizedValue,
+                        out var tabControlError))
+                {
+                    map[canonicalName] = normalizedValue;
+                }
+                else
+                {
+                    warnings.Add($"Ignored {tagName}.{name}: {tabControlError}");
+                }
+
+                continue;
+            }
+
             if (DesignerSelectionRuntime.IsSupportedProperty(tagName, name))
             {
                 if (DesignerSelectionRuntime.TryNormalizeProperty(
@@ -8938,6 +9054,15 @@ public partial class MainWindowViewModel : ViewModelBase
             DesignerSplitViewRuntime.RemoveProperties(tagName, map);
         }
 
+        if (!DesignerTabControlRuntime.TryValidateProperties(
+                tagName,
+                map,
+                out var tabControlConstraintError))
+        {
+            warnings.Add($"Ignored {tagName} tab behavior properties: {tabControlConstraintError}");
+            DesignerTabControlRuntime.RemoveProperties(tagName, map);
+        }
+
         var hasItemsSourceBinding = bindings.Any(binding =>
             string.Equals(binding.PropertyName, "ItemsSource", StringComparison.Ordinal));
         int? staticItemCount = hasItemsSourceBinding
@@ -9109,6 +9234,11 @@ public partial class MainWindowViewModel : ViewModelBase
         }
 
         if (DesignerContainerBehaviorRuntime.IsSupportedProperty(tagName, propertyName))
+        {
+            return true;
+        }
+
+        if (DesignerTabControlRuntime.IsSupportedProperty(tagName, propertyName))
         {
             return true;
         }
@@ -10669,7 +10799,7 @@ public partial class MainWindowViewModel : ViewModelBase
                 sb.Append(indent);
                 sb.Append("<TabControl");
                 AppendCanvasLayoutAttributes(sb, element);
-                AppendAttribute(sb, "SelectedIndex", tabControl.SelectedIndex.ToString(CultureInfo.InvariantCulture));
+                AppendTabControlAttributes(sb, tabControl);
                 sb.AppendLine(">");
                 var tabHeaders = ReadTabHeaders(tabControl);
                 for (var tabIndex = 0; tabIndex < tabHeaders.Count; tabIndex++)
@@ -11847,6 +11977,28 @@ public partial class MainWindowViewModel : ViewModelBase
             {
                 AppendAttribute(sb, attribute.Name, attribute.Value);
             }
+        }
+    }
+
+    private static void AppendTabControlAttributes(StringBuilder sb, TabControl tabControl)
+    {
+        var boundProperties = DesignerBindingRuntime.ReadBindings(tabControl)
+            .Select(binding => binding.PropertyName)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        foreach (var attribute in DesignerTabControlRuntime.GetAxamlAttributes(tabControl))
+        {
+            if (!boundProperties.Contains(attribute.Name))
+            {
+                AppendAttribute(sb, attribute.Name, attribute.Value);
+            }
+        }
+
+        if (!boundProperties.Contains("SelectedIndex"))
+        {
+            AppendAttribute(
+                sb,
+                "SelectedIndex",
+                tabControl.SelectedIndex.ToString(CultureInfo.InvariantCulture));
         }
     }
 
