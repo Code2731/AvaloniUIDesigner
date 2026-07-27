@@ -5970,7 +5970,16 @@ public partial class MainWindowViewModel : ViewModelBase
             return;
         }
 
-        var primary = Canvas.SelectedElement ?? targets[^1];
+        if (!TryValidateRootOrCanvasSiblingSelection(targets, "Arrange", out var selectionError))
+        {
+            StatusText = selectionError;
+            return;
+        }
+
+        var primary = Canvas.SelectedElement is { } selectedElement
+            && targets.Contains(selectedElement)
+                ? selectedElement
+                : targets[^1];
         BeginCanvasMutation(HistoryActionType.TransformElement, "Arranged selected controls.");
 
         switch (action)
@@ -6112,6 +6121,16 @@ public partial class MainWindowViewModel : ViewModelBase
             return;
         }
 
+        if (!TryValidateRootOrCanvasSiblingSelection(
+                targets,
+                "Center on Artboard",
+                allowCanvasChildren: false,
+                out var selectionError))
+        {
+            StatusText = selectionError;
+            return;
+        }
+
         BeginCanvasMutation(HistoryActionType.TransformElement, "Centered controls on artboard.");
 
         if (horizontally)
@@ -6142,6 +6161,64 @@ public partial class MainWindowViewModel : ViewModelBase
             : horizontally
                 ? $"Horizontally centered {targets.Count} control(s) on the artboard."
                 : $"Vertically centered {targets.Count} control(s) on the artboard.";
+    }
+
+    private bool TryValidateRootOrCanvasSiblingSelection(
+        IReadOnlyList<DesignElement> targets,
+        string operation,
+        out string error)
+        => TryValidateRootOrCanvasSiblingSelection(
+            targets,
+            operation,
+            allowCanvasChildren: true,
+            out error);
+
+    private bool TryValidateRootOrCanvasSiblingSelection(
+        IReadOnlyList<DesignElement> targets,
+        string operation,
+        bool allowCanvasChildren,
+        out string error)
+    {
+        var parentNames = targets
+            .Select(element => element.ParentName ?? string.Empty)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        if (parentNames.Count != 1)
+        {
+            error = $"{operation} requires controls at the same root or inside the same Canvas.";
+            return false;
+        }
+
+        var parentName = parentNames[0];
+        if (parentName.Length == 0)
+        {
+            if (targets.Any(element => element.IsContainerChild))
+            {
+                error = $"{operation} is available for root controls or siblings inside the same Canvas.";
+                return false;
+            }
+
+            error = string.Empty;
+            return true;
+        }
+
+        if (!allowCanvasChildren)
+        {
+            error = $"{operation} is available for root controls only; container children are positioned by their parent.";
+            return false;
+        }
+
+        var parent = Canvas.Elements.FirstOrDefault(element =>
+            string.Equals(element.DisplayName, parentName, StringComparison.OrdinalIgnoreCase));
+        if (parent?.Visual is Canvas && targets.All(element => element.IsCanvasChild))
+        {
+            error = string.Empty;
+            return true;
+        }
+
+        error = $"{operation} supports root controls or siblings inside the same Canvas. "
+            + "Grid, StackPanel, DockPanel, WrapPanel, UniformGrid, TabControl, SplitView, and Content children use parent layout.";
+        return false;
     }
 
     public void MoveSelectedElementsInLayerOrder(LayerOrderAction action)
