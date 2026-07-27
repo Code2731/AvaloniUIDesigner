@@ -610,6 +610,20 @@ public partial class MainWindow : Window
         }
     }
 
+    private async void OnEditDataGridBehaviorPropertiesMenuClicked(
+        object? sender,
+        Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        FlushPendingPropertyHistory();
+        if (Vm is null
+            || !Vm.TryGetSelectedDataGridBehaviorProperties(out var state))
+        {
+            return;
+        }
+
+        await ShowDataGridBehaviorPropertiesDialogAsync(state);
+    }
+
     private async void OnEditBindingsMenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
         FlushPendingPropertyHistory();
@@ -3039,6 +3053,260 @@ public partial class MainWindow : Window
         dialog.Content = content;
 
         return await dialog.ShowDialog<IReadOnlyList<string>?>(this);
+    }
+
+    private async Task ShowDataGridBehaviorPropertiesDialogAsync(
+        DataGridBehaviorEditorState state)
+    {
+        if (Vm is null)
+        {
+            return;
+        }
+
+        var autoGenerateEditor = new CheckBox
+        {
+            Content = "Auto-generate columns",
+            IsChecked = state.AutoGenerateColumns,
+        };
+        var readOnlyEditor = new CheckBox
+        {
+            Content = "Read-only cells",
+            IsChecked = state.IsReadOnly,
+        };
+        var reorderEditor = new CheckBox
+        {
+            Content = "Allow column reordering",
+            IsChecked = state.CanUserReorderColumns,
+        };
+        var resizeEditor = new CheckBox
+        {
+            Content = "Allow column resizing",
+            IsChecked = state.CanUserResizeColumns,
+        };
+        var sortEditor = new CheckBox
+        {
+            Content = "Allow column sorting",
+            IsChecked = state.CanUserSortColumns,
+        };
+        var rowDetailsFrozenEditor = new CheckBox
+        {
+            Content = "Freeze row details",
+            IsChecked = state.AreRowDetailsFrozen,
+        };
+        var rowGroupsFrozenEditor = new CheckBox
+        {
+            Content = "Freeze row group headers",
+            IsChecked = state.AreRowGroupHeadersFrozen,
+        };
+        var inertiaEditor = new CheckBox
+        {
+            Content = "Use scroll inertia",
+            IsChecked = state.IsScrollInertiaEnabled,
+        };
+        var headersEditor = CreateComboBox(
+            DesignerDataGridBehaviorRuntime.HeadersVisibilityNames,
+            state.HeadersVisibility);
+        var gridLinesEditor = CreateComboBox(
+            DesignerDataGridBehaviorRuntime.GridLinesVisibilityNames,
+            state.GridLinesVisibility);
+        var selectionEditor = CreateComboBox(
+            DesignerDataGridBehaviorRuntime.SelectionModeNames,
+            state.SelectionMode);
+        var clipboardEditor = CreateComboBox(
+            DesignerDataGridBehaviorRuntime.ClipboardCopyModeNames,
+            state.ClipboardCopyMode);
+        var horizontalScrollEditor = CreateComboBox(
+            DesignerDataGridBehaviorRuntime.ScrollBarVisibilityNames,
+            state.HorizontalScrollBarVisibility);
+        var verticalScrollEditor = CreateComboBox(
+            DesignerDataGridBehaviorRuntime.ScrollBarVisibilityNames,
+            state.VerticalScrollBarVisibility);
+        var frozenColumnsEditor = new TextBox
+        {
+            Text = state.FrozenColumnCount,
+            Watermark = "0 or greater",
+        };
+        var rowHeightEditor = new TextBox
+        {
+            Text = state.RowHeight,
+            Watermark = "Auto or non-negative number",
+        };
+        var rowHeaderWidthEditor = new TextBox
+        {
+            Text = state.RowHeaderWidth,
+            Watermark = "Auto or non-negative number",
+        };
+        var columnHeaderHeightEditor = new TextBox
+        {
+            Text = state.ColumnHeaderHeight,
+            Watermark = "Auto or non-negative number",
+        };
+        var minColumnWidthEditor = new TextBox
+        {
+            Text = state.MinColumnWidth,
+            Watermark = "Finite non-negative number",
+        };
+        var maxColumnWidthEditor = new TextBox
+        {
+            Text = state.MaxColumnWidth,
+            Watermark = "Finite number or Infinity",
+        };
+        var columnWidthEditor = new TextBox
+        {
+            Text = state.ColumnWidth,
+            Watermark = "Auto, SizeToCells, SizeToHeader, 120, or 2*",
+        };
+        var fields = new Grid
+        {
+            ColumnDefinitions = new ColumnDefinitions("*,*,*"),
+            RowDefinitions = new RowDefinitions("Auto,Auto,Auto,Auto,Auto"),
+            ColumnSpacing = 12,
+            RowSpacing = 10,
+            Children =
+            {
+                CreateField("Headers visibility", headersEditor, 0, 0),
+                CreateField("Grid lines", gridLinesEditor, 0, 1),
+                CreateField("Selection mode", selectionEditor, 0, 2),
+                CreateField("Clipboard copy", clipboardEditor, 1, 0),
+                CreateField("Horizontal scrollbar", horizontalScrollEditor, 1, 1),
+                CreateField("Vertical scrollbar", verticalScrollEditor, 1, 2),
+                CreateField("Frozen column count", frozenColumnsEditor, 2, 0),
+                CreateField("Row height", rowHeightEditor, 2, 1),
+                CreateField("Row header width", rowHeaderWidthEditor, 2, 2),
+                CreateField("Column header height", columnHeaderHeightEditor, 3, 0),
+                CreateField("Minimum column width", minColumnWidthEditor, 3, 1),
+                CreateField("Maximum column width", maxColumnWidthEditor, 3, 2),
+                CreateField("Default column width", columnWidthEditor, 4, 0),
+            },
+        };
+        Grid.SetColumnSpan(fields.Children[^1], 3);
+        var switches = new WrapPanel
+        {
+            Orientation = Orientation.Horizontal,
+            ItemSpacing = 18,
+            LineSpacing = 8,
+            Children =
+            {
+                autoGenerateEditor,
+                readOnlyEditor,
+                reorderEditor,
+                resizeEditor,
+                sortEditor,
+                rowDetailsFrozenEditor,
+                rowGroupsFrozenEditor,
+                inertiaEditor,
+            },
+        };
+        var errorText = new TextBlock
+        {
+            Foreground = Avalonia.Media.Brushes.IndianRed,
+            TextWrapping = Avalonia.Media.TextWrapping.Wrap,
+        };
+        var dialog = new Window
+        {
+            Title = $"Edit DataGrid Behavior - {state.ControlName}",
+            Width = 920,
+            Height = 760,
+            MinWidth = 760,
+            MinHeight = 620,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner,
+        };
+        var applyButton = new Button { Content = "Apply", MinWidth = 84 };
+        applyButton.Click += (_, _) =>
+        {
+            var input = new DesignerDataGridBehaviorEditorInput(
+                autoGenerateEditor.IsChecked == true,
+                readOnlyEditor.IsChecked == true,
+                reorderEditor.IsChecked == true,
+                resizeEditor.IsChecked == true,
+                sortEditor.IsChecked == true,
+                headersEditor.SelectedItem?.ToString() ?? string.Empty,
+                gridLinesEditor.SelectedItem?.ToString() ?? string.Empty,
+                selectionEditor.SelectedItem?.ToString() ?? string.Empty,
+                clipboardEditor.SelectedItem?.ToString() ?? string.Empty,
+                rowDetailsFrozenEditor.IsChecked == true,
+                rowGroupsFrozenEditor.IsChecked == true,
+                inertiaEditor.IsChecked == true,
+                frozenColumnsEditor.Text ?? string.Empty,
+                rowHeightEditor.Text ?? string.Empty,
+                rowHeaderWidthEditor.Text ?? string.Empty,
+                columnHeaderHeightEditor.Text ?? string.Empty,
+                minColumnWidthEditor.Text ?? string.Empty,
+                maxColumnWidthEditor.Text ?? string.Empty,
+                columnWidthEditor.Text ?? string.Empty,
+                horizontalScrollEditor.SelectedItem?.ToString() ?? string.Empty,
+                verticalScrollEditor.SelectedItem?.ToString() ?? string.Empty);
+            if (!Vm.SetSelectedDataGridBehaviorProperties(input))
+            {
+                errorText.Text = Vm.StatusText;
+                return;
+            }
+
+            dialog.Close();
+        };
+        var cancelButton = new Button { Content = "Cancel", MinWidth = 84 };
+        cancelButton.Click += (_, _) => dialog.Close();
+        var buttons = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            Spacing = 8,
+            HorizontalAlignment = HorizontalAlignment.Right,
+            Children = { cancelButton, applyButton },
+        };
+        var content = new Grid
+        {
+            Margin = new Thickness(16),
+            RowDefinitions = new RowDefinitions("Auto,Auto,Auto,*,Auto,Auto"),
+            RowSpacing = 12,
+            Children =
+            {
+                new TextBlock
+                {
+                    Text = "Configure DataGrid presentation, interaction, selection, scrolling, and shared column sizing. Column definitions remain editable separately from this behavior workflow.",
+                    TextWrapping = Avalonia.Media.TextWrapping.Wrap,
+                },
+                fields,
+                switches,
+                errorText,
+                buttons,
+            },
+        };
+        Grid.SetRow(fields, 1);
+        Grid.SetRow(switches, 2);
+        Grid.SetRow(errorText, 4);
+        Grid.SetRow(buttons, 5);
+        dialog.Content = content;
+        await dialog.ShowDialog(this);
+
+        static ComboBox CreateComboBox(
+            IReadOnlyList<string> items,
+            string selectedItem)
+            => new()
+            {
+                ItemsSource = items,
+                SelectedItem = selectedItem,
+                HorizontalAlignment = HorizontalAlignment.Stretch,
+            };
+
+        static Control CreateField(
+            string label,
+            Control editor,
+            int row,
+            int column)
+        {
+            var field = new StackPanel
+            {
+                Spacing = 4,
+                Children =
+                {
+                    new TextBlock { Text = label },
+                    editor,
+                },
+            };
+            Grid.SetRow(field, row);
+            Grid.SetColumn(field, column);
+            return field;
+        }
     }
 
     private async Task ShowTypographyPropertiesDialogAsync(TypographyEditorState state)

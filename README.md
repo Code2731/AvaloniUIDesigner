@@ -25,6 +25,7 @@ dotnet run --project src/AvaloniaUIDesigner.App/AvaloniaUIDesigner.App.csproj
 - **계층 항목 편집**: TreeView 항목을 `[-]`(펼침), `[+]`(접힘), 두 칸 들여쓰기 문법으로 편집하고 Undo/Redo, 복제, 미리보기, AXAML 왕복에 보존
 - **메뉴 구조 편집**: Menu 항목을 두 칸 들여쓰기로 중첩하고 `---` 구분선, `[x]/[ ]` 체크, `(x)/( )` 라디오와 `{Group}`, `| Ctrl+N` 표시·실행 단축키를 편집해 Undo/Redo, 복제, 미리보기, AXAML 왕복에 보존
 - **DataGrid 열 설계**: Text·CheckBox 열의 Header·Binding·Width·ReadOnly를 편집하고 샘플 행, Undo/Redo, 복제, 미리보기, AXAML 왕복에 보존
+- **DataGrid Behavior 속성**: 헤더·그리드선·선택·클립보드, 열 조작, 읽기 전용, 고정 열, 행·열 크기, 스크롤 정책을 전용 편집기로 검증하고 열 정의·Undo/Redo·Preview·Binding·AXAML 왕복에 보존
 - **데이터 바인딩**: 선택 컨트롤의 지원 속성에 Path·Mode·Fallback을 여러 개 선언하고, 디자인 샘플을 유지한 채 ReflectionBinding·Undo/Redo·복제·미리보기·AXAML 왕복에 보존
 - **샘플 DataContext**: 문서 단위 JSON을 바인딩 Path에 연결해 Text·상태·숫자·선택·ItemsSource를 캔버스와 Preview에서 확인하고, 원래 디자인 값·Undo/Redo·AXAML 왕복에 보존
 - **공통 레이아웃 속성**: Margin·Padding·수평/수직 정렬·Min/Max 크기를 편집하고 컨테이너 자식, Undo/Redo, 복제, Preview, AXAML 왕복에 보존
@@ -70,7 +71,7 @@ dotnet run --project src/AvaloniaUIDesigner.App/AvaloniaUIDesigner.App.csproj
 4. 우측 하단 Properties 패널에서 속성 편집
 5. ComboBox, AutoCompleteBox, ListBox, ItemsControl, TreeView, Menu, TabControl은 `Edit > Edit Items / Columns...`에서 항목 편집
 6. Path는 `Edit > Edit Path Data...`에서 Avalonia geometry mini-language 편집
-7. DataGrid는 `Edit > Edit Items / Columns...`에서 `Type | Header | Binding | Width | ReadOnly` 형식으로 열 편집
+7. DataGrid는 `Edit > Edit Items / Columns...`에서 `Type | Header | Binding | Width | ReadOnly` 형식으로 열을 편집하고, `Edit > Edit DataGrid Behavior...`에서 표 동작과 크기 정책을 편집
 8. 선택 컨트롤은 `Edit > Edit Bindings...`에서 `Property | Path | Mode | Fallback` 형식으로 바인딩 편집
 9. `Edit > Edit AXAML Source...`에서 전체 AXAML을 검증·미리보기하고 캔버스에 적용
 10. `Edit > Edit Root Properties...`에서 Window/UserControl 루트와 Window 동작·루트 크기 제약 편집
@@ -97,6 +98,8 @@ dotnet run --project src/AvaloniaUIDesigner.App/AvaloniaUIDesigner.App.csproj
 31. `Edit > Edit Button Actions & Commands...`에서 Button의 포인터·키보드 활성화, Window 기본/취소 역할, command data와 Click 이벤트 편집
 
 DataGrid가 포함된 생성 AXAML을 다른 프로젝트에서 사용할 때는 같은 Avalonia 버전의 `Avalonia.Controls.DataGrid` 패키지와 `avares://Avalonia.Controls.DataGrid/Themes/Fluent.xaml` 스타일 include가 필요합니다.
+
+DataGrid Behavior 편집기는 열 정의와 분리된 표 동작을 관리합니다. `HeadersVisibility`, `GridLinesVisibility`, `SelectionMode`, `ClipboardCopyMode`, 열 조작 허용 여부, `FrozenColumnCount`, 행·열 크기, `ColumnWidth`와 축별 scrollbar를 원자적으로 검증하며, `RowHeight=Auto` 같은 Avalonia의 `NaN` 기본값과 `MaxColumnWidth=Infinity`도 AXAML에서 안전하게 보존합니다.
 
 바인딩 편집기는 선택 타입에서 지원하는 속성을 대화상자에 표시합니다. 생성 AXAML은 ViewModel 타입을 알 수 없는 디자이너 문서가 compiled-bindings 설정과 독립적으로 컴파일되도록 `ReflectionBinding`을 사용합니다.
 

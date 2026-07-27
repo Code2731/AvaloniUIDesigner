@@ -42,6 +42,30 @@ public sealed record ItemsEditorState(
     IReadOnlyList<string> Items,
     ItemsEditorMode Mode);
 
+public sealed record DataGridBehaviorEditorState(
+    string ControlName,
+    bool AutoGenerateColumns,
+    bool IsReadOnly,
+    bool CanUserReorderColumns,
+    bool CanUserResizeColumns,
+    bool CanUserSortColumns,
+    string HeadersVisibility,
+    string GridLinesVisibility,
+    string SelectionMode,
+    string ClipboardCopyMode,
+    bool AreRowDetailsFrozen,
+    bool AreRowGroupHeadersFrozen,
+    bool IsScrollInertiaEnabled,
+    string FrozenColumnCount,
+    string RowHeight,
+    string RowHeaderWidth,
+    string ColumnHeaderHeight,
+    string MinColumnWidth,
+    string MaxColumnWidth,
+    string ColumnWidth,
+    string HorizontalScrollBarVisibility,
+    string VerticalScrollBarVisibility);
+
 public sealed record BindingEditorState(
     string ControlName,
     string TargetType,
@@ -3486,6 +3510,112 @@ public partial class MainWindowViewModel : ViewModelBase
 
     private static ItemsEditorState EmptyItemsEditorState()
         => new(string.Empty, Array.Empty<string>(), ItemsEditorMode.Flat);
+
+    public bool TryGetSelectedDataGridBehaviorProperties(
+        out DataGridBehaviorEditorState state)
+    {
+        var target = Canvas.SelectedElement;
+        if (target is null
+            || target.IsLocked
+            || !DesignerDataGridBehaviorRuntime.IsSupportedControl(target.Visual))
+        {
+            state = default!;
+            StatusText = target switch
+            {
+                null => "Select a DataGrid before editing table behavior.",
+                { IsLocked: true } => "Unlock the selected DataGrid before editing table behavior.",
+                _ => "DataGrid behavior editing is available for DataGrid controls.",
+            };
+            return false;
+        }
+
+        if (!DesignerDataGridBehaviorRuntime.TryRead(
+                target.Visual,
+                out var values,
+                out var error))
+        {
+            state = default!;
+            StatusText = $"DataGrid behavior cannot be edited. {error}";
+            return false;
+        }
+
+        state = CreateDataGridBehaviorEditorState(target.DisplayName, values);
+        return true;
+    }
+
+    public bool SetSelectedDataGridBehaviorProperties(
+        DesignerDataGridBehaviorEditorInput input)
+    {
+        var target = Canvas.SelectedElement;
+        if (target is null
+            || target.IsLocked
+            || target.Visual is not DataGrid dataGrid)
+        {
+            StatusText = "Select an unlocked DataGrid before editing table behavior.";
+            return false;
+        }
+
+        if (!DesignerDataGridBehaviorRuntime.TryRead(dataGrid, out var current, out var error))
+        {
+            StatusText = $"DataGrid behavior was not changed. {error}";
+            return false;
+        }
+
+        if (!DesignerDataGridBehaviorRuntime.TryParseValues(
+                dataGrid,
+                input,
+                out var values,
+                out error))
+        {
+            StatusText = $"DataGrid behavior was not changed. {error}";
+            return false;
+        }
+
+        if (current == values)
+        {
+            StatusText = "DataGrid behavior is unchanged.";
+            return true;
+        }
+
+        BeginCanvasMutation(HistoryActionType.EditProperty, "Updated DataGrid behavior.");
+        DesignerDataGridBehaviorRuntime.Apply(dataGrid, values);
+        foreach (var attribute in DesignerDataGridBehaviorRuntime.GetAxamlAttributes(dataGrid))
+        {
+            DesignerStyleApplicationMetadata.ClearApplied(dataGrid, attribute.Name);
+        }
+
+        Canvas.RefreshDocumentStyles(dataGrid);
+        CommitCanvasMutation();
+        StatusText = $"Updated table behavior for {target.DisplayName}.";
+        return true;
+    }
+
+    private static DataGridBehaviorEditorState CreateDataGridBehaviorEditorState(
+        string controlName,
+        DesignerDataGridBehaviorValues values)
+        => new(
+            controlName,
+            values.AutoGenerateColumns,
+            values.IsReadOnly,
+            values.CanUserReorderColumns,
+            values.CanUserResizeColumns,
+            values.CanUserSortColumns,
+            values.HeadersVisibility.ToString(),
+            values.GridLinesVisibility.ToString(),
+            values.SelectionMode.ToString(),
+            values.ClipboardCopyMode.ToString(),
+            values.AreRowDetailsFrozen,
+            values.AreRowGroupHeadersFrozen,
+            values.IsScrollInertiaEnabled,
+            values.FrozenColumnCount.ToString(CultureInfo.InvariantCulture),
+            DesignerDataGridBehaviorRuntime.FormatEditorDouble(values.RowHeight),
+            DesignerDataGridBehaviorRuntime.FormatEditorDouble(values.RowHeaderWidth),
+            DesignerDataGridBehaviorRuntime.FormatEditorDouble(values.ColumnHeaderHeight),
+            DesignerDataGridBehaviorRuntime.FormatEditorDouble(values.MinColumnWidth),
+            DesignerDataGridBehaviorRuntime.FormatEditorDouble(values.MaxColumnWidth),
+            DesignerDataGridBehaviorRuntime.FormatColumnWidth(values.ColumnWidth),
+            values.HorizontalScrollBarVisibility.ToString(),
+            values.VerticalScrollBarVisibility.ToString());
 
     public bool TrySetSelectedImageSource(string source)
     {
@@ -6958,6 +7088,7 @@ public partial class MainWindowViewModel : ViewModelBase
         DesignerContainerBehaviorRuntime.Capture(visual, result);
         DesignerImageRuntime.Capture(visual, result);
         DesignerButtonRuntime.Capture(visual, result);
+        DesignerDataGridBehaviorRuntime.Capture(visual, result);
         foreach (var pair in DesignerResourceReferenceMetadata.GetReferences(visual))
         {
             result[pair.Key] = DesignerResourceReferenceMetadata.FormatExpression(pair.Value);
@@ -8774,6 +8905,26 @@ public partial class MainWindowViewModel : ViewModelBase
                 continue;
             }
 
+            if (DesignerDataGridBehaviorRuntime.IsSupportedProperty(tagName, name))
+            {
+                if (DesignerDataGridBehaviorRuntime.TryNormalizeProperty(
+                        tagName,
+                        name,
+                        attr.Value,
+                        out var canonicalName,
+                        out var normalizedValue,
+                        out var dataGridBehaviorError))
+                {
+                    map[canonicalName] = normalizedValue;
+                }
+                else
+                {
+                    warnings.Add($"Ignored {tagName}.{name}: {dataGridBehaviorError}");
+                }
+
+                continue;
+            }
+
             if (DesignerSelectionRuntime.IsSupportedProperty(tagName, name))
             {
                 if (DesignerSelectionRuntime.TryNormalizeProperty(
@@ -9063,6 +9214,15 @@ public partial class MainWindowViewModel : ViewModelBase
             DesignerTabControlRuntime.RemoveProperties(tagName, map);
         }
 
+        if (!DesignerDataGridBehaviorRuntime.TryValidateProperties(
+                tagName,
+                map,
+                out var dataGridBehaviorConstraintError))
+        {
+            warnings.Add($"Ignored {tagName} behavior properties: {dataGridBehaviorConstraintError}");
+            DesignerDataGridBehaviorRuntime.RemoveProperties(tagName, map);
+        }
+
         var hasItemsSourceBinding = bindings.Any(binding =>
             string.Equals(binding.PropertyName, "ItemsSource", StringComparison.Ordinal));
         int? staticItemCount = hasItemsSourceBinding
@@ -9239,6 +9399,11 @@ public partial class MainWindowViewModel : ViewModelBase
         }
 
         if (DesignerTabControlRuntime.IsSupportedProperty(tagName, propertyName))
+        {
+            return true;
+        }
+
+        if (DesignerDataGridBehaviorRuntime.IsSupportedProperty(tagName, propertyName))
         {
             return true;
         }
@@ -10719,9 +10884,7 @@ public partial class MainWindowViewModel : ViewModelBase
                 sb.Append(indent);
                 sb.Append("<DataGrid");
                 AppendCanvasLayoutAttributes(sb, element);
-                AppendAttribute(sb, "AutoGenerateColumns", bool.FalseString);
-                AppendAttribute(sb, "GridLinesVisibility", dataGrid.GridLinesVisibility.ToString());
-                AppendAttribute(sb, "IsReadOnly", dataGrid.IsReadOnly.ToString());
+                AppendDataGridBehaviorAttributes(sb, dataGrid);
                 sb.AppendLine(">");
                 WriteDataGridColumnsAxaml(
                     sb,
@@ -11999,6 +12162,20 @@ public partial class MainWindowViewModel : ViewModelBase
                 sb,
                 "SelectedIndex",
                 tabControl.SelectedIndex.ToString(CultureInfo.InvariantCulture));
+        }
+    }
+
+    private static void AppendDataGridBehaviorAttributes(StringBuilder sb, DataGrid dataGrid)
+    {
+        var boundProperties = DesignerBindingRuntime.ReadBindings(dataGrid)
+            .Select(binding => binding.PropertyName)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        foreach (var attribute in DesignerDataGridBehaviorRuntime.GetAxamlAttributes(dataGrid))
+        {
+            if (!boundProperties.Contains(attribute.Name))
+            {
+                AppendAttribute(sb, attribute.Name, attribute.Value);
+            }
         }
     }
 

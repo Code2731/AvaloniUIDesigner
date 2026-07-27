@@ -1012,20 +1012,7 @@ public sealed class PreviewWindow : Window
             DesignerDataGridRuntime.ReplaceColumns(dataGrid, definitions);
         }
 
-        if (properties.TryGetValue("GridLinesVisibility", out var gridLinesVisibility)
-            && Enum.TryParse<DataGridGridLinesVisibility>(
-                gridLinesVisibility,
-                ignoreCase: true,
-                out var parsedGridLinesVisibility))
-        {
-            dataGrid.GridLinesVisibility = parsedGridLinesVisibility;
-        }
-
-        if (properties.TryGetValue("IsReadOnly", out var isReadOnly)
-            && bool.TryParse(isReadOnly, out var parsedIsReadOnly))
-        {
-            dataGrid.IsReadOnly = parsedIsReadOnly;
-        }
+        DesignerDataGridBehaviorRuntime.Apply(dataGrid, properties);
     }
 
     private static void ApplyBorderProperties(

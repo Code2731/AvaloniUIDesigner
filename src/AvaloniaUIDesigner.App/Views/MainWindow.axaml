@@ -63,6 +63,7 @@
                 <MenuItem Header="Edit Sample Data..." Click="OnEditSampleDataMenuClicked"/>
                 <Separator/>
                 <MenuItem Header="Edit Items / Columns..." Click="OnEditItemsMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
+                <MenuItem Header="Edit DataGrid Behavior..." Click="OnEditDataGridBehaviorPropertiesMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
                 <MenuItem Header="Edit Bindings..." Click="OnEditBindingsMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
                 <MenuItem Header="Edit Layout Properties..." Click="OnEditLayoutPropertiesMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
                 <MenuItem Header="Edit Typography Properties..." Click="OnEditTypographyPropertiesMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
@@ -383,6 +384,7 @@
                                                     <MenuItem Header="Duplicate" Click="OnDuplicateMenuClicked"/>
                                                     <MenuItem Header="Rename..." Click="OnRenameSelectedControlMenuClicked"/>
                                                     <MenuItem Header="Edit Appearance..." Click="OnEditAppearanceMenuClicked"/>
+                                                    <MenuItem Header="Edit DataGrid Behavior..." Click="OnEditDataGridBehaviorPropertiesMenuClicked"/>
                                                     <MenuItem Header="Edit Bindings..." Click="OnEditBindingsMenuClicked"/>
                                                     <MenuItem Header="Edit Layout Properties..." Click="OnEditLayoutPropertiesMenuClicked"/>
                                                     <MenuItem Header="Edit Typography Properties..." Click="OnEditTypographyPropertiesMenuClicked"/>
