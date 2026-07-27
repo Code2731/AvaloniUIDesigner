@@ -80,6 +80,14 @@ public static class DesignerBindingRuntime
             "TabControl" => ["SelectedIndex"],
             "SplitView" => ["IsPaneOpen"],
             "Expander" => ["IsExpanded"],
+            "GridSplitter" =>
+            [
+                "ResizeDirection",
+                "ResizeBehavior",
+                "ShowsPreview",
+                "KeyboardIncrement",
+                "DragIncrement",
+            ],
             _ => [],
         });
         return properties.Distinct(StringComparer.Ordinal).OrderBy(name => name, StringComparer.Ordinal).ToList();

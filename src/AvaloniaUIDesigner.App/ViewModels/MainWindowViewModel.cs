@@ -361,6 +361,14 @@ public sealed record GridDefinitionEditorState(
     string ColumnDefinitions,
     bool ShowGridLines);
 
+public sealed record GridSplitterEditorState(
+    string ControlName,
+    string ResizeDirection,
+    string ResizeBehavior,
+    bool ShowsPreview,
+    string KeyboardIncrement,
+    string DragIncrement);
+
 public sealed record GridCellParentOption(string DisplayName, int RowCount, int ColumnCount)
 {
     public override string ToString() => DisplayName;
@@ -1548,6 +1556,82 @@ public partial class MainWindowViewModel : ViewModelBase
         Canvas.ReflowGridChildren(target);
         CommitCanvasMutation();
         StatusText = $"Updated Grid definitions for {target.DisplayName}.";
+        return true;
+    }
+
+    public bool TryGetSelectedGridSplitterProperties(out GridSplitterEditorState state)
+    {
+        var target = Canvas.SelectedElement;
+        if (target is null
+            || target.IsLocked
+            || !DesignerGridSplitterRuntime.IsSupportedControl(target.Visual))
+        {
+            state = default!;
+            StatusText = target switch
+            {
+                null => "Select a GridSplitter before editing its behavior.",
+                { IsLocked: true } => "Unlock the selected GridSplitter before editing its behavior.",
+                _ => "GridSplitter behavior editing is available for GridSplitter controls.",
+            };
+            return false;
+        }
+
+        if (!DesignerGridSplitterRuntime.TryRead(
+                target.Visual,
+                out var values,
+                out var error))
+        {
+            state = default!;
+            StatusText = $"GridSplitter cannot be edited. {error}";
+            return false;
+        }
+
+        state = new GridSplitterEditorState(
+            target.DisplayName,
+            values.ResizeDirection.ToString(),
+            values.ResizeBehavior.ToString(),
+            values.ShowsPreview,
+            values.KeyboardIncrement.ToString("0.###", CultureInfo.InvariantCulture),
+            values.DragIncrement.ToString("0.###", CultureInfo.InvariantCulture));
+        return true;
+    }
+
+    public bool SetSelectedGridSplitterProperties(
+        DesignerGridSplitterEditorInput input)
+    {
+        var target = Canvas.SelectedElement;
+        if (target is null
+            || target.IsLocked
+            || !DesignerGridSplitterRuntime.IsSupportedControl(target.Visual))
+        {
+            StatusText = "Select an unlocked GridSplitter before editing its behavior.";
+            return false;
+        }
+
+        if (!DesignerGridSplitterRuntime.TryRead(
+                target.Visual,
+                out var current,
+                out var error)
+            || !DesignerGridSplitterRuntime.TryParseValues(
+                target.Visual,
+                input,
+                out var values,
+                out error))
+        {
+            StatusText = $"GridSplitter was not changed. {error}";
+            return false;
+        }
+
+        if (current == values)
+        {
+            StatusText = "GridSplitter behavior is unchanged.";
+            return true;
+        }
+
+        BeginCanvasMutation(HistoryActionType.EditProperty, "Updated GridSplitter behavior.");
+        DesignerGridSplitterRuntime.Apply(target.Visual, values);
+        CommitCanvasMutation();
+        StatusText = $"Updated GridSplitter behavior for {target.DisplayName}.";
         return true;
     }
 
@@ -7553,6 +7637,13 @@ public partial class MainWindowViewModel : ViewModelBase
             };
         }
 
+        if (visual is GridSplitter gridSplitter)
+        {
+            var properties = new Dictionary<string, string>(StringComparer.Ordinal);
+            DesignerGridSplitterRuntime.Capture(gridSplitter, properties);
+            return properties;
+        }
+
         if (visual is ItemsControl itemsControl && visual.GetType() == typeof(ItemsControl))
         {
             return new Dictionary<string, string>
@@ -8990,6 +9081,26 @@ public partial class MainWindowViewModel : ViewModelBase
                 continue;
             }
 
+            if (DesignerGridSplitterRuntime.IsSupportedProperty(tagName, name))
+            {
+                if (DesignerGridSplitterRuntime.TryNormalizeProperty(
+                        tagName,
+                        name,
+                        attr.Value,
+                        out var canonicalName,
+                        out var normalizedValue,
+                        out var gridSplitterError))
+                {
+                    map[canonicalName] = normalizedValue;
+                }
+                else
+                {
+                    warnings.Add($"Ignored {tagName}.{name}: {gridSplitterError}");
+                }
+
+                continue;
+            }
+
             if (DesignerDataGridBehaviorRuntime.IsSupportedProperty(tagName, name))
             {
                 if (DesignerDataGridBehaviorRuntime.TryNormalizeProperty(
@@ -9299,6 +9410,15 @@ public partial class MainWindowViewModel : ViewModelBase
             DesignerTabControlRuntime.RemoveProperties(tagName, map);
         }
 
+        if (!DesignerGridSplitterRuntime.TryValidateProperties(
+                tagName,
+                map,
+                out var gridSplitterConstraintError))
+        {
+            warnings.Add($"Ignored {tagName} GridSplitter behavior: {gridSplitterConstraintError}");
+            DesignerGridSplitterRuntime.RemoveProperties(map);
+        }
+
         if (!DesignerDataGridBehaviorRuntime.TryValidateProperties(
                 tagName,
                 map,
@@ -9488,6 +9608,11 @@ public partial class MainWindowViewModel : ViewModelBase
             return true;
         }
 
+        if (DesignerGridSplitterRuntime.IsSupportedProperty(tagName, propertyName))
+        {
+            return true;
+        }
+
         if (DesignerDataGridBehaviorRuntime.IsSupportedProperty(tagName, propertyName))
         {
             return true;
@@ -9548,6 +9673,8 @@ public partial class MainWindowViewModel : ViewModelBase
                 or "FormatString" or "ClipValueToMinMax" or "AllowSpin"
                 or "ShowButtonSpinner" or "ButtonSpinnerLocation",
             "TabControl" => propertyName == "SelectedIndex",
+            "GridSplitter" => propertyName is "ResizeDirection" or "ResizeBehavior"
+                or "ShowsPreview" or "KeyboardIncrement" or "DragIncrement",
             "SplitView" => propertyName is "DisplayMode" or "IsPaneOpen" or "OpenPaneLength"
                 or "CompactPaneLength" or "PanePlacement" or "PaneBackground"
                 or "UseLightDismissOverlayMode",
@@ -9570,7 +9697,7 @@ public partial class MainWindowViewModel : ViewModelBase
             or "ToggleSwitch" or "ToggleButton" or "ComboBox" or "ListBox" or "ItemsControl" or "TreeView" or "Menu" or "Slider"
             or "ProgressBar" or "DatePicker" or "CalendarDatePicker"
             or "Calendar" or "ColorPicker" or "TimePicker"
-            or "NumericUpDown" or "TabControl" or "Expander" or "ScrollViewer" or "DataGrid";
+            or "NumericUpDown" or "TabControl" or "GridSplitter" or "Expander" or "ScrollViewer" or "DataGrid";
 
     private static bool IsSupportedShapeProperty(string propertyName)
         => propertyName is "Fill" or "Stroke" or "StrokeThickness" or "Stretch"
@@ -11236,6 +11363,14 @@ public partial class MainWindowViewModel : ViewModelBase
                 sb.AppendLine("</Border>");
                 break;
 
+            case GridSplitter gridSplitter:
+                sb.Append(indent);
+                sb.Append("<GridSplitter");
+                AppendCanvasLayoutAttributes(sb, element);
+                AppendGridSplitterAttributes(sb, gridSplitter);
+                sb.AppendLine(" />");
+                break;
+
             case Grid grid:
                 sb.Append(indent);
                 sb.Append("<Grid");
@@ -12367,6 +12502,22 @@ public partial class MainWindowViewModel : ViewModelBase
             .Select(binding => binding.PropertyName)
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
         foreach (var attribute in DesignerContainerBehaviorRuntime.GetAxamlAttributes(visual))
+        {
+            if (!boundProperties.Contains(attribute.Name))
+            {
+                AppendAttribute(sb, attribute.Name, attribute.Value);
+            }
+        }
+    }
+
+    private static void AppendGridSplitterAttributes(
+        StringBuilder sb,
+        GridSplitter gridSplitter)
+    {
+        var boundProperties = DesignerBindingRuntime.ReadBindings(gridSplitter)
+            .Select(binding => binding.PropertyName)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        foreach (var attribute in DesignerGridSplitterRuntime.GetAxamlAttributes(gridSplitter))
         {
             if (!boundProperties.Contains(attribute.Name))
             {

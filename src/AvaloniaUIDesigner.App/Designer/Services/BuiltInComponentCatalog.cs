@@ -353,6 +353,20 @@ public sealed class BuiltInComponentCatalog : IComponentCatalog
                 ShowGridLines = true,
             }),
         new(
+            DisplayName: "GridSplitter",
+            AvaloniaTypeName: "Avalonia.Controls.GridSplitter",
+            DefaultWidth: 12,
+            DefaultHeight: 160,
+            VisualFactory: static () => new GridSplitter
+            {
+                Background = Brush.Parse("#94A3B8"),
+                HorizontalAlignment = HorizontalAlignment.Center,
+                ResizeDirection = GridResizeDirection.Columns,
+                ResizeBehavior = GridResizeBehavior.PreviousAndNext,
+                KeyboardIncrement = 10,
+                DragIncrement = 1,
+            }),
+        new(
             DisplayName: "StackPanel",
             AvaloniaTypeName: "Avalonia.Controls.StackPanel",
             DefaultWidth: 220,

@@ -88,6 +88,7 @@
                 <MenuItem Header="Edit Image Source &amp; Rendering..." Click="OnEditImagePropertiesMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
                 <MenuItem Header="Edit Button Actions &amp; Commands..." Click="OnEditButtonPropertiesMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
                 <MenuItem Header="Edit Grid Definitions..." Click="OnEditGridDefinitionsMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
+                <MenuItem Header="Edit GridSplitter Behavior..." Click="OnEditGridSplitterPropertiesMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
                 <MenuItem Header="Assign to Grid Cell..." Click="OnAssignToGridCellMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
                 <MenuItem Header="Assign to StackPanel..." Click="OnAssignToStackPanelMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
                 <MenuItem Header="Assign to DockPanel..." Click="OnAssignToDockPanelMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
@@ -407,6 +408,7 @@
                                                     <MenuItem Header="Edit Button Actions &amp; Commands..." Click="OnEditButtonPropertiesMenuClicked"/>
                                                     <MenuItem Header="Edit Path Data..." Click="OnEditPathDataMenuClicked"/>
                                                     <MenuItem Header="Edit Grid Definitions..." Click="OnEditGridDefinitionsMenuClicked"/>
+                                                    <MenuItem Header="Edit GridSplitter Behavior..." Click="OnEditGridSplitterPropertiesMenuClicked"/>
                                                     <MenuItem Header="Assign to Grid Cell..." Click="OnAssignToGridCellMenuClicked"/>
                                                     <MenuItem Header="Assign to StackPanel..." Click="OnAssignToStackPanelMenuClicked"/>
                                                     <MenuItem Header="Assign to DockPanel..." Click="OnAssignToDockPanelMenuClicked"/>

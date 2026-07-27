@@ -2169,6 +2169,12 @@ public partial class CanvasViewModel : ViewModelBase
         DesignerTextInputRuntime.Apply(visual, properties);
         ApplyTemplatedAppearanceProperties(visual, properties);
 
+        if (visual is GridSplitter gridSplitter)
+        {
+            DesignerGridSplitterRuntime.Apply(gridSplitter, properties);
+            return;
+        }
+
         if (visual is AutoCompleteBox autoCompleteBox)
         {
             if (properties.TryGetValue("__items", out var itemsJson))

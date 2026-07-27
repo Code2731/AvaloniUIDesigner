@@ -385,6 +385,15 @@ public sealed class PreviewWindow : Window
                     Margin = new Thickness(8),
                 },
             },
+            "Avalonia.Controls.GridSplitter" => new GridSplitter
+            {
+                Background = Brush.Parse("#94A3B8"),
+                HorizontalAlignment = HorizontalAlignment.Center,
+                ResizeDirection = GridResizeDirection.Columns,
+                ResizeBehavior = GridResizeBehavior.PreviousAndNext,
+                KeyboardIncrement = 10,
+                DragIncrement = 1,
+            },
             "Avalonia.Controls.Grid" => new Grid
             {
                 RowDefinitions = new RowDefinitions("*,*"),
@@ -608,6 +617,9 @@ public sealed class PreviewWindow : Window
                 break;
             case ContentControl contentControl when contentControl.GetType() == typeof(ContentControl):
                 ApplyContentControlProperties(contentControl, properties);
+                break;
+            case GridSplitter gridSplitter:
+                DesignerGridSplitterRuntime.Apply(gridSplitter, properties);
                 break;
             case Grid grid:
                 DesignerGridDefinitionRuntime.TryApply(grid, properties, out _);

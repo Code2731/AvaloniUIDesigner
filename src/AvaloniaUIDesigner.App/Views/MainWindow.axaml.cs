@@ -995,6 +995,19 @@ public partial class MainWindow : Window
         }
     }
 
+    private async void OnEditGridSplitterPropertiesMenuClicked(
+        object? sender,
+        Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        FlushPendingPropertyHistory();
+        if (Vm is null || !Vm.TryGetSelectedGridSplitterProperties(out var state))
+        {
+            return;
+        }
+
+        await ShowGridSplitterPropertiesDialogAsync(state);
+    }
+
     private async void OnAssignToGridCellMenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
         FlushPendingPropertyHistory();
@@ -7582,6 +7595,137 @@ public partial class MainWindow : Window
         dialog.Content = content;
 
         return await dialog.ShowDialog<GridDefinitionOptions?>(this);
+    }
+
+    private async Task ShowGridSplitterPropertiesDialogAsync(
+        GridSplitterEditorState state)
+    {
+        if (Vm is null)
+        {
+            return;
+        }
+
+        var resizeDirectionEditor = new ComboBox
+        {
+            ItemsSource = DesignerGridSplitterRuntime.ResizeDirectionNames,
+            SelectedItem = state.ResizeDirection,
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+        };
+        var resizeBehaviorEditor = new ComboBox
+        {
+            ItemsSource = DesignerGridSplitterRuntime.ResizeBehaviorNames,
+            SelectedItem = state.ResizeBehavior,
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+        };
+        var keyboardIncrementEditor = new TextBox
+        {
+            Text = state.KeyboardIncrement,
+            Watermark = "Finite non-negative number",
+        };
+        var dragIncrementEditor = new TextBox
+        {
+            Text = state.DragIncrement,
+            Watermark = "Finite non-negative number",
+        };
+        var showsPreviewEditor = new CheckBox
+        {
+            Content = "Show the resize preview adorner",
+            IsChecked = state.ShowsPreview,
+        };
+        var fields = new Grid
+        {
+            ColumnDefinitions = new ColumnDefinitions("*,*"),
+            RowDefinitions = new RowDefinitions("Auto,Auto,Auto"),
+            ColumnSpacing = 12,
+            RowSpacing = 10,
+            Children =
+            {
+                CreateField("Resize direction", resizeDirectionEditor, 0, 0),
+                CreateField("Resize behavior", resizeBehaviorEditor, 0, 1),
+                CreateField("Keyboard increment", keyboardIncrementEditor, 1, 0),
+                CreateField("Drag increment", dragIncrementEditor, 1, 1),
+            },
+        };
+        var errorText = new TextBlock
+        {
+            Foreground = Avalonia.Media.Brushes.IndianRed,
+            TextWrapping = Avalonia.Media.TextWrapping.Wrap,
+        };
+        var dialog = new Window
+        {
+            Title = $"Edit GridSplitter Behavior - {state.ControlName}",
+            Width = 680,
+            Height = 470,
+            MinWidth = 560,
+            MinHeight = 400,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner,
+        };
+        var applyButton = new Button { Content = "Apply", MinWidth = 84 };
+        applyButton.Click += (_, _) =>
+        {
+            var input = new DesignerGridSplitterEditorInput(
+                resizeDirectionEditor.SelectedItem?.ToString() ?? string.Empty,
+                resizeBehaviorEditor.SelectedItem?.ToString() ?? string.Empty,
+                showsPreviewEditor.IsChecked == true,
+                keyboardIncrementEditor.Text ?? string.Empty,
+                dragIncrementEditor.Text ?? string.Empty);
+            if (!Vm.SetSelectedGridSplitterProperties(input))
+            {
+                errorText.Text = Vm.StatusText;
+                return;
+            }
+
+            dialog.Close();
+        };
+        var cancelButton = new Button { Content = "Cancel", MinWidth = 84 };
+        cancelButton.Click += (_, _) => dialog.Close();
+        var buttons = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            Spacing = 8,
+            HorizontalAlignment = HorizontalAlignment.Right,
+            Children = { cancelButton, applyButton },
+        };
+        var content = new Grid
+        {
+            Margin = new Thickness(16),
+            RowDefinitions = new RowDefinitions("Auto,Auto,Auto,*,Auto"),
+            RowSpacing = 12,
+            Children =
+            {
+                new TextBlock
+                {
+                    Text = "Configure which Grid rows or columns are resized and how keyboard, drag, and preview increments behave. Assign the splitter to a Grid cell separately.",
+                    TextWrapping = Avalonia.Media.TextWrapping.Wrap,
+                },
+                fields,
+                showsPreviewEditor,
+                errorText,
+                buttons,
+            },
+        };
+        Grid.SetRow(fields, 1);
+        Grid.SetRow(showsPreviewEditor, 2);
+        Grid.SetRow(errorText, 3);
+        Grid.SetRow(buttons, 4);
+        dialog.Content = content;
+        await dialog.ShowDialog(this);
+
+        static Control CreateField(string label, Control editor, int row, int column)
+        {
+            var field = new StackPanel
+            {
+                Spacing = 4,
+                Children =
+                {
+                    new TextBlock { Text = label },
+                    editor,
+                },
+            };
+            Grid.SetRow(field, row);
+            Grid.SetColumn(field, column);
+            return field;
+        }
     }
 
     private async Task<GridCellAssignmentOptions?> ShowGridCellAssignmentDialogAsync(
