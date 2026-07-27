@@ -2323,6 +2323,12 @@ public partial class CanvasViewModel : ViewModelBase
             return;
         }
 
+        if (visual is Avalonia.Controls.ColorPicker colorPicker)
+        {
+            DesignerColorPickerRuntime.Apply(colorPicker, properties);
+            return;
+        }
+
         if (visual is TimePicker timePicker)
         {
             DesignerDateTimeRuntime.Apply(timePicker, properties);

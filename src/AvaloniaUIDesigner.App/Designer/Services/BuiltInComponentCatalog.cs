@@ -48,6 +48,12 @@ public sealed class BuiltInComponentCatalog : IComponentCatalog
             DefaultHeight: 160,
             VisualFactory: static () => new Image { Stretch = Stretch.Uniform }),
         new(
+            DisplayName: "ColorPicker",
+            AvaloniaTypeName: "Avalonia.Controls.ColorPicker",
+            DefaultWidth: 220,
+            DefaultHeight: 44,
+            VisualFactory: static () => new ColorPicker { Color = Color.Parse("#FF3B82F6") }),
+        new(
             DisplayName: "Rectangle",
             AvaloniaTypeName: "Avalonia.Controls.Shapes.Rectangle",
             DefaultWidth: 180,

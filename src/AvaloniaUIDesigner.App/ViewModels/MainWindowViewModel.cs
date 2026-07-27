@@ -220,6 +220,27 @@ public sealed record DateTimeEditorState(
     string CalendarDisplayMode,
     bool AllowTapRangeSelection);
 
+public sealed record ColorPickerEditorState(
+    string ControlName,
+    string Color,
+    string ColorModel,
+    string ColorSpectrumComponents,
+    string ColorSpectrumShape,
+    string HexInputAlphaPosition,
+    bool IsAccentColorsVisible,
+    bool IsAlphaEnabled,
+    bool IsAlphaVisible,
+    bool IsColorComponentsVisible,
+    bool IsColorModelVisible,
+    bool IsColorPaletteVisible,
+    bool IsColorPreviewVisible,
+    bool IsColorSpectrumVisible,
+    bool IsColorSpectrumSliderVisible,
+    bool IsComponentSliderVisible,
+    bool IsComponentTextInputVisible,
+    bool IsHexInputVisible,
+    string PaletteColumnCount);
+
 public sealed record ToggleEditorState(
     string ControlName,
     string ControlKind,
@@ -4226,6 +4247,116 @@ public partial class MainWindowViewModel : ViewModelBase
         return true;
     }
 
+    public bool TryGetSelectedColorPickerProperties(out ColorPickerEditorState state)
+    {
+        var target = Canvas.SelectedElement;
+        if (target is null || target.IsLocked || !DesignerColorPickerRuntime.IsSupportedControl(target.Visual))
+        {
+            state = default!;
+            StatusText = target switch
+            {
+                null => "Select a ColorPicker before editing color picker behavior.",
+                { IsLocked: true } => "Unlock the selected control before editing color picker behavior.",
+                _ => "Color picker editing is available for ColorPicker controls.",
+            };
+            return false;
+        }
+
+        if (!DesignerColorPickerRuntime.TryRead(target.Visual, out var values, out var error))
+        {
+            state = default!;
+            StatusText = $"Color picker cannot be edited. {error}";
+            return false;
+        }
+
+        state = CreateColorPickerEditorState(target.DisplayName, values);
+        return true;
+    }
+
+    public bool SetSelectedColorPickerProperties(DesignerColorPickerEditorInput input)
+    {
+        var target = Canvas.SelectedElement;
+        if (target is null || target.IsLocked || !DesignerColorPickerRuntime.IsSupportedControl(target.Visual))
+        {
+            StatusText = "Select an unlocked ColorPicker before editing color picker behavior.";
+            return false;
+        }
+
+        if (!DesignerColorPickerRuntime.TryRead(target.Visual, out var current, out var error))
+        {
+            StatusText = $"Color picker was not changed. {error}";
+            return false;
+        }
+
+        if (!DesignerColorPickerRuntime.TryParseValues(input, current, out var values, out error))
+        {
+            StatusText = $"Color picker was not changed. {error}";
+            return false;
+        }
+
+        if (current == values)
+        {
+            StatusText = "Color picker is unchanged.";
+            return true;
+        }
+
+        BeginCanvasMutation(HistoryActionType.EditProperty, "Updated color picker behavior.");
+        DesignerColorPickerRuntime.Apply((Avalonia.Controls.ColorPicker)target.Visual, values);
+        foreach (var propertyName in new[]
+                 {
+                     "Color",
+                     "ColorModel",
+                     "ColorSpectrumComponents",
+                     "ColorSpectrumShape",
+                     "HexInputAlphaPosition",
+                     "IsAccentColorsVisible",
+                     "IsAlphaEnabled",
+                     "IsAlphaVisible",
+                     "IsColorComponentsVisible",
+                     "IsColorModelVisible",
+                     "IsColorPaletteVisible",
+                     "IsColorPreviewVisible",
+                     "IsColorSpectrumVisible",
+                     "IsColorSpectrumSliderVisible",
+                     "IsComponentSliderVisible",
+                     "IsComponentTextInputVisible",
+                     "IsHexInputVisible",
+                     "PaletteColumnCount",
+                 })
+        {
+            DesignerStyleApplicationMetadata.ClearApplied(target.Visual, propertyName);
+        }
+
+        Canvas.RefreshDocumentStyles(target.Visual);
+        CommitCanvasMutation();
+        StatusText = $"Updated color picker behavior for {target.DisplayName}.";
+        return true;
+    }
+
+    private static ColorPickerEditorState CreateColorPickerEditorState(
+        string controlName,
+        DesignerColorPickerValues values)
+        => new(
+            controlName,
+            FormatColorValue(values.Color),
+            values.ColorModel.ToString(),
+            values.ColorSpectrumComponents.ToString(),
+            values.ColorSpectrumShape.ToString(),
+            values.HexInputAlphaPosition.ToString(),
+            values.IsAccentColorsVisible,
+            values.IsAlphaEnabled,
+            values.IsAlphaVisible,
+            values.IsColorComponentsVisible,
+            values.IsColorModelVisible,
+            values.IsColorPaletteVisible,
+            values.IsColorPreviewVisible,
+            values.IsColorSpectrumVisible,
+            values.IsColorSpectrumSliderVisible,
+            values.IsComponentSliderVisible,
+            values.IsComponentTextInputVisible,
+            values.IsHexInputVisible,
+            values.PaletteColumnCount.ToString(CultureInfo.InvariantCulture));
+
     private static DateTimeEditorState CreateDateTimeEditorState(
         string controlName,
         DesignerDateTimeValues values)
@@ -6323,6 +6454,7 @@ public partial class MainWindowViewModel : ViewModelBase
         DesignerTextInputRuntime.Capture(visual, result);
         DesignerSelectionRuntime.Capture(visual, result);
         DesignerDateTimeRuntime.Capture(visual, result);
+        DesignerColorPickerRuntime.Capture(visual, result);
         DesignerToggleRuntime.Capture(visual, result);
         DesignerContainerBehaviorRuntime.Capture(visual, result);
         DesignerImageRuntime.Capture(visual, result);
@@ -8072,6 +8204,26 @@ public partial class MainWindowViewModel : ViewModelBase
                 continue;
             }
 
+            if (DesignerColorPickerRuntime.IsSupportedProperty(tagName, name))
+            {
+                if (DesignerColorPickerRuntime.TryNormalizeProperty(
+                        tagName,
+                        name,
+                        attr.Value,
+                        out var canonicalName,
+                        out var normalizedValue,
+                        out var colorPickerError))
+                {
+                    map[canonicalName] = normalizedValue;
+                }
+                else
+                {
+                    warnings.Add($"Ignored {tagName}.{name}: {colorPickerError}");
+                }
+
+                continue;
+            }
+
             if (DesignerToggleRuntime.IsSupportedProperty(tagName, name))
             {
                 if (DesignerToggleRuntime.TryNormalizeProperty(
@@ -8269,6 +8421,15 @@ public partial class MainWindowViewModel : ViewModelBase
             DesignerDateTimeRuntime.RemoveConstraintProperties(tagName, map);
         }
 
+        if (!DesignerColorPickerRuntime.TryValidateProperties(
+                tagName,
+                map,
+                out var colorPickerConstraintError))
+        {
+            warnings.Add($"Ignored {tagName} color picker constraints: {colorPickerConstraintError}");
+            DesignerColorPickerRuntime.RemoveProperties(tagName, map);
+        }
+
         if (!DesignerToggleRuntime.TryValidateProperties(
                 tagName,
                 map,
@@ -8369,6 +8530,11 @@ public partial class MainWindowViewModel : ViewModelBase
             return true;
         }
 
+        if (DesignerColorPickerRuntime.IsSupportedProperty(tagName, propertyName))
+        {
+            return true;
+        }
+
         if (DesignerToggleRuntime.IsSupportedProperty(tagName, propertyName))
         {
             return true;
@@ -8429,6 +8595,7 @@ public partial class MainWindowViewModel : ViewModelBase
                 or "IsIndeterminate" or "ShowProgressText" or "ProgressTextFormat",
             "DatePicker" or "CalendarDatePicker" or "Calendar"
                 or "TimePicker" => false,
+            "ColorPicker" => false,
             "NumericUpDown" => propertyName is "Minimum" or "Maximum" or "Increment" or "Value"
                 or "FormatString" or "ClipValueToMinMax" or "AllowSpin"
                 or "ShowButtonSpinner" or "ButtonSpinnerLocation",
@@ -8454,7 +8621,7 @@ public partial class MainWindowViewModel : ViewModelBase
         => tagName is "Button" or "TextBox" or "Label" or "CheckBox" or "RadioButton"
             or "ToggleSwitch" or "ToggleButton" or "ComboBox" or "ListBox" or "TreeView" or "Menu" or "Slider"
             or "ProgressBar" or "DatePicker" or "CalendarDatePicker"
-            or "Calendar" or "TimePicker"
+            or "Calendar" or "ColorPicker" or "TimePicker"
             or "NumericUpDown" or "TabControl" or "Expander" or "ScrollViewer" or "DataGrid";
 
     private static bool IsSupportedShapeProperty(string propertyName)
@@ -9784,6 +9951,14 @@ public partial class MainWindowViewModel : ViewModelBase
                 sb.AppendLine(" />");
                 break;
 
+            case Avalonia.Controls.ColorPicker colorPicker:
+                sb.Append(indent);
+                sb.Append("<ColorPicker");
+                AppendCanvasLayoutAttributes(sb, element);
+                AppendColorPickerAttributes(sb, colorPicker);
+                sb.AppendLine(" />");
+                break;
+
             case TimePicker timePicker:
                 sb.Append(indent);
                 sb.Append("<TimePicker");
@@ -10977,6 +11152,20 @@ public partial class MainWindowViewModel : ViewModelBase
             .Select(binding => binding.PropertyName)
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
         foreach (var attribute in DesignerDateTimeRuntime.GetAxamlAttributes(visual))
+        {
+            if (!boundProperties.Contains(attribute.Name))
+            {
+                AppendAttribute(sb, attribute.Name, attribute.Value);
+            }
+        }
+    }
+
+    private static void AppendColorPickerAttributes(StringBuilder sb, Control visual)
+    {
+        var boundProperties = DesignerBindingRuntime.ReadBindings(visual)
+            .Select(binding => binding.PropertyName)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        foreach (var attribute in DesignerColorPickerRuntime.GetAxamlAttributes(visual))
         {
             if (!boundProperties.Contains(attribute.Name))
             {

@@ -44,7 +44,7 @@ public static class DesignerLayoutRuntime
         => targetType is "Button" or "TextBox" or "Label" or "CheckBox" or "RadioButton"
             or "ToggleSwitch" or "ToggleButton" or "ComboBox" or "ListBox" or "TreeView"
             or "Menu" or "DataGrid" or "Slider" or "ProgressBar" or "DatePicker"
-            or "CalendarDatePicker" or "Calendar" or "TimePicker"
+            or "CalendarDatePicker" or "Calendar" or "ColorPicker" or "TimePicker"
             or "NumericUpDown" or "TabControl"
             or "SplitView" or "Expander" or "ScrollViewer" or "Border";
 

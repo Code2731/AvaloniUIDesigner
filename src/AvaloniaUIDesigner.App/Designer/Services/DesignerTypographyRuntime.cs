@@ -43,6 +43,7 @@ public static class DesignerTypographyRuntime
         "DatePicker",
         "CalendarDatePicker",
         "Calendar",
+        "ColorPicker",
         "TimePicker",
         "NumericUpDown",
         "TabControl",

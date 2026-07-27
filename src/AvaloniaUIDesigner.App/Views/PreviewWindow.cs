@@ -304,6 +304,7 @@ public sealed class PreviewWindow : Window
             "Avalonia.Controls.DatePicker" => new DatePicker(),
             "Avalonia.Controls.CalendarDatePicker" => new CalendarDatePicker { Watermark = "Select date" },
             "Avalonia.Controls.Calendar" => new Avalonia.Controls.Calendar(),
+            "Avalonia.Controls.ColorPicker" => new ColorPicker { Color = Color.Parse("#FF3B82F6") },
             "Avalonia.Controls.TimePicker" => new TimePicker(),
             "Avalonia.Controls.NumericUpDown" => new NumericUpDown
             {
@@ -533,6 +534,9 @@ public sealed class PreviewWindow : Window
                 break;
             case Avalonia.Controls.Calendar calendar:
                 DesignerDateTimeRuntime.Apply(calendar, properties);
+                break;
+            case ColorPicker colorPicker:
+                DesignerColorPickerRuntime.Apply(colorPicker, properties);
                 break;
             case TimePicker timePicker:
                 ApplyTimePickerProperties(timePicker, properties);

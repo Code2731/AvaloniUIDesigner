@@ -755,6 +755,18 @@ public partial class MainWindow : Window
         await ShowDateTimePropertiesDialogAsync(state);
     }
 
+    private async void OnEditColorPickerPropertiesMenuClicked(
+        object? sender,
+        Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        if (Vm is null || !Vm.TryGetSelectedColorPickerProperties(out var state))
+        {
+            return;
+        }
+
+        await ShowColorPickerPropertiesDialogAsync(state);
+    }
+
     private async void OnEditTogglePropertiesMenuClicked(
         object? sender,
         Avalonia.Interactivity.RoutedEventArgs e)
@@ -4826,6 +4838,252 @@ public partial class MainWindow : Window
                 ColumnSpacing = 12,
                 RowSpacing = 10,
             };
+
+        static void AddField(Grid owner, string label, Control editor, int row, int column)
+        {
+            var field = new StackPanel
+            {
+                Spacing = 4,
+                Children =
+                {
+                    new TextBlock { Text = label },
+                    editor,
+                },
+            };
+            Grid.SetRow(field, row);
+            Grid.SetColumn(field, column);
+            owner.Children.Add(field);
+        }
+    }
+
+    private async Task ShowColorPickerPropertiesDialogAsync(ColorPickerEditorState state)
+    {
+        if (Vm is null)
+        {
+            return;
+        }
+
+        var colorEditor = new TextBox
+        {
+            Text = state.Color,
+            Watermark = "#AARRGGBB or named color",
+        };
+        var colorModelEditor = CreateCombo(
+            DesignerColorPickerRuntime.ColorModelNames,
+            state.ColorModel);
+        var spectrumComponentsEditor = CreateCombo(
+            DesignerColorPickerRuntime.ColorSpectrumComponentsNames,
+            state.ColorSpectrumComponents);
+        var spectrumShapeEditor = CreateCombo(
+            DesignerColorPickerRuntime.ColorSpectrumShapeNames,
+            state.ColorSpectrumShape);
+        var alphaPositionEditor = CreateCombo(
+            DesignerColorPickerRuntime.AlphaComponentPositionNames,
+            state.HexInputAlphaPosition);
+        var paletteColumnCountEditor = new TextBox
+        {
+            Text = state.PaletteColumnCount,
+            Watermark = "1-32",
+        };
+
+        var accentColorsEditor = new CheckBox
+        {
+            Content = "Show accent colors",
+            IsChecked = state.IsAccentColorsVisible,
+        };
+        var alphaEnabledEditor = new CheckBox
+        {
+            Content = "Enable alpha",
+            IsChecked = state.IsAlphaEnabled,
+        };
+        var alphaVisibleEditor = new CheckBox
+        {
+            Content = "Show alpha",
+            IsChecked = state.IsAlphaVisible,
+        };
+        var previewVisibleEditor = new CheckBox
+        {
+            Content = "Show color preview",
+            IsChecked = state.IsColorPreviewVisible,
+        };
+        var paletteVisibleEditor = new CheckBox
+        {
+            Content = "Show palette",
+            IsChecked = state.IsColorPaletteVisible,
+        };
+        var spectrumVisibleEditor = new CheckBox
+        {
+            Content = "Show spectrum",
+            IsChecked = state.IsColorSpectrumVisible,
+        };
+        var spectrumSliderVisibleEditor = new CheckBox
+        {
+            Content = "Show spectrum slider",
+            IsChecked = state.IsColorSpectrumSliderVisible,
+        };
+        var componentSliderVisibleEditor = new CheckBox
+        {
+            Content = "Show component slider",
+            IsChecked = state.IsComponentSliderVisible,
+        };
+        var componentsVisibleEditor = new CheckBox
+        {
+            Content = "Show color components",
+            IsChecked = state.IsColorComponentsVisible,
+        };
+        var modelVisibleEditor = new CheckBox
+        {
+            Content = "Show color model",
+            IsChecked = state.IsColorModelVisible,
+        };
+        var componentTextVisibleEditor = new CheckBox
+        {
+            Content = "Show component inputs",
+            IsChecked = state.IsComponentTextInputVisible,
+        };
+        var hexVisibleEditor = new CheckBox
+        {
+            Content = "Show hex input",
+            IsChecked = state.IsHexInputVisible,
+        };
+
+        var fields = new Grid
+        {
+            ColumnDefinitions = new ColumnDefinitions("*,*,*"),
+            RowDefinitions = new RowDefinitions("Auto,Auto"),
+            ColumnSpacing = 12,
+            RowSpacing = 10,
+        };
+        AddField(fields, "Color", colorEditor, 0, 0);
+        AddField(fields, "Color model", colorModelEditor, 0, 1);
+        AddField(fields, "Hex alpha position", alphaPositionEditor, 0, 2);
+        AddField(fields, "Spectrum components", spectrumComponentsEditor, 1, 0);
+        AddField(fields, "Spectrum shape", spectrumShapeEditor, 1, 1);
+        AddField(fields, "Palette columns", paletteColumnCountEditor, 1, 2);
+
+        var appearanceOptions = CreateOptionPanel(
+            accentColorsEditor,
+            alphaEnabledEditor,
+            alphaVisibleEditor,
+            previewVisibleEditor);
+        var spectrumOptions = CreateOptionPanel(
+            paletteVisibleEditor,
+            spectrumVisibleEditor,
+            spectrumSliderVisibleEditor,
+            componentSliderVisibleEditor);
+        var inputOptions = CreateOptionPanel(
+            componentsVisibleEditor,
+            modelVisibleEditor,
+            componentTextVisibleEditor,
+            hexVisibleEditor);
+
+        var errorText = new TextBlock
+        {
+            Foreground = Avalonia.Media.Brushes.IndianRed,
+            TextWrapping = Avalonia.Media.TextWrapping.Wrap,
+        };
+        var dialog = new Window
+        {
+            Title = $"Edit ColorPicker - {state.ControlName}",
+            Width = 860,
+            Height = 650,
+            MinWidth = 720,
+            MinHeight = 560,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner,
+        };
+        var applyButton = new Button { Content = "Apply", MinWidth = 84 };
+        applyButton.Click += (_, _) =>
+        {
+            var input = new DesignerColorPickerEditorInput(
+                colorEditor.Text ?? string.Empty,
+                colorModelEditor.SelectedItem?.ToString() ?? string.Empty,
+                spectrumComponentsEditor.SelectedItem?.ToString() ?? string.Empty,
+                spectrumShapeEditor.SelectedItem?.ToString() ?? string.Empty,
+                alphaPositionEditor.SelectedItem?.ToString() ?? string.Empty,
+                accentColorsEditor.IsChecked == true,
+                alphaEnabledEditor.IsChecked == true,
+                alphaVisibleEditor.IsChecked == true,
+                componentsVisibleEditor.IsChecked == true,
+                modelVisibleEditor.IsChecked == true,
+                paletteVisibleEditor.IsChecked == true,
+                previewVisibleEditor.IsChecked == true,
+                spectrumVisibleEditor.IsChecked == true,
+                spectrumSliderVisibleEditor.IsChecked == true,
+                componentSliderVisibleEditor.IsChecked == true,
+                componentTextVisibleEditor.IsChecked == true,
+                hexVisibleEditor.IsChecked == true,
+                paletteColumnCountEditor.Text ?? string.Empty);
+            if (!Vm.SetSelectedColorPickerProperties(input))
+            {
+                errorText.Text = Vm.StatusText;
+                return;
+            }
+
+            dialog.Close();
+        };
+        var cancelButton = new Button { Content = "Cancel", MinWidth = 84 };
+        cancelButton.Click += (_, _) => dialog.Close();
+        var buttons = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            Spacing = 8,
+            HorizontalAlignment = HorizontalAlignment.Right,
+            Children = { cancelButton, applyButton },
+        };
+        var content = new Grid
+        {
+            Margin = new Thickness(16),
+            RowDefinitions = new RowDefinitions("Auto,Auto,Auto,Auto,Auto,Auto,*,Auto"),
+            RowSpacing = 12,
+            Children =
+            {
+                new TextBlock
+                {
+                    Text = "Edit the color value and the ColorPicker flyout sections. PaletteColors is kept as a collection and is not changed by this editor.",
+                    TextWrapping = Avalonia.Media.TextWrapping.Wrap,
+                },
+                fields,
+                new TextBlock { Text = "Preview and alpha" },
+                appearanceOptions,
+                spectrumOptions,
+                inputOptions,
+                errorText,
+                buttons,
+            },
+        };
+        Grid.SetRow(fields, 1);
+        Grid.SetRow(content.Children[2], 2);
+        Grid.SetRow(appearanceOptions, 3);
+        Grid.SetRow(spectrumOptions, 4);
+        Grid.SetRow(inputOptions, 5);
+        Grid.SetRow(errorText, 6);
+        Grid.SetRow(buttons, 7);
+        dialog.Content = content;
+        await dialog.ShowDialog(this);
+
+        static ComboBox CreateCombo(IEnumerable<string> items, string selected)
+            => new()
+            {
+                ItemsSource = items,
+                SelectedItem = selected,
+                HorizontalAlignment = HorizontalAlignment.Stretch,
+            };
+
+        static WrapPanel CreateOptionPanel(params Control[] options)
+        {
+            var panel = new WrapPanel
+            {
+                Orientation = Orientation.Horizontal,
+                ItemSpacing = 18,
+                LineSpacing = 8,
+            };
+            foreach (var option in options)
+            {
+                panel.Children.Add(option);
+            }
+
+            return panel;
+        }
 
         static void AddField(Grid owner, string label, Control editor, int row, int column)
         {

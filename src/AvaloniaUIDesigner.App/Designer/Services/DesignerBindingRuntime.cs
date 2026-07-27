@@ -44,6 +44,7 @@ public static class DesignerBindingRuntime
             "Slider" or "ProgressBar" => ["Minimum", "Maximum", "Value"],
             "DatePicker" or "CalendarDatePicker" or "Calendar"
                 => ["SelectedDate"],
+            "ColorPicker" => ["Color"],
             "TimePicker" => ["SelectedTime"],
             "NumericUpDown" => ["Value"],
             "TabControl" => ["SelectedIndex"],
