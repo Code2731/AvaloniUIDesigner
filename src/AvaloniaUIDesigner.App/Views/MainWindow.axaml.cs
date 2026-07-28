@@ -77,6 +77,7 @@ public partial class MainWindow : Window
     private bool _isPanningViewport;
     private Point _panStart;
     private Vector _panStartOffset;
+    private Point? _viewportPointer;
     private ToolboxItem? _pendingToolboxDragItem;
     private Point _toolboxDragStart;
 
@@ -2031,6 +2032,30 @@ public partial class MainWindow : Window
         HorizontalRuler.ScrollOffset = offset.X;
         VerticalRuler.ZoomScale = zoom;
         VerticalRuler.ScrollOffset = offset.Y;
+        if (_viewportPointer is { } pointer)
+        {
+            UpdateViewportCursor(pointer);
+        }
+        else
+        {
+            ClearViewportCursor();
+        }
+    }
+
+    private void UpdateViewportCursor(Point pointer)
+    {
+        _viewportPointer = pointer;
+        var zoom = Math.Max(0.01, Vm?.Canvas.ZoomScale ?? 1);
+        var offset = DesignScrollViewer.Offset;
+        HorizontalRuler.CursorPosition = (offset.X + pointer.X) / zoom;
+        VerticalRuler.CursorPosition = (offset.Y + pointer.Y) / zoom;
+    }
+
+    private void ClearViewportCursor()
+    {
+        _viewportPointer = null;
+        HorizontalRuler.CursorPosition = double.NaN;
+        VerticalRuler.CursorPosition = double.NaN;
     }
 
     private void RebindSelection()
@@ -2785,20 +2810,26 @@ public partial class MainWindow : Window
     {
         if (sender is Control host)
         {
+            UpdateViewportCursor(e.GetPosition(DesignScrollViewer));
             TryBeginViewportPan(host, e);
         }
     }
 
     private void OnDesignViewportPointerMoved(object? sender, PointerEventArgs e)
     {
+        var point = e.GetPosition(DesignScrollViewer);
+        UpdateViewportCursor(point);
         if (!_isPanningViewport)
         {
             return;
         }
 
-        UpdateViewportPan(e.GetPosition(DesignScrollViewer));
+        UpdateViewportPan(point);
         e.Handled = true;
     }
+
+    private void OnDesignViewportPointerExited(object? sender, PointerEventArgs e)
+        => ClearViewportCursor();
 
     private void OnDesignViewportPointerReleased(object? sender, PointerReleasedEventArgs e)
     {

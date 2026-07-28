@@ -345,6 +345,7 @@
                                 PointerPressed="OnDesignViewportPointerPressed"
                                 PointerMoved="OnDesignViewportPointerMoved"
                                 PointerReleased="OnDesignViewportPointerReleased"
+                                PointerExited="OnDesignViewportPointerExited"
                                 PointerWheelChanged="OnDesignViewportPointerWheelChanged">
                         <ScrollViewer Name="DesignScrollViewer"
                                       HorizontalScrollBarVisibility="Auto"

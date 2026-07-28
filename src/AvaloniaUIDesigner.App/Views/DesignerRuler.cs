@@ -18,15 +18,23 @@ public sealed class DesignerRuler : Control
     public static readonly StyledProperty<double> ScrollOffsetProperty =
         AvaloniaProperty.Register<DesignerRuler, double>(nameof(ScrollOffset));
 
+    public static readonly StyledProperty<double> CursorPositionProperty =
+        AvaloniaProperty.Register<DesignerRuler, double>(nameof(CursorPosition), double.NaN);
+
     private static readonly IBrush SurfaceBrush = Brush.Parse("#2D2D30");
     private static readonly IBrush LabelBrush = Brush.Parse("#CBD5E1");
     private static readonly Pen MinorPen = new(Brush.Parse("#64748B"), 1);
     private static readonly Pen MajorPen = new(Brush.Parse("#CBD5E1"), 1);
+    private static readonly Pen CursorPen = new(Brush.Parse("#22D3EE"), 1.5);
     private static readonly Typeface LabelTypeface = new("Segoe UI");
 
     static DesignerRuler()
     {
-        AffectsRender<DesignerRuler>(OrientationProperty, ZoomScaleProperty, ScrollOffsetProperty);
+        AffectsRender<DesignerRuler>(
+            OrientationProperty,
+            ZoomScaleProperty,
+            ScrollOffsetProperty,
+            CursorPositionProperty);
     }
 
     public Orientation Orientation
@@ -45,6 +53,12 @@ public sealed class DesignerRuler : Control
     {
         get => GetValue(ScrollOffsetProperty);
         set => SetValue(ScrollOffsetProperty, value);
+    }
+
+    public double CursorPosition
+    {
+        get => GetValue(CursorPositionProperty);
+        set => SetValue(CursorPositionProperty, value);
     }
 
     public override void Render(DrawingContext context)
@@ -94,6 +108,21 @@ public sealed class DesignerRuler : Control
                     context.DrawText(label, new Point(2, screenPosition - label.Height / 2));
                 }
             }
+        }
+
+        if (!double.IsFinite(CursorPosition))
+        {
+            return;
+        }
+
+        var cursorScreenPosition = CursorPosition * scale - ScrollOffset;
+        if (Orientation == Orientation.Horizontal)
+        {
+            context.DrawLine(CursorPen, new Point(cursorScreenPosition, 0), new Point(cursorScreenPosition, Bounds.Height));
+        }
+        else
+        {
+            context.DrawLine(CursorPen, new Point(0, cursorScreenPosition), new Point(Bounds.Width, cursorScreenPosition));
         }
     }
 
