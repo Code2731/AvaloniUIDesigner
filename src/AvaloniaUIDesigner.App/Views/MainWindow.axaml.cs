@@ -93,6 +93,7 @@ public partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
+        DesignScrollViewer.PropertyChanged += OnDesignScrollViewerPropertyChanged;
         _propertyEditTimer = new DispatcherTimer
         {
             Interval = TimeSpan.FromMilliseconds(450)
@@ -1938,6 +1939,7 @@ public partial class MainWindow : Window
 
         RebuildRecentFilesMenu();
         RebindSelection();
+        UpdateViewportRulers();
     }
 
     private void OnRecentFilesChanged(object? sender, NotifyCollectionChangedEventArgs e)
@@ -2009,6 +2011,26 @@ public partial class MainWindow : Window
         {
             RebindSelection();
         }
+
+        UpdateViewportRulers();
+    }
+
+    private void OnDesignScrollViewerPropertyChanged(object? sender, AvaloniaPropertyChangedEventArgs e)
+    {
+        if (e.Property == ScrollViewer.OffsetProperty)
+        {
+            UpdateViewportRulers();
+        }
+    }
+
+    private void UpdateViewportRulers()
+    {
+        var zoom = Vm?.Canvas.ZoomScale ?? 1;
+        var offset = DesignScrollViewer.Offset;
+        HorizontalRuler.ZoomScale = zoom;
+        HorizontalRuler.ScrollOffset = offset.X;
+        VerticalRuler.ZoomScale = zoom;
+        VerticalRuler.ScrollOffset = offset.Y;
     }
 
     private void RebindSelection()

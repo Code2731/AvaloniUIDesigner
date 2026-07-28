@@ -321,16 +321,31 @@
                             <TextBlock Text="Design Surface" FontWeight="SemiBold" Foreground="#CCCCCC"/>
                         </DockPanel>
                     </Border>
-                    <Border Name="DesignViewport"
-                            Background="#252526"
-                            Margin="24"
-                            BorderBrush="#3F3F46"
-                            BorderThickness="1"
-                            ClipToBounds="True"
-                            PointerPressed="OnDesignViewportPointerPressed"
-                            PointerMoved="OnDesignViewportPointerMoved"
-                            PointerReleased="OnDesignViewportPointerReleased"
-                            PointerWheelChanged="OnDesignViewportPointerWheelChanged">
+                    <Grid Margin="24" RowDefinitions="24,*" ColumnDefinitions="24,*">
+                        <Border Grid.Row="0" Grid.Column="0" Background="#252526" BorderBrush="#3F3F46" BorderThickness="1,1,0,0"/>
+                        <views:DesignerRuler Name="HorizontalRuler"
+                                              Grid.Row="0"
+                                              Grid.Column="1"
+                                              Orientation="Horizontal"
+                                              ZoomScale="1"
+                                              ScrollOffset="0"/>
+                        <views:DesignerRuler Name="VerticalRuler"
+                                              Grid.Row="1"
+                                              Grid.Column="0"
+                                              Orientation="Vertical"
+                                              ZoomScale="1"
+                                              ScrollOffset="0"/>
+                        <Border Name="DesignViewport"
+                                Grid.Row="1"
+                                Grid.Column="1"
+                                Background="#252526"
+                                BorderBrush="#3F3F46"
+                                BorderThickness="1"
+                                ClipToBounds="True"
+                                PointerPressed="OnDesignViewportPointerPressed"
+                                PointerMoved="OnDesignViewportPointerMoved"
+                                PointerReleased="OnDesignViewportPointerReleased"
+                                PointerWheelChanged="OnDesignViewportPointerWheelChanged">
                         <ScrollViewer Name="DesignScrollViewer"
                                       HorizontalScrollBarVisibility="Auto"
                                       VerticalScrollBarVisibility="Auto"
@@ -645,6 +660,7 @@
                             </Border>
                         </ScrollViewer>
                         </Border>
+                    </Grid>
                 </DockPanel>
             </Border>
 
