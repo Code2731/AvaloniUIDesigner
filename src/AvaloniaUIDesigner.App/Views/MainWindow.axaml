@@ -329,7 +329,8 @@
                             ClipToBounds="True"
                             PointerPressed="OnDesignViewportPointerPressed"
                             PointerMoved="OnDesignViewportPointerMoved"
-                            PointerReleased="OnDesignViewportPointerReleased">
+                            PointerReleased="OnDesignViewportPointerReleased"
+                            PointerWheelChanged="OnDesignViewportPointerWheelChanged">
                         <ScrollViewer Name="DesignScrollViewer"
                                       HorizontalScrollBarVisibility="Auto"
                                       VerticalScrollBarVisibility="Auto"

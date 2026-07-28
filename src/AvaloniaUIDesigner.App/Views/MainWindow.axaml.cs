@@ -2790,6 +2790,68 @@ public partial class MainWindow : Window
         e.Handled = true;
     }
 
+    private void OnDesignViewportPointerWheelChanged(object? sender, PointerWheelEventArgs e)
+    {
+        if (Vm is null || !e.KeyModifiers.HasFlag(KeyModifiers.Control))
+        {
+            return;
+        }
+
+        var delta = Math.Abs(e.Delta.Y) >= double.Epsilon ? e.Delta.Y : e.Delta.X;
+        if (Math.Abs(delta) < double.Epsilon)
+        {
+            return;
+        }
+
+        ZoomViewportAtPointer(delta, e.GetPosition(DesignScrollViewer));
+        e.Handled = true;
+    }
+
+    private void ZoomViewportAtPointer(double wheelDelta, Point pointer)
+    {
+        if (Vm is null)
+        {
+            return;
+        }
+
+        var oldZoom = Vm.Canvas.ZoomScale;
+        var documentPoint = new Point(
+            (DesignScrollViewer.Offset.X + pointer.X) / oldZoom,
+            (DesignScrollViewer.Offset.Y + pointer.Y) / oldZoom);
+
+        if (wheelDelta > 0)
+        {
+            Vm.Canvas.ZoomIn();
+        }
+        else
+        {
+            Vm.Canvas.ZoomOut();
+        }
+
+        var newZoom = Vm.Canvas.ZoomScale;
+        if (Math.Abs(newZoom - oldZoom) < double.Epsilon)
+        {
+            return;
+        }
+
+        void ApplyZoomOffset()
+        {
+            DesignScrollViewer.Offset = new Vector(
+                documentPoint.X * newZoom - pointer.X,
+                documentPoint.Y * newZoom - pointer.Y);
+        }
+
+        ApplyZoomOffset();
+        EventHandler? layoutUpdated = null;
+        layoutUpdated = (_, _) =>
+        {
+            DesignScrollViewer.LayoutUpdated -= layoutUpdated;
+            ApplyZoomOffset();
+        };
+        DesignScrollViewer.LayoutUpdated += layoutUpdated;
+        Dispatcher.UIThread.Post(ApplyZoomOffset, DispatcherPriority.Normal);
+    }
+
     private void UpdateViewportPan(Point current)
     {
         var delta = current - _panStart;
