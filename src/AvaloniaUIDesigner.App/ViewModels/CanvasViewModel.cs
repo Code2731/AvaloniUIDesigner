@@ -69,13 +69,17 @@ public partial class CanvasViewModel : ViewModelBase
     private string _artboardBackground = "#FFFFFF";
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ZoomedArtboardWidth))]
     private double _artboardWidth = 1280;
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ZoomedArtboardHeight))]
     private double _artboardHeight = 800;
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(ZoomPercentage))]
+    [NotifyPropertyChangedFor(nameof(ZoomedArtboardWidth))]
+    [NotifyPropertyChangedFor(nameof(ZoomedArtboardHeight))]
     private double _zoomScale = 1;
 
     [ObservableProperty]
@@ -88,6 +92,10 @@ public partial class CanvasViewModel : ViewModelBase
     public string? ActiveStylePreviewPseudoClass => _stylePreviewPseudoClass;
 
     public string ZoomPercentage => $"{ZoomScale * 100:0}%";
+
+    public double ZoomedArtboardWidth => Math.Max(1, ArtboardWidth * ZoomScale);
+
+    public double ZoomedArtboardHeight => Math.Max(1, ArtboardHeight * ZoomScale);
 
     public IBrush ArtboardBrush => Brush.Parse(ArtboardBackground);
 

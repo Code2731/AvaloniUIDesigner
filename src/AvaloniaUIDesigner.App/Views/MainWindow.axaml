@@ -322,14 +322,21 @@
                         </DockPanel>
                     </Border>
                     <Border Name="DesignViewport" Background="#252526" Margin="24" BorderBrush="#3F3F46" BorderThickness="1" ClipToBounds="True">
-                        <Border Width="{Binding Canvas.ArtboardWidth}"
-                                Height="{Binding Canvas.ArtboardHeight}"
-                                Background="{Binding Canvas.ArtboardBrush}"
-                                RenderTransformOrigin="0,0">
-                            <Border.RenderTransform>
-                                <ScaleTransform ScaleX="{Binding Canvas.ZoomScale}" ScaleY="{Binding Canvas.ZoomScale}"/>
-                            </Border.RenderTransform>
-                            <Panel Name="DesignSurface"
+                        <ScrollViewer Name="DesignScrollViewer"
+                                      HorizontalScrollBarVisibility="Auto"
+                                      VerticalScrollBarVisibility="Auto"
+                                      HorizontalContentAlignment="Left"
+                                      VerticalContentAlignment="Top">
+                            <Border Width="{Binding Canvas.ZoomedArtboardWidth}"
+                                    Height="{Binding Canvas.ZoomedArtboardHeight}">
+                                <Border Width="{Binding Canvas.ArtboardWidth}"
+                                        Height="{Binding Canvas.ArtboardHeight}"
+                                        Background="{Binding Canvas.ArtboardBrush}"
+                                        RenderTransformOrigin="0,0">
+                                    <Border.RenderTransform>
+                                        <ScaleTransform ScaleX="{Binding Canvas.ZoomScale}" ScaleY="{Binding Canvas.ZoomScale}"/>
+                                    </Border.RenderTransform>
+                                    <Panel Name="DesignSurface"
                                    DragDrop.AllowDrop="True"
                                    DragDrop.DragEnter="OnDesignSurfaceDragEnter"
                                    DragDrop.DragLeave="OnDesignSurfaceDragLeave"
@@ -624,9 +631,11 @@
                                            StrokeThickness="1"
                                            IsVisible="False"/>
                             </Canvas>
-                            </Panel>
+                                    </Panel>
+                                </Border>
+                            </Border>
+                        </ScrollViewer>
                         </Border>
-                    </Border>
                 </DockPanel>
             </Border>
 
