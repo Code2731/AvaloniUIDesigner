@@ -64,8 +64,10 @@ public partial class MainWindow : Window
     private const double MinSize = 10;
     private const double MarqueeThreshold = 3;
     private const double SmartSnapThreshold = 6;
+    private const double GuideHitThreshold = 8;
     private const string ToolboxDragDataFormat = "AvaloniaUIDesigner.ToolboxItem";
 
+    private enum GuideOrientation { Horizontal, Vertical }
     private DragMode _dragMode = DragMode.None;
     private Point _dragStart;
     private double _origX, _origY, _origW, _origH;
@@ -78,6 +80,11 @@ public partial class MainWindow : Window
     private Point _panStart;
     private Vector _panStartOffset;
     private Point? _viewportPointer;
+    private readonly List<double> _horizontalGuides = new();
+    private readonly List<double> _verticalGuides = new();
+    private bool _isDraggingGuide;
+    private GuideOrientation _guideOrientation;
+    private int _guideIndex = -1;
     private ToolboxItem? _pendingToolboxDragItem;
     private Point _toolboxDragStart;
 
@@ -557,6 +564,7 @@ public partial class MainWindow : Window
         if (await EnsureCanContinueWithUnsavedChangesAsync())
         {
             Vm?.CreateDocumentFromTemplate(templateName);
+            ClearDesignGuides();
         }
     }
 
@@ -569,6 +577,7 @@ public partial class MainWindow : Window
         }
 
         Vm?.NewDocument();
+        ClearDesignGuides();
     }
 
     private async void OnExitMenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
@@ -2002,6 +2011,7 @@ public partial class MainWindow : Window
             return;
         }
 
+        ClearDesignGuides();
         Vm.MarkDocumentLoaded(path);
         Vm.StatusText = BuildOpenStatus(System.IO.Path.GetFileName(path), warning);
     }
@@ -2056,6 +2066,29 @@ public partial class MainWindow : Window
         _viewportPointer = null;
         HorizontalRuler.CursorPosition = double.NaN;
         VerticalRuler.CursorPosition = double.NaN;
+    }
+
+    private void UpdateGuideOverlay()
+    {
+        if (Vm is not null && !_isDraggingGuide)
+        {
+            var width = Vm.Canvas.ArtboardWidth;
+            var height = Vm.Canvas.ArtboardHeight;
+            _verticalGuides.RemoveAll(value => value < 0 || value > width);
+            _horizontalGuides.RemoveAll(value => value < 0 || value > height);
+        }
+
+        GuideOverlay.VerticalGuides = _verticalGuides.ToArray();
+        GuideOverlay.HorizontalGuides = _horizontalGuides.ToArray();
+    }
+
+    private void ClearDesignGuides()
+    {
+        _horizontalGuides.Clear();
+        _verticalGuides.Clear();
+        _isDraggingGuide = false;
+        _guideIndex = -1;
+        UpdateGuideOverlay();
     }
 
     private void RebindSelection()
@@ -2791,6 +2824,112 @@ public partial class MainWindow : Window
         e.Pointer.Capture(DesignHost);
     }
 
+    private void OnDesignRulerPointerPressed(object? sender, PointerPressedEventArgs e)
+    {
+        if (sender is not DesignerRuler ruler
+            || !e.GetCurrentPoint(ruler).Properties.IsLeftButtonPressed)
+        {
+            return;
+        }
+
+        _guideOrientation = ruler.Orientation == Orientation.Horizontal
+            ? GuideOrientation.Vertical
+            : GuideOrientation.Horizontal;
+        var coordinate = GetGuideCoordinate(ruler, e.GetPosition(ruler));
+        var guides = GetGuideCollection(_guideOrientation);
+        _guideIndex = FindGuideIndex(guides, coordinate);
+        if (_guideIndex < 0)
+        {
+            _guideIndex = guides.Count;
+            guides.Add(coordinate);
+        }
+
+        _isDraggingGuide = true;
+        UpdateGuideOverlay();
+        e.Pointer.Capture(DesignViewport);
+        e.Handled = true;
+    }
+
+    private List<double> GetGuideCollection(GuideOrientation orientation)
+        => orientation == GuideOrientation.Horizontal ? _horizontalGuides : _verticalGuides;
+
+    private static int FindGuideIndex(IReadOnlyList<double> guides, double coordinate)
+    {
+        var index = -1;
+        var distance = GuideHitThreshold;
+        for (var i = 0; i < guides.Count; i++)
+        {
+            var candidateDistance = Math.Abs(guides[i] - coordinate);
+            if (candidateDistance <= distance)
+            {
+                index = i;
+                distance = candidateDistance;
+            }
+        }
+
+        return index;
+    }
+
+    private static double GetGuideCoordinate(DesignerRuler ruler, Point point)
+    {
+        var position = ruler.Orientation == Orientation.Horizontal ? point.X : point.Y;
+        return (ruler.ScrollOffset + position) / Math.Max(0.01, ruler.ZoomScale);
+    }
+
+    private double GetGuideCoordinate(Point viewportPoint)
+    {
+        var zoom = Math.Max(0.01, Vm?.Canvas.ZoomScale ?? 1);
+        var offset = DesignScrollViewer.Offset;
+        var position = _guideOrientation == GuideOrientation.Vertical
+            ? viewportPoint.X
+            : viewportPoint.Y;
+        var scrollOffset = _guideOrientation == GuideOrientation.Vertical ? offset.X : offset.Y;
+        return (scrollOffset + position) / zoom;
+    }
+
+    private void UpdateGuidePosition(Point viewportPoint)
+    {
+        if (!_isDraggingGuide || _guideIndex < 0)
+        {
+            return;
+        }
+
+        var guides = GetGuideCollection(_guideOrientation);
+        if (_guideIndex >= guides.Count)
+        {
+            return;
+        }
+
+        guides[_guideIndex] = GetGuideCoordinate(viewportPoint);
+        UpdateGuideOverlay();
+    }
+
+    private void CompleteGuideDrag(Point viewportPoint)
+    {
+        if (!_isDraggingGuide)
+        {
+            return;
+        }
+
+        var guides = GetGuideCollection(_guideOrientation);
+        if (_guideIndex >= 0 && _guideIndex < guides.Count)
+        {
+            var coordinate = GetGuideCoordinate(viewportPoint);
+            var maximum = _guideOrientation == GuideOrientation.Vertical
+                ? Vm?.Canvas.ArtboardWidth ?? 0
+                : Vm?.Canvas.ArtboardHeight ?? 0;
+            guides[_guideIndex] = coordinate;
+            if (coordinate < 0 || coordinate > maximum)
+            {
+                guides.RemoveAt(_guideIndex);
+            }
+        }
+
+        _isDraggingGuide = false;
+        _guideIndex = -1;
+        UpdateGuideOverlay();
+    }
+
     private bool TryBeginViewportPan(Control host, PointerPressedEventArgs e)
     {
         if (!e.GetCurrentPoint(host).Properties.IsMiddleButtonPressed)
@@ -2818,6 +2957,13 @@ public partial class MainWindow : Window
     private void OnDesignViewportPointerMoved(object? sender, PointerEventArgs e)
     {
         var point = e.GetPosition(DesignScrollViewer);
+        if (_isDraggingGuide)
+        {
+            UpdateGuidePosition(point);
+            e.Handled = true;
+            return;
+        }
+
         UpdateViewportCursor(point);
         if (!_isPanningViewport)
         {
@@ -2829,10 +2975,23 @@ public partial class MainWindow : Window
     }
 
     private void OnDesignViewportPointerExited(object? sender, PointerEventArgs e)
-        => ClearViewportCursor();
+    {
+        if (!_isDraggingGuide)
+        {
+            ClearViewportCursor();
+        }
+    }
 
     private void OnDesignViewportPointerReleased(object? sender, PointerReleasedEventArgs e)
     {
+        if (_isDraggingGuide)
+        {
+            CompleteGuideDrag(e.GetPosition(DesignScrollViewer));
+            e.Pointer.Capture(null);
+            e.Handled = true;
+            return;
+        }
+
         if (!_isPanningViewport)
         {
             return;
@@ -3053,6 +3212,8 @@ public partial class MainWindow : Window
         var movingY = new[] { y, y + _dragTarget.Height / 2, y + _dragTarget.Height };
         var candidatesX = new System.Collections.Generic.List<double> { 0, Vm.Canvas.ArtboardWidth / 2, Vm.Canvas.ArtboardWidth };
         var candidatesY = new System.Collections.Generic.List<double> { 0, Vm.Canvas.ArtboardHeight / 2, Vm.Canvas.ArtboardHeight };
+        candidatesX.AddRange(_verticalGuides);
+        candidatesY.AddRange(_horizontalGuides);
 
         foreach (var element in Vm.Canvas.Elements.Where(element => !_dragOrigins.ContainsKey(element)))
         {
@@ -3213,6 +3374,7 @@ public partial class MainWindow : Window
             return;
         }
 
+        ClearDesignGuides();
         var localPath = file.TryGetLocalPath();
         if (!string.IsNullOrWhiteSpace(localPath))
         {
@@ -7734,6 +7896,7 @@ public partial class MainWindow : Window
                 return;
             }
 
+            ClearDesignGuides();
             dialog.Close();
         };
         var cancelButton = new Button { Content = "Cancel", MinWidth = 84 };

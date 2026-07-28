@@ -328,13 +328,15 @@
                                               Grid.Column="1"
                                               Orientation="Horizontal"
                                               ZoomScale="1"
-                                              ScrollOffset="0"/>
+                                              ScrollOffset="0"
+                                              PointerPressed="OnDesignRulerPointerPressed"/>
                         <views:DesignerRuler Name="VerticalRuler"
                                               Grid.Row="1"
                                               Grid.Column="0"
                                               Orientation="Vertical"
                                               ZoomScale="1"
-                                              ScrollOffset="0"/>
+                                              ScrollOffset="0"
+                                              PointerPressed="OnDesignRulerPointerPressed"/>
                         <Border Name="DesignViewport"
                                 Grid.Row="1"
                                 Grid.Column="1"
@@ -635,7 +637,12 @@
                                     </DataTemplate>
                                 </ItemsControl.ItemTemplate>
                             </ItemsControl>
-                            <Canvas Name="SelectionOverlay" IsVisible="{Binding Canvas.IsSelectionActive}">
+                            <views:DesignerGuideOverlay Name="GuideOverlay"
+                                                        ZIndex="20"
+                                                        ArtboardWidth="{Binding Canvas.ArtboardWidth}"
+                                                        ArtboardHeight="{Binding Canvas.ArtboardHeight}"
+                                                        IsHitTestVisible="False"/>
+                            <Canvas Name="SelectionOverlay" ZIndex="30" IsVisible="{Binding Canvas.IsSelectionActive}">
                                 <Rectangle Name="HandleNW" Tag="NW" Width="10" Height="10" Fill="DodgerBlue" PointerPressed="OnHandlePressed"/>
                                 <Rectangle Name="HandleN" Tag="N" Width="10" Height="10" Fill="DodgerBlue" PointerPressed="OnHandlePressed"/>
                                 <Rectangle Name="HandleNE" Tag="NE" Width="10" Height="10" Fill="DodgerBlue" PointerPressed="OnHandlePressed"/>
