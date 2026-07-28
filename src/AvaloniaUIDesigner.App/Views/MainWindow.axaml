@@ -321,7 +321,15 @@
                             <TextBlock Text="Design Surface" FontWeight="SemiBold" Foreground="#CCCCCC"/>
                         </DockPanel>
                     </Border>
-                    <Border Name="DesignViewport" Background="#252526" Margin="24" BorderBrush="#3F3F46" BorderThickness="1" ClipToBounds="True">
+                    <Border Name="DesignViewport"
+                            Background="#252526"
+                            Margin="24"
+                            BorderBrush="#3F3F46"
+                            BorderThickness="1"
+                            ClipToBounds="True"
+                            PointerPressed="OnDesignViewportPointerPressed"
+                            PointerMoved="OnDesignViewportPointerMoved"
+                            PointerReleased="OnDesignViewportPointerReleased">
                         <ScrollViewer Name="DesignScrollViewer"
                                       HorizontalScrollBarVisibility="Auto"
                                       VerticalScrollBarVisibility="Auto"

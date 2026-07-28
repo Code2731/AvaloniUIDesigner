@@ -74,6 +74,9 @@ public partial class MainWindow : Window
     private bool _isMarqueeSelecting;
     private bool _marqueeAdditive;
     private Point _marqueeStart;
+    private bool _isPanningViewport;
+    private Point _panStart;
+    private Vector _panStartOffset;
     private ToolboxItem? _pendingToolboxDragItem;
     private Point _toolboxDragStart;
 
@@ -2585,6 +2588,11 @@ public partial class MainWindow : Window
             return;
         }
 
+        if (TryBeginViewportPan(host, e))
+        {
+            return;
+        }
+
         if (e.GetCurrentPoint(host).Properties.IsRightButtonPressed)
         {
             return;
@@ -2609,6 +2617,11 @@ public partial class MainWindow : Window
     private void OnElementPointerPressed(object? sender, PointerPressedEventArgs e)
     {
         if (Vm is null || sender is not Control { DataContext: DesignElement element })
+        {
+            return;
+        }
+
+        if (TryBeginViewportPan((Control)sender, e))
         {
             return;
         }
@@ -2657,7 +2670,12 @@ public partial class MainWindow : Window
 
     private void OnHandlePressed(object? sender, PointerPressedEventArgs e)
     {
-        if (sender is not Rectangle { Tag: string tag })
+        if (sender is not Rectangle { Tag: string tag } handle)
+        {
+            return;
+        }
+
+        if (TryBeginViewportPan(handle, e))
         {
             return;
         }
@@ -2726,8 +2744,69 @@ public partial class MainWindow : Window
         e.Pointer.Capture(DesignHost);
     }
 
+    private bool TryBeginViewportPan(Control host, PointerPressedEventArgs e)
+    {
+        if (!e.GetCurrentPoint(host).Properties.IsMiddleButtonPressed)
+        {
+            return false;
+        }
+
+        _isPanningViewport = true;
+        _panStart = e.GetPosition(DesignScrollViewer);
+        _panStartOffset = DesignScrollViewer.Offset;
+        e.Pointer.Capture(DesignViewport);
+        e.Handled = true;
+        return true;
+    }
+
+    private void OnDesignViewportPointerPressed(object? sender, PointerPressedEventArgs e)
+    {
+        if (sender is Control host)
+        {
+            TryBeginViewportPan(host, e);
+        }
+    }
+
+    private void OnDesignViewportPointerMoved(object? sender, PointerEventArgs e)
+    {
+        if (!_isPanningViewport)
+        {
+            return;
+        }
+
+        UpdateViewportPan(e.GetPosition(DesignScrollViewer));
+        e.Handled = true;
+    }
+
+    private void OnDesignViewportPointerReleased(object? sender, PointerReleasedEventArgs e)
+    {
+        if (!_isPanningViewport)
+        {
+            return;
+        }
+
+        _isPanningViewport = false;
+        e.Pointer.Capture(null);
+        e.Handled = true;
+    }
+
+    private void UpdateViewportPan(Point current)
+    {
+        var delta = current - _panStart;
+        DesignScrollViewer.Offset = new Vector(
+            _panStartOffset.X - delta.X,
+            _panStartOffset.Y - delta.Y);
+    }
+
     private void OnDragPointerMoved(object? sender, PointerEventArgs e)
     {
+        if (_isPanningViewport)
+        {
+            UpdateViewportPan(e.GetPosition(DesignScrollViewer));
+            e.Handled = true;
+            return;
+        }
+
         if (_isMarqueeSelecting)
         {
             UpdateMarquee(e.GetPosition(DesignHost));
@@ -2925,6 +3004,14 @@ public partial class MainWindow : Window
 
     private void OnDragPointerReleased(object? sender, PointerReleasedEventArgs e)
     {
+        if (_isPanningViewport)
+        {
+            _isPanningViewport = false;
+            e.Pointer.Capture(null);
+            e.Handled = true;
+            return;
+        }
+
         if (_isMarqueeSelecting)
         {
             CompleteMarquee(e.GetPosition(DesignHost));
