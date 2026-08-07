@@ -98,7 +98,8 @@ public partial class MainWindow : Window
     private const double MarqueeThreshold = 3;
     private const double SmartSnapThreshold = 6;
     private const double GuideHitThreshold = 8;
-    private const string ToolboxDragDataFormat = "AvaloniaUIDesigner.ToolboxItem";
+    private static readonly DataFormat<string> ToolboxDragDataFormat =
+        DataFormat.CreateStringApplicationFormat("AvaloniaUIDesigner.ToolboxItem");
 
     private enum GuideOrientation { Horizontal, Vertical }
     private DragMode _dragMode = DragMode.None;
@@ -3234,9 +3235,9 @@ public partial class MainWindow : Window
 
         _pendingToolboxDragItem = null;
         e.Pointer.Capture(null);
-        var data = new DataObject();
-        data.Set(ToolboxDragDataFormat, item.DisplayName);
-        await DragDrop.DoDragDrop(e, data, DragDropEffects.Copy);
+        var data = new DataTransfer();
+        data.Add(DataTransferItem.Create(ToolboxDragDataFormat, item.DisplayName));
+        await DragDrop.DoDragDropAsync(e, data, DragDropEffects.Copy);
         e.Handled = true;
     }
 
@@ -3248,7 +3249,7 @@ public partial class MainWindow : Window
 
     private void OnDesignSurfaceDragEnter(object? sender, DragEventArgs e)
     {
-        if (e.Data.Contains(ToolboxDragDataFormat))
+        if (e.DataTransfer.Contains(ToolboxDragDataFormat))
         {
             ToolboxDropHint.IsVisible = true;
             Vm?.StatusText = "Drop the Toolbox item onto the artboard.";
@@ -3262,7 +3263,7 @@ public partial class MainWindow : Window
 
     private void OnDesignSurfaceDragOver(object? sender, DragEventArgs e)
     {
-        e.DragEffects = e.Data.Contains(ToolboxDragDataFormat)
+        e.DragEffects = e.DataTransfer.Contains(ToolboxDragDataFormat)
             ? DragDropEffects.Copy
             : DragDropEffects.None;
         e.Handled = true;
@@ -3272,7 +3273,7 @@ public partial class MainWindow : Window
     {
         ToolboxDropHint.IsVisible = false;
         if (Vm is null || sender is not Control host
-            || e.Data.Get(ToolboxDragDataFormat) is not string displayName
+            || e.DataTransfer.TryGetValue(ToolboxDragDataFormat) is not string displayName
             || Vm.Toolbox.FindItemByDisplayName(displayName) is not { } item)
         {
             e.DragEffects = DragDropEffects.None;
