@@ -702,7 +702,12 @@
                         <Border DockPanel.Dock="Top" Background="#2D2D30" Padding="8,6">
                             <TextBlock Text="Object Tree" FontWeight="SemiBold" Foreground="#CCCCCC"/>
                         </Border>
-                        <TextBox Name="ObjectTreeSearch" DockPanel.Dock="Top" Margin="6" Watermark="Find control..." Text="{Binding ObjectTree.SearchText, Mode=TwoWay}"/>
+                        <TextBox Name="ObjectTreeSearch"
+                                 DockPanel.Dock="Top"
+                                 Margin="6"
+                                 Watermark="Find control... (Enter next)"
+                                 KeyDown="OnObjectTreeSearchKeyDown"
+                                 Text="{Binding ObjectTree.SearchText, Mode=TwoWay}"/>
                         <TextBlock DockPanel.Dock="Top"
                                    Text="{Binding ObjectTree.SearchResultText}"
                                    IsVisible="{Binding ObjectTree.IsSearchActive}"

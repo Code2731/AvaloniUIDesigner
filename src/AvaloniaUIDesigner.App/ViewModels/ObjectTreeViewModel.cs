@@ -29,7 +29,16 @@ public partial class ObjectTreeViewModel : ViewModelBase
         ? string.Empty
         : Root.Children.Count == 0
             ? "No matching controls"
-            : $"{Root.Children.Count} matching control(s)";
+            : SelectedNode is { } selectedNode
+                && Root.Children.IndexOf(selectedNode) is var selectedIndex
+                && selectedIndex >= 0
+                ? $"{selectedIndex + 1} of {Root.Children.Count} matching control(s)"
+                : $"{Root.Children.Count} matching control(s)";
+
+    partial void OnSelectedNodeChanged(ObjectNodeViewModel? value)
+    {
+        OnPropertyChanged(nameof(SearchResultText));
+    }
 
     partial void OnSearchTextChanged(string value)
     {
@@ -81,6 +90,24 @@ public partial class ObjectTreeViewModel : ViewModelBase
         }
 
         SelectedNode = null;
+    }
+
+    public bool SelectNextMatch(bool reverse = false)
+    {
+        if (!IsSearchActive || Root.Children.Count == 0)
+        {
+            return false;
+        }
+
+        var currentIndex = SelectedNode is { } selectedNode
+            ? Root.Children.IndexOf(selectedNode)
+            : -1;
+        var nextIndex = reverse
+            ? currentIndex <= 0 ? Root.Children.Count - 1 : currentIndex - 1
+            : currentIndex < 0 || currentIndex == Root.Children.Count - 1 ? 0 : currentIndex + 1;
+
+        SelectedNode = Root.Children[nextIndex];
+        return true;
     }
 
     private void RefreshVisibleChildren()

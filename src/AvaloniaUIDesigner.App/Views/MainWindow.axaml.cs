@@ -2369,6 +2369,25 @@ public partial class MainWindow : Window
         Vm?.CenterSelectedElementsOnArtboard(horizontally, vertically);
     }
 
+    private void OnObjectTreeSearchKeyDown(object? sender, KeyEventArgs e)
+    {
+        if (Vm is null)
+        {
+            return;
+        }
+
+        if (e.Key == Key.Enter)
+        {
+            var reverse = e.KeyModifiers.HasFlag(KeyModifiers.Shift);
+            if (!Vm.ObjectTree.SelectNextMatch(reverse))
+            {
+                Vm.StatusText = "No matching controls.";
+            }
+
+            e.Handled = true;
+        }
+    }
+
     private async void OnWindowKeyDown(object? sender, KeyEventArgs e)
     {
         if (Vm is null)
