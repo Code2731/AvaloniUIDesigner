@@ -231,6 +231,17 @@
                           ToggleType="CheckBox"
                           IsChecked="{Binding Canvas.SnapToGrid, Mode=OneWay}"
                           Click="OnSnapToGridMenuClicked"/>
+                <MenuItem Name="ShowDesignGuidesMenu"
+                          Header="Show Design Guides"
+                          ToggleType="CheckBox"
+                          IsChecked="True"
+                          Click="OnShowDesignGuidesMenuClicked"/>
+                <MenuItem Name="SnapToGuidesMenu"
+                          Header="Snap to Guides"
+                          ToggleType="CheckBox"
+                          IsChecked="True"
+                          Click="OnSnapToGuidesMenuClicked"/>
+                <MenuItem Header="Clear Design Guides" Click="OnClearDesignGuidesMenuClicked"/>
             </MenuItem>
             <MenuItem Header="Help"/>
         </Menu>

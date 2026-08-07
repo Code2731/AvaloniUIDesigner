@@ -24,7 +24,7 @@ dotnet run --project src/AvaloniaUIDesigner.App/AvaloniaUIDesigner.App.csproj
 - **배치**: 클릭-투-플레이스와 드래그 앤 드롭으로 실제 Avalonia 컨트롤 생성
 - **캔버스 뷰포트**: 큰 아트보드와 확대 상태를 양축 자동 스크롤로 탐색하고, Zoom In/Out·Actual Size·Fit to View와 스크롤 콘텐츠 크기를 동기화하며 중간 마우스 드래그로 뷰포트를 팬하고 Ctrl+휠로 포인터 중심 줌
 - **디자인 룰러**: 가로·세로 눈금을 ScrollViewer 오프셋과 렌더 줌에 동기화하고 포인터 기준선을 표시해 현재 화면의 아트보드 좌표를 확인
-- **디자인 가이드**: 가로·세로 룰러에서 드래그해 가이드라인을 만들고 캔버스 이동·리사이즈 Smart Snap 후보로 사용하며, 캔버스 밖으로 드래그하면 제거
+- **디자인 가이드**: 가로·세로 룰러에서 드래그해 가이드라인을 만들고 캔버스 이동·리사이즈 Smart Snap 후보로 사용하며, 캔버스 밖으로 드래그하면 제거합니다. View 메뉴에서 표시·가이드 스냅을 각각 끄거나 전체 가이드를 지울 수 있습니다.
 - **계층 클립보드**: 컨테이너를 선택해 복사·잘라내기·붙여넣기·복제하면 내부 자식 계층과 부모별 배치 메타데이터를 함께 보존하고, 붙여넣은 부모 이름을 새 이름으로 재매핑
 - **컨테이너 편집**: Grid 셀, StackPanel 순서·주축 크기, DockPanel 순서·방향·크기·LastChildFill, WrapPanel 순서·방향·항목 크기·간격·정렬, UniformGrid 순서·행·열·첫 열·간격, 중첩 Canvas 로컬 좌표·직접 변형·z-order, TabControl 탭 정의·탭별 단일 자식·활성 페이지·TabStripPlacement·콘텐츠 정렬, SplitView Pane·Content 슬롯·Inline/Overlay·배치 방향, Border·ContentControl·UserControl·ScrollViewer·Expander의 단일 Content 자식을 편집하고 재귀 Object Tree·AXAML·미리보기에 보존
 - **계층 항목 편집**: TreeView 항목을 `[-]`(펼침), `[+]`(접힘), 두 칸 들여쓰기 문법으로 편집하고 Undo/Redo, 복제, 미리보기, AXAML 왕복에 보존
@@ -114,6 +114,7 @@ dotnet run --project src/AvaloniaUIDesigner.App/AvaloniaUIDesigner.App.csproj
 37. 여러 root 컨트롤 또는 같은 Canvas의 형제 컨트롤을 선택해 `Edit > Arrange`에서 정렬·분배·크기 맞춤을 실행하고, `Center on Artboard`로 root 컨트롤을 아트보드 중앙에 배치
 38. 여러 root 컨트롤 또는 같은 Canvas의 형제 컨트롤을 선택해 `File > Add Selection to Toolbox...`에서 이름을 지정하면 상대 배치와 계층을 Toolbox 프리셋으로 등록하고, 이후 Toolbox에서 반복 배치
 39. Toolbox에서 프리셋을 선택해 `File > Export Selected Toolbox Preset...`으로 JSON 팩을 저장하거나 `File > Load Toolbox Preset Pack...`으로 다른 세션에 불러옴
+40. View 메뉴에서 `Show Design Guides`, `Snap to Guides`, `Clear Design Guides`로 가이드 보조 기능을 관리하고 `Ctrl+Shift+G`로 전체 가이드를 지움
 
 DataGrid가 포함된 생성 AXAML을 다른 프로젝트에서 사용할 때는 같은 Avalonia 버전의 `Avalonia.Controls.DataGrid` 패키지와 `avares://Avalonia.Controls.DataGrid/Themes/Fluent.xaml` 스타일 include가 필요합니다.
 

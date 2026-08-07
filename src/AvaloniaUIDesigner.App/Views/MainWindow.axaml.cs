@@ -82,6 +82,8 @@ public partial class MainWindow : Window
     private Point? _viewportPointer;
     private readonly List<double> _horizontalGuides = new();
     private readonly List<double> _verticalGuides = new();
+    private bool _showDesignGuides = true;
+    private bool _snapToGuides = true;
     private bool _isDraggingGuide;
     private GuideOrientation _guideOrientation;
     private int _guideIndex = -1;
@@ -1628,6 +1630,28 @@ public partial class MainWindow : Window
     private void OnSnapToGridMenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
         => Vm?.SetCanvasSnapToGrid(!Vm.Canvas.SnapToGrid);
 
+    private void OnShowDesignGuidesMenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        _showDesignGuides = !_showDesignGuides;
+        ShowDesignGuidesMenu.IsChecked = _showDesignGuides;
+        GuideOverlay.IsVisible = _showDesignGuides;
+    }
+
+    private void OnSnapToGuidesMenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        _snapToGuides = !_snapToGuides;
+        SnapToGuidesMenu.IsChecked = _snapToGuides;
+    }
+
+    private void OnClearDesignGuidesMenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        ClearDesignGuides();
+        if (Vm is not null)
+        {
+            Vm.StatusText = "Design guides cleared.";
+        }
+    }
+
     private void OnDesktopArtboardMenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
         => SetArtboard(1280, 800);
 
@@ -1778,6 +1802,14 @@ public partial class MainWindow : Window
 
         var ctrl = e.KeyModifiers.HasFlag(KeyModifiers.Control);
         var shift = e.KeyModifiers.HasFlag(KeyModifiers.Shift);
+
+        if (ctrl && shift && e.Key == Key.G)
+        {
+            ClearDesignGuides();
+            Vm.StatusText = "Design guides cleared.";
+            e.Handled = true;
+            return;
+        }
 
         if (e.Key == Key.Escape)
         {
@@ -3212,8 +3244,11 @@ public partial class MainWindow : Window
         var movingY = new[] { y, y + _dragTarget.Height / 2, y + _dragTarget.Height };
         var candidatesX = new System.Collections.Generic.List<double> { 0, Vm.Canvas.ArtboardWidth / 2, Vm.Canvas.ArtboardWidth };
         var candidatesY = new System.Collections.Generic.List<double> { 0, Vm.Canvas.ArtboardHeight / 2, Vm.Canvas.ArtboardHeight };
-        candidatesX.AddRange(_verticalGuides);
-        candidatesY.AddRange(_horizontalGuides);
+        if (_snapToGuides)
+        {
+            candidatesX.AddRange(_verticalGuides);
+            candidatesY.AddRange(_horizontalGuides);
+        }
 
         foreach (var element in Vm.Canvas.Elements.Where(element => !_dragOrigins.ContainsKey(element)))
         {
