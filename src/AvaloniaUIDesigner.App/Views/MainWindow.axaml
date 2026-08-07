@@ -210,6 +210,7 @@
                     <MenuItem Header="Tablet (1024 x 768)" Click="OnTabletArtboardMenuClicked"/>
                     <MenuItem Header="Mobile (390 x 844)" Click="OnMobileArtboardMenuClicked"/>
                     <Separator/>
+                    <MenuItem Header="Custom..." Click="OnCustomArtboardSizeMenuClicked"/>
                     <MenuItem Header="Rotate Artboard" Click="OnRotateArtboardMenuClicked"/>
                 </MenuItem>
                 <MenuItem Header="Artboard Background">

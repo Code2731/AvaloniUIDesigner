@@ -1662,6 +1662,132 @@ public partial class MainWindow : Window
     private void OnMobileArtboardMenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
         => SetArtboard(390, 844);
 
+    private async void OnCustomArtboardSizeMenuClicked(
+        object? sender,
+        Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        if (Vm is null)
+        {
+            return;
+        }
+
+        var widthEditor = new TextBox
+        {
+            Text = Vm.Canvas.ArtboardWidth.ToString("0", CultureInfo.InvariantCulture),
+            Watermark = "320-3840",
+            Width = 128,
+        };
+        var heightEditor = new TextBox
+        {
+            Text = Vm.Canvas.ArtboardHeight.ToString("0", CultureInfo.InvariantCulture),
+            Watermark = "240-2160",
+            Width = 128,
+        };
+        var previewText = new TextBlock
+        {
+            TextWrapping = TextWrapping.Wrap,
+        };
+        var applyButton = new Button
+        {
+            Content = "Apply",
+            MinWidth = 84,
+        };
+        var cancelButton = new Button
+        {
+            Content = "Cancel",
+            MinWidth = 84,
+        };
+        var dialog = new Window
+        {
+            Title = "Custom Artboard Size",
+            Width = 420,
+            Height = 280,
+            MinWidth = 360,
+            MinHeight = 240,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner,
+        };
+
+        void RefreshPreview()
+        {
+            if (TryParseCustomArtboardSize(
+                    widthEditor.Text,
+                    heightEditor.Text,
+                    out var width,
+                    out var height,
+                    out var error))
+            {
+                applyButton.IsEnabled = true;
+                previewText.Foreground = Brushes.SeaGreen;
+                previewText.Text = $"Preview: {width:0} x {height:0} px";
+            }
+            else
+            {
+                applyButton.IsEnabled = false;
+                previewText.Foreground = Brushes.IndianRed;
+                previewText.Text = error;
+            }
+        }
+
+        widthEditor.TextChanged += (_, _) => RefreshPreview();
+        heightEditor.TextChanged += (_, _) => RefreshPreview();
+        applyButton.Click += (_, _) =>
+        {
+            if (!TryParseCustomArtboardSize(
+                    widthEditor.Text,
+                    heightEditor.Text,
+                    out var width,
+                    out var height,
+                    out _))
+            {
+                RefreshPreview();
+                return;
+            }
+
+            SetArtboard(width, height);
+            dialog.Close();
+        };
+        cancelButton.Click += (_, _) => dialog.Close();
+
+        var dimensions = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            Spacing = 8,
+            Children =
+            {
+                new TextBlock { Text = "Width", VerticalAlignment = VerticalAlignment.Center },
+                widthEditor,
+                new TextBlock { Text = "Height", VerticalAlignment = VerticalAlignment.Center },
+                heightEditor,
+            },
+        };
+        var buttons = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            Spacing = 8,
+            HorizontalAlignment = HorizontalAlignment.Right,
+            Children = { cancelButton, applyButton },
+        };
+        dialog.Content = new StackPanel
+        {
+            Margin = new Thickness(16),
+            Spacing = 12,
+            Children =
+            {
+                new TextBlock { Text = "Enter the design artboard dimensions in pixels." },
+                dimensions,
+                previewText,
+                new TextBlock
+                {
+                    Text = "Width: 320-3840 px | Height: 240-2160 px",
+                    Foreground = Brushes.Gray,
+                },
+                buttons,
+            },
+        };
+        RefreshPreview();
+        await dialog.ShowDialog(this);
+    }
+
     private void OnRotateArtboardMenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
         if (Vm is null)
@@ -1830,6 +1956,49 @@ public partial class MainWindow : Window
             error = "The artboard color contains invalid hexadecimal digits.";
             return false;
         }
+    }
+
+    private static bool TryParseCustomArtboardSize(
+        string? widthText,
+        string? heightText,
+        out double width,
+        out double height,
+        out string error)
+    {
+        width = 0;
+        height = 0;
+        error = "Enter whole-number artboard dimensions.";
+
+        if (!int.TryParse(
+                widthText?.Trim(),
+                NumberStyles.Integer,
+                CultureInfo.InvariantCulture,
+                out var parsedWidth)
+            || !int.TryParse(
+                heightText?.Trim(),
+                NumberStyles.Integer,
+                CultureInfo.InvariantCulture,
+                out var parsedHeight))
+        {
+            return false;
+        }
+
+        if (parsedWidth is < 320 or > 3840)
+        {
+            error = "Width must be between 320 and 3840 px.";
+            return false;
+        }
+
+        if (parsedHeight is < 240 or > 2160)
+        {
+            error = "Height must be between 240 and 2160 px.";
+            return false;
+        }
+
+        width = parsedWidth;
+        height = parsedHeight;
+        error = string.Empty;
+        return true;
     }
 
     private void UpdateZoomStatus()
