@@ -107,6 +107,9 @@ public partial class MainWindow : Window
     private double _origX, _origY, _origW, _origH;
     private DesignElement? _dragTarget;
     private readonly System.Collections.Generic.Dictionary<DesignElement, Point> _dragOrigins = new();
+    private readonly System.Collections.Generic.Dictionary<DesignElement, Rect> _selectionResizeOrigins = new();
+    private Rect _selectionResizeBounds;
+    private bool _isSelectionResize;
     private bool _isMarqueeSelecting;
     private bool _marqueeAdditive;
     private Point _marqueeStart;
@@ -3091,6 +3094,7 @@ public partial class MainWindow : Window
     {
         var canEdit = _boundElement is { IsLocked: false };
         var canEditLayout = canEdit && _boundElement is not { IsContainerChild: true };
+        var canResizeSelection = CanResizeSelection();
 
         PropGrid.IsEnabled = canEdit;
         ElementNameEditor.IsEnabled = canEdit;
@@ -3099,14 +3103,35 @@ public partial class MainWindow : Window
         LayoutWidthEditor.IsEnabled = canEditLayout;
         LayoutHeightEditor.IsEnabled = canEditLayout;
 
-        HandleNW.IsVisible = canEditLayout;
-        HandleN.IsVisible = canEditLayout;
-        HandleNE.IsVisible = canEditLayout;
-        HandleE.IsVisible = canEditLayout;
-        HandleSE.IsVisible = canEditLayout;
-        HandleS.IsVisible = canEditLayout;
-        HandleSW.IsVisible = canEditLayout;
-        HandleW.IsVisible = canEditLayout;
+        HandleNW.IsVisible = canResizeSelection;
+        HandleN.IsVisible = canResizeSelection;
+        HandleNE.IsVisible = canResizeSelection;
+        HandleE.IsVisible = canResizeSelection;
+        HandleSE.IsVisible = canResizeSelection;
+        HandleS.IsVisible = canResizeSelection;
+        HandleSW.IsVisible = canResizeSelection;
+        HandleW.IsVisible = canResizeSelection;
+    }
+
+    private bool CanResizeSelection()
+    {
+        var selected = Vm?.Canvas.SelectedElements;
+        if (selected is null || selected.Count == 0 || selected.Any(element => element.IsLocked))
+        {
+            return false;
+        }
+
+        if (selected.Any(element => element.IsContainerChild
+                && element.ParentLayout != DesignerParentLayoutKind.Canvas))
+        {
+            return false;
+        }
+
+        var parentNames = selected
+            .Select(element => element.ParentName ?? string.Empty)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Count();
+        return parentNames == 1;
     }
 
     private void OnLayoutEditorLostFocus(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
@@ -3177,18 +3202,17 @@ public partial class MainWindow : Window
 
     private void UpdateHandlePositions()
     {
-        var el = _boundElement;
-        if (el is null)
+        if (!TryGetSelectionBounds(out var bounds))
         {
             return;
         }
 
-        var left = el.X;
-        var top = el.Y;
-        var right = el.X + el.Width;
-        var bottom = el.Y + el.Height;
-        var midX = el.X + el.Width / 2;
-        var midY = el.Y + el.Height / 2;
+        var left = bounds.X;
+        var top = bounds.Y;
+        var right = bounds.Right;
+        var bottom = bounds.Bottom;
+        var midX = bounds.X + bounds.Width / 2;
+        var midY = bounds.Y + bounds.Height / 2;
 
         Place(HandleNW, left, top);
         Place(HandleN, midX, top);
@@ -3198,6 +3222,23 @@ public partial class MainWindow : Window
         Place(HandleS, midX, bottom);
         Place(HandleSW, left, bottom);
         Place(HandleW, left, midY);
+    }
+
+    private bool TryGetSelectionBounds(out Rect bounds)
+    {
+        var selected = Vm?.Canvas.SelectedElements;
+        if (selected is null || selected.Count == 0)
+        {
+            bounds = default;
+            return false;
+        }
+
+        var left = selected.Min(element => element.X);
+        var top = selected.Min(element => element.Y);
+        var right = selected.Max(element => element.X + element.Width);
+        var bottom = selected.Max(element => element.Y + element.Height);
+        bounds = new Rect(left, top, right - left, bottom - top);
+        return true;
     }
 
     private static void Place(Rectangle rectangle, double cx, double cy)
@@ -3385,23 +3426,19 @@ public partial class MainWindow : Window
             return;
         }
 
-        var target = _boundElement;
+        if (Vm is null || !CanResizeSelection())
+        {
+            Vm?.StatusText = Vm?.Canvas.SelectedElements.Any(element => element.IsContainerChild)
+                == true
+                ? "Only root controls or siblings inside the same Canvas can be resized together."
+                : "Selected controls cannot be resized together.";
+            e.Handled = true;
+            return;
+        }
+
+        var target = _boundElement ?? Vm.Canvas.SelectedElements.LastOrDefault();
         if (target is null)
         {
-            return;
-        }
-
-        if (target.IsLocked)
-        {
-            Vm?.StatusText = "Selected control is locked.";
-            e.Handled = true;
-            return;
-        }
-
-        if (target.IsContainerChild)
-        {
-            Vm?.StatusText = "Container child position and size are managed by its parent layout.";
-            e.Handled = true;
             return;
         }
 
@@ -3437,11 +3474,28 @@ public partial class MainWindow : Window
         _origW = target.Width;
         _origH = target.Height;
         _dragOrigins.Clear();
+        _selectionResizeOrigins.Clear();
+        _isSelectionResize = false;
         if (mode == DragMode.Move && Vm is not null)
         {
             foreach (var selected in Vm.Canvas.SelectedElements)
             {
                 _dragOrigins[selected] = new Point(selected.X, selected.Y);
+            }
+        }
+        else if (mode != DragMode.Move
+            && Vm is not null
+            && Vm.Canvas.SelectedElements.Count > 1
+            && TryGetSelectionBounds(out _selectionResizeBounds))
+        {
+            _isSelectionResize = true;
+            foreach (var selected in Vm.Canvas.SelectedElements)
+            {
+                _selectionResizeOrigins[selected] = new Rect(
+                    selected.X,
+                    selected.Y,
+                    selected.Width,
+                    selected.Height);
             }
         }
 
@@ -3731,6 +3785,12 @@ public partial class MainWindow : Window
             return;
         }
 
+        if (_isSelectionResize)
+        {
+            ApplySelectionResize(dx, dy);
+            return;
+        }
+
         switch (_dragMode)
         {
             case DragMode.Move:
@@ -3780,6 +3840,62 @@ public partial class MainWindow : Window
         {
             ApplySmartResizeSnap();
         }
+    }
+
+    private void ApplySelectionResize(double dx, double dy)
+    {
+        if (Vm is null || _selectionResizeOrigins.Count == 0)
+        {
+            return;
+        }
+
+        var requested = GetGridResizeBounds(_selectionResizeBounds, _dragMode, dx, dy);
+        var snapped = GetSmartResizeBounds(requested, _dragMode, out var guideX, out var guideY);
+        var scaleX = snapped.Width / Math.Max(MinSize, _selectionResizeBounds.Width);
+        var scaleY = snapped.Height / Math.Max(MinSize, _selectionResizeBounds.Height);
+        foreach (var (element, origin) in _selectionResizeOrigins)
+        {
+            element.X = Math.Max(0, snapped.X + ((origin.X - _selectionResizeBounds.X) * scaleX));
+            element.Y = Math.Max(0, snapped.Y + ((origin.Y - _selectionResizeBounds.Y) * scaleY));
+            element.Width = Math.Max(MinSize, origin.Width * scaleX);
+            element.Height = Math.Max(MinSize, origin.Height * scaleY);
+        }
+
+        UpdateSmartSnapGuides(guideX, guideY);
+    }
+
+    private Rect GetGridResizeBounds(Rect original, DragMode mode, double dx, double dy)
+    {
+        var left = original.X;
+        var top = original.Y;
+        var right = original.Right;
+        var bottom = original.Bottom;
+
+        if (mode is DragMode.W or DragMode.NW or DragMode.SW)
+        {
+            var width = SnapSize(original.Width - dx);
+            left = Math.Max(0, SnapPosition(original.Right - width));
+        }
+        else if (mode is DragMode.E or DragMode.NE or DragMode.SE)
+        {
+            right = original.X + SnapSize(original.Width + dx);
+        }
+
+        if (mode is DragMode.N or DragMode.NW or DragMode.NE)
+        {
+            var height = SnapSize(original.Height - dy);
+            top = Math.Max(0, SnapPosition(original.Bottom - height));
+        }
+        else if (mode is DragMode.S or DragMode.SW or DragMode.SE)
+        {
+            bottom = original.Y + SnapSize(original.Height + dy);
+        }
+
+        return new Rect(
+            left,
+            top,
+            Math.Max(MinSize, right - left),
+            Math.Max(MinSize, bottom - top));
     }
 
     private void ResizeLeft(double dx)
@@ -3891,7 +4007,9 @@ public partial class MainWindow : Window
 
         foreach (var element in Vm.Canvas.Elements)
         {
-            if (ReferenceEquals(element, _dragTarget) || _dragOrigins.ContainsKey(element))
+            if (ReferenceEquals(element, _dragTarget)
+                || _dragOrigins.ContainsKey(element)
+                || _selectionResizeOrigins.ContainsKey(element))
             {
                 continue;
             }
@@ -3921,32 +4039,59 @@ public partial class MainWindow : Window
             return;
         }
 
-        var left = _dragTarget.X;
-        var top = _dragTarget.Y;
-        var right = left + _dragTarget.Width;
-        var bottom = top + _dragTarget.Height;
-        double? guideX = null;
-        double? guideY = null;
-
+        var requested = new Rect(
+            _dragTarget.X,
+            _dragTarget.Y,
+            _dragTarget.Width,
+            _dragTarget.Height);
+        var snapped = GetSmartResizeBounds(requested, _dragMode, out var guideX, out var guideY);
         if (_dragMode is DragMode.W or DragMode.NW or DragMode.SW)
         {
-            left = SnapResizeEdge(left, horizontal: true, out guideX);
-        }
-        else if (_dragMode is DragMode.E or DragMode.NE or DragMode.SE)
-        {
-            right = SnapResizeEdge(right, horizontal: true, out guideX);
+            _dragTarget.X = snapped.X;
         }
 
         if (_dragMode is DragMode.N or DragMode.NW or DragMode.NE)
         {
+            _dragTarget.Y = snapped.Y;
+        }
+
+        _dragTarget.Width = snapped.Width;
+        _dragTarget.Height = snapped.Height;
+        UpdateSmartSnapGuides(guideX, guideY);
+    }
+
+    private Rect GetSmartResizeBounds(
+        Rect requested,
+        DragMode mode,
+        out double? guideX,
+        out double? guideY)
+    {
+        var left = requested.X;
+        var top = requested.Y;
+        var right = requested.Right;
+        var bottom = requested.Bottom;
+        guideX = null;
+        guideY = null;
+
+        if (mode is DragMode.W or DragMode.NW or DragMode.SW)
+        {
+            left = SnapResizeEdge(left, horizontal: true, out guideX);
+        }
+        else if (mode is DragMode.E or DragMode.NE or DragMode.SE)
+        {
+            right = SnapResizeEdge(right, horizontal: true, out guideX);
+        }
+
+        if (mode is DragMode.N or DragMode.NW or DragMode.NE)
+        {
             top = SnapResizeEdge(top, horizontal: false, out guideY);
         }
-        else if (_dragMode is DragMode.S or DragMode.SW or DragMode.SE)
+        else if (mode is DragMode.S or DragMode.SW or DragMode.SE)
         {
             bottom = SnapResizeEdge(bottom, horizontal: false, out guideY);
         }
 
-        if (_dragMode is DragMode.W or DragMode.NW or DragMode.SW)
+        if (mode is DragMode.W or DragMode.NW or DragMode.SW)
         {
             left = Math.Max(0, left);
             if (right - left < MinSize)
@@ -3954,17 +4099,13 @@ public partial class MainWindow : Window
                 left = Math.Max(0, right - MinSize);
                 right = Math.Max(right, left + MinSize);
             }
-
-            _dragTarget.X = left;
-            _dragTarget.Width = Math.Max(MinSize, right - left);
         }
-        else if (_dragMode is DragMode.E or DragMode.NE or DragMode.SE)
+        else if (mode is DragMode.E or DragMode.NE or DragMode.SE)
         {
             right = Math.Max(left + MinSize, right);
-            _dragTarget.Width = Math.Max(MinSize, right - left);
         }
 
-        if (_dragMode is DragMode.N or DragMode.NW or DragMode.NE)
+        if (mode is DragMode.N or DragMode.NW or DragMode.NE)
         {
             top = Math.Max(0, top);
             if (bottom - top < MinSize)
@@ -3972,17 +4113,17 @@ public partial class MainWindow : Window
                 top = Math.Max(0, bottom - MinSize);
                 bottom = Math.Max(bottom, top + MinSize);
             }
-
-            _dragTarget.Y = top;
-            _dragTarget.Height = Math.Max(MinSize, bottom - top);
         }
-        else if (_dragMode is DragMode.S or DragMode.SW or DragMode.SE)
+        else if (mode is DragMode.S or DragMode.SW or DragMode.SE)
         {
             bottom = Math.Max(top + MinSize, bottom);
-            _dragTarget.Height = Math.Max(MinSize, bottom - top);
         }
 
-        UpdateSmartSnapGuides(guideX, guideY);
+        return new Rect(
+            left,
+            top,
+            Math.Max(MinSize, right - left),
+            Math.Max(MinSize, bottom - top));
     }
 
     private double SnapResizeEdge(double edge, bool horizontal, out double? snappedGuide)
@@ -4058,6 +4199,9 @@ public partial class MainWindow : Window
         _dragMode = DragMode.None;
         _dragTarget = null;
         _dragOrigins.Clear();
+        _selectionResizeOrigins.Clear();
+        _selectionResizeBounds = default;
+        _isSelectionResize = false;
         HideSmartSnapGuides();
         e.Pointer.Capture(null);
         e.Handled = true;
