@@ -736,7 +736,7 @@
                                 <TextBox Name="ElementNameEditor" Grid.Column="1" LostFocus="OnElementNameEditorLostFocus"/>
                             </Grid>
                         </Border>
-                        <pg:PropertyGrid Name="PropGrid" IsQuickFilterVisible="False" IsHeaderVisible="False"/>
+                        <pg:PropertyGrid Name="PropGrid" IsQuickFilterVisible="True" IsHeaderVisible="False"/>
                     </DockPanel>
                 </Border>
             </Grid>

@@ -65,6 +65,7 @@ dotnet run --project src/AvaloniaUIDesigner.App/AvaloniaUIDesigner.App.csproj
 - **Object Tree 자동 동기화**: 배치된 요소가 루트(Window) 아래에 추가
 - **이동/리사이즈 기즈모**: 선택된 요소를 드래그로 이동, 8방향 핸들로 리사이즈 (최소 10px)
 - **PropertyGrid 연동**: 선택된 컨트롤의 속성을 bodong PropertyGrid로 실시간 편집
+- **Property Inspector 검색**: 우측 PropertyGrid의 Quick Filter로 선택 컨트롤의 속성 이름을 즉시 필터링
 - **Appearance 편집**: 배경·전경·테두리·두께·모서리를 편집하고 Undo/Redo, 미리보기, AXAML 왕복에 보존
 - **색상 리소스**: 문서 단위 SolidColorBrush를 편집하고 DynamicResource로 컨트롤에 적용
 - **클래스·상태 스타일**: `[Button.primary:pointerover]` 형식의 Setter, 선택 컨트롤별 상태 선택기와 캔버스 배지, 대화형 미리보기, 로컬 속성 우선순위 지원
@@ -115,6 +116,7 @@ dotnet run --project src/AvaloniaUIDesigner.App/AvaloniaUIDesigner.App.csproj
 38. 여러 root 컨트롤 또는 같은 Canvas의 형제 컨트롤을 선택해 `File > Add Selection to Toolbox...`에서 이름을 지정하면 상대 배치와 계층을 Toolbox 프리셋으로 등록하고, 이후 Toolbox에서 반복 배치
 39. Toolbox에서 프리셋을 선택해 `File > Export Selected Toolbox Preset...`으로 JSON 팩을 저장하거나 `File > Load Toolbox Preset Pack...`으로 다른 세션에 불러옴
 40. View 메뉴에서 `Show Design Guides`, `Snap to Guides`, `Clear Design Guides`로 가이드 보조 기능을 관리하고 `Ctrl+Shift+G`로 전체 가이드를 지움
+41. 우측 Properties 패널의 Quick Filter에 `width`, `background`, `font` 같은 속성명을 입력해 편집할 속성만 표시
 
 DataGrid가 포함된 생성 AXAML을 다른 프로젝트에서 사용할 때는 같은 Avalonia 버전의 `Avalonia.Controls.DataGrid` 패키지와 `avares://Avalonia.Controls.DataGrid/Themes/Fluent.xaml` 스타일 include가 필요합니다.
 
