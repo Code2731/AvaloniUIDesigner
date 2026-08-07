@@ -21,10 +21,42 @@ namespace AvaloniaUIDesigner.App.Views;
 
 public sealed class PreviewWindow : Window
 {
+    private readonly Border _previewSurface;
+    private readonly ScrollViewer _previewScrollViewer;
+
     public PreviewWindow(DesignerCanvasDocument document)
+    {
+        _previewScrollViewer = new ScrollViewer
+        {
+            HorizontalScrollBarVisibility = Avalonia.Controls.Primitives.ScrollBarVisibility.Auto,
+            VerticalScrollBarVisibility = Avalonia.Controls.Primitives.ScrollBarVisibility.Auto,
+        };
+        _previewSurface = new Border
+        {
+            Padding = new Thickness(16),
+            Child = _previewScrollViewer,
+        };
+        Content = _previewSurface;
+        RefreshDocument(document, resizeWindow: true);
+    }
+
+    public void RefreshDocument(DesignerCanvasDocument document)
+        => RefreshDocument(document, resizeWindow: false);
+
+    private void RefreshDocument(DesignerCanvasDocument document, bool resizeWindow)
     {
         var settings = document.Settings ?? new DesignerCanvasSettings();
         var rootSettings = document.RootSettings ?? new DesignerRootSettings();
+        ApplyRootSettings(rootSettings, settings, resizeWindow);
+        _previewSurface.Background = Brush.Parse(settings.Background);
+        _previewScrollViewer.Content = CreatePreviewCanvas(document);
+    }
+
+    private void ApplyRootSettings(
+        DesignerRootSettings rootSettings,
+        DesignerCanvasSettings settings,
+        bool resizeWindow)
+    {
         Title = rootSettings.Kind == DesignerRootKind.Window
             && !string.IsNullOrEmpty(rootSettings.Title)
                 ? rootSettings.Title
@@ -42,6 +74,11 @@ public sealed class PreviewWindow : Window
         MinHeight = rootSettings.MinHeight;
         MaxWidth = rootSettings.MaxWidth;
         MaxHeight = rootSettings.MaxHeight;
+        if (!resizeWindow)
+        {
+            return;
+        }
+
         var previewMaxWidth = double.IsPositiveInfinity(MaxWidth)
             ? Math.Max(1280, MinWidth)
             : MaxWidth;
@@ -50,19 +87,6 @@ public sealed class PreviewWindow : Window
             : MaxHeight;
         Width = Math.Clamp(settings.Width + 32, MinWidth, previewMaxWidth);
         Height = Math.Clamp(settings.Height + 72, MinHeight, previewMaxHeight);
-        var canvas = CreatePreviewCanvas(document);
-
-        Content = new Border
-        {
-            Background = Brush.Parse(settings.Background),
-            Padding = new Thickness(16),
-            Child = new ScrollViewer
-            {
-                HorizontalScrollBarVisibility = Avalonia.Controls.Primitives.ScrollBarVisibility.Auto,
-                VerticalScrollBarVisibility = Avalonia.Controls.Primitives.ScrollBarVisibility.Auto,
-                Content = canvas,
-            },
-        };
     }
 
     internal static Canvas CreatePreviewCanvas(DesignerCanvasDocument document)

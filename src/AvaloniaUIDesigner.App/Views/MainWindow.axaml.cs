@@ -133,6 +133,7 @@ public partial class MainWindow : Window
     private DesignElement? _boundElement;
     private Control? _boundVisual;
     private MainWindowViewModel? _boundVm;
+    private PreviewWindow? _previewWindow;
 
     private readonly DispatcherTimer _propertyEditTimer;
     private bool _hasPendingPropertyEdit;
@@ -1634,9 +1635,25 @@ public partial class MainWindow : Window
         }
 
         FlushPendingPropertyHistory();
+        if (_previewWindow is not null)
+        {
+            _previewWindow.RefreshDocument(Vm.CreatePreviewDocument());
+            _previewWindow.Activate();
+            Vm.StatusText = "Refreshed live preview.";
+            return;
+        }
+
         var preview = new PreviewWindow(Vm.CreatePreviewDocument());
+        _previewWindow = preview;
+        preview.Closed += (_, _) =>
+        {
+            if (ReferenceEquals(_previewWindow, preview))
+            {
+                _previewWindow = null;
+            }
+        };
         preview.Show(this);
-        Vm.StatusText = "Opened runtime preview.";
+        Vm.StatusText = "Opened live preview. Changes update automatically.";
     }
 
     private async void OnEditAxamlSourceMenuClicked(
@@ -2530,7 +2547,11 @@ public partial class MainWindow : Window
         {
             _boundVm.RecentFiles.CollectionChanged -= OnRecentFilesChanged;
             _boundVm.PropertyChanged -= OnViewModelPropertyChanged;
+            _boundVm.DocumentChanged -= OnDocumentChanged;
         }
+
+        _previewWindow?.Close();
+        _previewWindow = null;
 
         _boundVm = Vm;
         _boundCanvas = _boundVm?.Canvas;
@@ -2544,6 +2565,7 @@ public partial class MainWindow : Window
         {
             _boundVm.RecentFiles.CollectionChanged += OnRecentFilesChanged;
             _boundVm.PropertyChanged += OnViewModelPropertyChanged;
+            _boundVm.DocumentChanged += OnDocumentChanged;
         }
 
         RebuildRecentFilesMenu();
@@ -2562,6 +2584,14 @@ public partial class MainWindow : Window
         if (e.PropertyName == nameof(MainWindowViewModel.CurrentDocumentPath))
         {
             UpdateDocumentBackupMenu();
+        }
+    }
+
+    private void OnDocumentChanged(object? sender, EventArgs e)
+    {
+        if (Vm is not null && _previewWindow is not null)
+        {
+            _previewWindow.RefreshDocument(Vm.CreatePreviewDocument());
         }
     }
 
@@ -10354,6 +10384,8 @@ public partial class MainWindow : Window
         }
 
         _allowCloseWithoutPrompt = true;
+        _previewWindow?.Close();
+        _previewWindow = null;
         Close();
     }
 }

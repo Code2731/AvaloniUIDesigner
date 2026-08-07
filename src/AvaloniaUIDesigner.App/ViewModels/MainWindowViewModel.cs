@@ -577,6 +577,8 @@ public partial class MainWindowViewModel : ViewModelBase
     public ObservableCollection<string> RecentFiles { get; }
     public ObservableCollection<StylePreviewOption> StylePreviewOptions { get; }
 
+    public event EventHandler? DocumentChanged;
+
     public bool CanUndo => _undoStack.Count > 0;
     public bool CanRedo => _redoStack.Count > 0;
     public string UndoMenuLabel => _undoStack.TryPeek(out var entry)
@@ -7385,6 +7387,7 @@ public partial class MainWindowViewModel : ViewModelBase
         _redoStack.Clear();
         RaiseHistoryChanged();
         RefreshDirtyState();
+        DocumentChanged?.Invoke(this, EventArgs.Empty);
     }
 
     public void Undo()
@@ -7590,6 +7593,7 @@ public partial class MainWindowViewModel : ViewModelBase
         OnPropertyChanged(nameof(HasSampleData));
         OnPropertyChanged(nameof(SampleDataJson));
         OnPropertyChanged(nameof(RootKindLabel));
+        DocumentChanged?.Invoke(this, EventArgs.Empty);
     }
 
     private DesignerCanvasDocument CaptureDocument()
