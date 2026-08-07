@@ -24,6 +24,38 @@ namespace AvaloniaUIDesigner.App.Views;
 
 public partial class MainWindow : Window
 {
+    private const string KeyboardShortcutsHelpText = """
+        Ctrl+N              New document
+        Ctrl+O              Open AXAML document
+        Ctrl+S              Save document
+        Ctrl+Shift+S        Save document as...
+        Ctrl+F              Focus Object Tree search
+        Ctrl+0              Actual size (100%)
+        Ctrl+R              Open runtime Preview
+        Ctrl+Z              Undo
+        Ctrl+Y              Redo
+        Ctrl+A              Select all controls
+        Ctrl+D              Duplicate selection
+        Ctrl+C              Copy selection
+        Ctrl+X              Cut selection
+        Ctrl+V              Paste selection
+        Ctrl+Shift+G        Clear design guides
+        Escape              Return to the selection tool
+        Arrow keys           Nudge selection by 1 px
+        Shift+Arrow keys     Nudge selection by 10 px
+        Delete / Backspace   Remove selection
+        """;
+
+    private const string AboutHelpText = """
+        AvaloniaUIDesigner
+
+        A Qt Designer-style visual designer for Avalonia UI.
+        Place controls, edit properties, preview the result, and round-trip AXAML.
+
+        Runtime: .NET 8
+        UI framework: Avalonia 11.3.12
+        """;
+
     private enum DragMode { None, Move, N, S, E, W, NE, NW, SE, SW }
     private enum UnsavedChoice { Save, Discard, Cancel }
     private sealed record ComponentPackExportOptions(string PackName, string DisplayName, string NamePrefix);
@@ -1785,6 +1817,72 @@ public partial class MainWindow : Window
             },
         };
         RefreshPreview();
+        await dialog.ShowDialog(this);
+    }
+
+    private async void OnKeyboardShortcutsMenuClicked(
+        object? sender,
+        Avalonia.Interactivity.RoutedEventArgs e)
+        => await ShowHelpDialogAsync(
+            "Keyboard Shortcuts",
+            "Keyboard shortcuts",
+            KeyboardShortcutsHelpText);
+
+    private async void OnAboutMenuClicked(
+        object? sender,
+        Avalonia.Interactivity.RoutedEventArgs e)
+        => await ShowHelpDialogAsync(
+            "About AvaloniaUIDesigner",
+            "About",
+            AboutHelpText);
+
+    private async Task ShowHelpDialogAsync(string title, string heading, string body)
+    {
+        var closeButton = new Button
+        {
+            Content = "Close",
+            MinWidth = 84,
+        };
+        var dialog = new Window
+        {
+            Title = title,
+            Width = 520,
+            Height = 460,
+            MinWidth = 380,
+            MinHeight = 280,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner,
+        };
+        closeButton.Click += (_, _) => dialog.Close();
+        dialog.Content = new StackPanel
+        {
+            Margin = new Thickness(18),
+            Spacing = 12,
+            Children =
+            {
+                new TextBlock
+                {
+                    Text = heading,
+                    FontSize = 18,
+                    FontWeight = FontWeight.SemiBold,
+                },
+                new ScrollViewer
+                {
+                    VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+                    Content = new TextBlock
+                    {
+                        Text = body,
+                        TextWrapping = TextWrapping.NoWrap,
+                        FontFamily = new FontFamily("Consolas"),
+                    },
+                },
+                new StackPanel
+                {
+                    Orientation = Orientation.Horizontal,
+                    HorizontalAlignment = HorizontalAlignment.Right,
+                    Children = { closeButton },
+                },
+            },
+        };
         await dialog.ShowDialog(this);
     }
 

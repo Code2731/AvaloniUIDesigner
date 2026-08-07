@@ -245,7 +245,10 @@
                           Click="OnSnapToGuidesMenuClicked"/>
                 <MenuItem Header="Clear Design Guides" Click="OnClearDesignGuidesMenuClicked"/>
             </MenuItem>
-            <MenuItem Header="Help"/>
+            <MenuItem Header="Help">
+                <MenuItem Header="Keyboard Shortcuts..." Click="OnKeyboardShortcutsMenuClicked"/>
+                <MenuItem Header="About AvaloniaUIDesigner..." Click="OnAboutMenuClicked"/>
+            </MenuItem>
         </Menu>
 
         <Border DockPanel.Dock="Bottom" Height="24" Background="#2D2D30" BorderBrush="#3F3F46" BorderThickness="0,1,0,0">
