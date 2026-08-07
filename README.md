@@ -26,6 +26,7 @@ dotnet run --project src/AvaloniaUIDesigner.App/AvaloniaUIDesigner.App.csproj
 - **아트보드 배경**: White·Soft Gray·Ink 프리셋과 사용자 지정 `#RRGGBB`/`#AARRGGBB` 색상을 편집하고 Undo·Preview·AXAML 왕복에 보존
 - **디자인 룰러**: 가로·세로 눈금을 ScrollViewer 오프셋과 렌더 줌에 동기화하고 포인터 기준선을 표시해 현재 화면의 아트보드 좌표를 확인
 - **디자인 가이드**: 가로·세로 룰러에서 드래그해 가이드라인을 만들고 캔버스 이동·리사이즈 Smart Snap 후보로 사용하며, 캔버스 밖으로 드래그하면 제거합니다. View 메뉴에서 표시·가이드 스냅을 각각 끄거나 전체 가이드를 지울 수 있습니다.
+- **디자인 그리드**: 그리드 표시·Snap to Grid를 전환하고 4·8·16px 프리셋 또는 4~32px 사용자 지정 간격을 편집하며 문서 설정·Undo/Redo·Preview·AXAML 메타데이터에 보존
 - **계층 클립보드**: 컨테이너를 선택해 복사·잘라내기·붙여넣기·복제하면 내부 자식 계층과 부모별 배치 메타데이터를 함께 보존하고, 붙여넣은 부모 이름을 새 이름으로 재매핑
 - **컨테이너 편집**: Grid 셀, StackPanel 순서·주축 크기, DockPanel 순서·방향·크기·LastChildFill, WrapPanel 순서·방향·항목 크기·간격·정렬, UniformGrid 순서·행·열·첫 열·간격, 중첩 Canvas 로컬 좌표·직접 변형·z-order, TabControl 탭 정의·탭별 단일 자식·활성 페이지·TabStripPlacement·콘텐츠 정렬, SplitView Pane·Content 슬롯·Inline/Overlay·배치 방향, Border·ContentControl·UserControl·ScrollViewer·Expander의 단일 Content 자식을 편집하고 재귀 Object Tree·AXAML·미리보기에 보존
 - **계층 항목 편집**: TreeView 항목을 `[-]`(펼침), `[+]`(접힘), 두 칸 들여쓰기 문법으로 편집하고 Undo/Redo, 복제, 미리보기, AXAML 왕복에 보존
@@ -122,6 +123,7 @@ dotnet run --project src/AvaloniaUIDesigner.App/AvaloniaUIDesigner.App.csproj
 42. View > Artboard Background > `Custom...`에서 `#RRGGBB` 또는 `#AARRGGBB`를 입력하고 미리보기 후 적용
 43. View > Artboard Size > `Custom...`에서 320-3840 x 240-2160 px 크기를 입력하고 미리보기 후 적용
 44. Help > `Keyboard Shortcuts...`에서 New·Open·Save·Preview·Undo/Redo·선택·가이드 단축키를 확인하고 Help > `About AvaloniaUIDesigner...`에서 앱 정보를 확인
+45. View > Grid Size > `Custom...`에서 4-32 px 간격을 입력하고 미리보기 후 적용
 
 DataGrid가 포함된 생성 AXAML을 다른 프로젝트에서 사용할 때는 같은 Avalonia 버전의 `Avalonia.Controls.DataGrid` 패키지와 `avares://Avalonia.Controls.DataGrid/Themes/Fluent.xaml` 스타일 include가 필요합니다.
 

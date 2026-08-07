@@ -1657,6 +1657,103 @@ public partial class MainWindow : Window
     private void OnGridSize16MenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
         => Vm?.SetCanvasGridSize(16);
 
+    private async void OnCustomGridSizeMenuClicked(
+        object? sender,
+        Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        if (Vm is null)
+        {
+            return;
+        }
+
+        var editor = new TextBox
+        {
+            Text = Vm.Canvas.GridSize.ToString("0.###", CultureInfo.InvariantCulture),
+            Watermark = "4-32",
+            Width = 160,
+        };
+        var previewText = new TextBlock
+        {
+            TextWrapping = TextWrapping.Wrap,
+        };
+        var applyButton = new Button
+        {
+            Content = "Apply",
+            MinWidth = 84,
+        };
+        var cancelButton = new Button
+        {
+            Content = "Cancel",
+            MinWidth = 84,
+        };
+        var dialog = new Window
+        {
+            Title = "Custom Grid Size",
+            Width = 400,
+            Height = 240,
+            MinWidth = 340,
+            MinHeight = 210,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner,
+        };
+
+        void RefreshPreview()
+        {
+            if (TryParseCustomGridSize(editor.Text, out var gridSize, out var error))
+            {
+                applyButton.IsEnabled = true;
+                previewText.Foreground = Brushes.SeaGreen;
+                previewText.Text = $"Preview: {gridSize:0.###} px grid spacing";
+            }
+            else
+            {
+                applyButton.IsEnabled = false;
+                previewText.Foreground = Brushes.IndianRed;
+                previewText.Text = error;
+            }
+        }
+
+        editor.TextChanged += (_, _) => RefreshPreview();
+        applyButton.Click += (_, _) =>
+        {
+            if (!TryParseCustomGridSize(editor.Text, out var gridSize, out _))
+            {
+                RefreshPreview();
+                return;
+            }
+
+            Vm.SetCanvasGridSize(gridSize);
+            dialog.Close();
+        };
+        cancelButton.Click += (_, _) => dialog.Close();
+
+        var buttons = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            Spacing = 8,
+            HorizontalAlignment = HorizontalAlignment.Right,
+            Children = { cancelButton, applyButton },
+        };
+        dialog.Content = new StackPanel
+        {
+            Margin = new Thickness(16),
+            Spacing = 12,
+            Children =
+            {
+                new TextBlock { Text = "Enter the design grid spacing in pixels." },
+                editor,
+                previewText,
+                new TextBlock
+                {
+                    Text = "Allowed range: 4-32 px",
+                    Foreground = Brushes.Gray,
+                },
+                buttons,
+            },
+        };
+        RefreshPreview();
+        await dialog.ShowDialog(this);
+    }
+
     private void OnShowGridMenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
         => Vm?.SetCanvasGridVisibility(!Vm.Canvas.IsGridVisible);
 
@@ -2095,6 +2192,34 @@ public partial class MainWindow : Window
 
         width = parsedWidth;
         height = parsedHeight;
+        error = string.Empty;
+        return true;
+    }
+
+    private static bool TryParseCustomGridSize(
+        string? value,
+        out double gridSize,
+        out string error)
+    {
+        gridSize = 0;
+        error = "Enter a finite grid size.";
+        if (!double.TryParse(
+                value?.Trim(),
+                NumberStyles.Float,
+                CultureInfo.InvariantCulture,
+                out var parsed)
+            || !double.IsFinite(parsed))
+        {
+            return false;
+        }
+
+        if (parsed < 4 || parsed > 32)
+        {
+            error = "Grid size must be between 4 and 32 px.";
+            return false;
+        }
+
+        gridSize = parsed;
         error = string.Empty;
         return true;
     }

@@ -228,6 +228,8 @@
                     <MenuItem Header="4px" Click="OnGridSize4MenuClicked"/>
                     <MenuItem Header="8px" Click="OnGridSize8MenuClicked"/>
                     <MenuItem Header="16px" Click="OnGridSize16MenuClicked"/>
+                    <Separator/>
+                    <MenuItem Header="Custom..." Click="OnCustomGridSizeMenuClicked"/>
                 </MenuItem>
                 <MenuItem Header="Snap to Grid"
                           ToggleType="CheckBox"
