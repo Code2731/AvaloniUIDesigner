@@ -216,6 +216,7 @@
                     <MenuItem Header="White" Click="OnWhiteArtboardBackgroundMenuClicked"/>
                     <MenuItem Header="Soft Gray" Click="OnGrayArtboardBackgroundMenuClicked"/>
                     <MenuItem Header="Ink" Click="OnInkArtboardBackgroundMenuClicked"/>
+                    <MenuItem Header="Custom..." Click="OnCustomArtboardBackgroundMenuClicked"/>
                 </MenuItem>
                 <Separator/>
                 <MenuItem Header="Show Grid"

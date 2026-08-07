@@ -12,6 +12,7 @@ using Avalonia.Controls.Primitives;
 using Avalonia.Controls.Shapes;
 using Avalonia.Input;
 using Avalonia.Layout;
+using Avalonia.Media;
 using Avalonia.Platform.Storage;
 using Avalonia.Threading;
 using AvaloniaUIDesigner.App.Designer.Core;
@@ -1687,6 +1688,97 @@ public partial class MainWindow : Window
     private void OnInkArtboardBackgroundMenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
         => SetArtboardBackground("#1E293B");
 
+    private async void OnCustomArtboardBackgroundMenuClicked(
+        object? sender,
+        Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        if (Vm is null)
+        {
+            return;
+        }
+
+        var editor = new TextBox
+        {
+            Text = Vm.Canvas.ArtboardBackground,
+            Watermark = "#RRGGBB or #AARRGGBB",
+        };
+        var preview = new Border
+        {
+            Height = 44,
+            BorderBrush = Brushes.Gray,
+            BorderThickness = new Thickness(1),
+            CornerRadius = new CornerRadius(4),
+        };
+        var errorText = new TextBlock
+        {
+            TextWrapping = TextWrapping.Wrap,
+        };
+        var dialog = new Window
+        {
+            Title = "Custom Artboard Background",
+            Width = 420,
+            Height = 260,
+            MinWidth = 360,
+            MinHeight = 220,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner,
+        };
+
+        void RefreshPreview()
+        {
+            if (TryNormalizeArtboardColor(editor.Text, out var normalized, out var error))
+            {
+                preview.Background = Brush.Parse(normalized);
+                errorText.Foreground = Brushes.SeaGreen;
+                errorText.Text = $"Preview: {normalized}";
+            }
+            else
+            {
+                preview.Background = Brushes.Transparent;
+                errorText.Foreground = Brushes.IndianRed;
+                errorText.Text = error;
+            }
+        }
+
+        editor.TextChanged += (_, _) => RefreshPreview();
+        var applyButton = new Button { Content = "Apply", MinWidth = 84 };
+        applyButton.Click += (_, _) =>
+        {
+            if (!TryNormalizeArtboardColor(editor.Text, out var normalized, out var error))
+            {
+                errorText.Foreground = Brushes.IndianRed;
+                errorText.Text = error;
+                return;
+            }
+
+            SetArtboardBackground(normalized);
+            dialog.Close();
+        };
+        var cancelButton = new Button { Content = "Cancel", MinWidth = 84 };
+        cancelButton.Click += (_, _) => dialog.Close();
+        var buttons = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            Spacing = 8,
+            HorizontalAlignment = HorizontalAlignment.Right,
+            Children = { cancelButton, applyButton },
+        };
+        dialog.Content = new StackPanel
+        {
+            Margin = new Thickness(16),
+            Spacing = 10,
+            Children =
+            {
+                new TextBlock { Text = "Enter a solid ARGB color for the design artboard." },
+                editor,
+                preview,
+                errorText,
+                buttons,
+            },
+        };
+        RefreshPreview();
+        await dialog.ShowDialog(this);
+    }
+
     private void SetArtboard(double width, double height)
     {
         if (Vm is null)
@@ -1711,6 +1803,33 @@ public partial class MainWindow : Window
         Vm.Canvas.SetArtboard(Vm.Canvas.ArtboardWidth, Vm.Canvas.ArtboardHeight, background);
         Vm.CommitCanvasMutation();
         Vm.StatusText = "Updated artboard background.";
+    }
+
+    private static bool TryNormalizeArtboardColor(
+        string? value,
+        out string normalized,
+        out string error)
+    {
+        normalized = string.Empty;
+        error = "Enter a color as #RRGGBB or #AARRGGBB.";
+        var text = value?.Trim() ?? string.Empty;
+        if (text.Length is not (7 or 9) || !text.StartsWith('#'))
+        {
+            return false;
+        }
+
+        try
+        {
+            var color = Color.Parse(text);
+            normalized = $"#{color.A:X2}{color.R:X2}{color.G:X2}{color.B:X2}";
+            error = string.Empty;
+            return true;
+        }
+        catch (FormatException)
+        {
+            error = "The artboard color contains invalid hexadecimal digits.";
+            return false;
+        }
     }
 
     private void UpdateZoomStatus()
