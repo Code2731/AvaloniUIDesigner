@@ -28,6 +28,7 @@ dotnet run --project src/AvaloniaUIDesigner.App/AvaloniaUIDesigner.App.csproj
 - **디자인 가이드**: 가로·세로 룰러에서 드래그해 가이드라인을 만들고 캔버스 이동·리사이즈 Smart Snap 후보로 사용하며, 캔버스 밖으로 드래그하면 제거합니다. View 메뉴에서 표시·가이드 스냅을 각각 끄거나 전체 가이드를 지울 수 있습니다.
 - **리사이즈 Smart Snap**: 8방향 핸들로 크기를 조정할 때 아트보드 경계·중앙선, 디자인 가이드, 다른 컨트롤의 모서리·중앙선에 맞추고 스냅 기준선을 표시하며 최소 10px 크기를 보호합니다. 크기 변경은 이동과 같은 Undo·AXAML 왕복 흐름을 사용합니다.
 - **다중 선택 리사이즈**: 같은 root 또는 같은 Canvas의 여러 컨트롤을 선택하면 bounding box 핸들로 위치·크기를 비율 조정하고 Canvas 자식의 로컬 좌표도 동기화합니다. Grid·StackPanel·Content 자식이나 서로 다른 부모를 섞은 선택은 좌표 손실을 막기 위해 리사이즈를 차단합니다.
+- **리사이즈 비율 잠금**: 코너 핸들을 `Shift`와 함께 드래그하면 단일 컨트롤과 다중 선택 bounding box의 원래 가로·세로 비율을 유지하며, 잠금 중에는 Smart Snap보다 비율을 우선합니다.
 - **디자인 그리드**: 그리드 표시·Snap to Grid를 전환하고 4·8·16px 프리셋 또는 4~32px 사용자 지정 간격을 편집하며 문서 설정·Undo/Redo·Preview·AXAML 메타데이터에 보존
 - **계층 클립보드**: 컨테이너를 선택해 복사·잘라내기·붙여넣기·복제하면 내부 자식 계층과 부모별 배치 메타데이터를 함께 보존하고, 붙여넣은 부모 이름을 새 이름으로 재매핑
 - **컨테이너 편집**: Grid 셀, StackPanel 순서·주축 크기, DockPanel 순서·방향·크기·LastChildFill, WrapPanel 순서·방향·항목 크기·간격·정렬, UniformGrid 순서·행·열·첫 열·간격, 중첩 Canvas 로컬 좌표·직접 변형·z-order, TabControl 탭 정의·탭별 단일 자식·활성 페이지·TabStripPlacement·콘텐츠 정렬, SplitView Pane·Content 슬롯·Inline/Overlay·배치 방향, Border·ContentControl·UserControl·ScrollViewer·Expander의 단일 Content 자식을 편집하고 재귀 Object Tree·AXAML·미리보기에 보존
@@ -130,6 +131,7 @@ dotnet run --project src/AvaloniaUIDesigner.App/AvaloniaUIDesigner.App.csproj
 46. AXAML을 두 번 이상 저장한 뒤 File > `Recover Backup...`에서 직전 저장본을 복구하고 필요하면 Undo/Redo로 확인
 47. 선택한 컨트롤의 8방향 핸들을 드래그하면 이동과 동일한 Smart Snap 후보에 크기의 해당 모서리가 맞고, 최소 크기 10px 아래로 줄어들지 않음
 48. 같은 root 또는 같은 Canvas의 컨트롤을 여러 개 선택한 뒤 bounding box 핸들을 드래그하면 상대 배치와 크기를 함께 조정하며, 부모가 좌표를 관리하는 컨트롤은 기존 전용 편집기를 사용
+49. 코너 핸들을 `Shift`와 함께 드래그하면 원래 가로·세로 비율을 유지하며, 잠금 중에는 Smart Snap 기준선보다 비율 보존을 우선함
 
 DataGrid가 포함된 생성 AXAML을 다른 프로젝트에서 사용할 때는 같은 Avalonia 버전의 `Avalonia.Controls.DataGrid` 패키지와 `avares://Avalonia.Controls.DataGrid/Themes/Fluent.xaml` 스타일 include가 필요합니다.
 

@@ -43,6 +43,7 @@ public partial class MainWindow : Window
         Escape              Return to the selection tool
         Arrow keys           Nudge selection by 1 px
         Shift+Arrow keys     Nudge selection by 10 px
+        Shift+corner handle  Lock aspect ratio while resizing
         Delete / Backspace   Remove selection
         """;
 
@@ -3775,10 +3776,13 @@ public partial class MainWindow : Window
         var dx = p.X - _dragStart.X;
         var dy = p.Y - _dragStart.Y;
 
-        ApplyDrag(dx, dy);
+        ApplyDrag(dx, dy, e.KeyModifiers);
     }
 
     private void ApplyDrag(double dx, double dy)
+        => ApplyDrag(dx, dy, KeyModifiers.None);
+
+    private void ApplyDrag(double dx, double dy, KeyModifiers modifiers)
     {
         if (_dragTarget is null)
         {
@@ -3787,7 +3791,7 @@ public partial class MainWindow : Window
 
         if (_isSelectionResize)
         {
-            ApplySelectionResize(dx, dy);
+            ApplySelectionResize(dx, dy, modifiers);
             return;
         }
 
@@ -3838,11 +3842,14 @@ public partial class MainWindow : Window
 
         if (_dragMode != DragMode.Move)
         {
-            ApplySmartResizeSnap();
+            ApplySmartResizeSnap(modifiers);
         }
     }
 
     private void ApplySelectionResize(double dx, double dy)
+        => ApplySelectionResize(dx, dy, KeyModifiers.None);
+
+    private void ApplySelectionResize(double dx, double dy, KeyModifiers modifiers)
     {
         if (Vm is null || _selectionResizeOrigins.Count == 0)
         {
@@ -3850,7 +3857,19 @@ public partial class MainWindow : Window
         }
 
         var requested = GetGridResizeBounds(_selectionResizeBounds, _dragMode, dx, dy);
+        var aspectLocked = modifiers.HasFlag(KeyModifiers.Shift) && IsCornerResizeMode(_dragMode);
+        if (aspectLocked)
+        {
+            requested = GetAspectLockedResizeBounds(_selectionResizeBounds, requested, _dragMode);
+        }
+
         var snapped = GetSmartResizeBounds(requested, _dragMode, out var guideX, out var guideY);
+        if (aspectLocked)
+        {
+            snapped = GetAspectLockedResizeBounds(_selectionResizeBounds, snapped, _dragMode);
+            guideX = null;
+            guideY = null;
+        }
         var scaleX = snapped.Width / Math.Max(MinSize, _selectionResizeBounds.Width);
         var scaleY = snapped.Height / Math.Max(MinSize, _selectionResizeBounds.Height);
         foreach (var (element, origin) in _selectionResizeOrigins)
@@ -3896,6 +3915,35 @@ public partial class MainWindow : Window
             top,
             Math.Max(MinSize, right - left),
             Math.Max(MinSize, bottom - top));
+    }
+
+    private static bool IsCornerResizeMode(DragMode mode)
+        => mode is DragMode.NW or DragMode.NE or DragMode.SE or DragMode.SW;
+
+    private static Rect GetAspectLockedResizeBounds(Rect original, Rect requested, DragMode mode)
+    {
+        if (!IsCornerResizeMode(mode)
+            || original.Width <= 0
+            || original.Height <= 0)
+        {
+            return requested;
+        }
+
+        var widthScale = requested.Width / original.Width;
+        var heightScale = requested.Height / original.Height;
+        var scale = Math.Abs(widthScale - 1) >= Math.Abs(heightScale - 1)
+            ? widthScale
+            : heightScale;
+        scale = Math.Max(scale, Math.Max(MinSize / original.Width, MinSize / original.Height));
+        var width = Math.Max(MinSize, original.Width * scale);
+        var height = Math.Max(MinSize, original.Height * scale);
+        var left = mode is DragMode.NW or DragMode.SW
+            ? original.Right - width
+            : original.X;
+        var top = mode is DragMode.NW or DragMode.NE
+            ? original.Bottom - height
+            : original.Y;
+        return new Rect(left, top, width, height);
     }
 
     private void ResizeLeft(double dx)
@@ -4032,6 +4080,9 @@ public partial class MainWindow : Window
     }
 
     private void ApplySmartResizeSnap()
+        => ApplySmartResizeSnap(KeyModifiers.None);
+
+    private void ApplySmartResizeSnap(KeyModifiers modifiers)
     {
         if (_dragTarget is null || Vm is null)
         {
@@ -4044,7 +4095,20 @@ public partial class MainWindow : Window
             _dragTarget.Y,
             _dragTarget.Width,
             _dragTarget.Height);
+        var original = new Rect(_origX, _origY, _origW, _origH);
+        var aspectLocked = modifiers.HasFlag(KeyModifiers.Shift) && IsCornerResizeMode(_dragMode);
+        if (aspectLocked)
+        {
+            requested = GetAspectLockedResizeBounds(original, requested, _dragMode);
+        }
+
         var snapped = GetSmartResizeBounds(requested, _dragMode, out var guideX, out var guideY);
+        if (aspectLocked)
+        {
+            snapped = GetAspectLockedResizeBounds(original, snapped, _dragMode);
+            guideX = null;
+            guideY = null;
+        }
         if (_dragMode is DragMode.W or DragMode.NW or DragMode.SW)
         {
             _dragTarget.X = snapped.X;
