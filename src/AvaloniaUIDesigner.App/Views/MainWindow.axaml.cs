@@ -3775,6 +3775,11 @@ public partial class MainWindow : Window
                 ResizeTop(dy);
                 break;
         }
+
+        if (_dragMode != DragMode.Move)
+        {
+            ApplySmartResizeSnap();
+        }
     }
 
     private void ResizeLeft(double dx)
@@ -3835,19 +3840,8 @@ public partial class MainWindow : Window
         var snappedY = y;
         var movingX = new[] { x, x + _dragTarget.Width / 2, x + _dragTarget.Width };
         var movingY = new[] { y, y + _dragTarget.Height / 2, y + _dragTarget.Height };
-        var candidatesX = new System.Collections.Generic.List<double> { 0, Vm.Canvas.ArtboardWidth / 2, Vm.Canvas.ArtboardWidth };
-        var candidatesY = new System.Collections.Generic.List<double> { 0, Vm.Canvas.ArtboardHeight / 2, Vm.Canvas.ArtboardHeight };
-        if (_snapToGuides)
-        {
-            candidatesX.AddRange(_verticalGuides);
-            candidatesY.AddRange(_horizontalGuides);
-        }
-
-        foreach (var element in Vm.Canvas.Elements.Where(element => !_dragOrigins.ContainsKey(element)))
-        {
-            candidatesX.AddRange([element.X, element.X + element.Width / 2, element.X + element.Width]);
-            candidatesY.AddRange([element.Y, element.Y + element.Height / 2, element.Y + element.Height]);
-        }
+        var candidatesX = GetSmartSnapCandidates(horizontal: true);
+        var candidatesY = GetSmartSnapCandidates(horizontal: false);
 
         foreach (var candidate in candidatesX)
         {
@@ -3879,6 +3873,135 @@ public partial class MainWindow : Window
 
         UpdateSmartSnapGuides(guideX, guideY);
         return new Point(snappedX, snappedY);
+    }
+
+    private List<double> GetSmartSnapCandidates(bool horizontal)
+    {
+        if (Vm is null)
+        {
+            return new List<double>();
+        }
+
+        var extent = horizontal ? Vm.Canvas.ArtboardWidth : Vm.Canvas.ArtboardHeight;
+        var candidates = new List<double> { 0, extent / 2, extent };
+        if (_snapToGuides)
+        {
+            candidates.AddRange(horizontal ? _verticalGuides : _horizontalGuides);
+        }
+
+        foreach (var element in Vm.Canvas.Elements)
+        {
+            if (ReferenceEquals(element, _dragTarget) || _dragOrigins.ContainsKey(element))
+            {
+                continue;
+            }
+
+            if (horizontal)
+            {
+                candidates.Add(element.X);
+                candidates.Add(element.X + element.Width / 2);
+                candidates.Add(element.X + element.Width);
+            }
+            else
+            {
+                candidates.Add(element.Y);
+                candidates.Add(element.Y + element.Height / 2);
+                candidates.Add(element.Y + element.Height);
+            }
+        }
+
+        return candidates;
+    }
+
+    private void ApplySmartResizeSnap()
+    {
+        if (_dragTarget is null || Vm is null)
+        {
+            HideSmartSnapGuides();
+            return;
+        }
+
+        var left = _dragTarget.X;
+        var top = _dragTarget.Y;
+        var right = left + _dragTarget.Width;
+        var bottom = top + _dragTarget.Height;
+        double? guideX = null;
+        double? guideY = null;
+
+        if (_dragMode is DragMode.W or DragMode.NW or DragMode.SW)
+        {
+            left = SnapResizeEdge(left, horizontal: true, out guideX);
+        }
+        else if (_dragMode is DragMode.E or DragMode.NE or DragMode.SE)
+        {
+            right = SnapResizeEdge(right, horizontal: true, out guideX);
+        }
+
+        if (_dragMode is DragMode.N or DragMode.NW or DragMode.NE)
+        {
+            top = SnapResizeEdge(top, horizontal: false, out guideY);
+        }
+        else if (_dragMode is DragMode.S or DragMode.SW or DragMode.SE)
+        {
+            bottom = SnapResizeEdge(bottom, horizontal: false, out guideY);
+        }
+
+        if (_dragMode is DragMode.W or DragMode.NW or DragMode.SW)
+        {
+            left = Math.Max(0, left);
+            if (right - left < MinSize)
+            {
+                left = Math.Max(0, right - MinSize);
+                right = Math.Max(right, left + MinSize);
+            }
+
+            _dragTarget.X = left;
+            _dragTarget.Width = Math.Max(MinSize, right - left);
+        }
+        else if (_dragMode is DragMode.E or DragMode.NE or DragMode.SE)
+        {
+            right = Math.Max(left + MinSize, right);
+            _dragTarget.Width = Math.Max(MinSize, right - left);
+        }
+
+        if (_dragMode is DragMode.N or DragMode.NW or DragMode.NE)
+        {
+            top = Math.Max(0, top);
+            if (bottom - top < MinSize)
+            {
+                top = Math.Max(0, bottom - MinSize);
+                bottom = Math.Max(bottom, top + MinSize);
+            }
+
+            _dragTarget.Y = top;
+            _dragTarget.Height = Math.Max(MinSize, bottom - top);
+        }
+        else if (_dragMode is DragMode.S or DragMode.SW or DragMode.SE)
+        {
+            bottom = Math.Max(top + MinSize, bottom);
+            _dragTarget.Height = Math.Max(MinSize, bottom - top);
+        }
+
+        UpdateSmartSnapGuides(guideX, guideY);
+    }
+
+    private double SnapResizeEdge(double edge, bool horizontal, out double? snappedGuide)
+    {
+        var bestDistance = SmartSnapThreshold + 1;
+        var snappedEdge = edge;
+        snappedGuide = null;
+        foreach (var candidate in GetSmartSnapCandidates(horizontal))
+        {
+            var distance = Math.Abs(candidate - edge);
+            if (distance < bestDistance)
+            {
+                bestDistance = distance;
+                snappedEdge = candidate;
+                snappedGuide = candidate;
+            }
+        }
+
+        return snappedEdge;
     }
 
     private void UpdateSmartSnapGuides(double? x, double? y)
