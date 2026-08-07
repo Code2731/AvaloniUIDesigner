@@ -44,6 +44,7 @@ public partial class MainWindow : Window
         Arrow keys           Nudge selection by 1 px
         Shift+Arrow keys     Nudge selection by 10 px
         Shift+corner handle  Lock aspect ratio while resizing
+        Double-click element Quick edit visible content
         Delete / Backspace   Remove selection
         """;
 
@@ -3361,7 +3362,7 @@ public partial class MainWindow : Window
         e.Handled = true;
     }
 
-    private void OnElementPointerPressed(object? sender, PointerPressedEventArgs e)
+    private async void OnElementPointerPressed(object? sender, PointerPressedEventArgs e)
     {
         if (Vm is null || sender is not Control { DataContext: DesignElement element })
         {
@@ -3404,6 +3405,12 @@ public partial class MainWindow : Window
             return;
         }
 
+        if (e.ClickCount >= 2 && await TryOpenQuickContentEditorAsync(element))
+        {
+            e.Handled = true;
+            return;
+        }
+
         if (element.IsContainerChild)
         {
             Vm.StatusText = "Container child position and size are managed by its parent layout.";
@@ -3413,6 +3420,26 @@ public partial class MainWindow : Window
 
         BeginDrag(DragMode.Move, element, e);
         e.Handled = true;
+    }
+
+    private async Task<bool> TryOpenQuickContentEditorAsync(DesignElement element)
+    {
+        if (Vm is null || !Vm.TryGetSelectedQuickContent(out var state))
+        {
+            return false;
+        }
+
+        var updatedContent = await ShowTextEditorDialogAsync(
+            $"Quick Edit - {state.ControlName}",
+            state.Content,
+            $"Edit the visible {state.PropertyName} for {state.ControlKind}.",
+            state.IsMultiline);
+        if (updatedContent is not null)
+        {
+            Vm.SetSelectedQuickContent(updatedContent);
+        }
+
+        return true;
     }
 
     private void OnHandlePressed(object? sender, PointerPressedEventArgs e)

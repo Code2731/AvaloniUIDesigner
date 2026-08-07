@@ -132,6 +132,7 @@ dotnet run --project src/AvaloniaUIDesigner.App/AvaloniaUIDesigner.App.csproj
 47. 선택한 컨트롤의 8방향 핸들을 드래그하면 이동과 동일한 Smart Snap 후보에 크기의 해당 모서리가 맞고, 최소 크기 10px 아래로 줄어들지 않음
 48. 같은 root 또는 같은 Canvas의 컨트롤을 여러 개 선택한 뒤 bounding box 핸들을 드래그하면 상대 배치와 크기를 함께 조정하며, 부모가 좌표를 관리하는 컨트롤은 기존 전용 편집기를 사용
 49. 코너 핸들을 `Shift`와 함께 드래그하면 원래 가로·세로 비율을 유지하며, 잠금 중에는 Smart Snap 기준선보다 비율 보존을 우선함
+50. 캔버스에서 텍스트·버튼·토글·라벨·fallback 컨트롤을 더블클릭하면 해당 요소의 visible `Text`/`Content`를 빠르게 편집하고, 적용 시 Undo·AXAML·Preview에 함께 반영
 
 DataGrid가 포함된 생성 AXAML을 다른 프로젝트에서 사용할 때는 같은 Avalonia 버전의 `Avalonia.Controls.DataGrid` 패키지와 `avares://Avalonia.Controls.DataGrid/Themes/Fluent.xaml` 스타일 include가 필요합니다.
 

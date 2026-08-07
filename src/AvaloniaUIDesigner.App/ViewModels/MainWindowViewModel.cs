@@ -355,6 +355,13 @@ public sealed record ButtonEditorState(
     string CommandParameter,
     string ClickHandler);
 
+public sealed record QuickContentEditorState(
+    string ControlName,
+    string ControlKind,
+    string PropertyName,
+    string Content,
+    bool IsMultiline);
+
 public sealed record GridDefinitionEditorState(
     string ControlName,
     string RowDefinitions,
@@ -4048,6 +4055,173 @@ public partial class MainWindowViewModel : ViewModelBase
         return true;
     }
 
+    public bool TryGetSelectedQuickContent(out QuickContentEditorState state)
+    {
+        var target = Canvas.SelectedElement;
+        if (target is null || target.IsLocked)
+        {
+            state = default!;
+            StatusText = target is { IsLocked: true }
+                ? "Unlock the selected control before quick content editing."
+                : "Select a control before quick content editing.";
+            return false;
+        }
+
+        switch (target.Visual)
+        {
+            case SelectableTextBlock selectableTextBlock:
+                state = new QuickContentEditorState(
+                    target.DisplayName,
+                    nameof(SelectableTextBlock),
+                    "Text",
+                    selectableTextBlock.Text ?? string.Empty,
+                    true);
+                return true;
+            case TextBlock textBlock:
+                state = new QuickContentEditorState(
+                    target.DisplayName,
+                    nameof(TextBlock),
+                    "Text",
+                    textBlock.Text ?? string.Empty,
+                    true);
+                return true;
+            case TextBox textBox:
+                state = new QuickContentEditorState(
+                    target.DisplayName,
+                    target.Visual.GetType().Name,
+                    "Text",
+                    textBox.Text ?? string.Empty,
+                    true);
+                return true;
+            case AutoCompleteBox autoCompleteBox:
+                state = new QuickContentEditorState(
+                    target.DisplayName,
+                    nameof(AutoCompleteBox),
+                    "Text",
+                    autoCompleteBox.Text ?? string.Empty,
+                    true);
+                return true;
+            case ToggleButton toggleButton:
+                state = new QuickContentEditorState(
+                    target.DisplayName,
+                    target.Visual.GetType().Name,
+                    "Content",
+                    toggleButton.Content?.ToString() ?? string.Empty,
+                    false);
+                return true;
+            case Button button when DesignerButtonRuntime.IsSupportedControl(button):
+                state = new QuickContentEditorState(
+                    target.DisplayName,
+                    nameof(Button),
+                    "Content",
+                    button.Content?.ToString() ?? string.Empty,
+                    false);
+                return true;
+            case Label label:
+                state = new QuickContentEditorState(
+                    target.DisplayName,
+                    nameof(Label),
+                    "Content",
+                    label.Content?.ToString() ?? string.Empty,
+                    true);
+                return true;
+        }
+
+        if (IsDesignerContentContainer(target.Visual))
+        {
+            if (GetDesignerContentChild(target) is not null)
+            {
+                state = default!;
+                StatusText = "This container uses a designer child. Select that child to quick-edit its content.";
+                return false;
+            }
+
+            state = new QuickContentEditorState(
+                target.DisplayName,
+                target.Visual.GetType().Name,
+                "Content",
+                target.Visual switch
+                {
+                    Expander expander => ReadExpanderContent(expander),
+                    ScrollViewer scrollViewer => ReadScrollViewerContent(scrollViewer),
+                    Border border => ReadBorderContent(border),
+                    ContentControl contentControl => ReadContentControlContent(contentControl),
+                    _ => string.Empty,
+                },
+                true);
+            return true;
+        }
+
+        state = default!;
+        StatusText = "Quick content editing is available for text, button, toggle, label, and fallback content controls.";
+        return false;
+    }
+
+    public bool SetSelectedQuickContent(string content)
+    {
+        if (!TryGetSelectedQuickContent(out var state))
+        {
+            return false;
+        }
+
+        var target = Canvas.SelectedElement!;
+        if (string.Equals(state.Content, content, StringComparison.Ordinal))
+        {
+            StatusText = "Content is unchanged.";
+            return true;
+        }
+
+        BeginCanvasMutation(HistoryActionType.EditProperty, $"Updated {state.PropertyName}.");
+        switch (target.Visual)
+        {
+            case SelectableTextBlock selectableTextBlock:
+                selectableTextBlock.Text = content;
+                DesignerStyleApplicationMetadata.ClearApplied(selectableTextBlock, "Text");
+                break;
+            case TextBlock textBlock:
+                textBlock.Text = content;
+                DesignerStyleApplicationMetadata.ClearApplied(textBlock, "Text");
+                break;
+            case TextBox textBox:
+                textBox.Text = content;
+                DesignerStyleApplicationMetadata.ClearApplied(textBox, "Text");
+                break;
+            case AutoCompleteBox autoCompleteBox:
+                autoCompleteBox.Text = content;
+                DesignerStyleApplicationMetadata.ClearApplied(autoCompleteBox, "Text");
+                break;
+            case ToggleButton toggleButton:
+                toggleButton.Content = content;
+                DesignerStyleApplicationMetadata.ClearApplied(toggleButton, "Content");
+                break;
+            case Button button when DesignerButtonRuntime.IsSupportedControl(button):
+                button.Content = content;
+                DesignerStyleApplicationMetadata.ClearApplied(button, "Content");
+                break;
+            case Label label:
+                label.Content = content;
+                DesignerStyleApplicationMetadata.ClearApplied(label, "Content");
+                break;
+            case Expander expander:
+                SetExpanderContent(expander, content);
+                break;
+            case ScrollViewer scrollViewer:
+                SetScrollViewerContent(scrollViewer, content);
+                break;
+            case Border border:
+                SetBorderContent(border, content);
+                break;
+            case ContentControl contentControl:
+                SetContentControlContent(contentControl, content);
+                break;
+        }
+
+        Canvas.RefreshDocumentStyles(target.Visual);
+        CommitCanvasMutation();
+        StatusText = $"Updated quick content for {target.DisplayName}.";
+        return true;
+    }
+
     public bool TryGetSelectedExpanderContent(out string controlName, out string content)
     {
         var target = Canvas.SelectedElement;
@@ -6524,10 +6698,25 @@ public partial class MainWindowViewModel : ViewModelBase
 
     public void RemoveSelectedElement()
     {
-        var targets = Canvas.SelectedElements.Where(element => !element.IsLocked).ToList();
-        if (targets.Count == 0)
+        var selected = Canvas.SelectedElements.Where(element => !element.IsLocked).ToList();
+        if (selected.Count == 0)
         {
             StatusText = "No unlocked controls to delete.";
+            return;
+        }
+
+        var targets = selected
+            .SelectMany(target => target.Visual is Canvas
+                || target.Visual.GetType() == typeof(ContentControl)
+                ? CollectSelectionSubtree([target])
+                : [target])
+            .Distinct()
+            .OrderBy(GetElementDepth)
+            .ThenBy(Canvas.Elements.IndexOf)
+            .ToList();
+        if (targets.Any(element => element.IsLocked))
+        {
+            StatusText = "Cannot delete a hierarchy that contains locked controls.";
             return;
         }
 
@@ -6542,7 +6731,7 @@ public partial class MainWindowViewModel : ViewModelBase
             }
         }
 
-        foreach (var target in targets)
+        foreach (var target in targets.OrderByDescending(GetElementDepth).ToList())
         {
             Canvas.RemoveElement(target);
         }
