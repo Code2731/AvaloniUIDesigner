@@ -405,6 +405,54 @@ public partial class MainWindow : Window
         _ = await SaveDocumentAsync(forceSaveAs: true);
     }
 
+    private async void OnRecoverBackupMenuClicked(
+        object? sender,
+        Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        if (Vm is null || string.IsNullOrWhiteSpace(Vm.CurrentDocumentPath))
+        {
+            return;
+        }
+
+        FlushPendingPropertyHistory();
+        if (!await EnsureCanContinueWithUnsavedChangesAsync())
+        {
+            return;
+        }
+
+        var documentPath = Vm.CurrentDocumentPath;
+        if (string.IsNullOrWhiteSpace(documentPath))
+        {
+            UpdateDocumentBackupMenu();
+            return;
+        }
+
+        var backupPath = GetDocumentBackupPath(documentPath);
+        if (!File.Exists(backupPath))
+        {
+            UpdateDocumentBackupMenu();
+            Vm.StatusText = "No document backup is available.";
+            return;
+        }
+
+        try
+        {
+            var backupAxaml = await File.ReadAllTextAsync(backupPath);
+            if (!Vm.TryApplyAxamlSource(backupAxaml, out var result))
+            {
+                Vm.StatusText = $"Could not recover backup: {result}";
+                return;
+            }
+
+            ClearDesignGuides();
+            Vm.StatusText = $"Recovered backup for {System.IO.Path.GetFileName(documentPath)}. {result}";
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        {
+            Vm.StatusText = $"Could not recover backup: {exception.Message}";
+        }
+    }
+
     private async void OnCopyAxamlMenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
         if (Vm is null)
@@ -2475,6 +2523,7 @@ public partial class MainWindow : Window
         if (_boundVm is not null)
         {
             _boundVm.RecentFiles.CollectionChanged -= OnRecentFilesChanged;
+            _boundVm.PropertyChanged -= OnViewModelPropertyChanged;
         }
 
         _boundVm = Vm;
@@ -2488,9 +2537,11 @@ public partial class MainWindow : Window
         if (_boundVm is not null)
         {
             _boundVm.RecentFiles.CollectionChanged += OnRecentFilesChanged;
+            _boundVm.PropertyChanged += OnViewModelPropertyChanged;
         }
 
         RebuildRecentFilesMenu();
+        UpdateDocumentBackupMenu();
         RebindSelection();
         UpdateViewportRulers();
     }
@@ -2499,6 +2550,36 @@ public partial class MainWindow : Window
     {
         RebuildRecentFilesMenu();
     }
+
+    private void OnViewModelPropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(MainWindowViewModel.CurrentDocumentPath))
+        {
+            UpdateDocumentBackupMenu();
+        }
+    }
+
+    private void UpdateDocumentBackupMenu()
+    {
+        if (RecoverBackupMenu is null)
+        {
+            return;
+        }
+
+        var path = Vm?.CurrentDocumentPath;
+        try
+        {
+            RecoverBackupMenu.IsEnabled = !string.IsNullOrWhiteSpace(path)
+                && File.Exists(GetDocumentBackupPath(path));
+        }
+        catch (ArgumentException)
+        {
+            RecoverBackupMenu.IsEnabled = false;
+        }
+    }
+
+    private static string GetDocumentBackupPath(string documentPath)
+        => $"{System.IO.Path.GetFullPath(documentPath)}.bak";
 
     private void RebuildRecentFilesMenu()
     {
@@ -3971,7 +4052,10 @@ public partial class MainWindow : Window
             {
                 if (!string.IsNullOrWhiteSpace(pickedPath))
                 {
-                    await AtomicFileWriter.WriteAllTextAsync(pickedPath, axaml);
+                    await AtomicFileWriter.WriteAllTextAsync(
+                        pickedPath,
+                        axaml,
+                        GetDocumentBackupPath(pickedPath));
                     Vm.MarkDocumentSaved(pickedPath);
                     Vm.StatusText = $"Saved {System.IO.Path.GetFileName(pickedPath)}";
                 }
@@ -3998,7 +4082,10 @@ public partial class MainWindow : Window
 
         try
         {
-            await AtomicFileWriter.WriteAllTextAsync(targetPath, axaml);
+            await AtomicFileWriter.WriteAllTextAsync(
+                targetPath,
+                axaml,
+                GetDocumentBackupPath(targetPath));
             Vm.MarkDocumentSaved(targetPath);
             Vm.StatusText = $"Saved {System.IO.Path.GetFileName(targetPath)}";
             return true;

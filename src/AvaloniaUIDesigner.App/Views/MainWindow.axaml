@@ -40,6 +40,10 @@
                 <Separator/>
                 <MenuItem Header="Save" Click="OnSaveMenuClicked"/>
                 <MenuItem Header="Save As..." Click="OnSaveAsMenuClicked"/>
+                <MenuItem Header="Recover Backup..."
+                          x:Name="RecoverBackupMenu"
+                          Click="OnRecoverBackupMenuClicked"
+                          IsEnabled="False"/>
                 <MenuItem Header="Copy AXAML to Clipboard" Click="OnCopyAxamlMenuClicked"/>
                 <MenuItem Header="Copy Selected AXAML" Click="OnCopySelectedAxamlMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
                 <MenuItem Header="Export Selected AXAML..." Click="OnExportSelectedAxamlMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>

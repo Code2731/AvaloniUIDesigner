@@ -35,7 +35,7 @@ Users should be able to place controls visually, inspect properties, and validat
 ## Non-Functional Requirements
 - Startup under 2 seconds on a typical dev machine
 - Interactive operations (move/resize/select) should feel immediate
-- Crash-safe save path in future versions (v0.6+)
+- Crash-safe save path with atomic AXAML writes and recoverable `.bak` snapshots
 
 ## Roadmap
 1. v0.5

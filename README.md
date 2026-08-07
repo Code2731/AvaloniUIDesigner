@@ -73,6 +73,7 @@ dotnet run --project src/AvaloniaUIDesigner.App/AvaloniaUIDesigner.App.csproj
 - **클래스·상태 스타일**: `[Button.primary:pointerover]` 형식의 Setter, 선택 컨트롤별 상태 선택기와 캔버스 배지, 대화형 미리보기, 로컬 속성 우선순위 지원
 - **이벤트 선언**: Button Click 핸들러 이름 편집 및 AXAML 내보내기
 - **AXAML 워크플로**: Window 저장/열기, UserControl 내보내기, 복사, 현재 문서 유효성 확인과 런타임 미리보기
+- **Crash-safe 저장**: 기존 AXAML을 `.bak`으로 원자적으로 보존하고 File > Recover Backup...에서 복구하며, 복구 결과를 dirty 상태와 Undo/Redo에 연결
 - **디자인 ↔ 소스 왕복 편집**: 전체 Window/UserControl AXAML을 직접 편집하고, 캔버스를 바꾸지 않는 검증·미리보기 후 파일 경로를 유지한 채 단일 Undo/Redo 작업으로 적용
 - **도움말**: Help 메뉴에서 실제 편집·저장·Preview·AXAML 작업에 연결된 키보드 단축키와 앱 정보를 확인
 - 상태바 피드백
@@ -124,6 +125,7 @@ dotnet run --project src/AvaloniaUIDesigner.App/AvaloniaUIDesigner.App.csproj
 43. View > Artboard Size > `Custom...`에서 320-3840 x 240-2160 px 크기를 입력하고 미리보기 후 적용
 44. Help > `Keyboard Shortcuts...`에서 New·Open·Save·Preview·Undo/Redo·선택·가이드 단축키를 확인하고 Help > `About AvaloniaUIDesigner...`에서 앱 정보를 확인
 45. View > Grid Size > `Custom...`에서 4-32 px 간격을 입력하고 미리보기 후 적용
+46. AXAML을 두 번 이상 저장한 뒤 File > `Recover Backup...`에서 직전 저장본을 복구하고 필요하면 Undo/Redo로 확인
 
 DataGrid가 포함된 생성 AXAML을 다른 프로젝트에서 사용할 때는 같은 Avalonia 버전의 `Avalonia.Controls.DataGrid` 패키지와 `avares://Avalonia.Controls.DataGrid/Themes/Fluent.xaml` 스타일 include가 필요합니다.
 

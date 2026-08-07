@@ -7,15 +7,30 @@ namespace AvaloniaUIDesigner.App.Designer.Services;
 
 public static class AtomicFileWriter
 {
-    public static async Task WriteAllTextAsync(string path, string content)
+    public static Task WriteAllTextAsync(string path, string content)
+        => WriteAllTextAsync(path, content, backupPath: null);
+
+    public static async Task WriteAllTextAsync(string path, string content, string? backupPath)
     {
         var targetPath = Path.GetFullPath(path);
         var directory = Path.GetDirectoryName(targetPath)
             ?? throw new IOException("The target path does not have a directory.");
+        var backupTargetPath = string.IsNullOrWhiteSpace(backupPath)
+            ? null
+            : Path.GetFullPath(backupPath);
+        if (string.Equals(targetPath, backupTargetPath, StringComparison.OrdinalIgnoreCase))
+        {
+            throw new ArgumentException("The backup path must differ from the target path.", nameof(backupPath));
+        }
+
         var fileName = Path.GetFileName(targetPath);
         var temporaryPath = Path.Combine(directory, $".{fileName}.{Guid.NewGuid():N}.tmp");
 
         Directory.CreateDirectory(directory);
+        if (backupTargetPath is not null)
+        {
+            Directory.CreateDirectory(Path.GetDirectoryName(backupTargetPath)!);
+        }
 
         try
         {
@@ -39,7 +54,11 @@ public static class AtomicFileWriter
 
             if (File.Exists(targetPath))
             {
-                File.Replace(temporaryPath, targetPath, destinationBackupFileName: null, ignoreMetadataErrors: true);
+                File.Replace(
+                    temporaryPath,
+                    targetPath,
+                    destinationBackupFileName: backupTargetPath,
+                    ignoreMetadataErrors: true);
             }
             else
             {
