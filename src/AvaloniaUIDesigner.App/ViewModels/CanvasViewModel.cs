@@ -3268,9 +3268,11 @@ public partial class CanvasViewModel : ViewModelBase
         }
 
         return (
-            new TextBlock { Text = $"[Unsupported: {displayName}]" },
-            160,
-            24);
+            DesignerCustomControlRuntime.CreatePlaceholder(
+                typeName,
+                string.IsNullOrWhiteSpace(displayName) ? typeName : displayName),
+            240,
+            96);
     }
 
     private void ApplyVisualProperties(Control visual, IReadOnlyDictionary<string, string>? properties)
@@ -3279,6 +3281,8 @@ public partial class CanvasViewModel : ViewModelBase
         {
             return;
         }
+
+        ApplyCustomControlMetadata(visual, properties);
 
         if (properties.TryGetValue("__bindings", out var bindingsJson)
             && DesignerBindingRuntime.TryDeserialize(bindingsJson, out var bindings))
@@ -3794,6 +3798,37 @@ public partial class CanvasViewModel : ViewModelBase
                 grid.ShowGridLines = parsedShowGrid;
             }
         }
+    }
+
+    private static void ApplyCustomControlMetadata(
+        Control visual,
+        IReadOnlyDictionary<string, string> properties)
+    {
+        if (visual.Tag is not DesignerCustomControlMetadata metadata)
+        {
+            return;
+        }
+
+        var defaultProperties = new Dictionary<string, string>(
+            metadata.DefaultProperties,
+            StringComparer.Ordinal);
+        foreach (var pair in properties)
+        {
+            if (!pair.Key.StartsWith("__", StringComparison.Ordinal))
+            {
+                defaultProperties[pair.Key] = pair.Value;
+            }
+        }
+
+        var previewText = properties.TryGetValue("__designPreviewText", out var persistedPreviewText)
+            && !string.IsNullOrWhiteSpace(persistedPreviewText)
+                ? persistedPreviewText
+                : metadata.PreviewText;
+        visual.Tag = metadata with
+        {
+            PreviewText = previewText,
+            DefaultProperties = defaultProperties,
+        };
     }
 
     private void TrySetTextForeground(TextBlock textBlock, string foreground)

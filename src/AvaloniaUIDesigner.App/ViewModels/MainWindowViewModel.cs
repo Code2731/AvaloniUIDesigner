@@ -1046,7 +1046,7 @@ public partial class MainWindowViewModel : ViewModelBase
             return false;
         }
 
-        if (!_componentCatalog.TryGet(target.TypeName, out _))
+        if (!_componentCatalog.TryGet(target.TypeName, out var targetDefinition))
         {
             error = $"Unsupported Avalonia type: {target.TypeName}";
             return false;
@@ -1087,6 +1087,8 @@ public partial class MainWindowViewModel : ViewModelBase
                     DefaultWidth = target.Width,
                     DefaultHeight = target.Height,
                     DefaultProperties = properties,
+                    DesignOnly = targetDefinition.IsDesignOnly,
+                    PreviewText = targetDefinition.PreviewText,
                 }
             ]
         };
@@ -9524,6 +9526,26 @@ public partial class MainWindowViewModel : ViewModelBase
     private IReadOnlyDictionary<string, string>? CaptureVisualPropertiesWithoutSample(Control visual)
     {
         var properties = CaptureVisualPropertiesCore(visual);
+
+        if (visual.Tag is DesignerCustomControlMetadata customMetadata)
+        {
+            var customProperties = new Dictionary<string, string>(
+                customMetadata.DefaultProperties,
+                StringComparer.Ordinal);
+            if (properties is not null)
+            {
+                foreach (var propertyName in customProperties.Keys.ToList())
+                {
+                    if (properties.TryGetValue(propertyName, out var currentValue))
+                    {
+                        customProperties[propertyName] = currentValue;
+                    }
+                }
+            }
+
+            customProperties["__designPreviewText"] = customMetadata.PreviewText;
+            return customProperties;
+        }
 
         var result = properties is null
             ? new Dictionary<string, string>(StringComparer.Ordinal)

@@ -11,4 +11,6 @@ public sealed record DesignerComponentDefinition(
     double DefaultHeight,
     Func<Control> VisualFactory,
     IReadOnlyDictionary<string, string>? DefaultProperties = null,
-    string? NamePrefix = null);
+    string? NamePrefix = null,
+    bool IsDesignOnly = false,
+    string? PreviewText = null);

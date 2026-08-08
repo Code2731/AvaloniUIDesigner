@@ -546,7 +546,10 @@ public sealed class PreviewWindow : Window
             {
                 Background = Brush.Parse("#F8FAFC"),
             },
-            _ => new TextBlock { Text = $"[Unsupported: {snapshot.DisplayName}]" },
+            _ => DesignerCustomControlRuntime.CreatePlaceholder(
+                snapshot.TypeName,
+                ReadDesignOnlyPreviewText(snapshot),
+                ReadDesignOnlyProperties(snapshot.VisualProperties)),
         };
 
         ApplyProperties(control, snapshot.VisualProperties, colorResources);
@@ -554,6 +557,21 @@ public sealed class PreviewWindow : Window
         WireInteractiveStyleStates(control, styles, colorResources);
         return control;
     }
+
+    private static string ReadDesignOnlyPreviewText(DesignerElementSnapshot snapshot)
+        => snapshot.VisualProperties is not null
+            && snapshot.VisualProperties.TryGetValue("__designPreviewText", out var previewText)
+            && !string.IsNullOrWhiteSpace(previewText)
+                ? previewText
+                : snapshot.DisplayName;
+
+    private static IReadOnlyDictionary<string, string> ReadDesignOnlyProperties(
+        IReadOnlyDictionary<string, string>? properties)
+        => properties is null
+            ? new Dictionary<string, string>()
+            : properties
+                .Where(pair => !pair.Key.StartsWith("__", StringComparison.Ordinal))
+                .ToDictionary(pair => pair.Key, pair => pair.Value, StringComparer.Ordinal);
 
     private static void WireInteractiveStyleStates(
         Control control,

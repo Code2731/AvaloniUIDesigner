@@ -460,7 +460,10 @@ public sealed class BuiltInComponentCatalog : IComponentCatalog
             return false;
         }
 
-        if (!_baseDefinitions.TryGetValue(definition.AvaloniaTypeName, out var baseDefinition))
+        var hasBaseDefinition = _baseDefinitions.TryGetValue(
+            definition.AvaloniaTypeName,
+            out var baseDefinition);
+        if (!hasBaseDefinition && !definition.IsDesignOnly)
         {
             error = $"Unsupported Avalonia type: {definition.AvaloniaTypeName}";
             return false;
@@ -475,7 +478,14 @@ public sealed class BuiltInComponentCatalog : IComponentCatalog
             return false;
         }
 
-        _definitions.Add(definition with { VisualFactory = baseDefinition.VisualFactory });
+        var registered = hasBaseDefinition && !definition.IsDesignOnly
+            ? definition with { VisualFactory = baseDefinition!.VisualFactory }
+            : definition;
+        _definitions.Add(registered);
+        if (!hasBaseDefinition || definition.IsDesignOnly)
+        {
+            _baseDefinitions[registered.AvaloniaTypeName] = registered;
+        }
         error = string.Empty;
         return true;
     }

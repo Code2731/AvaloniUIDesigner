@@ -49,6 +49,6 @@ Users should be able to place controls visually, inspect properties, and validat
 - Undo/redo stack
 
 3. v0.7
-- Custom control metadata extension model
+- ~~Custom control metadata extension model~~
 - Plugin-based component packs
 - ~~Style and resource editing support~~

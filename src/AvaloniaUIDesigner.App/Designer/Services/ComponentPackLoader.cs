@@ -4,6 +4,7 @@ using System.Linq;
 using System.Text.Json;
 using AvaloniaUIDesigner.App.Designer.Contracts;
 using AvaloniaUIDesigner.App.Designer.Core;
+using AvaloniaUIDesigner.App.Models;
 
 namespace AvaloniaUIDesigner.App.Designer.Services;
 
@@ -56,14 +57,17 @@ public sealed class ComponentPackLoader
                 return false;
             }
 
-            if (!catalog.TryGet(component.AvaloniaTypeName, out var baseDefinition))
+            var typeName = component.AvaloniaTypeName.Trim();
+            var hasBaseDefinition = catalog.TryGet(typeName, out var baseDefinition);
+            var isDesignOnly = !hasBaseDefinition || baseDefinition.IsDesignOnly;
+            if (isDesignOnly && !component.DesignOnly)
             {
-                error = $"Unsupported Avalonia type: {component.AvaloniaTypeName}";
+                error = $"Unsupported Avalonia type: {typeName}. Set DesignOnly to true to use a design-time placeholder.";
                 return false;
             }
 
-            var width = component.DefaultWidth ?? baseDefinition.DefaultWidth;
-            var height = component.DefaultHeight ?? baseDefinition.DefaultHeight;
+            var width = component.DefaultWidth ?? (hasBaseDefinition ? baseDefinition.DefaultWidth : 240);
+            var height = component.DefaultHeight ?? (hasBaseDefinition ? baseDefinition.DefaultHeight : 96);
             if (!double.IsFinite(width) || width < 10 || width > 3840
                 || !double.IsFinite(height) || height < 10 || height > 2160)
             {
@@ -83,14 +87,26 @@ public sealed class ComponentPackLoader
                 return false;
             }
 
+            var previewText = string.IsNullOrWhiteSpace(component.PreviewText)
+                ? component.DisplayName.Trim()
+                : component.PreviewText.Trim();
+            var visualFactory = isDesignOnly
+                ? () => DesignerCustomControlRuntime.CreatePlaceholder(
+                    typeName,
+                    previewText,
+                    properties ?? new Dictionary<string, string>(StringComparer.Ordinal))
+                : baseDefinition.VisualFactory;
+
             definitions.Add(new DesignerComponentDefinition(
                 component.DisplayName,
-                component.AvaloniaTypeName,
+                typeName,
                 width,
                 height,
-                baseDefinition.VisualFactory,
+                visualFactory,
                 properties,
-                namePrefix));
+                namePrefix,
+                isDesignOnly,
+                previewText));
         }
 
         foreach (var definition in definitions)
@@ -138,6 +154,8 @@ public sealed class ComponentPackComponent
     public double? DefaultWidth { get; set; }
     public double? DefaultHeight { get; set; }
     public Dictionary<string, string?>? DefaultProperties { get; set; }
+    public bool DesignOnly { get; set; }
+    public string? PreviewText { get; set; }
 }
 
 public sealed record ComponentPackLoadResult(
