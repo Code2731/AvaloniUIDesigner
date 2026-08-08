@@ -420,6 +420,7 @@
                             <ItemsControl Name="DesignHost"
                                           ItemsSource="{Binding Canvas.Elements}"
                                           Background="Transparent"
+                                          Focusable="True"
                                           PointerPressed="OnDesignHostPointerPressed"
                                           PointerMoved="OnDragPointerMoved"
                                           PointerReleased="OnDragPointerReleased">

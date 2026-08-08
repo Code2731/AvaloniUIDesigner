@@ -40,6 +40,8 @@ public partial class MainWindow : Window
         Ctrl+X              Cut selection
         Ctrl+V              Paste selection
         Ctrl+Shift+G        Clear design guides
+        Tab                 Select next visible control on the canvas
+        Shift+Tab           Select previous visible control on the canvas
         Escape              Return to the selection tool
         Arrow keys           Nudge selection by 1 px
         Shift+Arrow keys     Nudge selection by 10 px
@@ -2404,6 +2406,13 @@ public partial class MainWindow : Window
         var ctrl = e.KeyModifiers.HasFlag(KeyModifiers.Control);
         var shift = e.KeyModifiers.HasFlag(KeyModifiers.Shift);
 
+        if (!ctrl && e.Key == Key.Tab && ReferenceEquals(e.Source, DesignHost))
+        {
+            Vm.SelectNextVisibleElement(shift);
+            e.Handled = true;
+            return;
+        }
+
         if (ctrl && shift && e.Key == Key.G)
         {
             ClearDesignGuides();
@@ -3385,6 +3394,8 @@ public partial class MainWindow : Window
             return;
         }
 
+        DesignHost.Focus();
+
         if (TryBeginViewportPan(host, e))
         {
             return;
@@ -3417,6 +3428,8 @@ public partial class MainWindow : Window
         {
             return;
         }
+
+        DesignHost.Focus();
 
         if (TryBeginViewportPan((Control)sender, e))
         {

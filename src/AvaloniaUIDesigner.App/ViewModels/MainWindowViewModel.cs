@@ -1128,6 +1128,30 @@ public partial class MainWindowViewModel : ViewModelBase
         StatusText = selection.Count == 0 ? "Ready" : $"Selected {selection.Count} control(s)";
     }
 
+    public bool SelectNextVisibleElement(bool reverse = false)
+    {
+        var candidates = Canvas.Elements
+            .Where(element => element.IsVisibleOnArtboard)
+            .ToList();
+        if (candidates.Count == 0)
+        {
+            StatusText = "No visible controls to select.";
+            return false;
+        }
+
+        var currentIndex = Canvas.SelectedElement is { } selected
+            ? candidates.IndexOf(selected)
+            : -1;
+        var nextIndex = reverse
+            ? currentIndex <= 0 ? candidates.Count - 1 : currentIndex - 1
+            : currentIndex < 0 || currentIndex == candidates.Count - 1 ? 0 : currentIndex + 1;
+
+        var next = candidates[nextIndex];
+        SelectElement(next);
+        StatusText = $"Selected {next.DisplayName} ({nextIndex + 1}/{candidates.Count})";
+        return true;
+    }
+
     public void SetSelectedOpacity(double opacity)
     {
         var targets = Canvas.SelectedElements.Where(element => !element.IsLocked).ToList();
