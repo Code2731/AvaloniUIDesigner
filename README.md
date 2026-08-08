@@ -106,6 +106,7 @@ dotnet run --project src/AvaloniaUIDesigner.App/AvaloniaUIDesigner.App.csproj
 - **Object Tree 키보드 편집**: 트리에 포커스가 있을 때 방향키는 계층을 탐색하고, `F2`로 이름 변경, `Delete`/`Backspace`로 삭제, `Ctrl+L`로 잠금 전환
 - **이동/리사이즈 기즈모**: 선택된 요소를 드래그로 이동, 8방향 핸들로 리사이즈 (최소 10px)
 - **PropertyGrid 연동**: 선택된 컨트롤의 속성을 bodong PropertyGrid로 실시간 편집
+- **Property Inspector 탐색**: 선택 컨트롤 타입을 헤더에 표시하고 `Categories`/`Flat`, `Expand`/`Collapse`로 속성 그룹과 표시 밀도를 즉시 전환하며, 내장 카테고리 순서·알파벳 속성 정렬·Quick Filter를 함께 제공
 - **Property Inspector 검색**: 우측 PropertyGrid의 Quick Filter로 선택 컨트롤의 속성 이름을 즉시 필터링
 - **Appearance 편집**: 배경·전경·테두리·두께·모서리를 편집하고 Undo/Redo, 미리보기, AXAML 왕복에 보존
 - **색상 리소스**: 문서 단위 SolidColorBrush를 편집하고 DynamicResource로 컨트롤에 적용
@@ -207,6 +208,7 @@ dotnet run --project src/AvaloniaUIDesigner.App/AvaloniaUIDesigner.App.csproj
 85. 배치 모드에서 Canvas 위로 포인터를 움직이면 반투명 ghost와 항목명, 기본 크기, 스냅된 `x, y`가 표시됩니다. 포인터를 Canvas 밖으로 옮기거나 드래그 앤 드롭을 시작하면 ghost가 숨겨지고, 클릭하면 표시된 좌표에 배치됩니다.
 86. 배치 모드에서 Grid·StackPanel·DockPanel·WrapPanel·UniformGrid·Canvas·TabControl·SplitView·Content 컨테이너 위로 포인터를 옮기면 수용 가능한 target이 주황색 outline으로 강조됩니다. 해당 영역을 클릭하면 Toolbox 컨트롤이 target에 자동 삽입되고, 빈 셀·삽입 순서·단일 Content 슬롯 검증 결과가 상태바와 Object Tree에 반영됩니다.
 87. 정밀 target feedback은 Grid/UniformGrid의 `R# C#` 셀, StackPanel/DockPanel/WrapPanel의 `insert #` 삽입선, TabControl/SplitView/Content의 슬롯 bounds를 ghost 상세에 표시해 클릭 전에 실제 계층 배치 결과를 확인하게 합니다.
+88. Properties 패널 헤더에서 선택 컨트롤의 타입을 확인하고 `Categories`/`Flat`으로 속성 그룹을 전환하거나 `Expand`/`Collapse`로 모든 카테고리를 펼치고 접습니다. Quick Filter에 속성명을 입력하면 현재 선택 컨트롤의 속성을 즉시 좁힙니다.
 
 DataGrid가 포함된 생성 AXAML을 다른 프로젝트에서 사용할 때는 같은 Avalonia 버전의 `Avalonia.Controls.DataGrid` 패키지와 `avares://Avalonia.Controls.DataGrid/Themes/Fluent.xaml` 스타일 include가 필요합니다.
 
@@ -317,6 +319,8 @@ AXAML 소스 편집기의 `Validate`와 `Preview`는 현재 디자인과 Undo �
 - ~~v1.4: Canvas Toolbox 배치 미리보기와 스냅 좌표 표시~~ ✅
 - ~~v1.5: Toolbox 컨테이너 target 강조 및 클릭 자동 삽입~~ ✅
 - ~~v1.6: 컨테이너 셀·삽입선·슬롯 정밀 target feedback~~ ✅
+- ~~v1.7: Object Tree 키보드 탐색 및 이름 변경·삭제·잠금 단축키~~ ✅
+- v1.8: Property Inspector 카테고리/평면 보기와 일괄 펼침 탐색
 
 ## 컴포넌트 팩
 

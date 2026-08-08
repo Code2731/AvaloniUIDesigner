@@ -906,6 +906,38 @@ public partial class MainWindow : Window
     private void OnToggleLockMenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
         => Vm?.ToggleSelectedLock();
 
+    private void OnPropertyInspectorCategoriesClicked(
+        object? sender,
+        Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        PropGrid.IsCategoryVisible = true;
+        Vm?.StatusText = "Property categories shown.";
+    }
+
+    private void OnPropertyInspectorFlatClicked(
+        object? sender,
+        Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        PropGrid.IsCategoryVisible = false;
+        Vm?.StatusText = "Property categories hidden.";
+    }
+
+    private void OnPropertyInspectorExpandAllClicked(
+        object? sender,
+        Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        PropGrid.AllCategoriesExpanded = true;
+        Vm?.StatusText = "All property categories expanded.";
+    }
+
+    private void OnPropertyInspectorCollapseAllClicked(
+        object? sender,
+        Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        PropGrid.AllCategoriesExpanded = false;
+        Vm?.StatusText = "All property categories collapsed.";
+    }
+
     private void OnOpacity100MenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
         => SetSelectionOpacity(1);
 

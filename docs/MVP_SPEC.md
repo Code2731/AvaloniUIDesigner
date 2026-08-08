@@ -82,3 +82,6 @@ Users should be able to place controls visually, inspect properties, and validat
 
 13. v1.7
 - ~~Object Tree keyboard navigation and inline editing shortcuts~~
+
+14. v1.8
+- Property Inspector category/flat view and expand/collapse navigation controls

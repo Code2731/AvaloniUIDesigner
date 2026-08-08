@@ -1035,9 +1035,43 @@
 
                 <Border Grid.Row="2" Background="#252526" BorderBrush="#3F3F46" BorderThickness="1,0,0,0">
                     <DockPanel>
-                        <Border DockPanel.Dock="Top" Background="#2D2D30" Padding="8,6">
-                            <TextBlock Text="Properties" FontWeight="SemiBold" Foreground="#CCCCCC"/>
-                        </Border>
+                    <Border DockPanel.Dock="Top" Background="#2D2D30" Padding="8,6">
+                        <Grid RowDefinitions="Auto,Auto">
+                            <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="6">
+                                <TextBlock Text="Properties" FontWeight="SemiBold" Foreground="#CCCCCC"/>
+                                <TextBlock Text="{Binding Canvas.SelectedElement.TypeName}"
+                                           IsVisible="{Binding Canvas.IsSelectionActive}"
+                                           FontSize="10"
+                                           Foreground="#9CDCFE"
+                                           VerticalAlignment="Center"/>
+                            </StackPanel>
+                            <StackPanel Grid.Row="1"
+                                        Orientation="Horizontal"
+                                        Spacing="3"
+                                        Margin="0,6,0,0">
+                                <Button Content="Categories"
+                                        Padding="5,2"
+                                        FontSize="10"
+                                        ToolTip.Tip="Show grouped property categories"
+                                        Click="OnPropertyInspectorCategoriesClicked"/>
+                                <Button Content="Flat"
+                                        Padding="5,2"
+                                        FontSize="10"
+                                        ToolTip.Tip="Show properties without category groups"
+                                        Click="OnPropertyInspectorFlatClicked"/>
+                                <Button Content="Expand"
+                                        Padding="5,2"
+                                        FontSize="10"
+                                        ToolTip.Tip="Expand all property categories"
+                                        Click="OnPropertyInspectorExpandAllClicked"/>
+                                <Button Content="Collapse"
+                                        Padding="5,2"
+                                        FontSize="10"
+                                        ToolTip.Tip="Collapse all property categories"
+                                        Click="OnPropertyInspectorCollapseAllClicked"/>
+                            </StackPanel>
+                        </Grid>
+                    </Border>
                         <Border DockPanel.Dock="Top" Padding="8" IsVisible="{Binding Canvas.IsSelectionActive}">
                             <Grid ColumnDefinitions="Auto,*,Auto,*" RowDefinitions="Auto,Auto">
                                 <TextBlock Grid.Row="0" Grid.Column="0" Text="X" VerticalAlignment="Center" Margin="0,0,4,4"/>
@@ -1056,7 +1090,15 @@
                                 <TextBox Name="ElementNameEditor" Grid.Column="1" LostFocus="OnElementNameEditorLostFocus"/>
                             </Grid>
                         </Border>
-                        <pg:PropertyGrid Name="PropGrid" IsQuickFilterVisible="True" IsHeaderVisible="False"/>
+                        <pg:PropertyGrid Name="PropGrid"
+                                         IsQuickFilterVisible="True"
+                                         IsHeaderVisible="False"
+                                         IsCategoryVisible="True"
+                                         IsAutoNameWidth="True"
+                                         LayoutStyle="Tree"
+                                         CategoryOrderStyle="Builtin"
+                                         PropertyOrderStyle="Alphabetic"
+                                         AllCategoriesExpanded="True"/>
                     </DockPanel>
                 </Border>
             </Grid>
