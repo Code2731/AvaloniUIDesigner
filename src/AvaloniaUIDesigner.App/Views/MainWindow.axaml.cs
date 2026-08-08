@@ -2402,6 +2402,11 @@ public partial class MainWindow : Window
         var point = e.GetCurrentPoint((Control)sender);
         if (!point.Properties.IsLeftButtonPressed)
         {
+            if (point.Properties.IsRightButtonPressed)
+            {
+                Vm.SelectElement(element);
+            }
+
             return;
         }
 

@@ -730,6 +730,17 @@
                                     <StackPanel Orientation="Horizontal"
                                                 Spacing="4"
                                                 PointerPressed="OnObjectTreeNodePointerPressed">
+                                        <StackPanel.ContextMenu>
+                                            <ContextMenu>
+                                                <MenuItem Header="Rename..." Click="OnRenameSelectedControlMenuClicked"/>
+                                                <MenuItem Header="Lock / Unlock" Click="OnToggleLockMenuClicked"/>
+                                                <Separator/>
+                                                <MenuItem Header="Copy" Click="OnCopyMenuClicked"/>
+                                                <MenuItem Header="Cut" Click="OnCutMenuClicked"/>
+                                                <MenuItem Header="Duplicate" Click="OnDuplicateMenuClicked"/>
+                                                <MenuItem Header="Delete" Click="OnDeleteMenuClicked"/>
+                                            </ContextMenu>
+                                        </StackPanel.ContextMenu>
                                         <Border Background="#1D4ED8"
                                                 CornerRadius="2"
                                                 Padding="3,0"
