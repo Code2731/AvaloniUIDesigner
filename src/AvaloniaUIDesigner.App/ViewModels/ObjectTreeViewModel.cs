@@ -12,6 +12,7 @@ public partial class ObjectTreeViewModel : ViewModelBase
     public ObjectTreeViewModel()
     {
         Root = new ObjectNodeViewModel("Window (Root)");
+        Root.IsExpanded = true;
         Nodes = new ObservableCollection<ObjectNodeViewModel> { Root };
     }
 
@@ -62,10 +63,18 @@ public partial class ObjectTreeViewModel : ViewModelBase
 
     public void RebuildFrom(System.Collections.Generic.IEnumerable<DesignElement> elements)
     {
+        var expandedNames = _allChildren
+            .Where(node => node.IsExpanded)
+            .Select(node => node.DisplayName)
+            .ToHashSet(System.StringComparer.OrdinalIgnoreCase);
         _allChildren.Clear();
         foreach (var element in elements)
         {
-            _allChildren.Add(new ObjectNodeViewModel(element.DisplayName) { Element = element });
+            _allChildren.Add(new ObjectNodeViewModel(element.DisplayName)
+            {
+                Element = element,
+                IsExpanded = expandedNames.Contains(element.DisplayName),
+            });
         }
 
         RefreshVisibleChildren();
@@ -84,12 +93,34 @@ public partial class ObjectTreeViewModel : ViewModelBase
         {
             if (ReferenceEquals(node.Element, element))
             {
+                if (!IsSearchActive)
+                {
+                    ExpandAncestors(node);
+                }
+
                 SelectedNode = node;
                 return;
             }
         }
 
         SelectedNode = null;
+    }
+
+    private void ExpandAncestors(ObjectNodeViewModel node)
+    {
+        Root.IsExpanded = true;
+        var current = node;
+        while (true)
+        {
+            var parent = _allChildren.FirstOrDefault(candidate => candidate.Children.Contains(current));
+            if (parent is null)
+            {
+                return;
+            }
+
+            parent.IsExpanded = true;
+            current = parent;
+        }
     }
 
     public bool SelectNextMatch(bool reverse = false)
@@ -272,4 +303,7 @@ public partial class ObjectNodeViewModel : ViewModelBase
     public string DisplayName { get; }
     public DesignElement? Element { get; init; }
     public ObservableCollection<ObjectNodeViewModel> Children { get; } = new();
+
+    [ObservableProperty]
+    private bool _isExpanded;
 }
