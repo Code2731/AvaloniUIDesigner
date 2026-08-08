@@ -8202,7 +8202,9 @@ public partial class MainWindowViewModel : ViewModelBase
                     _serializer.Serialize(state.Document),
                     _serializer.Serialize(state.LastSavedSnapshot),
                     ExportPersistedHistory(state.UndoStack),
-                    ExportPersistedHistory(state.RedoStack));
+                    ExportPersistedHistory(state.RedoStack),
+                    state.ZoomScale,
+                    state.SelectedElementNames.ToList());
             })
             .ToList();
         var activeTabIndex = _selectedDocumentTab is null
@@ -8256,13 +8258,23 @@ public partial class MainWindowViewModel : ViewModelBase
                     : persistedTab.DisplayName;
                 var undoHistory = ParsePersistedHistory(persistedTab.UndoHistory);
                 var redoHistory = ParsePersistedHistory(persistedTab.RedoHistory);
+                var zoomScale = double.IsFinite(persistedTab.ZoomScale)
+                    ? Math.Clamp(persistedTab.ZoomScale, 0.25, 2)
+                    : 1;
+                var selectedElementNames = persistedTab.SelectedElementNames?
+                    .Where(name => !string.IsNullOrWhiteSpace(name))
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .ToList()
+                    ?? new List<string>();
                 restoredDocuments.Add(new RestoredDocumentTab(
                     persistedTab.DocumentPath,
                     displayName,
                     currentDocument,
                     savedDocument,
                     undoHistory,
-                    redoHistory));
+                    redoHistory,
+                    zoomScale,
+                    selectedElementNames));
             }
         }
         catch (Exception ex)
@@ -8286,6 +8298,9 @@ public partial class MainWindowViewModel : ViewModelBase
             var state = _documentTabStates[tab];
             CopyHistoryStack(CreateHistoryStack(restoredDocument.UndoHistory), state.UndoStack);
             CopyHistoryStack(CreateHistoryStack(restoredDocument.RedoHistory), state.RedoStack);
+            state.ZoomScale = restoredDocument.ZoomScale;
+            state.SelectedElementNames.Clear();
+            state.SelectedElementNames.AddRange(restoredDocument.SelectedElementNames);
             tab.Update(
                 restoredDocument.DocumentPath,
                 restoredDocument.DisplayName,
@@ -8386,7 +8401,9 @@ public partial class MainWindowViewModel : ViewModelBase
         _pendingMutation = state.PendingMutation;
         RestoreHistoryStack(_undoStack, state.UndoStack);
         RestoreHistoryStack(_redoStack, state.RedoStack);
+        Canvas.SetZoomScale(state.ZoomScale);
         ApplyDocument(state.Document);
+        RestoreTabSelection(state);
         RefreshDirtyState();
         RaiseHistoryChanged();
         OnPropertyChanged(nameof(CurrentDocumentPath));
@@ -8395,6 +8412,27 @@ public partial class MainWindowViewModel : ViewModelBase
         UpdateDocumentTabPresentations();
         StatusText = $"Switched to {state.Tab.DisplayName}.";
         return true;
+    }
+
+    public bool ActivateNextDocumentTab(bool reverse = false)
+    {
+        if (DocumentTabs.Count < 2)
+        {
+            return false;
+        }
+
+        var currentIndex = _selectedDocumentTab is null
+            ? 0
+            : DocumentTabs.IndexOf(_selectedDocumentTab);
+        if (currentIndex < 0)
+        {
+            currentIndex = 0;
+        }
+
+        var nextIndex = reverse
+            ? (currentIndex - 1 + DocumentTabs.Count) % DocumentTabs.Count
+            : (currentIndex + 1) % DocumentTabs.Count;
+        return ActivateDocumentTab(DocumentTabs[nextIndex]);
     }
 
     public bool IsDocumentTabDirty(DocumentTabViewModel tab)
@@ -12149,7 +12187,9 @@ public partial class MainWindowViewModel : ViewModelBase
             documentPath,
             new Stack<HistoryEntry>(),
             new Stack<HistoryEntry>(),
-            _pendingMutation);
+            _pendingMutation,
+            Canvas.ZoomScale,
+            new List<string>());
         _documentTabStates[tab] = state;
         DocumentTabs.Add(tab);
         OnPropertyChanged(nameof(HasMultipleDocumentTabs));
@@ -12185,9 +12225,24 @@ public partial class MainWindowViewModel : ViewModelBase
         state.DocumentPath = _currentDocumentPath;
         state.LastSavedSnapshot = _lastSavedSnapshot;
         state.PendingMutation = _pendingMutation;
+        state.ZoomScale = Canvas.ZoomScale;
+        state.SelectedElementNames.Clear();
+        state.SelectedElementNames.AddRange(
+            Canvas.SelectedElements.Select(element => element.DisplayName));
         CopyHistoryStack(_undoStack, state.UndoStack);
         CopyHistoryStack(_redoStack, state.RedoStack);
         UpdateDocumentTabPresentations();
+    }
+
+    private void RestoreTabSelection(DocumentTabState state)
+    {
+        var selectedElements = state.SelectedElementNames
+            .Select(name => Canvas.Elements.FirstOrDefault(element =>
+                string.Equals(element.DisplayName, name, StringComparison.OrdinalIgnoreCase)))
+            .Where(element => element is not null)
+            .Cast<DesignElement>()
+            .ToList();
+        SelectElements(selectedElements);
     }
 
     private List<PersistedHistoryEntry> ExportPersistedHistory(Stack<HistoryEntry> history)
@@ -15181,7 +15236,9 @@ public partial class MainWindowViewModel : ViewModelBase
         string? documentPath,
         Stack<HistoryEntry> undoStack,
         Stack<HistoryEntry> redoStack,
-        PendingMutation? pendingMutation)
+        PendingMutation? pendingMutation,
+        double zoomScale,
+        List<string> selectedElementNames)
     {
         public DocumentTabViewModel Tab { get; } = tab;
         public DesignerCanvasDocument Document { get; set; } = document;
@@ -15190,6 +15247,8 @@ public partial class MainWindowViewModel : ViewModelBase
         public Stack<HistoryEntry> UndoStack { get; } = undoStack;
         public Stack<HistoryEntry> RedoStack { get; } = redoStack;
         public PendingMutation? PendingMutation { get; set; } = pendingMutation;
+        public double ZoomScale { get; set; } = zoomScale;
+        public List<string> SelectedElementNames { get; } = selectedElementNames;
     }
 
     private sealed record PersistedDocumentSession(
@@ -15202,7 +15261,9 @@ public partial class MainWindowViewModel : ViewModelBase
         string CurrentAxaml,
         string SavedAxaml,
         List<PersistedHistoryEntry>? UndoHistory = null,
-        List<PersistedHistoryEntry>? RedoHistory = null);
+        List<PersistedHistoryEntry>? RedoHistory = null,
+        double ZoomScale = 1,
+        List<string>? SelectedElementNames = null);
 
     private sealed record PersistedHistoryEntry(
         string BeforeAxaml,
@@ -15216,7 +15277,9 @@ public partial class MainWindowViewModel : ViewModelBase
         DesignerCanvasDocument CurrentDocument,
         DesignerCanvasDocument SavedDocument,
         List<HistoryEntry> UndoHistory,
-        List<HistoryEntry> RedoHistory);
+        List<HistoryEntry> RedoHistory,
+        double ZoomScale,
+        List<string> SelectedElementNames);
 
     private sealed record PendingMutation(DesignerCanvasDocument Before, HistoryActionType ActionType, string Message);
 

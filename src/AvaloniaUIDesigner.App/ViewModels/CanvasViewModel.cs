@@ -265,6 +265,8 @@ public partial class CanvasViewModel : ViewModelBase
 
     public void ResetZoom() => SetZoom(1);
 
+    public void SetZoomScale(double zoom) => SetZoom(zoom);
+
     public void FitToViewport(double viewportWidth, double viewportHeight)
     {
         if (viewportWidth <= 0 || viewportHeight <= 0 || Elements.Count == 0)

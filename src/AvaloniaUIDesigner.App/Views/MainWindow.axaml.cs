@@ -31,6 +31,8 @@ public partial class MainWindow : Window
         Ctrl+S              Save document
         Ctrl+Shift+S        Save document as...
         Ctrl+W              Close active document tab
+        Ctrl+Tab            Next document tab
+        Ctrl+Shift+Tab      Previous document tab
         Ctrl+F              Focus Object Tree search
         Ctrl+0              Actual size (100%)
         Ctrl+R              Open runtime Preview
@@ -2902,6 +2904,13 @@ public partial class MainWindow : Window
                 await CloseDocumentTabAsync(tab);
             }
 
+            e.Handled = true;
+            return;
+        }
+
+        if (ctrl && e.Key == Key.Tab)
+        {
+            Vm.ActivateNextDocumentTab(reverse: shift);
             e.Handled = true;
             return;
         }
