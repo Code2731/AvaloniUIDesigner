@@ -20,9 +20,16 @@ public partial class App : Application
     {
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {
+            var viewModel = new MainWindowViewModel();
+            if (!viewModel.TryRestoreSession(out var sessionError)
+                && !string.IsNullOrWhiteSpace(sessionError))
+            {
+                viewModel.StatusText = "Previous session could not be restored. Started a new document.";
+            }
+
             desktop.MainWindow = new MainWindow
             {
-                DataContext = new MainWindowViewModel(),
+                DataContext = viewModel,
             };
         }
 

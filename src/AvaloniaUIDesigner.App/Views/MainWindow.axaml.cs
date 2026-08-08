@@ -10944,6 +10944,7 @@ public partial class MainWindow : Window
             }
         }
 
+        Vm.SaveSession();
         _allowCloseWithoutPrompt = true;
         _previewWindow?.Close();
         _previewWindow = null;

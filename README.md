@@ -74,6 +74,7 @@ dotnet run --project src/AvaloniaUIDesigner.App/AvaloniaUIDesigner.App.csproj
 - **Style Clipboard**: 선택 컨트롤의 외형·타이포그래피·렌더링·효과·상호작용·스타일 클래스와 리소스 참조만 복사해 하나 또는 여러 대상에 붙여넣고, 콘텐츠·위치·크기·계층·바인딩·이벤트는 보존
 - **Undo History Timeline**: `Edit > History...`에서 현재 문서와 Undo·Redo 작업을 한 번에 확인하고 원하는 지점으로 이동
 - **Document Tabs**: 여러 AXAML 문서를 동시에 탭으로 열고 전환하며, 문서별 캔버스·dirty 상태·Undo/Redo history를 독립적으로 보존합니다. `Ctrl+N`/`File > New`는 새 탭, `Ctrl+W`/`File > Close Tab`은 현재 탭을 닫고, `File > Open...`은 문서를 새 탭으로 엽니다.
+- **Workspace Session Restore**: 앱을 정상적으로 닫으면 열린 탭 목록·활성 탭·현재 AXAML·저장 기준 스냅샷을 로컬 세션에 저장하고, 다음 실행 시 dirty 문서를 포함해 복원합니다. 세션 JSON이 손상되면 현재 새 문서 상태를 유지하고 안전하게 시작합니다.
 - **선택 요소 AXAML 재사용**: 선택한 컨트롤을 하위 계층·리소스·스타일·바인딩·컨트롤 전용 선언과 함께 독립 UserControl AXAML로 클립보드 복사하거나 파일로 내보냄
 - **문서 루트 속성**: Window/UserControl 루트 종류와 Window 제목·리사이즈·시작 위치, 루트 Min/Max 크기를 편집하고 Undo/Redo, Preview, Draft·Full AXAML 왕복에 보존
 - **벡터 Shape 편집**: Rectangle, Ellipse, Line, Path의 Fill·Stroke·대시·끝점·결합 스타일과 반지름·점 좌표를 편집하고, 검증된 Path geometry를 리소스·Undo/Redo·복제·미리보기·AXAML 왕복에 보존
@@ -178,6 +179,7 @@ dotnet run --project src/AvaloniaUIDesigner.App/AvaloniaUIDesigner.App.csproj
 70. 한 컨트롤을 선택해 Edit > `Copy Style` 또는 `Ctrl+Shift+C`를 실행한 뒤 하나 이상의 대상 컨트롤을 선택해 Edit > `Paste Style` 또는 `Ctrl+Shift+V`를 실행하고, 잠긴 대상은 건너뛴 결과를 확인
 71. Edit > `History...`를 열어 Current document state와 Undo·Redo 작업을 확인하고 원하는 항목을 선택해 여러 단계를 한 번에 이동
 72. `Ctrl+N` 또는 `File > New`로 새 문서 탭을 만들고 탭 제목을 클릭해 문서를 전환합니다. `File > Open...`은 AXAML을 새 탭으로 열며 `Ctrl+W` 또는 탭의 `x` 버튼으로 현재 탭을 닫습니다.
+73. 앱을 정상적으로 종료한 뒤 다시 실행하면 마지막 탭 구성과 dirty 편집 내용이 자동 복원됩니다. 복원 데이터는 `%LocalAppData%/AvaloniaUIDesigner/session.json`에 저장됩니다.
 
 DataGrid가 포함된 생성 AXAML을 다른 프로젝트에서 사용할 때는 같은 Avalonia 버전의 `Avalonia.Controls.DataGrid` 패키지와 `avares://Avalonia.Controls.DataGrid/Themes/Fluent.xaml` 스타일 include가 필요합니다.
 
@@ -252,6 +254,8 @@ Live Preview 하단의 `Interaction Log`는 위 이벤트 메타데이터를 안
 `Copy Style`은 하나의 잠금 해제 컨트롤에서 외형·타이포그래피·렌더링·효과·상호작용 속성, 스타일 클래스와 DynamicResource 참조만 캡처합니다. `Paste Style`은 선택된 잠금 해제 대상에 해당 값을 한 번의 Undo 작업으로 적용하며 Text/Content, 위치·크기, 부모 계층, 바인딩, 이벤트 핸들러, 항목 정의는 변경하지 않습니다. 서로 다른 컨트롤 타입에 붙여넣으면 해당 타입이 지원하는 스타일 속성만 적용하고 나머지는 안전하게 무시합니다.
 
 `Edit > History...`는 현재 문서 상태를 기준으로 완료된 Undo 작업과 앞으로 적용할 Redo 작업을 함께 표시합니다. 항목을 선택하면 기존 snapshot 기반 Undo/Redo를 필요한 횟수만큼 수행해 해당 지점으로 이동하며, 이동 후에도 dirty 상태·Preview·AXAML·Object Tree를 기존 Undo 흐름과 동일하게 갱신합니다.
+
+Workspace Session Restore는 종료 시 각 문서 탭의 현재 스냅샷과 마지막 저장 기준 스냅샷을 함께 저장하므로, 저장하지 않은 디자인 변경도 다음 실행에서 dirty 상태로 복원합니다. 세션 파일은 앱의 로컬 설정 영역에만 저장되며, 손상되거나 일부 문서가 파싱되지 않으면 세션 전체를 적용하지 않고 기본 새 문서로 시작합니다.
 
 `Break Selected Layout`은 선택한 컨테이너를 제거하고 직접 자식들을 root 또는 원래 Canvas에 다시 연결합니다. Grid·StackPanel·DockPanel·WrapPanel·UniformGrid는 현재 화면 bounds를 유지하고, Canvas 안의 레이아웃은 부모 상대 좌표와 형제 순서를 유지하며 해제된 자식들을 다시 선택합니다.
 

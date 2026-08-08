@@ -8189,6 +8189,184 @@ public partial class MainWindowViewModel : ViewModelBase
         return true;
     }
 
+    public string ExportSessionJson()
+    {
+        SyncActiveDocumentTabState();
+        var tabs = DocumentTabs
+            .Select(tab =>
+            {
+                var state = _documentTabStates[tab];
+                return new PersistedDocumentTab(
+                    state.DocumentPath,
+                    tab.DisplayName,
+                    _serializer.Serialize(state.Document),
+                    _serializer.Serialize(state.LastSavedSnapshot),
+                    ExportPersistedHistory(state.UndoStack),
+                    ExportPersistedHistory(state.RedoStack));
+            })
+            .ToList();
+        var activeTabIndex = _selectedDocumentTab is null
+            ? 0
+            : Math.Max(0, DocumentTabs.IndexOf(_selectedDocumentTab));
+        return JsonSerializer.Serialize(
+            new PersistedDocumentSession(tabs, activeTabIndex),
+            new JsonSerializerOptions { WriteIndented = true });
+    }
+
+    public bool TryRestoreSessionJson(string json, out string error)
+    {
+        error = string.Empty;
+        PersistedDocumentSession? session;
+        try
+        {
+            session = JsonSerializer.Deserialize<PersistedDocumentSession>(json);
+        }
+        catch (Exception ex)
+        {
+            error = $"Session data is invalid: {ex.Message}";
+            return false;
+        }
+
+        if (session?.Tabs is not { Count: > 0 })
+        {
+            error = "Session data does not contain any document tabs.";
+            return false;
+        }
+
+        var restoredDocuments = new List<RestoredDocumentTab>();
+        try
+        {
+            foreach (var persistedTab in session.Tabs)
+            {
+                if (string.IsNullOrWhiteSpace(persistedTab.CurrentAxaml))
+                {
+                    throw new InvalidOperationException("A session tab is missing its current AXAML snapshot.");
+                }
+
+                var currentDocument = ParseDraftDocument(
+                    persistedTab.CurrentAxaml,
+                    new List<string>());
+                var savedDocument = string.IsNullOrWhiteSpace(persistedTab.SavedAxaml)
+                    ? currentDocument
+                    : ParseDraftDocument(persistedTab.SavedAxaml, new List<string>());
+                var displayName = string.IsNullOrWhiteSpace(persistedTab.DisplayName)
+                    ? string.IsNullOrWhiteSpace(persistedTab.DocumentPath)
+                        ? "Untitled"
+                        : Path.GetFileName(persistedTab.DocumentPath!)
+                    : persistedTab.DisplayName;
+                var undoHistory = ParsePersistedHistory(persistedTab.UndoHistory);
+                var redoHistory = ParsePersistedHistory(persistedTab.RedoHistory);
+                restoredDocuments.Add(new RestoredDocumentTab(
+                    persistedTab.DocumentPath,
+                    displayName,
+                    currentDocument,
+                    savedDocument,
+                    undoHistory,
+                    redoHistory));
+            }
+        }
+        catch (Exception ex)
+        {
+            error = $"Session documents could not be restored: {ex.Message}";
+            return false;
+        }
+
+        ClearDocumentTabsForSessionRestore();
+        var restoredTabs = new List<DocumentTabViewModel>();
+        foreach (var restoredDocument in restoredDocuments)
+        {
+            var tab = AddDocumentTab(
+                restoredDocument.CurrentDocument,
+                restoredDocument.DocumentPath,
+                isDirty: !AreSameDocument(
+                    restoredDocument.CurrentDocument,
+                    restoredDocument.SavedDocument),
+                lastSavedSnapshot: restoredDocument.SavedDocument,
+                activate: false);
+            var state = _documentTabStates[tab];
+            CopyHistoryStack(CreateHistoryStack(restoredDocument.UndoHistory), state.UndoStack);
+            CopyHistoryStack(CreateHistoryStack(restoredDocument.RedoHistory), state.RedoStack);
+            tab.Update(
+                restoredDocument.DocumentPath,
+                restoredDocument.DisplayName,
+                !AreSameDocument(restoredDocument.CurrentDocument, restoredDocument.SavedDocument),
+                isActive: false,
+                canClose: restoredDocuments.Count > 1);
+            restoredTabs.Add(tab);
+        }
+
+        var activeIndex = Math.Clamp(session.ActiveTabIndex, 0, restoredTabs.Count - 1);
+        ActivateDocumentTab(restoredTabs[activeIndex]);
+        UpdateDocumentTabPresentations();
+        StatusText = $"Restored {restoredTabs.Count} document tab(s) from the previous session.";
+        return true;
+    }
+
+    public bool TryRestoreSession(out string error)
+    {
+        error = string.Empty;
+        var path = GetSessionStorePath();
+        try
+        {
+            if (!File.Exists(path))
+            {
+                return false;
+            }
+
+            return TryRestoreSessionJson(File.ReadAllText(path), out error);
+        }
+        catch (Exception ex)
+        {
+            error = $"Session file could not be read: {ex.Message}";
+            return false;
+        }
+    }
+
+    public void SaveSession()
+    {
+        try
+        {
+            var path = GetSessionStorePath();
+            var directory = Path.GetDirectoryName(path);
+            if (!string.IsNullOrWhiteSpace(directory))
+            {
+                Directory.CreateDirectory(directory);
+            }
+
+            var temporaryPath = $"{path}.{Guid.NewGuid():N}.tmp";
+            try
+            {
+                File.WriteAllText(
+                    temporaryPath,
+                    ExportSessionJson(),
+                    new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
+                if (File.Exists(path))
+                {
+                    File.Replace(
+                        temporaryPath,
+                        path,
+                        destinationBackupFileName: null,
+                        ignoreMetadataErrors: true);
+                }
+                else
+                {
+                    File.Move(temporaryPath, path);
+                }
+            }
+            finally
+            {
+                if (File.Exists(temporaryPath))
+                {
+                    File.Delete(temporaryPath);
+                }
+            }
+        }
+        catch
+        {
+            // Session persistence is best effort and must not block application shutdown.
+        }
+    }
+
     public bool ActivateDocumentTab(DocumentTabViewModel tab)
     {
         if (!_documentTabStates.TryGetValue(tab, out var state))
@@ -12012,6 +12190,62 @@ public partial class MainWindowViewModel : ViewModelBase
         UpdateDocumentTabPresentations();
     }
 
+    private List<PersistedHistoryEntry> ExportPersistedHistory(Stack<HistoryEntry> history)
+        => history
+            .Select(entry => new PersistedHistoryEntry(
+                _serializer.Serialize(entry.Before),
+                _serializer.Serialize(entry.After),
+                entry.ActionType,
+                entry.Message))
+            .ToList();
+
+    private List<HistoryEntry> ParsePersistedHistory(
+        IEnumerable<PersistedHistoryEntry>? persistedHistory)
+    {
+        var history = new List<HistoryEntry>();
+        if (persistedHistory is null)
+        {
+            return history;
+        }
+
+        foreach (var persistedEntry in persistedHistory)
+        {
+            if (string.IsNullOrWhiteSpace(persistedEntry.BeforeAxaml)
+                || string.IsNullOrWhiteSpace(persistedEntry.AfterAxaml))
+            {
+                throw new InvalidOperationException("A session history entry is missing a document snapshot.");
+            }
+
+            var before = ParseDraftDocument(persistedEntry.BeforeAxaml, new List<string>());
+            var after = ParseDraftDocument(persistedEntry.AfterAxaml, new List<string>());
+            history.Add(new HistoryEntry(
+                before,
+                after,
+                persistedEntry.ActionType,
+                persistedEntry.Message ?? "Restored document change."));
+        }
+
+        return history;
+    }
+
+    private void ClearDocumentTabsForSessionRestore()
+    {
+        _documentTabStates.Clear();
+        DocumentTabs.Clear();
+        _selectedDocumentTab = null;
+        _currentDocumentPath = null;
+        _pendingMutation = null;
+        _undoStack.Clear();
+        _redoStack.Clear();
+        _lastSavedSnapshot = new DesignerCanvasDocument(Array.Empty<DesignerElementSnapshot>());
+        RaiseHistoryChanged();
+        OnPropertyChanged(nameof(HasMultipleDocumentTabs));
+        OnPropertyChanged(nameof(CanCloseCurrentDocumentTab));
+        OnPropertyChanged(nameof(SelectedDocumentTab));
+        OnPropertyChanged(nameof(CurrentDocumentPath));
+        OnPropertyChanged(nameof(WindowTitle));
+    }
+
     private void UpdateDocumentTabPresentations()
     {
         foreach (var state in _documentTabStates.Values)
@@ -12045,6 +12279,18 @@ public partial class MainWindowViewModel : ViewModelBase
         {
             target.Push(entry);
         }
+    }
+
+    private static Stack<HistoryEntry> CreateHistoryStack(
+        IReadOnlyList<HistoryEntry> entries)
+    {
+        var stack = new Stack<HistoryEntry>();
+        foreach (var entry in entries.Reverse())
+        {
+            stack.Push(entry);
+        }
+
+        return stack;
     }
 
     private static void RestoreHistoryStack(
@@ -12210,6 +12456,12 @@ public partial class MainWindowViewModel : ViewModelBase
     {
         var baseDir = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
         return Path.Combine(baseDir, "AvaloniaUIDesigner", "recent-files.json");
+    }
+
+    private static string GetSessionStorePath()
+    {
+        var baseDir = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+        return Path.Combine(baseDir, "AvaloniaUIDesigner", "session.json");
     }
 
     private string BuildDuplicateDisplayName(string sourceName)
@@ -14939,6 +15191,32 @@ public partial class MainWindowViewModel : ViewModelBase
         public Stack<HistoryEntry> RedoStack { get; } = redoStack;
         public PendingMutation? PendingMutation { get; set; } = pendingMutation;
     }
+
+    private sealed record PersistedDocumentSession(
+        List<PersistedDocumentTab> Tabs,
+        int ActiveTabIndex);
+
+    private sealed record PersistedDocumentTab(
+        string? DocumentPath,
+        string DisplayName,
+        string CurrentAxaml,
+        string SavedAxaml,
+        List<PersistedHistoryEntry>? UndoHistory = null,
+        List<PersistedHistoryEntry>? RedoHistory = null);
+
+    private sealed record PersistedHistoryEntry(
+        string BeforeAxaml,
+        string AfterAxaml,
+        HistoryActionType ActionType,
+        string? Message);
+
+    private sealed record RestoredDocumentTab(
+        string? DocumentPath,
+        string DisplayName,
+        DesignerCanvasDocument CurrentDocument,
+        DesignerCanvasDocument SavedDocument,
+        List<HistoryEntry> UndoHistory,
+        List<HistoryEntry> RedoHistory);
 
     private sealed record PendingMutation(DesignerCanvasDocument Before, HistoryActionType ActionType, string Message);
 
