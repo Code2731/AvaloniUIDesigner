@@ -367,7 +367,26 @@
             <Border Grid.Column="0" Background="#252526" BorderBrush="#3F3F46" BorderThickness="0,0,1,0">
                 <DockPanel>
                     <Border DockPanel.Dock="Top" Background="#2D2D30" Padding="8,6">
-                        <TextBlock Text="Toolbox" FontWeight="SemiBold" Foreground="#CCCCCC"/>
+                        <DockPanel>
+                            <StackPanel DockPanel.Dock="Right"
+                                        Orientation="Horizontal"
+                                        Spacing="4"
+                                        IsVisible="{Binding Toolbox.IsPlacementModeActive}">
+                                <TextBlock Text="{Binding Toolbox.PlacementModeLabel}"
+                                           VerticalAlignment="Center"
+                                           FontSize="10"
+                                           Foreground="#9CDCFE"/>
+                                <Button Content="{Binding Toolbox.PlacementModeButtonText}"
+                                        Padding="5,1"
+                                        MinWidth="48"
+                                        Height="22"
+                                        Click="OnCancelToolboxPlacementModeClicked"/>
+                            </StackPanel>
+                            <TextBlock Text="Toolbox"
+                                       VerticalAlignment="Center"
+                                       FontWeight="SemiBold"
+                                       Foreground="#CCCCCC"/>
+                        </DockPanel>
                     </Border>
                     <TextBox Name="ToolboxSearch"
                              DockPanel.Dock="Top"

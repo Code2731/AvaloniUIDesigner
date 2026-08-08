@@ -34,6 +34,8 @@ public partial class MainWindow : Window
         Ctrl+Tab            Next document tab
         Ctrl+Shift+Tab      Previous document tab
         Ctrl+F              Focus Object Tree search
+        Ctrl+Alt+T          Focus Toolbox search
+        Ctrl+Alt+P          Toggle Toolbox placement mode
         Ctrl+0              Actual size (100%)
         Ctrl+R              Open runtime Preview
         Ctrl+Z              Undo
@@ -2943,14 +2945,34 @@ public partial class MainWindow : Window
             return;
         }
 
+        var ctrl = e.KeyModifiers.HasFlag(KeyModifiers.Control);
+        var shift = e.KeyModifiers.HasFlag(KeyModifiers.Shift);
+        var alt = e.KeyModifiers.HasFlag(KeyModifiers.Alt);
+
+        if (ctrl && alt && e.Key == Key.T)
+        {
+            ToolboxSearch.Focus();
+            ToolboxSearch.SelectAll();
+            Vm.StatusText = "Toolbox focused. Search or press Enter to quick-place.";
+            e.Handled = true;
+            return;
+        }
+
+        if (ctrl && alt && e.Key == Key.P)
+        {
+            var isActive = Vm.Toolbox.TogglePlacementMode();
+            Vm.StatusText = isActive
+                ? $"Toolbox placement mode: {Vm.Toolbox.SelectedItem?.DisplayName}."
+                : "Toolbox placement mode cancelled.";
+            e.Handled = true;
+            return;
+        }
+
         // Keep text editing inside the PropertyGrid native to the focused editor.
         if (e.Source is TextBox)
         {
             return;
         }
-
-        var ctrl = e.KeyModifiers.HasFlag(KeyModifiers.Control);
-        var shift = e.KeyModifiers.HasFlag(KeyModifiers.Shift);
 
         if (!ctrl && e.Key == Key.Tab && ReferenceEquals(e.Source, DesignHost))
         {
@@ -3944,6 +3966,20 @@ public partial class MainWindow : Window
         }
 
         Vm.PlaceSelectedToolboxItemQuickly();
+        e.Handled = true;
+    }
+
+    private void OnCancelToolboxPlacementModeClicked(
+        object? sender,
+        Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        if (Vm is null)
+        {
+            return;
+        }
+
+        Vm.Toolbox.CancelPlacementMode();
+        Vm.StatusText = "Toolbox placement mode cancelled.";
         e.Handled = true;
     }
 

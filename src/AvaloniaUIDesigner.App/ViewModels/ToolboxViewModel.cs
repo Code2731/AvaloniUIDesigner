@@ -90,6 +90,16 @@ public partial class ToolboxViewModel : ViewModelBase
     public bool IsFavorite(ToolboxItem item)
         => _favoriteNames.Contains(item.DisplayName);
 
+    public bool IsPlacementModeActive => SelectedItem is not null;
+
+    public string PlacementModeLabel => SelectedItem is { } item
+        ? $"Place: {item.DisplayName}"
+        : "Select an item to place";
+
+    public string PlacementModeButtonText => IsPlacementModeActive
+        ? "Cancel"
+        : "Pick";
+
     public bool SelectFirstVisibleItem()
     {
         var item = Items.FirstOrDefault();
@@ -100,6 +110,22 @@ public partial class ToolboxViewModel : ViewModelBase
 
         SelectedItem = item;
         return true;
+    }
+
+    public bool TogglePlacementMode()
+    {
+        if (IsPlacementModeActive)
+        {
+            CancelPlacementMode();
+            return false;
+        }
+
+        return SelectFirstVisibleItem();
+    }
+
+    public void CancelPlacementMode()
+    {
+        SelectedItem = null;
     }
 
     public bool ToggleFavorite(ToolboxItem item)
@@ -262,7 +288,11 @@ public partial class ToolboxViewModel : ViewModelBase
         || !string.Equals(CategoryFilter, AllCategories, StringComparison.Ordinal);
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(IsPresetSelected))]
+    [NotifyPropertyChangedFor(
+        nameof(IsPresetSelected),
+        nameof(IsPlacementModeActive),
+        nameof(PlacementModeLabel),
+        nameof(PlacementModeButtonText))]
     private ToolboxItem? _selectedItem;
 
     public bool IsPresetSelected => SelectedItem?.IsPreset == true;

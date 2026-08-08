@@ -67,3 +67,6 @@ Users should be able to place controls visually, inspect properties, and validat
 
 8. v1.2
 - ~~Toolbox keyboard navigation and quick placement~~
+
+9. v1.3
+- ~~Toolbox search focus shortcuts and explicit placement mode~~
