@@ -25,6 +25,7 @@ dotnet run --project src/AvaloniaUIDesigner.App/AvaloniaUIDesigner.App.csproj
 - **Toolbox 키보드 작업**: 검색창 `Enter`로 첫 결과를 아트보드 중앙에 빠르게 배치하고, 카테고리 내부 ListBox에서 방향키로 이동한 뒤 `Enter`로 배치·`Space`로 즐겨찾기를 토글
 - **Toolbox 배치 모드**: `Ctrl+Alt+T`로 검색창에 포커스하고 `Ctrl+Alt+P` 또는 Toolbox 헤더의 `Pick`으로 첫 검색 결과를 선택해 배치 모드를 시작하며, 헤더 `Cancel`·`Ctrl+Alt+P` 재입력·`Escape`로 종료
 - **Toolbox 배치 미리보기**: 배치 모드에서 Canvas 위에 항목의 실제 기본 크기·그리드 스냅 좌표를 ghost로 표시하고, 클릭 시 미리 본 위치에 배치하며 Canvas 밖·드래그 작업에서는 미리보기를 숨김
+- **Toolbox 컨테이너 배치**: 배치 모드에서 포인터 아래 수용 가능한 컨테이너를 주황색 outline으로 강조하고, 클릭하면 Grid 셀·StackPanel/DockPanel/WrapPanel/UniformGrid 순서·Canvas 상대 좌표·Content 슬롯 규칙을 사용해 해당 컨테이너에 삽입
 - **Component Pack Plugins**: `IComponentPackPlugin`을 구현한 외부 DLL을 `File > Load Component Pack Plugin...`에서 로드하고, 플러그인 경로를 세션에 저장해 Toolbox 정의를 재사용
 - **Component Pack 관리**: `File > Manage Component Packs...`에서 JSON/DLL 팩의 출처·컴포넌트 목록을 확인하고 Toolbox에서 제거하며, 현재 문서가 사용하는 타입은 디자인 전용 placeholder로 보존
 - **Custom Control Metadata**: `DesignOnly: true` 컴포넌트 팩으로 외부 Avalonia 타입을 디자인 타임 플레이스홀더로 등록하고, 커스텀 기본 속성·Preview 문구·AXAML 타입명을 보존
@@ -201,6 +202,7 @@ dotnet run --project src/AvaloniaUIDesigner.App/AvaloniaUIDesigner.App.csproj
 82. Toolbox 검색창에 이름 또는 타입을 입력하고 `Enter`를 누르면 첫 번째 결과가 선택되어 아트보드 중앙에 빠르게 배치됩니다. 카테고리 내부 목록은 방향키로 탐색할 수 있으며, `Enter`는 선택 항목 배치, `Space`는 즐겨찾기 토글입니다.
 83. `Ctrl+Alt+T`로 Toolbox 검색창에 포커스하고 `Ctrl+Alt+P` 또는 헤더 `Pick`으로 배치 모드를 켭니다. 선택된 항목은 헤더에 표시되며 Canvas 클릭으로 계속 배치할 수 있고, 헤더 `Cancel`, `Ctrl+Alt+P` 재입력 또는 `Escape`로 선택을 해제합니다.
 84. 배치 모드에서 Canvas 위로 포인터를 움직이면 반투명 ghost와 항목명, 기본 크기, 스냅된 `x, y`가 표시됩니다. 포인터를 Canvas 밖으로 옮기거나 드래그 앤 드롭을 시작하면 ghost가 숨겨지고, 클릭하면 표시된 좌표에 배치됩니다.
+85. 배치 모드에서 Grid·StackPanel·DockPanel·WrapPanel·UniformGrid·Canvas·TabControl·SplitView·Content 컨테이너 위로 포인터를 옮기면 수용 가능한 target이 주황색 outline으로 강조됩니다. 해당 영역을 클릭하면 Toolbox 컨트롤이 target에 자동 삽입되고, 빈 셀·삽입 순서·단일 Content 슬롯 검증 결과가 상태바와 Object Tree에 반영됩니다.
 
 DataGrid가 포함된 생성 AXAML을 다른 프로젝트에서 사용할 때는 같은 Avalonia 버전의 `Avalonia.Controls.DataGrid` 패키지와 `avares://Avalonia.Controls.DataGrid/Themes/Fluent.xaml` 스타일 include가 필요합니다.
 
@@ -309,6 +311,7 @@ AXAML 소스 편집기의 `Validate`와 `Preview`는 현재 디자인과 Undo �
 - ~~v1.2: Toolbox 키보드 탐색 및 빠른 배치~~ ✅
 - ~~v1.3: Toolbox 검색 포커스 및 명시적 배치 모드~~ ✅
 - ~~v1.4: Canvas Toolbox 배치 미리보기와 스냅 좌표 표시~~ ✅
+- ~~v1.5: Toolbox 컨테이너 target 강조 및 클릭 자동 삽입~~ ✅
 
 ## 컴포넌트 팩
 

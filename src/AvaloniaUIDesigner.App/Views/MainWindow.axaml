@@ -583,6 +583,14 @@
                                                TextTrimming="CharacterEllipsis"/>
                                 </StackPanel>
                             </Border>
+                            <Border Name="ToolboxPlacementTargetHint"
+                                    Background="#12F59E0B"
+                                    BorderBrush="#F59E0B"
+                                    BorderThickness="2"
+                                    CornerRadius="3"
+                                    ZIndex="40"
+                                    IsHitTestVisible="False"
+                                    IsVisible="False"/>
                             <Border Name="ToolboxDropHint"
                                     Background="#243078D7"
                                     BorderBrush="DodgerBlue"

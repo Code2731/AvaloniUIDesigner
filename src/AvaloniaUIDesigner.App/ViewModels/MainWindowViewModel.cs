@@ -674,7 +674,17 @@ public partial class MainWindowViewModel : ViewModelBase
             return;
         }
 
-        PlaceToolboxItem(item, x, y);
+        PlaceToolboxItem(item, x, y, GetToolboxPlacementTarget(x, y));
+    }
+
+    public DesignElement? GetToolboxPlacementTarget(double x, double y)
+    {
+        if (Toolbox.SelectedItem is not { IsPreset: false })
+        {
+            return null;
+        }
+
+        return FindDropContainer(new Point(x, y));
     }
 
     public ToolboxPlacementPreview? GetToolboxPlacementPreview(double x, double y)

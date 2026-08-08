@@ -73,3 +73,6 @@ Users should be able to place controls visually, inspect properties, and validat
 
 10. v1.4
 - ~~Canvas Toolbox placement preview with snapped coordinates~~
+
+11. v1.5
+- ~~Toolbox placement target highlighting and click-to-insert containers~~

@@ -4058,12 +4058,29 @@ public partial class MainWindow : Window
         ToolboxPlacementPreviewLabel.Text = preview.DisplayName;
         ToolboxPlacementPreviewDetails.Text =
             $"{preview.Width:0} x {preview.Height:0} at {preview.X:0}, {preview.Y:0}";
+        UpdateToolboxPlacementTargetHint(point);
         ToolboxPlacementPreview.IsVisible = true;
+    }
+
+    private void UpdateToolboxPlacementTargetHint(Point point)
+    {
+        if (Vm?.GetToolboxPlacementTarget(point.X, point.Y) is not { } target)
+        {
+            ToolboxPlacementTargetHint.IsVisible = false;
+            return;
+        }
+
+        Canvas.SetLeft(ToolboxPlacementTargetHint, target.X);
+        Canvas.SetTop(ToolboxPlacementTargetHint, target.Y);
+        ToolboxPlacementTargetHint.Width = target.Width;
+        ToolboxPlacementTargetHint.Height = target.Height;
+        ToolboxPlacementTargetHint.IsVisible = true;
     }
 
     private void HideToolboxPlacementPreview()
     {
         ToolboxPlacementPreview.IsVisible = false;
+        ToolboxPlacementTargetHint.IsVisible = false;
     }
 
     private void OnDesignSurfaceDragEnter(object? sender, DragEventArgs e)
@@ -4201,6 +4218,16 @@ public partial class MainWindow : Window
             }
 
             Vm.StatusText = $"Selected {element.DisplayName}.";
+            return;
+        }
+
+        var placementPoint = e.GetPosition(DesignHost);
+        if (Vm.Toolbox.SelectedItem is not null
+            && Vm.GetToolboxPlacementTarget(placementPoint.X, placementPoint.Y) is not null)
+        {
+            Vm.PlaceFromToolbox(placementPoint.X, placementPoint.Y);
+            UpdateToolboxPlacementPreview(placementPoint);
+            e.Handled = true;
             return;
         }
 
