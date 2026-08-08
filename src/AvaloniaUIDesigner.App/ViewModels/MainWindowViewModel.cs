@@ -7250,6 +7250,56 @@ public partial class MainWindowViewModel : ViewModelBase
         return true;
     }
 
+    public bool LayoutSelectedIntoUniformGrid()
+    {
+        var targets = Canvas.SelectedElements.ToList();
+        if (targets.Count < 2)
+        {
+            StatusText = "Select at least two controls to create a UniformGrid layout.";
+            return false;
+        }
+
+        if (targets.Any(element => element.IsLocked))
+        {
+            StatusText = "Unlock all selected controls before creating a UniformGrid layout.";
+            return false;
+        }
+
+        if (!TryValidateRootOrCanvasSiblingSelection(targets, "UniformGrid layout", out var selectionError))
+        {
+            StatusText = selectionError;
+            return false;
+        }
+
+        BeginCanvasMutation(
+            HistoryActionType.TransformElement,
+            "Created UniformGrid layout from selected controls.");
+        if (!Canvas.TryCreateUniformGridLayout(targets, out var layout, out var error)
+            || layout is null)
+        {
+            _pendingMutation = null;
+            StatusText = error;
+            return false;
+        }
+
+        _isSyncingSelection = true;
+        try
+        {
+            ObjectTree.RebuildFrom(Canvas.Elements);
+            Canvas.Select(layout);
+            ObjectTree.SelectByElement(layout);
+        }
+        finally
+        {
+            _isSyncingSelection = false;
+        }
+
+        RefreshStylePreviewOptions();
+        CommitCanvasMutation();
+        StatusText = $"Laid out {targets.Count} control(s) in {layout.DisplayName}.";
+        return true;
+    }
+
     public bool GroupSelectedElements()
     {
         var targets = Canvas.SelectedElements.ToList();

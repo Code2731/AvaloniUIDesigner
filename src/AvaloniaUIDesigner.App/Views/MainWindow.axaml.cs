@@ -2386,6 +2386,14 @@ public partial class MainWindow : Window
         Vm?.LayoutSelectedIntoGrid();
     }
 
+    private void OnLayoutSelectedUniformGridMenuClicked(
+        object? sender,
+        Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        FlushPendingPropertyHistory();
+        Vm?.LayoutSelectedIntoUniformGrid();
+    }
+
     private void LayoutSelectedControls(Orientation orientation)
     {
         FlushPendingPropertyHistory();

@@ -1527,6 +1527,170 @@ public partial class CanvasViewModel : ViewModelBase
         return true;
     }
 
+    public bool TryCreateUniformGridLayout(
+        IEnumerable<DesignElement> requested,
+        out DesignElement? layout,
+        out string error)
+    {
+        layout = null;
+        error = string.Empty;
+
+        var targets = requested
+            .Where(Elements.Contains)
+            .Distinct()
+            .ToList();
+        if (targets.Count < 2)
+        {
+            error = "Select at least two controls to create a UniformGrid layout.";
+            return false;
+        }
+
+        if (targets.Any(element => element.IsLocked))
+        {
+            error = "Locked controls cannot be placed into a UniformGrid layout.";
+            return false;
+        }
+
+        var parentName = targets[0].ParentName;
+        if (targets.Any(element => !string.Equals(
+                element.ParentName,
+                parentName,
+                StringComparison.OrdinalIgnoreCase)))
+        {
+            error = "Layout controls must share the same root or Canvas parent.";
+            return false;
+        }
+
+        var parent = parentName is null
+            ? null
+            : Elements.FirstOrDefault(element => string.Equals(
+                element.DisplayName,
+                parentName,
+                StringComparison.OrdinalIgnoreCase));
+        if (parentName is not null
+            && (parent?.Visual is not Canvas || targets.Any(element => !element.IsCanvasChild)))
+        {
+            error = "Only root controls or siblings inside the same Canvas can be laid out.";
+            return false;
+        }
+
+        if (parentName is null && targets.Any(element => element.IsContainerChild))
+        {
+            error = "The selected controls have an invalid parent relationship.";
+            return false;
+        }
+
+        var orderedTargets = parent is null
+            ? targets.OrderBy(Elements.IndexOf).ToList()
+            : targets
+                .OrderBy(element => element.CanvasChildIndex)
+                .ThenBy(Elements.IndexOf)
+                .ToList();
+        const double spacing = 8;
+        var columnCount = Math.Clamp(
+            (int)Math.Ceiling(Math.Sqrt(orderedTargets.Count)),
+            1,
+            orderedTargets.Count);
+        var rowCount = (int)Math.Ceiling((double)orderedTargets.Count / columnCount);
+        var cellWidth = orderedTargets.Max(element => element.Width);
+        var cellHeight = orderedTargets.Max(element => element.Height);
+        var left = orderedTargets.Min(element => element.X);
+        var top = orderedTargets.Min(element => element.Y);
+        var layoutName = BuildUniqueDisplayName("UniformGrid");
+        var uniformGrid = new UniformGrid
+        {
+            Rows = rowCount,
+            Columns = columnCount,
+            FirstColumn = 0,
+            RowSpacing = spacing,
+            ColumnSpacing = spacing,
+        };
+        layout = new DesignElement(
+            layoutName,
+            "Avalonia.Controls.Primitives.UniformGrid",
+            uniformGrid,
+            left,
+            top,
+            Math.Max(10, cellWidth * columnCount + spacing * (columnCount - 1)),
+            Math.Max(10, cellHeight * rowCount + spacing * (rowCount - 1)));
+        layout.PropertyChanged += OnDesignElementPropertyChanged;
+
+        var insertIndex = Math.Clamp(targets.Min(Elements.IndexOf), 0, Elements.Count);
+        var originalSiblings = parent is null
+            ? new List<DesignElement>()
+            : GetDirectChildren(parent)
+                .OrderBy(child => child.CanvasChildIndex)
+                .ThenBy(Elements.IndexOf)
+                .ToList();
+        var originalLayoutIndex = parent is null
+            ? 0
+            : orderedTargets
+                .Select(child => originalSiblings.IndexOf(child))
+                .Where(index => index >= 0)
+                .DefaultIfEmpty(originalSiblings.Count)
+                .Min();
+
+        Elements.Insert(insertIndex, layout);
+        _isReflowingContainerChildren = true;
+        try
+        {
+            for (var index = 0; index < orderedTargets.Count; index++)
+            {
+                var target = orderedTargets[index];
+                target.GridRow = 0;
+                target.GridColumn = 0;
+                target.GridRowSpan = 1;
+                target.GridColumnSpan = 1;
+                target.StackPanelIndex = -1;
+                target.StackPanelItemSize = 40;
+                target.DockPanelIndex = -1;
+                target.DockPanelDock = DesignerDockSide.Left;
+                target.DockPanelItemSize = 40;
+                target.WrapPanelIndex = -1;
+                target.UniformGridIndex = index;
+                target.CanvasChildIndex = -1;
+                target.CanvasChildLeft = 0;
+                target.CanvasChildTop = 0;
+                target.TabIndex = -1;
+                target.TabHeader = null;
+                target.SplitViewSlot = DesignerSplitViewSlot.Content;
+                target.ParentLayout = DesignerParentLayoutKind.UniformGrid;
+                target.ParentName = layout.DisplayName;
+            }
+
+            ReflowContainerTreeCore(layout);
+
+            if (parent is not null)
+            {
+                var siblings = originalSiblings
+                    .Where(child => !targets.Contains(child))
+                    .ToList();
+                var layoutIndex = Math.Clamp(
+                    originalSiblings.Take(originalLayoutIndex).Count(child => !targets.Contains(child)),
+                    0,
+                    siblings.Count);
+                siblings.Insert(layoutIndex, layout);
+                SetCanvasChildRelationship(
+                    layout,
+                    parent,
+                    layoutIndex,
+                    left - parent.X,
+                    top - parent.Y);
+                SetCanvasChildOrder(parent, siblings);
+            }
+        }
+        finally
+        {
+            _isReflowingContainerChildren = false;
+        }
+
+        RefreshDocumentStyles(layout.Visual);
+        NormalizeContainerRelationships();
+        ReflowContainerChildren();
+        ResolveLabelTargets();
+        return true;
+    }
+
     public bool TryUngroupCanvas(
         DesignElement requested,
         out IReadOnlyList<DesignElement> children,
