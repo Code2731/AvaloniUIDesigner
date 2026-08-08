@@ -539,6 +539,8 @@ public partial class MainWindowViewModel : ViewModelBase
     private readonly Stack<HistoryEntry> _redoStack = new();
     private readonly Dictionary<string, string> _colorResources = new(StringComparer.Ordinal);
     private readonly List<DesignerStyleDefinition> _documentStyles = new();
+    private readonly Dictionary<DocumentTabViewModel, DocumentTabState> _documentTabStates = new();
+    private int _nextUntitledDocumentNumber = 1;
 
     private PendingMutation? _pendingMutation;
     private bool _isSyncingSelection;
@@ -551,6 +553,7 @@ public partial class MainWindowViewModel : ViewModelBase
     private DesignerSampleObject? _sampleDataRoot;
     private DesignerRootSettings _rootSettings = new();
     private DesignElement? _standaloneAxamlElement;
+    private DocumentTabViewModel? _selectedDocumentTab;
 
     public MainWindowViewModel()
         : this(new BuiltInComponentCatalog(), new DefaultControlRenderer(), new AxamlDocumentSerializer())
@@ -571,10 +574,17 @@ public partial class MainWindowViewModel : ViewModelBase
         PropertyInspector = new PropertyInspectorViewModel();
         RecentFiles = new ObservableCollection<string>();
         StylePreviewOptions = new ObservableCollection<StylePreviewOption>();
+        DocumentTabs = new ObservableCollection<DocumentTabViewModel>();
 
         ObjectTree.PropertyChanged += OnObjectTreePropertyChanged;
         Canvas.PropertyChanged += OnDesignerCanvasPropertyChanged;
         LoadRecentFilesFromDisk();
+        AddDocumentTab(
+            new DesignerCanvasDocument(Array.Empty<DesignerElementSnapshot>()),
+            documentPath: null,
+            isDirty: false,
+            lastSavedSnapshot: null,
+            activate: true);
     }
 
     public ToolboxViewModel Toolbox { get; }
@@ -583,6 +593,7 @@ public partial class MainWindowViewModel : ViewModelBase
     public PropertyInspectorViewModel PropertyInspector { get; }
     public ObservableCollection<string> RecentFiles { get; }
     public ObservableCollection<StylePreviewOption> StylePreviewOptions { get; }
+    public ObservableCollection<DocumentTabViewModel> DocumentTabs { get; }
 
     public event EventHandler? DocumentChanged;
 
@@ -601,6 +612,9 @@ public partial class MainWindowViewModel : ViewModelBase
     public bool CanPasteStyle => _styleClipboard is { Count: > 0 };
     public string? CurrentDocumentPath => _currentDocumentPath;
     public string WindowTitle => $"Avalonia UI Designer - {GetDisplayDocumentName()}{(IsDirty ? "*" : string.Empty)}";
+    public DocumentTabViewModel? SelectedDocumentTab => _selectedDocumentTab;
+    public bool HasMultipleDocumentTabs => DocumentTabs.Count > 1;
+    public bool CanCloseCurrentDocumentTab => HasMultipleDocumentTabs;
     public bool HasStylePreviewOptions => StylePreviewOptions.Count > 1;
     public bool HasSampleData => _sampleDataRoot is not null;
     public string SampleDataJson => _sampleDataJson ?? string.Empty;
@@ -8118,6 +8132,131 @@ public partial class MainWindowViewModel : ViewModelBase
         StatusText = $"Pasted {pastedElements.Count} control(s)";
     }
 
+    public DocumentTabViewModel CreateNewDocumentTab()
+    {
+        var tab = AddDocumentTab(
+            new DesignerCanvasDocument(Array.Empty<DesignerElementSnapshot>()),
+            documentPath: null,
+            isDirty: false,
+            lastSavedSnapshot: null,
+            activate: true);
+        StatusText = "Created a new document tab.";
+        return tab;
+    }
+
+    public DocumentTabViewModel CreateDocumentTabFromTemplate(string templateName)
+    {
+        var document = CreateTemplateDocument(templateName);
+        var tab = AddDocumentTab(
+            document,
+            documentPath: null,
+            isDirty: true,
+            lastSavedSnapshot: new DesignerCanvasDocument(Array.Empty<DesignerElementSnapshot>()),
+            activate: true);
+        StatusText = $"Created {templateName} template in a new tab. Save it to choose a file name.";
+        return tab;
+    }
+
+    public bool TryOpenDocumentTab(
+        string axaml,
+        string? documentPath,
+        out string error,
+        out string warning)
+    {
+        error = string.Empty;
+        warning = string.Empty;
+
+        DesignerCanvasDocument parsed;
+        var warnings = new List<string>();
+        try
+        {
+            parsed = ParseDraftDocument(axaml, warnings);
+        }
+        catch (Exception ex)
+        {
+            error = ex.Message;
+            return false;
+        }
+
+        AddDocumentTab(parsed, documentPath, isDirty: false, lastSavedSnapshot: parsed, activate: true);
+        if (!string.IsNullOrWhiteSpace(documentPath))
+        {
+            RegisterRecentFile(documentPath);
+        }
+
+        warning = FormatWarnings(warnings);
+        StatusText = $"Loaded AXAML document in a new tab.";
+        return true;
+    }
+
+    public bool ActivateDocumentTab(DocumentTabViewModel tab)
+    {
+        if (!_documentTabStates.TryGetValue(tab, out var state))
+        {
+            return false;
+        }
+
+        if (ReferenceEquals(_selectedDocumentTab, tab))
+        {
+            return true;
+        }
+
+        SyncActiveDocumentTabState();
+        _selectedDocumentTab = tab;
+        _currentDocumentPath = state.DocumentPath;
+        _lastSavedSnapshot = state.LastSavedSnapshot;
+        _pendingMutation = state.PendingMutation;
+        RestoreHistoryStack(_undoStack, state.UndoStack);
+        RestoreHistoryStack(_redoStack, state.RedoStack);
+        ApplyDocument(state.Document);
+        RefreshDirtyState();
+        RaiseHistoryChanged();
+        OnPropertyChanged(nameof(CurrentDocumentPath));
+        OnPropertyChanged(nameof(SelectedDocumentTab));
+        OnPropertyChanged(nameof(CanCloseCurrentDocumentTab));
+        UpdateDocumentTabPresentations();
+        StatusText = $"Switched to {state.Tab.DisplayName}.";
+        return true;
+    }
+
+    public bool IsDocumentTabDirty(DocumentTabViewModel tab)
+        => _documentTabStates.TryGetValue(tab, out var state)
+            && !AreSameDocument(state.LastSavedSnapshot, state.Document);
+
+    public bool CloseDocumentTab(DocumentTabViewModel tab)
+    {
+        if (DocumentTabs.Count <= 1 || !_documentTabStates.TryGetValue(tab, out _))
+        {
+            return false;
+        }
+
+        var wasActive = ReferenceEquals(_selectedDocumentTab, tab);
+        if (wasActive)
+        {
+            SyncActiveDocumentTabState();
+        }
+
+        var tabIndex = DocumentTabs.IndexOf(tab);
+        _documentTabStates.Remove(tab);
+        DocumentTabs.Remove(tab);
+        OnPropertyChanged(nameof(HasMultipleDocumentTabs));
+        OnPropertyChanged(nameof(CanCloseCurrentDocumentTab));
+
+        if (wasActive)
+        {
+            _selectedDocumentTab = null;
+            var nextIndex = Math.Min(tabIndex, DocumentTabs.Count - 1);
+            ActivateDocumentTab(DocumentTabs[nextIndex]);
+        }
+        else
+        {
+            UpdateDocumentTabPresentations();
+        }
+
+        StatusText = $"Closed {tab.DisplayName}.";
+        return true;
+    }
+
     public void NewDocument()
     {
         ApplyDocument(new DesignerCanvasDocument(Array.Empty<DesignerElementSnapshot>()));
@@ -8127,18 +8266,13 @@ public partial class MainWindowViewModel : ViewModelBase
         AcceptCurrentAsSaved();
         OnPropertyChanged(nameof(CurrentDocumentPath));
         OnPropertyChanged(nameof(WindowTitle));
+        SyncActiveDocumentTabState();
         StatusText = "Created a new document.";
     }
 
     public void CreateDocumentFromTemplate(string templateName)
     {
-        var document = templateName switch
-        {
-            "Login" => CreateLoginTemplate(),
-            "Settings" => CreateSettingsTemplate(),
-            "Dashboard" => CreateDashboardTemplate(),
-            _ => throw new ArgumentOutOfRangeException(nameof(templateName), templateName, "Unknown document template."),
-        };
+        var document = CreateTemplateDocument(templateName);
 
         ApplyDocument(document);
         _currentDocumentPath = null;
@@ -8147,8 +8281,18 @@ public partial class MainWindowViewModel : ViewModelBase
         IsDirty = true;
         OnPropertyChanged(nameof(CurrentDocumentPath));
         OnPropertyChanged(nameof(WindowTitle));
+        SyncActiveDocumentTabState();
         StatusText = $"Created {templateName} template. Save it to choose a file name.";
     }
+
+    private DesignerCanvasDocument CreateTemplateDocument(string templateName)
+        => templateName switch
+        {
+            "Login" => CreateLoginTemplate(),
+            "Settings" => CreateSettingsTemplate(),
+            "Dashboard" => CreateDashboardTemplate(),
+            _ => throw new ArgumentOutOfRangeException(nameof(templateName), templateName, "Unknown document template."),
+        };
 
     public void MarkDocumentLoaded(string path)
     {
@@ -8157,6 +8301,7 @@ public partial class MainWindowViewModel : ViewModelBase
         AcceptCurrentAsSaved();
         OnPropertyChanged(nameof(CurrentDocumentPath));
         OnPropertyChanged(nameof(WindowTitle));
+        SyncActiveDocumentTabState();
     }
 
     public void MarkDocumentSaved(string path)
@@ -8166,12 +8311,14 @@ public partial class MainWindowViewModel : ViewModelBase
         AcceptCurrentAsSaved();
         OnPropertyChanged(nameof(CurrentDocumentPath));
         OnPropertyChanged(nameof(WindowTitle));
+        SyncActiveDocumentTabState();
     }
 
     public void MarkCurrentStateSaved()
     {
         AcceptCurrentAsSaved();
         OnPropertyChanged(nameof(WindowTitle));
+        SyncActiveDocumentTabState();
     }
 
     public void MarkDocumentLoadedWithoutPath()
@@ -8180,6 +8327,7 @@ public partial class MainWindowViewModel : ViewModelBase
         AcceptCurrentAsSaved();
         OnPropertyChanged(nameof(CurrentDocumentPath));
         OnPropertyChanged(nameof(WindowTitle));
+        SyncActiveDocumentTabState();
     }
 
     public string ExportDraftAxaml() => _serializer.Serialize(CaptureDocument());
@@ -8416,6 +8564,7 @@ public partial class MainWindowViewModel : ViewModelBase
         _pendingMutation = null;
         ClearHistory();
         AcceptCurrentAsSaved();
+        SyncActiveDocumentTabState();
         StatusText = "Loaded AXAML document.";
         warning = FormatWarnings(warnings);
         return true;
@@ -8636,6 +8785,7 @@ public partial class MainWindowViewModel : ViewModelBase
         _redoStack.Clear();
         RaiseHistoryChanged();
         RefreshDirtyState();
+        SyncActiveDocumentTabState();
         DocumentChanged?.Invoke(this, EventArgs.Empty);
     }
 
@@ -8652,6 +8802,7 @@ public partial class MainWindowViewModel : ViewModelBase
         ApplyDocument(entry.Before);
         RaiseHistoryChanged();
         RefreshDirtyState();
+        SyncActiveDocumentTabState();
         StatusText = $"Undo: {DescribeAction(entry.ActionType)}";
     }
 
@@ -8668,6 +8819,7 @@ public partial class MainWindowViewModel : ViewModelBase
         ApplyDocument(entry.After);
         RaiseHistoryChanged();
         RefreshDirtyState();
+        SyncActiveDocumentTabState();
         StatusText = $"Redo: {DescribeAction(entry.ActionType)}";
     }
 
@@ -11796,6 +11948,110 @@ public partial class MainWindowViewModel : ViewModelBase
         RaiseHistoryChanged();
     }
 
+    private DocumentTabViewModel AddDocumentTab(
+        DesignerCanvasDocument document,
+        string? documentPath,
+        bool isDirty,
+        DesignerCanvasDocument? lastSavedSnapshot,
+        bool activate)
+    {
+        if (activate)
+        {
+            SyncActiveDocumentTabState();
+        }
+
+        var tab = new DocumentTabViewModel(
+            string.IsNullOrWhiteSpace(documentPath)
+                ? CreateUntitledDocumentName()
+                : Path.GetFileName(documentPath));
+        var state = new DocumentTabState(
+            tab,
+            document,
+            lastSavedSnapshot ?? document,
+            documentPath,
+            new Stack<HistoryEntry>(),
+            new Stack<HistoryEntry>(),
+            _pendingMutation);
+        _documentTabStates[tab] = state;
+        DocumentTabs.Add(tab);
+        OnPropertyChanged(nameof(HasMultipleDocumentTabs));
+        OnPropertyChanged(nameof(CanCloseCurrentDocumentTab));
+        UpdateDocumentTabPresentations();
+
+        if (activate)
+        {
+            ActivateDocumentTab(tab);
+            state.Document = CaptureDocument();
+            if (!isDirty)
+            {
+                state.LastSavedSnapshot = state.Document;
+            }
+
+            _lastSavedSnapshot = state.LastSavedSnapshot;
+            RefreshDirtyState();
+            SyncActiveDocumentTabState();
+        }
+
+        return tab;
+    }
+
+    private void SyncActiveDocumentTabState()
+    {
+        if (_selectedDocumentTab is null
+            || !_documentTabStates.TryGetValue(_selectedDocumentTab, out var state))
+        {
+            return;
+        }
+
+        state.Document = CaptureDocument();
+        state.DocumentPath = _currentDocumentPath;
+        state.LastSavedSnapshot = _lastSavedSnapshot;
+        state.PendingMutation = _pendingMutation;
+        CopyHistoryStack(_undoStack, state.UndoStack);
+        CopyHistoryStack(_redoStack, state.RedoStack);
+        UpdateDocumentTabPresentations();
+    }
+
+    private void UpdateDocumentTabPresentations()
+    {
+        foreach (var state in _documentTabStates.Values)
+        {
+            var isDirty = !AreSameDocument(state.LastSavedSnapshot, state.Document);
+            state.Tab.Update(
+                state.DocumentPath,
+                string.IsNullOrWhiteSpace(state.DocumentPath)
+                    ? state.Tab.DisplayName.Contains("Untitled", StringComparison.Ordinal)
+                        ? state.Tab.DisplayName
+                        : "Untitled"
+                    : Path.GetFileName(state.DocumentPath),
+                isDirty,
+                ReferenceEquals(state.Tab, _selectedDocumentTab),
+                DocumentTabs.Count > 1);
+        }
+    }
+
+    private string CreateUntitledDocumentName()
+    {
+        var number = _nextUntitledDocumentNumber++;
+        return number == 1 ? "Untitled" : $"Untitled {number}";
+    }
+
+    private static void CopyHistoryStack(
+        Stack<HistoryEntry> source,
+        Stack<HistoryEntry> target)
+    {
+        target.Clear();
+        foreach (var entry in source.Reverse())
+        {
+            target.Push(entry);
+        }
+    }
+
+    private static void RestoreHistoryStack(
+        Stack<HistoryEntry> target,
+        Stack<HistoryEntry> source)
+        => CopyHistoryStack(source, target);
+
     private void AcceptCurrentAsSaved()
     {
         _lastSavedSnapshot = CaptureDocument();
@@ -14664,6 +14920,24 @@ public partial class MainWindowViewModel : ViewModelBase
         SendToBack,
         BringForward,
         SendBackward,
+    }
+
+    private sealed class DocumentTabState(
+        DocumentTabViewModel tab,
+        DesignerCanvasDocument document,
+        DesignerCanvasDocument lastSavedSnapshot,
+        string? documentPath,
+        Stack<HistoryEntry> undoStack,
+        Stack<HistoryEntry> redoStack,
+        PendingMutation? pendingMutation)
+    {
+        public DocumentTabViewModel Tab { get; } = tab;
+        public DesignerCanvasDocument Document { get; set; } = document;
+        public DesignerCanvasDocument LastSavedSnapshot { get; set; } = lastSavedSnapshot;
+        public string? DocumentPath { get; set; } = documentPath;
+        public Stack<HistoryEntry> UndoStack { get; } = undoStack;
+        public Stack<HistoryEntry> RedoStack { get; } = redoStack;
+        public PendingMutation? PendingMutation { get; set; } = pendingMutation;
     }
 
     private sealed record PendingMutation(DesignerCanvasDocument Before, HistoryActionType ActionType, string Message);

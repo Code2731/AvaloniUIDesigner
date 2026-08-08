@@ -30,6 +30,7 @@ public partial class MainWindow : Window
         Ctrl+O              Open AXAML document
         Ctrl+S              Save document
         Ctrl+Shift+S        Save document as...
+        Ctrl+W              Close active document tab
         Ctrl+F              Focus Object Tree search
         Ctrl+0              Actual size (100%)
         Ctrl+R              Open runtime Preview
@@ -169,6 +170,66 @@ public partial class MainWindow : Window
     private async void OnOpenMenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
         await HandleOpenCommandAsync();
+    }
+
+    private void OnDocumentTabClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        if (Vm is not null && sender is Button { Tag: DocumentTabViewModel tab })
+        {
+            FlushPendingPropertyHistory();
+            Vm.ActivateDocumentTab(tab);
+            ClearDesignGuides();
+        }
+    }
+
+    private async void OnDocumentTabCloseClicked(
+        object? sender,
+        Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        if (Vm is null || sender is not Button { Tag: DocumentTabViewModel tab })
+        {
+            return;
+        }
+
+        await CloseDocumentTabAsync(tab);
+    }
+
+    private async void OnCloseCurrentTabMenuClicked(
+        object? sender,
+        Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        if (Vm?.SelectedDocumentTab is { } tab)
+        {
+            await CloseDocumentTabAsync(tab);
+        }
+    }
+
+    private async Task CloseDocumentTabAsync(DocumentTabViewModel tab)
+    {
+        if (Vm is null || Vm.DocumentTabs.Count <= 1)
+        {
+            return;
+        }
+
+        var originalTab = Vm.SelectedDocumentTab;
+        if (!ReferenceEquals(originalTab, tab))
+        {
+            Vm.ActivateDocumentTab(tab);
+        }
+
+        FlushPendingPropertyHistory();
+        if (!await EnsureCanContinueWithUnsavedChangesAsync())
+        {
+            if (originalTab is not null && !ReferenceEquals(originalTab, tab))
+            {
+                Vm.ActivateDocumentTab(originalTab);
+            }
+
+            return;
+        }
+
+        Vm.CloseDocumentTab(tab);
+        ClearDesignGuides();
     }
 
     private async void OnLoadComponentPackMenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
@@ -389,11 +450,6 @@ public partial class MainWindow : Window
         }
 
         FlushPendingPropertyHistory();
-        if (!await EnsureCanContinueWithUnsavedChangesAsync())
-        {
-            return;
-        }
-
         var files = await StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
         {
             Title = "Open AXAML",
@@ -653,7 +709,7 @@ public partial class MainWindow : Window
         await HandleNewCommandAsync();
     }
 
-    private async void OnTemplateMenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    private void OnTemplateMenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
         if (sender is not MenuItem { Tag: string templateName })
         {
@@ -661,23 +717,16 @@ public partial class MainWindow : Window
         }
 
         FlushPendingPropertyHistory();
-        if (await EnsureCanContinueWithUnsavedChangesAsync())
-        {
-            Vm?.CreateDocumentFromTemplate(templateName);
-            ClearDesignGuides();
-        }
+        Vm?.CreateDocumentTabFromTemplate(templateName);
+        ClearDesignGuides();
     }
 
-    private async Task HandleNewCommandAsync()
+    private Task HandleNewCommandAsync()
     {
         FlushPendingPropertyHistory();
-        if (!await EnsureCanContinueWithUnsavedChangesAsync())
-        {
-            return;
-        }
-
-        Vm?.NewDocument();
+        Vm?.CreateNewDocumentTab();
         ClearDesignGuides();
+        return Task.CompletedTask;
     }
 
     private async void OnExitMenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
@@ -2846,6 +2895,17 @@ public partial class MainWindow : Window
             return;
         }
 
+        if (ctrl && e.Key == Key.W)
+        {
+            if (Vm.SelectedDocumentTab is { } tab)
+            {
+                await CloseDocumentTabAsync(tab);
+            }
+
+            e.Handled = true;
+            return;
+        }
+
         if (ctrl && e.Key == Key.O)
         {
             await HandleOpenCommandAsync();
@@ -3103,11 +3163,6 @@ public partial class MainWindow : Window
         }
 
         FlushPendingPropertyHistory();
-        if (!await EnsureCanContinueWithUnsavedChangesAsync())
-        {
-            return;
-        }
-
         if (!File.Exists(path))
         {
             Vm.RemoveRecentFile(path);
@@ -3116,14 +3171,13 @@ public partial class MainWindow : Window
         }
 
         var content = await File.ReadAllTextAsync(path);
-        if (!Vm.TryImportDraftAxaml(content, out var error, out var warning))
+        if (!Vm.TryOpenDocumentTab(content, path, out var error, out var warning))
         {
             Vm.StatusText = $"Open failed: {error}";
             return;
         }
 
         ClearDesignGuides();
-        Vm.MarkDocumentLoaded(path);
         Vm.StatusText = BuildOpenStatus(System.IO.Path.GetFileName(path), warning);
     }
 
@@ -4874,22 +4928,20 @@ public partial class MainWindow : Window
         using var reader = new StreamReader(stream);
         var content = await reader.ReadToEndAsync();
 
-        if (!Vm.TryImportDraftAxaml(content, out var error, out var warning))
+        var localPath = file.TryGetLocalPath();
+        if (!Vm.TryOpenDocumentTab(content, localPath, out var error, out var warning))
         {
             Vm.StatusText = $"Open failed: {error}";
             return;
         }
 
         ClearDesignGuides();
-        var localPath = file.TryGetLocalPath();
         if (!string.IsNullOrWhiteSpace(localPath))
         {
-            Vm.MarkDocumentLoaded(localPath);
             Vm.StatusText = BuildOpenStatus(System.IO.Path.GetFileName(localPath), warning);
         }
         else
         {
-            Vm.MarkDocumentLoadedWithoutPath();
             Vm.StatusText = BuildOpenStatus(file.Name, warning);
         }
     }
@@ -10868,9 +10920,28 @@ public partial class MainWindow : Window
     private async Task RequestCloseAsync()
     {
         FlushPendingPropertyHistory();
-        if (!await EnsureCanContinueWithUnsavedChangesAsync())
+        if (Vm is null)
         {
             return;
+        }
+
+        var originalTab = Vm.SelectedDocumentTab;
+        foreach (var tab in Vm.DocumentTabs.ToList())
+        {
+            if (!ReferenceEquals(Vm.SelectedDocumentTab, tab))
+            {
+                Vm.ActivateDocumentTab(tab);
+            }
+
+            if (!await EnsureCanContinueWithUnsavedChangesAsync())
+            {
+                if (originalTab is not null && !ReferenceEquals(Vm.SelectedDocumentTab, originalTab))
+                {
+                    Vm.ActivateDocumentTab(originalTab);
+                }
+
+                return;
+            }
         }
 
         _allowCloseWithoutPrompt = true;

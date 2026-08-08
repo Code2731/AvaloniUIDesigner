@@ -25,6 +25,7 @@
         <Menu DockPanel.Dock="Top">
             <MenuItem Header="File">
                 <MenuItem Header="New" Click="OnNewMenuClicked"/>
+                <MenuItem Header="Close Tab" Click="OnCloseCurrentTabMenuClicked" IsEnabled="{Binding CanCloseCurrentDocumentTab}"/>
                 <MenuItem Header="New from Template">
                     <MenuItem Header="Login Form" Tag="Login" Click="OnTemplateMenuClicked"/>
                     <MenuItem Header="Settings" Tag="Settings" Click="OnTemplateMenuClicked"/>
@@ -280,6 +281,51 @@
                 <MenuItem Header="About AvaloniaUIDesigner..." Click="OnAboutMenuClicked"/>
             </MenuItem>
         </Menu>
+
+        <Border DockPanel.Dock="Top"
+                Background="#F3F4F6"
+                BorderBrush="#CBD5E1"
+                BorderThickness="0,0,0,1"
+                Padding="6,4"
+                IsVisible="{Binding HasMultipleDocumentTabs}">
+            <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Hidden">
+                <ItemsControl ItemsSource="{Binding DocumentTabs}">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <StackPanel Orientation="Horizontal" Spacing="4"/>
+                        </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="vm:DocumentTabViewModel">
+                            <Border Background="{Binding TabBackground}"
+                                    BorderBrush="{Binding TabBorderBrush}"
+                                    BorderThickness="1"
+                                    CornerRadius="4"
+                                    Padding="2"
+                                    ToolTip.Tip="{Binding DocumentPath}">
+                                <StackPanel Orientation="Horizontal" Spacing="2">
+                                    <Button Content="{Binding Header}"
+                                            Tag="{Binding}"
+                                            Click="OnDocumentTabClicked"
+                                            Background="Transparent"
+                                            BorderThickness="0"
+                                            Foreground="{Binding TabForeground}"
+                                            Padding="8,4"/>
+                                    <Button Content="x"
+                                            Tag="{Binding}"
+                                            Click="OnDocumentTabCloseClicked"
+                                            IsEnabled="{Binding CanClose}"
+                                            Background="Transparent"
+                                            BorderThickness="0"
+                                            Foreground="{Binding TabForeground}"
+                                            Padding="5,4"/>
+                                </StackPanel>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </ScrollViewer>
+        </Border>
 
         <Border DockPanel.Dock="Bottom" Height="24" Background="#2D2D30" BorderBrush="#3F3F46" BorderThickness="0,1,0,0">
             <DockPanel>
