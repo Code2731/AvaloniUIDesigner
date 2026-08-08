@@ -35,6 +35,7 @@ public partial class MainWindow : Window
         Ctrl+R              Open runtime Preview
         Ctrl+Z              Undo
         Ctrl+Y              Redo
+        Edit > History      Inspect and jump through Undo/Redo history
         Ctrl+A              Select all controls
         Ctrl+D              Duplicate selection
         Ctrl+C              Copy selection
@@ -694,6 +695,84 @@ public partial class MainWindow : Window
     {
         FlushPendingPropertyHistory();
         Vm?.Redo();
+    }
+
+    private async void OnHistoryMenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        FlushPendingPropertyHistory();
+        if (Vm is null)
+        {
+            return;
+        }
+
+        var dialog = new Window
+        {
+            Title = "Undo History",
+            Width = 560,
+            Height = 520,
+            MinWidth = 420,
+            MinHeight = 320,
+            CanResize = true,
+        };
+        var historyItems = new StackPanel { Spacing = 4 };
+        foreach (var entry in Vm.HistoryTimeline)
+        {
+            if (entry.IsCurrent)
+            {
+                historyItems.Children.Add(new Border
+                {
+                    Padding = new Thickness(10, 8),
+                    Background = Brush.Parse("#DBEAFE"),
+                    BorderBrush = Brush.Parse("#60A5FA"),
+                    BorderThickness = new Thickness(1),
+                    Child = new TextBlock
+                    {
+                        Text = $"Current: {entry.Label}",
+                        FontWeight = FontWeight.Bold,
+                        Foreground = Brush.Parse("#1E3A8A"),
+                    },
+                });
+                continue;
+            }
+
+            var historyButton = new Button
+            {
+                Content = entry.Label,
+                HorizontalAlignment = HorizontalAlignment.Stretch,
+                HorizontalContentAlignment = HorizontalAlignment.Left,
+                Padding = new Thickness(10, 7),
+            };
+            historyButton.Click += (_, _) =>
+            {
+                Vm.JumpToHistory(entry);
+                dialog.Close();
+            };
+            historyItems.Children.Add(historyButton);
+        }
+
+        var closeButton = new Button
+        {
+            Content = "Close",
+            HorizontalAlignment = HorizontalAlignment.Right,
+            MinWidth = 84,
+            Margin = new Thickness(0, 8, 0, 0),
+        };
+        closeButton.Click += (_, _) => dialog.Close();
+        var dialogLayout = new DockPanel();
+        DockPanel.SetDock(closeButton, Dock.Bottom);
+        dialogLayout.Children.Add(closeButton);
+        dialogLayout.Children.Add(new ScrollViewer
+        {
+            VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+            Content = historyItems,
+        });
+        dialog.Content = new Border
+        {
+            Padding = new Thickness(16),
+            Child = dialogLayout,
+        };
+
+        await dialog.ShowDialog(this);
     }
 
     private void OnSelectAllMenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)

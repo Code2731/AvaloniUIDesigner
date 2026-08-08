@@ -56,6 +56,7 @@
             <MenuItem Header="Edit">
                 <MenuItem Header="{Binding UndoMenuLabel}" Click="OnUndoMenuClicked" IsEnabled="{Binding CanUndo}"/>
                 <MenuItem Header="{Binding RedoMenuLabel}" Click="OnRedoMenuClicked" IsEnabled="{Binding CanRedo}"/>
+                <MenuItem Header="History..." Click="OnHistoryMenuClicked" IsEnabled="{Binding HasHistory}"/>
                 <Separator/>
                 <MenuItem Header="Select All" Click="OnSelectAllMenuClicked"/>
                 <MenuItem Header="Lock / Unlock Selection" Click="OnToggleLockMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>

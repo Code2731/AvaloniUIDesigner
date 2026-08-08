@@ -29,6 +29,12 @@ namespace AvaloniaUIDesigner.App.ViewModels;
 
 public sealed record StylePreviewOption(string DisplayName, string? PseudoClass);
 
+public sealed record HistoryTimelineEntry(
+    string Label,
+    bool IsCurrent,
+    bool IsUndo,
+    int Steps);
+
 public enum ItemsEditorMode
 {
     Flat,
@@ -589,6 +595,8 @@ public partial class MainWindowViewModel : ViewModelBase
         ? $"Redo {DescribeAction(entry.ActionType)}"
         : "Redo";
     public string HistorySummary => $"{UndoMenuLabel} | {RedoMenuLabel}";
+    public bool HasHistory => CanUndo || CanRedo;
+    public IReadOnlyList<HistoryTimelineEntry> HistoryTimeline => BuildHistoryTimeline();
     public bool CanPaste => _clipboardSnapshots is { Count: > 0 };
     public bool CanPasteStyle => _styleClipboard is { Count: > 0 };
     public string? CurrentDocumentPath => _currentDocumentPath;
@@ -8663,6 +8671,32 @@ public partial class MainWindowViewModel : ViewModelBase
         StatusText = $"Redo: {DescribeAction(entry.ActionType)}";
     }
 
+    public bool JumpToHistory(HistoryTimelineEntry entry)
+    {
+        if (entry.IsCurrent || entry.Steps <= 0)
+        {
+            return false;
+        }
+
+        var remaining = entry.Steps;
+        if (entry.IsUndo)
+        {
+            while (remaining-- > 0 && CanUndo)
+            {
+                Undo();
+            }
+        }
+        else
+        {
+            while (remaining-- > 0 && CanRedo)
+            {
+                Redo();
+            }
+        }
+
+        return true;
+    }
+
     private void OnObjectTreePropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
         if (_isSyncingSelection)
@@ -11719,6 +11753,40 @@ public partial class MainWindowViewModel : ViewModelBase
         OnPropertyChanged(nameof(UndoMenuLabel));
         OnPropertyChanged(nameof(RedoMenuLabel));
         OnPropertyChanged(nameof(HistorySummary));
+        OnPropertyChanged(nameof(HasHistory));
+        OnPropertyChanged(nameof(HistoryTimeline));
+    }
+
+    private IReadOnlyList<HistoryTimelineEntry> BuildHistoryTimeline()
+    {
+        var entries = new List<HistoryTimelineEntry>
+        {
+            new("Current document state", IsCurrent: true, IsUndo: false, Steps: 0),
+        };
+
+        var undoEntries = _undoStack.ToArray();
+        for (var index = 0; index < undoEntries.Length; index++)
+        {
+            var history = undoEntries[index];
+            entries.Add(new(
+                $"Undo {DescribeAction(history.ActionType)}: {history.Message}",
+                IsCurrent: false,
+                IsUndo: true,
+                Steps: index + 1));
+        }
+
+        var redoEntries = _redoStack.ToArray();
+        for (var index = 0; index < redoEntries.Length; index++)
+        {
+            var history = redoEntries[index];
+            entries.Add(new(
+                $"Redo {DescribeAction(history.ActionType)}: {history.Message}",
+                IsCurrent: false,
+                IsUndo: false,
+                Steps: index + 1));
+        }
+
+        return entries;
     }
 
     private void ClearHistory()
