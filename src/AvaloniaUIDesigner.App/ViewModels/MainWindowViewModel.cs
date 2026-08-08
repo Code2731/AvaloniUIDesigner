@@ -7200,6 +7200,56 @@ public partial class MainWindowViewModel : ViewModelBase
         return true;
     }
 
+    public bool LayoutSelectedIntoGrid()
+    {
+        var targets = Canvas.SelectedElements.ToList();
+        if (targets.Count < 2)
+        {
+            StatusText = "Select at least two controls to create a Grid layout.";
+            return false;
+        }
+
+        if (targets.Any(element => element.IsLocked))
+        {
+            StatusText = "Unlock all selected controls before creating a Grid layout.";
+            return false;
+        }
+
+        if (!TryValidateRootOrCanvasSiblingSelection(targets, "Grid layout", out var selectionError))
+        {
+            StatusText = selectionError;
+            return false;
+        }
+
+        BeginCanvasMutation(
+            HistoryActionType.TransformElement,
+            "Created Grid layout from selected controls.");
+        if (!Canvas.TryCreateGridLayout(targets, out var layout, out var error)
+            || layout is null)
+        {
+            _pendingMutation = null;
+            StatusText = error;
+            return false;
+        }
+
+        _isSyncingSelection = true;
+        try
+        {
+            ObjectTree.RebuildFrom(Canvas.Elements);
+            Canvas.Select(layout);
+            ObjectTree.SelectByElement(layout);
+        }
+        finally
+        {
+            _isSyncingSelection = false;
+        }
+
+        RefreshStylePreviewOptions();
+        CommitCanvasMutation();
+        StatusText = $"Laid out {targets.Count} control(s) in {layout.DisplayName}.";
+        return true;
+    }
+
     public bool GroupSelectedElements()
     {
         var targets = Canvas.SelectedElements.ToList();

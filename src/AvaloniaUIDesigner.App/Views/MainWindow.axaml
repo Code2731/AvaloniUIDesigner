@@ -202,6 +202,8 @@
                               Click="OnLayoutSelectedHorizontallyMenuClicked"/>
                     <MenuItem Header="Vertically (StackPanel)"
                               Click="OnLayoutSelectedVerticallyMenuClicked"/>
+                    <MenuItem Header="Grid (Auto)"
+                              Click="OnLayoutSelectedGridMenuClicked"/>
                 </MenuItem>
                 <Separator/>
                 <MenuItem Header="Group Selected into Canvas" Click="OnGroupSelectedMenuClicked" IsEnabled="{Binding Canvas.HasMultipleSelection}"/>
@@ -527,6 +529,8 @@
                                                                   Click="OnLayoutSelectedHorizontallyMenuClicked"/>
                                                         <MenuItem Header="Vertically (StackPanel)"
                                                                   Click="OnLayoutSelectedVerticallyMenuClicked"/>
+                                                        <MenuItem Header="Grid (Auto)"
+                                                                  Click="OnLayoutSelectedGridMenuClicked"/>
                                                     </MenuItem>
                                                     <Separator/>
                                                     <MenuItem Header="Group Selected into Canvas" Click="OnGroupSelectedMenuClicked"/>
