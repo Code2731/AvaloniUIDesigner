@@ -15,12 +15,16 @@ public sealed partial class ToolboxCategoryViewModel : ObservableObject
         string category,
         IEnumerable<ToolboxItem> items,
         bool isExpanded,
+        Func<ToolboxItem, bool> isFavorite,
         Action<ToolboxItem> itemSelected)
     {
         Category = category;
         _itemSelected = itemSelected;
         Items = new ObservableCollection<ToolboxItemPresentation>(
-            items.Select(item => new ToolboxItemPresentation(item)));
+            items.Select(item => new ToolboxItemPresentation(item)
+            {
+                IsFavorite = isFavorite(item),
+            }));
         IsExpanded = isExpanded;
     }
 

@@ -3883,6 +3883,11 @@ public partial class MainWindow : Window
 
     private void OnToolboxItemPointerPressed(object? sender, PointerPressedEventArgs e)
     {
+        if (e.Source is Button)
+        {
+            return;
+        }
+
         if (sender is not Control control
             || !TryGetToolboxItem(control, out var item)
             || !e.GetCurrentPoint(this).Properties.IsLeftButtonPressed)
@@ -3905,6 +3910,23 @@ public partial class MainWindow : Window
             _ => null!,
         };
         return item is not null;
+    }
+
+    private void OnToggleToolboxFavoriteClicked(
+        object? sender,
+        Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        if (Vm is null
+            || sender is not Control { DataContext: ToolboxItemPresentation presentation })
+        {
+            return;
+        }
+
+        var isFavorite = Vm.Toolbox.ToggleFavorite(presentation.Item);
+        Vm.StatusText = isFavorite
+            ? $"Added {presentation.DisplayName} to Toolbox favorites."
+            : $"Removed {presentation.DisplayName} from Toolbox favorites.";
+        e.Handled = true;
     }
 
     private async void OnToolboxItemPointerMoved(object? sender, PointerEventArgs e)

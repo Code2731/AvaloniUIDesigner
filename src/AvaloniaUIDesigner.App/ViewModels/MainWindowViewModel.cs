@@ -702,6 +702,7 @@ public partial class MainWindowViewModel : ViewModelBase
             ObjectTree.SelectByElement(Canvas.SelectedElement);
             Canvas.SelectMany(elements);
             CommitCanvasMutation();
+            Toolbox.RecordPlacement(item);
             StatusText = $"Placed {item.DisplayName} ({elements.Count} control(s))";
             return;
         }
@@ -720,6 +721,7 @@ public partial class MainWindowViewModel : ViewModelBase
         }
 
         CommitCanvasMutation();
+        Toolbox.RecordPlacement(item);
 
         StatusText = placedInContainer
             ? $"Placed {element.DisplayName} into {dropParent!.DisplayName}."
@@ -8535,7 +8537,9 @@ public partial class MainWindowViewModel : ViewModelBase
                 _componentPackPaths.ToList(),
                 _toolboxPresetPackPaths.ToList(),
                 _componentPluginPaths.ToList(),
-                ExportPersistedComponentTypes()),
+                ExportPersistedComponentTypes(),
+                Toolbox.FavoriteItemNames.ToList(),
+                Toolbox.RecentItemNames.ToList()),
             new JsonSerializerOptions { WriteIndented = true });
     }
 
@@ -8564,6 +8568,7 @@ public partial class MainWindowViewModel : ViewModelBase
         RestoreComponentPackFiles(session.ComponentPackPaths, packWarnings);
         RestoreMissingComponentTypes(session.ComponentTypes, packWarnings);
         RestoreToolboxPresetPackFiles(session.ToolboxPresetPackPaths, packWarnings);
+        Toolbox.RestoreUsageState(session.FavoriteToolboxItems, session.RecentToolboxItems);
 
         var restoredDocuments = new List<RestoredDocumentTab>();
         try
@@ -15924,7 +15929,9 @@ public partial class MainWindowViewModel : ViewModelBase
         List<string>? ComponentPackPaths = null,
         List<string>? ToolboxPresetPackPaths = null,
         List<string>? ComponentPluginPaths = null,
-        List<PersistedComponentType>? ComponentTypes = null);
+        List<PersistedComponentType>? ComponentTypes = null,
+        List<string>? FavoriteToolboxItems = null,
+        List<string>? RecentToolboxItems = null);
 
     private sealed record PersistedDocumentTab(
         string? DocumentPath,

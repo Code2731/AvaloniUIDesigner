@@ -21,6 +21,7 @@ dotnet run --project src/AvaloniaUIDesigner.App/AvaloniaUIDesigner.App.csproj
 - 4-Pane 레이아웃 (Toolbox / Canvas / Object Tree / Property Inspector)
 - **Toolbox**: 내장 컨트롤, 복합 프리셋, JSON 컴포넌트 팩. 외부 팩 파일 경로도 워크스페이스 세션에 기록해 재시작 후 자동 복원
 - **Toolbox 카테고리 UX**: 내장 컨트롤을 Layout·Containers·Input·Display·Shapes로 자동 분류하고, 우선순위별로 정렬한 접기/펼치기 그룹과 카드의 카테고리 칩·Avalonia 타입 힌트를 표시하며, Component Pack의 선택적 `category` 메타데이터와 이름/타입 검색을 함께 적용
+- **Toolbox Recent & Favorites**: Canvas에 배치한 최근 8개 항목을 `Recent` 그룹에 표시하고 별표로 즐겨찾기를 고정하며, 두 상태를 Workspace Session에 저장·복원
 - **Component Pack Plugins**: `IComponentPackPlugin`을 구현한 외부 DLL을 `File > Load Component Pack Plugin...`에서 로드하고, 플러그인 경로를 세션에 저장해 Toolbox 정의를 재사용
 - **Component Pack 관리**: `File > Manage Component Packs...`에서 JSON/DLL 팩의 출처·컴포넌트 목록을 확인하고 Toolbox에서 제거하며, 현재 문서가 사용하는 타입은 디자인 전용 placeholder로 보존
 - **Custom Control Metadata**: `DesignOnly: true` 컴포넌트 팩으로 외부 Avalonia 타입을 디자인 타임 플레이스홀더로 등록하고, 커스텀 기본 속성·Preview 문구·AXAML 타입명을 보존
@@ -193,6 +194,7 @@ dotnet run --project src/AvaloniaUIDesigner.App/AvaloniaUIDesigner.App.csproj
 78. `File > Manage Component Packs...`에서 로드된 JSON/DLL 팩의 출처와 컴포넌트를 확인하고 `Remove Pack`으로 Toolbox 등록과 세션 경로를 제거합니다. 현재 문서나 프리셋에서 사용 중인 커스텀 타입은 AXAML 타입명을 유지하는 디자인 전용 placeholder로 남으며, 플러그인 DLL 자체는 앱 재시작 전까지 프로세스에 로드된 상태입니다.
 79. 여러 컨트롤을 선택한 뒤 `Edit > Edit Common Properties...`를 열면 공통 Margin·Horizontal/VerticalAlignment·Opacity·IsEnabled·IsVisible·IsHitTestVisible을 일괄 편집합니다. 혼합 값은 빈 입력 또는 3상태 체크박스로 표시되며, 빈 값은 각 컨트롤의 기존 값을 유지합니다.
 80. Toolbox 상단 카테고리 선택기에서 `All categories`, Layout, Containers, Input, Display, Shapes 또는 외부 팩이 제공한 카테고리를 고르고, 카테고리 헤더를 접거나 펼치며 정렬된 카드의 카테고리 칩·Avalonia 타입 힌트를 확인하고 검색어로 결과를 좁힙니다. 검색·필터 후에도 각 그룹의 접힘 상태와 선택 항목을 유지합니다.
+81. Toolbox 카드의 별표 버튼으로 항목을 `Favorites` 그룹에 고정하거나 해제하고, Canvas에 배치한 항목은 최근 사용 순서로 `Recent` 그룹에 자동 기록됩니다. 최근 항목은 최대 8개이며 두 그룹의 상태는 세션 JSON에 함께 복원됩니다.
 
 DataGrid가 포함된 생성 AXAML을 다른 프로젝트에서 사용할 때는 같은 Avalonia 버전의 `Avalonia.Controls.DataGrid` 패키지와 `avares://Avalonia.Controls.DataGrid/Themes/Fluent.xaml` 스타일 include가 필요합니다.
 
@@ -297,6 +299,7 @@ AXAML 소스 편집기의 `Validate`와 `Preview`는 현재 디자인과 Undo �
 - ~~v0.8: Component Pack 관리 및 안전한 제거~~ ✅
 - ~~v0.9: 다중 선택 공통 속성 편집~~ ✅
 - ~~v1.0: 카테고리화된 Toolbox, 정렬·접기/펼치기·메타데이터 표시 및 카테고리 필터~~ ✅
+- ~~v1.1: Toolbox Recent 및 Favorites~~ ✅
 
 ## 컴포넌트 팩
 

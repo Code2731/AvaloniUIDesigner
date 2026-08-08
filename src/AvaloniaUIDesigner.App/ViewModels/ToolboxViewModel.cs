@@ -13,10 +13,17 @@ namespace AvaloniaUIDesigner.App.ViewModels;
 public partial class ToolboxViewModel : ViewModelBase
 {
     public const string AllCategories = "All categories";
+    public const string RecentCategory = "Recent";
+    public const string FavoritesCategory = "Favorites";
+
+    private const int MaxRecentItems = 8;
 
     private readonly List<ToolboxItem> _allItems;
     private readonly Dictionary<string, bool> _categoryExpandedStates =
         new(StringComparer.OrdinalIgnoreCase);
+    private readonly HashSet<string> _favoriteNames =
+        new(StringComparer.OrdinalIgnoreCase);
+    private readonly List<string> _recentNames = new();
 
     public ToolboxViewModel()
         : this(new BuiltInComponentCatalog())
@@ -70,11 +77,88 @@ public partial class ToolboxViewModel : ViewModelBase
 
     public ObservableCollection<ToolboxCategoryViewModel> Categories { get; }
 
+    public IReadOnlyList<string> FavoriteItemNames => _favoriteNames.ToList();
+
+    public IReadOnlyList<string> RecentItemNames => _recentNames.ToList();
+
     public ToolboxItem? FindItemByDisplayName(string displayName) =>
         _allItems.FirstOrDefault(item => string.Equals(
             item.DisplayName,
             displayName,
             System.StringComparison.OrdinalIgnoreCase));
+
+    public bool IsFavorite(ToolboxItem item)
+        => _favoriteNames.Contains(item.DisplayName);
+
+    public bool ToggleFavorite(ToolboxItem item)
+    {
+        var displayName = item.DisplayName.Trim();
+        var isFavorite = !_favoriteNames.Remove(displayName);
+        if (isFavorite)
+        {
+            _favoriteNames.Add(displayName);
+        }
+
+        RefreshCategories();
+        return isFavorite;
+    }
+
+    public void RecordPlacement(ToolboxItem item)
+    {
+        var displayName = item.DisplayName.Trim();
+        if (string.IsNullOrWhiteSpace(displayName))
+        {
+            return;
+        }
+
+        _recentNames.RemoveAll(name => string.Equals(
+            name,
+            displayName,
+            StringComparison.OrdinalIgnoreCase));
+        _recentNames.Insert(0, displayName);
+        if (_recentNames.Count > MaxRecentItems)
+        {
+            _recentNames.RemoveRange(MaxRecentItems, _recentNames.Count - MaxRecentItems);
+        }
+
+        RefreshCategories();
+    }
+
+    public void RestoreUsageState(
+        IEnumerable<string>? favoriteNames,
+        IEnumerable<string>? recentNames)
+    {
+        _favoriteNames.Clear();
+        foreach (var name in favoriteNames ?? Array.Empty<string>())
+        {
+            if (!string.IsNullOrWhiteSpace(name))
+            {
+                _favoriteNames.Add(name.Trim());
+            }
+        }
+
+        _recentNames.Clear();
+        foreach (var name in recentNames ?? Array.Empty<string>())
+        {
+            var normalizedName = name.Trim();
+            if (string.IsNullOrWhiteSpace(normalizedName)
+                || _recentNames.Any(existing => string.Equals(
+                    existing,
+                    normalizedName,
+                    StringComparison.OrdinalIgnoreCase)))
+            {
+                continue;
+            }
+
+            _recentNames.Add(normalizedName);
+            if (_recentNames.Count == MaxRecentItems)
+            {
+                break;
+            }
+        }
+
+        RefreshCategories();
+    }
 
     public void AddComponents(IEnumerable<DesignerComponentDefinition> definitions)
     {
@@ -172,6 +256,9 @@ public partial class ToolboxViewModel : ViewModelBase
     public bool IsPresetSelected => SelectedItem?.IsPreset == true;
 
     partial void OnSelectedItemChanged(ToolboxItem? value)
+        => UpdateCategorySelection(value);
+
+    private void UpdateCategorySelection(ToolboxItem? value)
     {
         foreach (var category in Categories)
         {
@@ -271,18 +358,57 @@ public partial class ToolboxViewModel : ViewModelBase
         }
 
         Categories.Clear();
+        var showUtilityGroups = string.Equals(
+                CategoryFilter,
+                AllCategories,
+                StringComparison.Ordinal)
+            && string.IsNullOrWhiteSpace(SearchText);
+        if (showUtilityGroups)
+        {
+            var recentItems = GetRecentItems().ToList();
+            if (recentItems.Count > 0)
+            {
+                AddCategory(RecentCategory, recentItems);
+            }
+
+            var favoriteItems = _allItems
+                .Where(IsFavorite)
+                .OrderBy(item => GetCategoryOrder(item.CategoryLabel))
+                .ThenBy(item => item.CategoryLabel, StringComparer.OrdinalIgnoreCase)
+                .ThenBy(item => item.DisplayName, StringComparer.OrdinalIgnoreCase)
+                .ToList();
+            if (favoriteItems.Count > 0)
+            {
+                AddCategory(FavoritesCategory, favoriteItems);
+            }
+        }
+
         foreach (var group in Items.GroupBy(item => item.CategoryLabel))
         {
-            var category = new ToolboxCategoryViewModel(
-                group.Key,
-                group,
-                _categoryExpandedStates.TryGetValue(group.Key, out var isExpanded)
-                    ? isExpanded
-                    : true,
-                item => SelectedItem = item);
-            Categories.Add(category);
+            AddCategory(group.Key, group);
         }
+
+        UpdateCategorySelection(SelectedItem);
     }
+
+    private void AddCategory(string categoryName, IEnumerable<ToolboxItem> items)
+    {
+        var category = new ToolboxCategoryViewModel(
+            categoryName,
+            items,
+            _categoryExpandedStates.TryGetValue(categoryName, out var isExpanded)
+                ? isExpanded
+                : true,
+            IsFavorite,
+            item => SelectedItem = item);
+        Categories.Add(category);
+    }
+
+    private IEnumerable<ToolboxItem> GetRecentItems()
+        => _recentNames
+            .Select(FindItemByDisplayName)
+            .Where(item => item is not null)
+            .Select(item => item!);
 
     private static int GetCategoryOrder(string category)
         => category switch

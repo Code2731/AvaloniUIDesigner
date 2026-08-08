@@ -61,3 +61,6 @@ Users should be able to place controls visually, inspect properties, and validat
 
 6. v1.0
 - ~~Categorized Toolbox ordering, collapsible groups, metadata chips, and category filter~~
+
+7. v1.1
+- ~~Toolbox Recent and Favorites with session restore~~

@@ -407,7 +407,7 @@
                                                             PointerPressed="OnToolboxItemPointerPressed"
                                                             PointerMoved="OnToolboxItemPointerMoved"
                                                             PointerReleased="OnToolboxItemPointerReleased">
-                                                        <Grid ColumnDefinitions="Auto,*">
+                                                        <Grid ColumnDefinitions="Auto,*,Auto">
                                                             <Border Background="#3A3F41"
                                                                     CornerRadius="2"
                                                                     Padding="4,1"
@@ -426,6 +426,16 @@
                                                                            Foreground="#8B949E"
                                                                            TextTrimming="CharacterEllipsis"/>
                                                             </StackPanel>
+                                                            <Button Grid.Column="2"
+                                                                    Width="24"
+                                                                    Height="22"
+                                                                    Padding="0"
+                                                                    Background="Transparent"
+                                                                    BorderThickness="0"
+                                                                    Content="{Binding FavoriteGlyph}"
+                                                                    Foreground="#FBBF24"
+                                                                    ToolTip.Tip="{Binding FavoriteToolTip}"
+                                                                    Click="OnToggleToolboxFavoriteClicked"/>
                                                         </Grid>
                                                     </Border>
                                                 </DataTemplate>
