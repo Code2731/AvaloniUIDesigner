@@ -1090,6 +1090,20 @@
                                 <TextBox Name="ElementNameEditor" Grid.Column="1" LostFocus="OnElementNameEditorLostFocus"/>
                             </Grid>
                         </Border>
+                        <Grid DockPanel.Dock="Top"
+                              ColumnDefinitions="*,Auto"
+                              Margin="8,0,8,8">
+                            <TextBox Name="PropertyInspectorFilter"
+                                     Watermark="Filter properties... (Ctrl+Alt+I)"
+                                     TextChanged="OnPropertyInspectorFilterChanged"
+                                     KeyDown="OnPropertyInspectorFilterKeyDown"/>
+                            <Button Grid.Column="1"
+                                    Content="Clear"
+                                    Margin="4,0,0,0"
+                                    Padding="6,2"
+                                    ToolTip.Tip="Clear the property filter"
+                                    Click="OnPropertyInspectorFilterClearClicked"/>
+                        </Grid>
                         <pg:PropertyGrid Name="PropGrid"
                                          IsQuickFilterVisible="True"
                                          IsHeaderVisible="False"

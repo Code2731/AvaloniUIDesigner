@@ -34,6 +34,7 @@ public partial class MainWindow : Window
         Ctrl+Tab            Next document tab
         Ctrl+Shift+Tab      Previous document tab
         Ctrl+F              Focus Object Tree search
+        Ctrl+Alt+I          Focus Property Inspector filter
         Ctrl+Alt+T          Focus Toolbox search
         Ctrl+Alt+P          Toggle Toolbox placement mode
         Ctrl+0              Actual size (100%)
@@ -166,10 +167,12 @@ public partial class MainWindow : Window
     private bool _hasPendingPropertyEdit;
     private bool _hasPendingLayoutEdit;
     private bool _allowCloseWithoutPrompt;
+    private string _propertyInspectorFilterText = string.Empty;
 
     public MainWindow()
     {
         InitializeComponent();
+        PropGrid.CustomPropertyDescriptorFilter += OnPropertyInspectorDescriptorFilter;
         DesignScrollViewer.PropertyChanged += OnDesignScrollViewerPropertyChanged;
         _propertyEditTimer = new DispatcherTimer
         {
@@ -936,6 +939,49 @@ public partial class MainWindow : Window
     {
         PropGrid.AllCategoriesExpanded = false;
         Vm?.StatusText = "All property categories collapsed.";
+    }
+
+    private void OnPropertyInspectorFilterChanged(object? sender, TextChangedEventArgs e)
+        => ApplyPropertyInspectorFilter();
+
+    private void OnPropertyInspectorDescriptorFilter(
+        object? sender,
+        Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        if (e is not Avalonia.PropertyGrid.Controls.CustomPropertyDescriptorFilterEventArgs filter)
+        {
+            return;
+        }
+
+        var query = _propertyInspectorFilterText;
+        filter.IsVisible = string.IsNullOrWhiteSpace(query)
+            || filter.PropertyDescriptor.Name.Contains(query, StringComparison.OrdinalIgnoreCase)
+            || filter.PropertyDescriptor.DisplayName.Contains(query, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private void OnPropertyInspectorFilterClearClicked(
+        object? sender,
+        Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        PropertyInspectorFilter.Text = string.Empty;
+        PropertyInspectorFilter.Focus();
+        Vm?.StatusText = "Property filter cleared.";
+    }
+
+    private void OnPropertyInspectorFilterKeyDown(object? sender, KeyEventArgs e)
+    {
+        if (e.Key == Key.Escape)
+        {
+            PropertyInspectorFilter.Text = string.Empty;
+            e.Handled = true;
+        }
+    }
+
+    private void ApplyPropertyInspectorFilter()
+    {
+        _propertyInspectorFilterText = PropertyInspectorFilter.Text?.Trim() ?? string.Empty;
+        PropGrid.Content = null;
+        PropGrid.Content = _boundElement?.Visual;
     }
 
     private void OnOpacity100MenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
@@ -3050,6 +3096,15 @@ public partial class MainWindow : Window
             return;
         }
 
+        if (ctrl && alt && e.Key == Key.I)
+        {
+            PropertyInspectorFilter.Focus();
+            PropertyInspectorFilter.SelectAll();
+            Vm.StatusText = "Property Inspector filter focused.";
+            e.Handled = true;
+            return;
+        }
+
         // Keep text editing inside the PropertyGrid native to the focused editor.
         if (e.Source is TextBox)
         {
@@ -3493,7 +3548,7 @@ public partial class MainWindow : Window
             _boundVisual.PropertyChanged += OnSelectedVisualPropertyChanged;
         }
 
-        PropGrid.Content = _boundElement?.Visual;
+        ApplyPropertyInspectorFilter();
         UpdateSelectionEditability();
         UpdateLayoutEditors();
         UpdateElementNameEditor();

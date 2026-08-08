@@ -85,3 +85,6 @@ Users should be able to place controls visually, inspect properties, and validat
 
 14. v1.8
 - Property Inspector category/flat view and expand/collapse navigation controls
+
+15. v1.9
+- Property Inspector dedicated filter, clear action, and focus shortcut
