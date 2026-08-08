@@ -89,6 +89,13 @@ public partial class CanvasViewModel : ViewModelBase
 
     public bool HasMultipleSelection => SelectedElements.Count > 1;
 
+    public string SelectionSummary => SelectedElements.Count switch
+    {
+        0 => string.Empty,
+        1 => "1 selected",
+        var count => $"{count} selected",
+    };
+
     public string? ActiveStylePreviewPseudoClass => _stylePreviewPseudoClass;
 
     public string ZoomPercentage => $"{ZoomScale * 100:0}%";
@@ -1610,6 +1617,7 @@ public partial class CanvasViewModel : ViewModelBase
     {
         OnPropertyChanged(nameof(IsSelectionActive));
         OnPropertyChanged(nameof(HasMultipleSelection));
+        OnPropertyChanged(nameof(SelectionSummary));
     }
 
     private void SetStylePreviewBadge(Control visual, string? label)
