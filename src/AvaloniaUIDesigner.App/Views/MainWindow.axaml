@@ -375,43 +375,67 @@
                               ItemsSource="{Binding Toolbox.CategoryOptions}"
                               SelectedItem="{Binding Toolbox.CategoryFilter, Mode=TwoWay}"/>
                     <TextBlock DockPanel.Dock="Top" Margin="8,0,8,4" Text="{Binding Toolbox.SearchResultText}" FontSize="11" Foreground="#9CDCFE"/>
-                    <ListBox ItemsSource="{Binding Toolbox.Items}"
-                             SelectedItem="{Binding Toolbox.SelectedItem}"
-                             Background="Transparent"
-                             BorderThickness="0">
-                        <ListBox.ItemTemplate>
-                            <DataTemplate>
-                                <Border Padding="5,4"
-                                        Margin="3,1"
-                                        Background="#2A2D2E"
-                                        CornerRadius="3"
-                                        PointerPressed="OnToolboxItemPointerPressed"
-                                        PointerMoved="OnToolboxItemPointerMoved"
-                                        PointerReleased="OnToolboxItemPointerReleased">
-                                    <Grid ColumnDefinitions="Auto,*">
-                                        <Border Background="#3A3F41"
-                                                CornerRadius="2"
-                                                Padding="4,1"
-                                                VerticalAlignment="Top">
-                                            <TextBlock Text="{Binding CategoryLabel}"
-                                                       FontSize="9"
-                                                       Foreground="#9CDCFE"/>
-                                        </Border>
-                                        <StackPanel Grid.Column="1"
-                                                    Margin="6,0,0,0">
-                                            <TextBlock Text="{Binding DisplayName}"
-                                                       FontWeight="SemiBold"
-                                                       Foreground="#E6E6E6"/>
-                                            <TextBlock Text="{Binding AvaloniaTypeName}"
-                                                       FontSize="9"
-                                                       Foreground="#8B949E"
-                                                       TextTrimming="CharacterEllipsis"/>
-                                        </StackPanel>
-                                    </Grid>
-                                </Border>
-                            </DataTemplate>
-                        </ListBox.ItemTemplate>
-                    </ListBox>
+                    <ScrollViewer VerticalScrollBarVisibility="Auto">
+                        <ItemsControl ItemsSource="{Binding Toolbox.Categories}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Expander Margin="3,2"
+                                              IsExpanded="{Binding IsExpanded, Mode=TwoWay}">
+                                        <Expander.Header>
+                                            <Grid ColumnDefinitions="*,Auto">
+                                                <TextBlock Text="{Binding Category}"
+                                                           FontWeight="SemiBold"
+                                                           Foreground="#D7E3F4"/>
+                                                <TextBlock Grid.Column="1"
+                                                           Text="{Binding ItemCount}"
+                                                           Margin="8,0,2,0"
+                                                           Foreground="#8B949E"/>
+                                            </Grid>
+                                        </Expander.Header>
+                                        <ListBox ItemsSource="{Binding Items}"
+                                                 SelectedItem="{Binding SelectedItem, Mode=TwoWay}"
+                                                 Background="Transparent"
+                                                 BorderThickness="0">
+                                            <ListBox.ItemTemplate>
+                                                <DataTemplate>
+                                                    <Border Padding="5,4"
+                                                            Margin="3,1"
+                                                            Background="{Binding RowBackground}"
+                                                            BorderBrush="{Binding RowBorderBrush}"
+                                                            BorderThickness="1"
+                                                            CornerRadius="3"
+                                                            PointerPressed="OnToolboxItemPointerPressed"
+                                                            PointerMoved="OnToolboxItemPointerMoved"
+                                                            PointerReleased="OnToolboxItemPointerReleased">
+                                                        <Grid ColumnDefinitions="Auto,*">
+                                                            <Border Background="#3A3F41"
+                                                                    CornerRadius="2"
+                                                                    Padding="4,1"
+                                                                    VerticalAlignment="Top">
+                                                                <TextBlock Text="{Binding CategoryLabel}"
+                                                                           FontSize="9"
+                                                                           Foreground="#9CDCFE"/>
+                                                            </Border>
+                                                            <StackPanel Grid.Column="1"
+                                                                        Margin="6,0,0,0">
+                                                                <TextBlock Text="{Binding DisplayName}"
+                                                                           FontWeight="SemiBold"
+                                                                           Foreground="#E6E6E6"/>
+                                                                <TextBlock Text="{Binding AvaloniaTypeName}"
+                                                                           FontSize="9"
+                                                                           Foreground="#8B949E"
+                                                                           TextTrimming="CharacterEllipsis"/>
+                                                            </StackPanel>
+                                                        </Grid>
+                                                    </Border>
+                                                </DataTemplate>
+                                            </ListBox.ItemTemplate>
+                                        </ListBox>
+                                    </Expander>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </ScrollViewer>
                 </DockPanel>
             </Border>
 

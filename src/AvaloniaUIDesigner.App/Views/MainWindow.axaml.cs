@@ -3883,15 +3883,28 @@ public partial class MainWindow : Window
 
     private void OnToolboxItemPointerPressed(object? sender, PointerPressedEventArgs e)
     {
-        if (sender is not Control { DataContext: ToolboxItem item } control
+        if (sender is not Control control
+            || !TryGetToolboxItem(control, out var item)
             || !e.GetCurrentPoint(this).Properties.IsLeftButtonPressed)
         {
             return;
         }
 
+        Vm?.Toolbox.SelectedItem = item;
         _pendingToolboxDragItem = item;
         _toolboxDragStart = e.GetPosition(this);
         e.Pointer.Capture(control);
+    }
+
+    private static bool TryGetToolboxItem(Control control, out ToolboxItem item)
+    {
+        item = control.DataContext switch
+        {
+            ToolboxItem directItem => directItem,
+            ToolboxItemPresentation presentation => presentation.Item,
+            _ => null!,
+        };
+        return item is not null;
     }
 
     private async void OnToolboxItemPointerMoved(object? sender, PointerEventArgs e)

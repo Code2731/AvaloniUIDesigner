@@ -15,6 +15,8 @@ public partial class ToolboxViewModel : ViewModelBase
     public const string AllCategories = "All categories";
 
     private readonly List<ToolboxItem> _allItems;
+    private readonly Dictionary<string, bool> _categoryExpandedStates =
+        new(StringComparer.OrdinalIgnoreCase);
 
     public ToolboxViewModel()
         : this(new BuiltInComponentCatalog())
@@ -57,6 +59,7 @@ public partial class ToolboxViewModel : ViewModelBase
 
         Items = new ObservableCollection<ToolboxItem>();
         CategoryOptions = new ObservableCollection<string>();
+        Categories = new ObservableCollection<ToolboxCategoryViewModel>();
         RefreshCategoryOptions();
         ApplyFilter();
     }
@@ -64,6 +67,8 @@ public partial class ToolboxViewModel : ViewModelBase
     public ObservableCollection<ToolboxItem> Items { get; }
 
     public ObservableCollection<string> CategoryOptions { get; }
+
+    public ObservableCollection<ToolboxCategoryViewModel> Categories { get; }
 
     public ToolboxItem? FindItemByDisplayName(string displayName) =>
         _allItems.FirstOrDefault(item => string.Equals(
@@ -166,6 +171,20 @@ public partial class ToolboxViewModel : ViewModelBase
 
     public bool IsPresetSelected => SelectedItem?.IsPreset == true;
 
+    partial void OnSelectedItemChanged(ToolboxItem? value)
+    {
+        foreach (var category in Categories)
+        {
+            var selected = category.Items.FirstOrDefault(presentation =>
+                ReferenceEquals(presentation.Item, value));
+            category.SetSelectedItem(selected);
+            foreach (var presentation in category.Items)
+            {
+                presentation.IsSelected = ReferenceEquals(presentation.Item, value);
+            }
+        }
+    }
+
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(HasActiveFilter), nameof(SearchResultText))]
     private string _searchText = string.Empty;
@@ -208,6 +227,8 @@ public partial class ToolboxViewModel : ViewModelBase
             Items.Add(item);
         }
 
+        RefreshCategories();
+
         SelectedItem = null;
         if (selected is not null && Items.Contains(selected))
         {
@@ -240,6 +261,27 @@ public partial class ToolboxViewModel : ViewModelBase
             ? current
             : AllCategories;
         OnPropertyChanged(nameof(CategoryOptions));
+    }
+
+    private void RefreshCategories()
+    {
+        foreach (var category in Categories)
+        {
+            _categoryExpandedStates[category.Category] = category.IsExpanded;
+        }
+
+        Categories.Clear();
+        foreach (var group in Items.GroupBy(item => item.CategoryLabel))
+        {
+            var category = new ToolboxCategoryViewModel(
+                group.Key,
+                group,
+                _categoryExpandedStates.TryGetValue(group.Key, out var isExpanded)
+                    ? isExpanded
+                    : true,
+                item => SelectedItem = item);
+            Categories.Add(category);
+        }
     }
 
     private static int GetCategoryOrder(string category)
