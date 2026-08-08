@@ -103,6 +103,7 @@ dotnet run --project src/AvaloniaUIDesigner.App/AvaloniaUIDesigner.App.csproj
 - **Object Tree 드롭 피드백**: 드래그 중 유효한 대상 행은 초록색, 거부되는 대상 행은 빨간색으로 강조하고 드롭·취소·트리 이탈 시 상태를 정리
 - **Object Tree 삽입 위치 표시**: 같은 부모의 행 위쪽/아래쪽 절반에 드롭하면 앞/뒤 삽입선을 표시하고, 표시된 위치 그대로 StackPanel·DockPanel·WrapPanel·UniformGrid·Canvas 순서를 변경
 - **Object Tree 검색 순환**: 검색 결과를 `Enter`로 다음, `Shift+Enter`로 이전 항목으로 순환하고 현재 위치/전체 개수를 표시
+- **Object Tree 키보드 편집**: 트리에 포커스가 있을 때 방향키는 계층을 탐색하고, `F2`로 이름 변경, `Delete`/`Backspace`로 삭제, `Ctrl+L`로 잠금 전환
 - **이동/리사이즈 기즈모**: 선택된 요소를 드래그로 이동, 8방향 핸들로 리사이즈 (최소 10px)
 - **PropertyGrid 연동**: 선택된 컨트롤의 속성을 bodong PropertyGrid로 실시간 편집
 - **Property Inspector 검색**: 우측 PropertyGrid의 Quick Filter로 선택 컨트롤의 속성 이름을 즉시 필터링
@@ -180,31 +181,32 @@ dotnet run --project src/AvaloniaUIDesigner.App/AvaloniaUIDesigner.App.csproj
 59. Object Tree에서 컨테이너를 펼치거나 접으면 순서 변경·Undo/Redo·AXAML 적용 뒤에도 상태가 유지되고, Canvas에서 하위 컨트롤을 선택하면 부모가 자동으로 펼쳐짐
 60. Object Tree의 잠기지 않은 컨테이너 자식 행을 같은 부모의 다른 자식 행 위로 드래그하면 해당 위치 앞으로 이동하고, 컨테이너 행으로 드래그하면 유효한 부모로 재배치됨
 61. Toolbox 컨트롤을 Canvas 위로 드래그하면 포인터 아래 가장 안쪽의 수용 가능한 컨테이너를 강조하고, StackPanel·DockPanel·WrapPanel·UniformGrid의 삽입 위치와 Grid 셀을 포인터에 맞춰 한 번의 Undo 작업으로 배치함
-62. 같은 root 또는 같은 Canvas의 형제 컨트롤을 여러 개 선택한 뒤 Edit > `Lay Out Selected`에서 `Horizontally (StackPanel)` 또는 `Vertically (StackPanel)`을 선택하면 새 레이아웃 컨테이너로 감싸고 Object Tree·Preview·Undo/Redo 결과를 확인
-63. 같은 선택 상태에서 `Grid (Auto)`를 선택하면 자동 행·열 Grid를 만들고 선택 순서대로 컨트롤을 셀에 배치하며, AXAML 검증에서 `Grid.Row`·`Grid.Column`과 행/열 정의를 확인
-64. 같은 선택 상태에서 `UniformGrid (Auto)`를 선택하면 동일 크기 셀과 8px 간격의 UniformGrid를 만들고 Rows·Columns·자식 순서를 AXAML과 Preview에서 확인
-65. 레이아웃 컨테이너를 선택한 뒤 Edit > `Break Selected Layout`을 선택하면 컨테이너를 제거하고 자식 컨트롤을 원래 계층·좌표·순서로 복원
-66. 같은 선택 상태에서 `DockPanel (Horizontal/Vertical)` 또는 `WrapPanel (Horizontal/Vertical)`을 선택하면 선택 순서 기반 자동 레이아웃을 만들고 도킹 방향·행/열·간격을 AXAML과 Preview에서 확인
-67. Edit > `Edit Tab Order Map...`에서 `TabIndex | ControlName` 형식으로 전체 포커스 순서를 편집하고, `auto`/`-1`로 자동 순서를 복원하며 캔버스의 `TAB #` 배지를 확인
-68. Edit > `Edit Event Handler Map...`에서 `ControlName | EventName | HandlerName` 형식으로 여러 컨트롤의 이벤트 핸들러를 일괄 편집하고, 지원되지 않는 이벤트·잠긴 컨트롤·중복 항목 검증 결과를 확인
-69. View > `Live Preview`에서 컨트롤을 클릭하거나 입력·선택·토글·포인터·키보드·포커스 동작을 수행하고, 창 하단 Interaction Log에서 `Control.Event -> HandlerName` 연결 결과를 확인
-70. 한 컨트롤을 선택해 Edit > `Copy Style` 또는 `Ctrl+Shift+C`를 실행한 뒤 하나 이상의 대상 컨트롤을 선택해 Edit > `Paste Style` 또는 `Ctrl+Shift+V`를 실행하고, 잠긴 대상은 건너뛴 결과를 확인
-71. Edit > `History...`를 열어 Current document state와 Undo·Redo 작업을 확인하고 원하는 항목을 선택해 여러 단계를 한 번에 이동
-72. `Ctrl+N` 또는 `File > New`로 새 문서 탭을 만들고 탭 제목을 클릭해 문서를 전환합니다. `File > Open...`은 AXAML을 새 탭으로 열며 `Ctrl+W` 또는 탭의 `x` 버튼으로 현재 탭을 닫습니다.
-73. 앱을 정상적으로 종료한 뒤 다시 실행하면 마지막 탭 구성과 dirty 편집 내용이 자동 복원됩니다. 복원 데이터는 `%LocalAppData%/AvaloniaUIDesigner/session.json`에 저장됩니다.
-74. `Ctrl+Tab`으로 다음 문서 탭, `Ctrl+Shift+Tab`으로 이전 문서 탭을 선택합니다. 각 탭은 마지막 줌 배율과 선택한 컨트롤을 독립적으로 유지합니다.
-75. `File > Load Component Pack...` 또는 `File > Load Toolbox Preset Pack...`으로 외부 Toolbox 팩을 추가하면 파일 경로가 세션에 등록되어 다음 실행 때 자동으로 다시 로드됩니다. 파일이 없어도 문서 탭 복원은 계속되며 상태바에 경고가 표시됩니다.
-76. 외부 프로젝트의 컨트롤은 Component Pack 항목에 `designOnly: true`, `avaloniaTypeName`, `previewText`, `defaultProperties`를 지정해 등록합니다. 디자이너에서는 타입명 플레이스홀더로 편집하고, 생성 AXAML에는 원래 커스텀 타입과 속성을 출력합니다. 예시는 [custom-component-pack.example.json](docs/custom-component-pack.example.json)을 참고하세요.
-77. `File > Load Component Pack Plugin...`에서 `IComponentPackPlugin`을 구현한 신뢰할 수 있는 DLL을 선택하면 플러그인이 제공한 Component Pack을 Toolbox에 등록합니다. DLL 경로는 세션 JSON의 `ComponentPluginPaths`에 저장되고, 앱 재시작 시 플러그인·JSON 팩·프리셋 팩 순서로 복원됩니다.
-78. `File > Manage Component Packs...`에서 로드된 JSON/DLL 팩의 출처와 컴포넌트를 확인하고 `Remove Pack`으로 Toolbox 등록과 세션 경로를 제거합니다. 현재 문서나 프리셋에서 사용 중인 커스텀 타입은 AXAML 타입명을 유지하는 디자인 전용 placeholder로 남으며, 플러그인 DLL 자체는 앱 재시작 전까지 프로세스에 로드된 상태입니다.
-79. 여러 컨트롤을 선택한 뒤 `Edit > Edit Common Properties...`를 열면 공통 Margin·Horizontal/VerticalAlignment·Opacity·IsEnabled·IsVisible·IsHitTestVisible을 일괄 편집합니다. 혼합 값은 빈 입력 또는 3상태 체크박스로 표시되며, 빈 값은 각 컨트롤의 기존 값을 유지합니다.
-80. Toolbox 상단 카테고리 선택기에서 `All categories`, Layout, Containers, Input, Display, Shapes 또는 외부 팩이 제공한 카테고리를 고르고, 카테고리 헤더를 접거나 펼치며 정렬된 카드의 카테고리 칩·Avalonia 타입 힌트를 확인하고 검색어로 결과를 좁힙니다. 검색·필터 후에도 각 그룹의 접힘 상태와 선택 항목을 유지합니다.
-81. Toolbox 카드의 별표 버튼으로 항목을 `Favorites` 그룹에 고정하거나 해제하고, Canvas에 배치한 항목은 최근 사용 순서로 `Recent` 그룹에 자동 기록됩니다. 최근 항목은 최대 8개이며 두 그룹의 상태는 세션 JSON에 함께 복원됩니다.
-82. Toolbox 검색창에 이름 또는 타입을 입력하고 `Enter`를 누르면 첫 번째 결과가 선택되어 아트보드 중앙에 빠르게 배치됩니다. 카테고리 내부 목록은 방향키로 탐색할 수 있으며, `Enter`는 선택 항목 배치, `Space`는 즐겨찾기 토글입니다.
-83. `Ctrl+Alt+T`로 Toolbox 검색창에 포커스하고 `Ctrl+Alt+P` 또는 헤더 `Pick`으로 배치 모드를 켭니다. 선택된 항목은 헤더에 표시되며 Canvas 클릭으로 계속 배치할 수 있고, 헤더 `Cancel`, `Ctrl+Alt+P` 재입력 또는 `Escape`로 선택을 해제합니다.
-84. 배치 모드에서 Canvas 위로 포인터를 움직이면 반투명 ghost와 항목명, 기본 크기, 스냅된 `x, y`가 표시됩니다. 포인터를 Canvas 밖으로 옮기거나 드래그 앤 드롭을 시작하면 ghost가 숨겨지고, 클릭하면 표시된 좌표에 배치됩니다.
-85. 배치 모드에서 Grid·StackPanel·DockPanel·WrapPanel·UniformGrid·Canvas·TabControl·SplitView·Content 컨테이너 위로 포인터를 옮기면 수용 가능한 target이 주황색 outline으로 강조됩니다. 해당 영역을 클릭하면 Toolbox 컨트롤이 target에 자동 삽입되고, 빈 셀·삽입 순서·단일 Content 슬롯 검증 결과가 상태바와 Object Tree에 반영됩니다.
-86. 정밀 target feedback은 Grid/UniformGrid의 `R# C#` 셀, StackPanel/DockPanel/WrapPanel의 `insert #` 삽입선, TabControl/SplitView/Content의 슬롯 bounds를 ghost 상세에 표시해 클릭 전에 실제 계층 배치 결과를 확인하게 합니다.
+62. Object Tree에 포커스를 둔 뒤 방향키로 계층을 탐색하고 `F2`로 이름 변경, `Delete`/`Backspace`로 삭제, `Ctrl+L`로 잠금 전환을 실행
+63. 같은 root 또는 같은 Canvas의 형제 컨트롤을 여러 개 선택한 뒤 Edit > `Lay Out Selected`에서 `Horizontally (StackPanel)` 또는 `Vertically (StackPanel)`을 선택하면 새 레이아웃 컨테이너로 감싸고 Object Tree·Preview·Undo/Redo 결과를 확인
+64. 같은 선택 상태에서 `Grid (Auto)`를 선택하면 자동 행·열 Grid를 만들고 선택 순서대로 컨트롤을 셀에 배치하며, AXAML 검증에서 `Grid.Row`·`Grid.Column`과 행/열 정의를 확인
+65. 같은 선택 상태에서 `UniformGrid (Auto)`를 선택하면 동일 크기 셀과 8px 간격의 UniformGrid를 만들고 Rows·Columns·자식 순서를 AXAML과 Preview에서 확인
+66. 레이아웃 컨테이너를 선택한 뒤 Edit > `Break Selected Layout`을 선택하면 컨테이너를 제거하고 자식 컨트롤을 원래 계층·좌표·순서로 복원
+67. 같은 선택 상태에서 `DockPanel (Horizontal/Vertical)` 또는 `WrapPanel (Horizontal/Vertical)`을 선택하면 선택 순서 기반 자동 레이아웃을 만들고 도킹 방향·행/열·간격을 AXAML과 Preview에서 확인
+68. Edit > `Edit Tab Order Map...`에서 `TabIndex | ControlName` 형식으로 전체 포커스 순서를 편집하고, `auto`/`-1`로 자동 순서를 복원하며 캔버스의 `TAB #` 배지를 확인
+69. Edit > `Edit Event Handler Map...`에서 `ControlName | EventName | HandlerName` 형식으로 여러 컨트롤의 이벤트 핸들러를 일괄 편집하고, 지원되지 않는 이벤트·잠긴 컨트롤·중복 항목 검증 결과를 확인
+70. View > `Live Preview`에서 컨트롤을 클릭하거나 입력·선택·토글·포인터·키보드·포커스 동작을 수행하고, 창 하단 Interaction Log에서 `Control.Event -> HandlerName` 연결 결과를 확인
+71. 한 컨트롤을 선택해 Edit > `Copy Style` 또는 `Ctrl+Shift+C`를 실행한 뒤 하나 이상의 대상 컨트롤을 선택해 Edit > `Paste Style` 또는 `Ctrl+Shift+V`를 실행하고, 잠긴 대상은 건너뛴 결과를 확인
+72. Edit > `History...`를 열어 Current document state와 Undo·Redo 작업을 확인하고 원하는 항목을 선택해 여러 단계를 한 번에 이동
+73. `Ctrl+N` 또는 `File > New`로 새 문서 탭을 만들고 탭 제목을 클릭해 문서를 전환합니다. `File > Open...`은 AXAML을 새 탭으로 열며 `Ctrl+W` 또는 탭의 `x` 버튼으로 현재 탭을 닫습니다.
+74. 앱을 정상적으로 종료한 뒤 다시 실행하면 마지막 탭 구성과 dirty 편집 내용이 자동 복원됩니다. 복원 데이터는 `%LocalAppData%/AvaloniaUIDesigner/session.json`에 저장됩니다.
+75. `Ctrl+Tab`으로 다음 문서 탭, `Ctrl+Shift+Tab`으로 이전 문서 탭을 선택합니다. 각 탭은 마지막 줌 배율과 선택한 컨트롤을 독립적으로 유지합니다.
+76. `File > Load Component Pack...` 또는 `File > Load Toolbox Preset Pack...`으로 외부 Toolbox 팩을 추가하면 파일 경로가 세션에 등록되어 다음 실행 때 자동으로 다시 로드됩니다. 파일이 없어도 문서 탭 복원은 계속되며 상태바에 경고가 표시됩니다.
+77. 외부 프로젝트의 컨트롤은 Component Pack 항목에 `designOnly: true`, `avaloniaTypeName`, `previewText`, `defaultProperties`를 지정해 등록합니다. 디자이너에서는 타입명 플레이스홀더로 편집하고, 생성 AXAML에는 원래 커스텀 타입과 속성을 출력합니다. 예시는 [custom-component-pack.example.json](docs/custom-component-pack.example.json)을 참고하세요.
+78. `File > Load Component Pack Plugin...`에서 `IComponentPackPlugin`을 구현한 신뢰할 수 있는 DLL을 선택하면 플러그인이 제공한 Component Pack을 Toolbox에 등록합니다. DLL 경로는 세션 JSON의 `ComponentPluginPaths`에 저장되고, 앱 재시작 시 플러그인·JSON 팩·프리셋 팩 순서로 복원됩니다.
+79. `File > Manage Component Packs...`에서 로드된 JSON/DLL 팩의 출처와 컴포넌트를 확인하고 `Remove Pack`으로 Toolbox 등록과 세션 경로를 제거합니다. 현재 문서나 프리셋에서 사용 중인 커스텀 타입은 AXAML 타입명을 유지하는 디자인 전용 placeholder로 남으며, 플러그인 DLL 자체는 앱 재시작 전까지 프로세스에 로드된 상태입니다.
+80. 여러 컨트롤을 선택한 뒤 `Edit > Edit Common Properties...`를 열면 공통 Margin·Horizontal/VerticalAlignment·Opacity·IsEnabled·IsVisible·IsHitTestVisible을 일괄 편집합니다. 혼합 값은 빈 입력 또는 3상태 체크박스로 표시되며, 빈 값은 각 컨트롤의 기존 값을 유지합니다.
+81. Toolbox 상단 카테고리 선택기에서 `All categories`, Layout, Containers, Input, Display, Shapes 또는 외부 팩이 제공한 카테고리를 고르고, 카테고리 헤더를 접거나 펼치며 정렬된 카드의 카테고리 칩·Avalonia 타입 힌트를 확인하고 검색어로 결과를 좁힙니다. 검색·필터 후에도 각 그룹의 접힘 상태와 선택 항목을 유지합니다.
+82. Toolbox 카드의 별표 버튼으로 항목을 `Favorites` 그룹에 고정하거나 해제하고, Canvas에 배치한 항목은 최근 사용 순서로 `Recent` 그룹에 자동 기록됩니다. 최근 항목은 최대 8개이며 두 그룹의 상태는 세션 JSON에 함께 복원됩니다.
+83. Toolbox 검색창에 이름 또는 타입을 입력하고 `Enter`를 누르면 첫 번째 결과가 선택되어 아트보드 중앙에 빠르게 배치됩니다. 카테고리 내부 목록은 방향키로 탐색할 수 있으며, `Enter`는 선택 항목 배치, `Space`는 즐겨찾기 토글입니다.
+84. `Ctrl+Alt+T`로 Toolbox 검색창에 포커스하고 `Ctrl+Alt+P` 또는 헤더 `Pick`으로 배치 모드를 켭니다. 선택된 항목은 헤더에 표시되며 Canvas 클릭으로 계속 배치할 수 있고, 헤더 `Cancel`, `Ctrl+Alt+P` 재입력 또는 `Escape`로 선택을 해제합니다.
+85. 배치 모드에서 Canvas 위로 포인터를 움직이면 반투명 ghost와 항목명, 기본 크기, 스냅된 `x, y`가 표시됩니다. 포인터를 Canvas 밖으로 옮기거나 드래그 앤 드롭을 시작하면 ghost가 숨겨지고, 클릭하면 표시된 좌표에 배치됩니다.
+86. 배치 모드에서 Grid·StackPanel·DockPanel·WrapPanel·UniformGrid·Canvas·TabControl·SplitView·Content 컨테이너 위로 포인터를 옮기면 수용 가능한 target이 주황색 outline으로 강조됩니다. 해당 영역을 클릭하면 Toolbox 컨트롤이 target에 자동 삽입되고, 빈 셀·삽입 순서·단일 Content 슬롯 검증 결과가 상태바와 Object Tree에 반영됩니다.
+87. 정밀 target feedback은 Grid/UniformGrid의 `R# C#` 셀, StackPanel/DockPanel/WrapPanel의 `insert #` 삽입선, TabControl/SplitView/Content의 슬롯 bounds를 ghost 상세에 표시해 클릭 전에 실제 계층 배치 결과를 확인하게 합니다.
 
 DataGrid가 포함된 생성 AXAML을 다른 프로젝트에서 사용할 때는 같은 Avalonia 버전의 `Avalonia.Controls.DataGrid` 패키지와 `avares://Avalonia.Controls.DataGrid/Themes/Fluent.xaml` 스타일 include가 필요합니다.
 

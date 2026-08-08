@@ -57,6 +57,9 @@ public partial class MainWindow : Window
         Shift+corner handle  Lock aspect ratio while resizing
         Double-click element Quick edit visible content
         Delete / Backspace   Remove selection
+        Object Tree F2       Rename selected control
+        Object Tree Ctrl+L   Lock / unlock selected control
+        Object Tree arrows   Navigate the hierarchy without nudging the canvas
         """;
 
     private const string AboutHelpText = """
@@ -1089,6 +1092,9 @@ public partial class MainWindow : Window
     }
 
     private async void OnRenameSelectedControlMenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+        => await RenameSelectedControlAsync();
+
+    private async Task RenameSelectedControlAsync()
     {
         FlushPendingPropertyHistory();
         if (Vm is null || !Vm.TryGetSelectedElementName(out var controlName, out var elementName))
@@ -2755,6 +2761,37 @@ public partial class MainWindow : Window
         }
     }
 
+    private async void OnObjectTreeKeyDown(object? sender, KeyEventArgs e)
+    {
+        if (Vm is null)
+        {
+            return;
+        }
+
+        var ctrl = e.KeyModifiers.HasFlag(KeyModifiers.Control);
+        if (!ctrl && e.Key == Key.F2)
+        {
+            await RenameSelectedControlAsync();
+            e.Handled = true;
+            return;
+        }
+
+        if (!ctrl && e.Key is Key.Delete or Key.Back)
+        {
+            FlushPendingPropertyHistory();
+            Vm.RemoveSelectedElement();
+            e.Handled = true;
+            return;
+        }
+
+        if (ctrl && e.Key == Key.L)
+        {
+            FlushPendingPropertyHistory();
+            Vm.ToggleSelectedLock();
+            e.Handled = true;
+        }
+    }
+
     private void OnObjectTreeNodePointerPressed(object? sender, PointerPressedEventArgs e)
     {
         if (Vm is null
@@ -2925,6 +2962,19 @@ public partial class MainWindow : Window
     private static ObjectNodeViewModel? FindObjectTreeNode(object? source)
         => FindObjectTreeNodeControl(source)?.DataContext as ObjectNodeViewModel;
 
+    private bool IsObjectTreeSource(object? source)
+    {
+        for (var current = source as Visual; current is not null; current = current.GetVisualParent())
+        {
+            if (ReferenceEquals(current, ObjectTreeView))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     private static Control? FindObjectTreeNodeControl(object? source)
     {
         for (var current = source as Visual; current is not null; current = current.GetVisualParent())
@@ -2970,6 +3020,13 @@ public partial class MainWindow : Window
 
         // Keep text editing inside the PropertyGrid native to the focused editor.
         if (e.Source is TextBox)
+        {
+            return;
+        }
+
+        // TreeView owns hierarchy navigation; arrows must not nudge the canvas selection.
+        if (IsObjectTreeSource(e.Source)
+            && e.Key is (Key.Left or Key.Right or Key.Up or Key.Down))
         {
             return;
         }

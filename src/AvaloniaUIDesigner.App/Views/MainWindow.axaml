@@ -942,10 +942,12 @@
                                    Margin="8,0,8,6"
                                    FontSize="11"
                                    Foreground="#9CDCFE"/>
-                        <TreeView ItemsSource="{Binding ObjectTree.Nodes}"
+                        <TreeView Name="ObjectTreeView"
+                                  ItemsSource="{Binding ObjectTree.Nodes}"
                                   SelectedItem="{Binding ObjectTree.SelectedNode, Mode=TwoWay}"
                                   Background="Transparent"
                                   BorderThickness="0"
+                                  KeyDown="OnObjectTreeKeyDown"
                                   DragDrop.AllowDrop="True"
                                   DragDrop.DragOver="OnObjectTreeDragOver"
                                   DragDrop.DragLeave="OnObjectTreeDragLeave"
