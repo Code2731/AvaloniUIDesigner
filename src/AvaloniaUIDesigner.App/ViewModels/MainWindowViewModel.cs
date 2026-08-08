@@ -1256,6 +1256,293 @@ public partial class MainWindowViewModel : ViewModelBase
         return true;
     }
 
+    public bool CanReparentElementTo(DesignElement source, DesignElement parent)
+    {
+        if (!Canvas.Elements.Contains(source)
+            || !Canvas.Elements.Contains(parent)
+            || ReferenceEquals(source, parent)
+            || source.IsLocked
+            || parent.IsLocked
+            || string.Equals(source.ParentName, parent.DisplayName, StringComparison.OrdinalIgnoreCase)
+            || IsDescendantOf(parent, source))
+        {
+            return false;
+        }
+
+        return parent.Visual switch
+        {
+            Grid => TryFindAvailableGridCell(parent, source, out _, out _),
+            StackPanel or DockPanel or WrapPanel or UniformGrid or Avalonia.Controls.Canvas => true,
+            TabControl tabControl => TryFindAvailableTabIndex(parent, source, tabControl, out _),
+            SplitView => TryFindAvailableSplitViewSlot(parent, source, out _),
+            _ when IsDesignerContentContainer(parent.Visual) => !HasOtherDirectChild(parent, source),
+            _ => false,
+        };
+    }
+
+    public bool TryReparentSelectedElementTo(DesignElement parent)
+    {
+        if (Canvas.SelectedElement is not { IsLocked: false } source)
+        {
+            StatusText = "Select an unlocked control before dragging it to a container.";
+            return false;
+        }
+
+        if (!CanReparentElementTo(source, parent))
+        {
+            StatusText = "The drop target cannot accept this control without replacing content or creating a cycle.";
+            return false;
+        }
+
+        var gridRow = 0;
+        var gridColumn = 0;
+        if (parent.Visual is Grid && !TryFindAvailableGridCell(parent, source, out gridRow, out gridColumn))
+        {
+            StatusText = $"Grid '{parent.DisplayName}' has no available cell.";
+            return false;
+        }
+
+        var tabIndex = -1;
+        if (parent.Visual is TabControl tabControlTarget
+            && !TryFindAvailableTabIndex(parent, source, tabControlTarget, out tabIndex))
+        {
+            StatusText = $"TabControl '{parent.DisplayName}' has no empty tab.";
+            return false;
+        }
+
+        var splitViewSlot = DesignerSplitViewSlot.Content;
+        if (parent.Visual is SplitView
+            && !TryFindAvailableSplitViewSlot(parent, source, out splitViewSlot))
+        {
+            StatusText = $"SplitView '{parent.DisplayName}' has no empty slot.";
+            return false;
+        }
+
+        BeginCanvasMutation(HistoryActionType.EditProperty, "Reparented control in Object Tree.");
+        switch (parent.Visual)
+        {
+            case Grid:
+                source.GridRow = gridRow;
+                source.GridColumn = gridColumn;
+                source.GridRowSpan = 1;
+                source.GridColumnSpan = 1;
+                source.StackPanelIndex = -1;
+                source.StackPanelItemSize = 40;
+                source.DockPanelIndex = -1;
+                source.DockPanelDock = DesignerDockSide.Left;
+                source.DockPanelItemSize = 40;
+                source.WrapPanelIndex = -1;
+                source.UniformGridIndex = -1;
+                source.CanvasChildIndex = -1;
+                source.CanvasChildLeft = 0;
+                source.CanvasChildTop = 0;
+                source.TabIndex = -1;
+                source.TabHeader = null;
+                source.SplitViewSlot = DesignerSplitViewSlot.Content;
+                source.ParentLayout = DesignerParentLayoutKind.Grid;
+                source.ParentName = parent.DisplayName;
+                Canvas.MoveElementsToFront([source]);
+                break;
+
+            case StackPanel stackPanel:
+            {
+                var siblings = GetDirectChildren(parent)
+                    .Where(child => !ReferenceEquals(child, source) && child.IsStackPanelChild)
+                    .OrderBy(child => child.StackPanelIndex)
+                    .ThenBy(Canvas.Elements.IndexOf)
+                    .ToList();
+                source.StackPanelItemSize = source.IsStackPanelChild
+                    ? Math.Max(10, source.StackPanelItemSize)
+                    : Math.Max(10, stackPanel.Orientation == Orientation.Vertical ? source.Height : source.Width);
+                siblings.Add(source);
+                Canvas.SetStackPanelChildOrder(parent, siblings);
+                Canvas.MoveElementsToFrontInOrder(siblings);
+                break;
+            }
+
+            case DockPanel dockPanel:
+            {
+                var siblings = GetDirectChildren(parent)
+                    .Where(child => !ReferenceEquals(child, source) && child.IsDockPanelChild)
+                    .OrderBy(child => child.DockPanelIndex)
+                    .ThenBy(Canvas.Elements.IndexOf)
+                    .ToList();
+                source.DockPanelDock = source.IsDockPanelChild ? source.DockPanelDock : DesignerDockSide.Left;
+                source.DockPanelItemSize = source.IsDockPanelChild
+                    ? Math.Max(10, source.DockPanelItemSize)
+                    : Math.Max(10, source.DockPanelDock is DesignerDockSide.Top or DesignerDockSide.Bottom
+                        ? source.Height
+                        : source.Width);
+                siblings.Add(source);
+                Canvas.SetDockPanelChildOrder(parent, siblings);
+                Canvas.MoveElementsToFrontInOrder(siblings);
+                break;
+            }
+
+            case WrapPanel:
+            {
+                var siblings = GetDirectChildren(parent)
+                    .Where(child => !ReferenceEquals(child, source) && child.IsWrapPanelChild)
+                    .OrderBy(child => child.WrapPanelIndex)
+                    .ThenBy(Canvas.Elements.IndexOf)
+                    .ToList();
+                siblings.Add(source);
+                Canvas.SetWrapPanelChildOrder(parent, siblings);
+                Canvas.MoveElementsToFrontInOrder(siblings);
+                break;
+            }
+
+            case UniformGrid:
+            {
+                var siblings = GetDirectChildren(parent)
+                    .Where(child => !ReferenceEquals(child, source) && child.IsUniformGridChild)
+                    .OrderBy(child => child.UniformGridIndex)
+                    .ThenBy(Canvas.Elements.IndexOf)
+                    .ToList();
+                siblings.Add(source);
+                Canvas.SetUniformGridChildOrder(parent, siblings);
+                Canvas.MoveElementsToFrontInOrder(siblings);
+                break;
+            }
+
+            case Avalonia.Controls.Canvas:
+            {
+                var siblings = GetDirectChildren(parent)
+                    .Where(child => !ReferenceEquals(child, source) && child.IsCanvasChild)
+                    .OrderBy(child => child.CanvasChildIndex)
+                    .ThenBy(Canvas.Elements.IndexOf)
+                    .ToList();
+                source.CanvasChildLeft = source.X - parent.X;
+                source.CanvasChildTop = source.Y - parent.Y;
+                siblings.Add(source);
+                Canvas.SetCanvasChildOrder(parent, siblings);
+                Canvas.MoveElementsToFrontInOrder(siblings);
+                break;
+            }
+
+            case TabControl tabControl:
+                Canvas.SetTabControlChild(parent, source, tabIndex);
+                Canvas.MoveElementsToFront([source]);
+                break;
+
+            case SplitView:
+                Canvas.SetSplitViewChild(parent, source, splitViewSlot);
+                Canvas.MoveElementsToFront([source]);
+                break;
+
+            default:
+                Canvas.SetContentChild(parent, source);
+                Canvas.MoveElementsToFront([source]);
+                break;
+        }
+
+        Canvas.NormalizeContainerRelationships();
+        ObjectTree.RebuildFrom(Canvas.Elements);
+        ObjectTree.SelectByElement(source);
+        CommitCanvasMutation();
+        StatusText = $"Moved {source.DisplayName} into {parent.DisplayName}.";
+        return true;
+    }
+
+    private bool TryFindAvailableGridCell(
+        DesignElement parent,
+        DesignElement source,
+        out int row,
+        out int column)
+    {
+        row = 0;
+        column = 0;
+        if (parent.Visual is not Grid grid)
+        {
+            return false;
+        }
+
+        var rowCount = DesignerGridDefinitionRuntime.GetRowCount(grid);
+        var columnCount = DesignerGridDefinitionRuntime.GetColumnCount(grid);
+        var children = Canvas.Elements
+            .Where(child => !ReferenceEquals(child, source)
+                && child.IsGridChild
+                && string.Equals(child.ParentName, parent.DisplayName, StringComparison.OrdinalIgnoreCase))
+            .ToList();
+        for (var candidateRow = 0; candidateRow < rowCount; candidateRow++)
+        {
+            for (var candidateColumn = 0; candidateColumn < columnCount; candidateColumn++)
+            {
+                if (children.All(child => candidateRow >= child.GridRow + child.GridRowSpan
+                    || candidateRow + 1 <= child.GridRow
+                    || candidateColumn >= child.GridColumn + child.GridColumnSpan
+                    || candidateColumn + 1 <= child.GridColumn))
+                {
+                    row = candidateRow;
+                    column = candidateColumn;
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    private bool TryFindAvailableTabIndex(
+        DesignElement parent,
+        DesignElement source,
+        TabControl tabControl,
+        out int tabIndex)
+    {
+        var headers = ReadTabHeaders(tabControl);
+        for (var index = 0; index < headers.Count; index++)
+        {
+            if (!Canvas.Elements.Any(child => !ReferenceEquals(child, source)
+                && child.IsTabControlChild
+                && child.TabIndex == index
+                && string.Equals(child.ParentName, parent.DisplayName, StringComparison.OrdinalIgnoreCase)))
+            {
+                tabIndex = index;
+                return true;
+            }
+        }
+
+        tabIndex = -1;
+        return false;
+    }
+
+    private bool TryFindAvailableSplitViewSlot(
+        DesignElement parent,
+        DesignElement source,
+        out DesignerSplitViewSlot slot)
+    {
+        if (!Canvas.Elements.Any(child => !ReferenceEquals(child, source)
+            && child.IsSplitViewChild
+            && child.SplitViewSlot == DesignerSplitViewSlot.Content
+            && string.Equals(child.ParentName, parent.DisplayName, StringComparison.OrdinalIgnoreCase)))
+        {
+            slot = DesignerSplitViewSlot.Content;
+            return true;
+        }
+
+        if (!Canvas.Elements.Any(child => !ReferenceEquals(child, source)
+            && child.IsSplitViewChild
+            && child.SplitViewSlot == DesignerSplitViewSlot.Pane
+            && string.Equals(child.ParentName, parent.DisplayName, StringComparison.OrdinalIgnoreCase)))
+        {
+            slot = DesignerSplitViewSlot.Pane;
+            return true;
+        }
+
+        slot = DesignerSplitViewSlot.Content;
+        return false;
+    }
+
+    private bool HasOtherDirectChild(DesignElement parent, DesignElement source)
+        => Canvas.Elements.Any(child => !ReferenceEquals(child, source)
+            && string.Equals(child.ParentName, parent.DisplayName, StringComparison.OrdinalIgnoreCase));
+
+    private IEnumerable<DesignElement> GetDirectChildren(DesignElement parent)
+        => Canvas.Elements.Where(child => string.Equals(
+            child.ParentName,
+            parent.DisplayName,
+            StringComparison.OrdinalIgnoreCase));
+
     private static int GetParentOrderIndex(DesignElement element)
         => element.ParentLayout switch
         {

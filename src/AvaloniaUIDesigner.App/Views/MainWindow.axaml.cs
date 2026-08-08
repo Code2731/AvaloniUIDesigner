@@ -2489,7 +2489,10 @@ public partial class MainWindow : Window
         }
 
         Vm.SelectElement(source);
-        e.DragEffects = Vm.ReorderSelectedElementBefore(target)
+        var changed = IsObjectTreeSiblingDrop(source, target)
+            ? Vm.ReorderSelectedElementBefore(target)
+            : Vm.TryReparentSelectedElementTo(target);
+        e.DragEffects = changed
             ? DragDropEffects.Move
             : DragDropEffects.None;
         e.Handled = true;
@@ -2511,12 +2514,13 @@ public partial class MainWindow : Window
 
         var sourceElement = Vm.Canvas.Elements.FirstOrDefault(element =>
             string.Equals(element.DisplayName, sourceName, StringComparison.OrdinalIgnoreCase));
-        if (sourceElement is null
-            || ReferenceEquals(sourceElement, targetElement)
-            || !sourceElement.IsContainerChild
-            || !targetElement.IsContainerChild
-            || sourceElement.ParentLayout != targetElement.ParentLayout
-            || !string.Equals(sourceElement.ParentName, targetElement.ParentName, StringComparison.OrdinalIgnoreCase))
+        if (sourceElement is null || ReferenceEquals(sourceElement, targetElement))
+        {
+            return false;
+        }
+
+        if (!IsObjectTreeSiblingDrop(sourceElement, targetElement)
+            && !Vm.CanReparentElementTo(sourceElement, targetElement))
         {
             return false;
         }
@@ -2525,6 +2529,17 @@ public partial class MainWindow : Window
         target = targetElement;
         return true;
     }
+
+    private static bool IsObjectTreeSiblingDrop(DesignElement source, DesignElement target)
+        => source.IsContainerChild
+            && target.IsContainerChild
+            && source.ParentLayout == target.ParentLayout
+            && source.ParentLayout is (DesignerParentLayoutKind.StackPanel
+                or DesignerParentLayoutKind.DockPanel
+                or DesignerParentLayoutKind.WrapPanel
+                or DesignerParentLayoutKind.UniformGrid
+                or DesignerParentLayoutKind.Canvas)
+            && string.Equals(source.ParentName, target.ParentName, StringComparison.OrdinalIgnoreCase);
 
     private static ObjectNodeViewModel? FindObjectTreeNode(object? source)
     {
