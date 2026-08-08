@@ -1530,6 +1530,24 @@ public partial class MainWindow : Window
         }
     }
 
+    private async void OnEditEventHandlerMapMenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        FlushPendingPropertyHistory();
+        if (Vm is null)
+        {
+            return;
+        }
+
+        var updatedMap = await ShowTextEditorDialogAsync(
+            "Edit Event Handler Map",
+            Vm.GetEventHandlerMapText(),
+            "Use ControlName | EventName | HandlerName. Common events include PointerPressed, PointerReleased, GotFocus, LostFocus, KeyDown, KeyUp, Tapped, and TextChanged. Locked controls are preserved.");
+        if (updatedMap is not null)
+        {
+            Vm.SetEventHandlerMapFromText(updatedMap);
+        }
+    }
+
     private async void OnEditAccessibleNameMenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
         FlushPendingPropertyHistory();

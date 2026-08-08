@@ -523,6 +523,7 @@ public sealed class PreviewWindow : Window
             }
         }
 
+        DesignerEventHandlerRuntime.Apply(control, properties);
         DesignerLayoutRuntime.Apply(control, properties);
         DesignerTypographyRuntime.Apply(control, properties);
         DesignerTransformRuntime.Apply(control, properties);

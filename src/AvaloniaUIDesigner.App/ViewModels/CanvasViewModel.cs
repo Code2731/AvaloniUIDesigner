@@ -3284,6 +3284,7 @@ public partial class CanvasViewModel : ViewModelBase
             SetUserStyleClasses(visual, classes);
         }
 
+        DesignerEventHandlerRuntime.Apply(visual, properties);
         DesignerLayoutRuntime.Apply(visual, properties);
         DesignerTypographyRuntime.Apply(visual, properties);
         DesignerTransformRuntime.Apply(visual, properties);

@@ -6690,6 +6690,82 @@ public partial class MainWindowViewModel : ViewModelBase
         return TryRenameElement(target, proposedName);
     }
 
+    public string GetEventHandlerMapText()
+        => DesignerEventHandlerRuntime.GetEditorText(Canvas.Elements);
+
+    public bool SetEventHandlerMapFromText(string? text)
+    {
+        if (!DesignerEventHandlerRuntime.TryParseEditorText(
+                text,
+                out var entries,
+                out var parseError))
+        {
+            StatusText = parseError;
+            return false;
+        }
+
+        var proposed = new Dictionary<DesignElement, Dictionary<string, string>>();
+        foreach (var entry in entries)
+        {
+            var target = Canvas.Elements.FirstOrDefault(element =>
+                string.Equals(element.DisplayName, entry.ControlName, StringComparison.OrdinalIgnoreCase));
+            if (target is null)
+            {
+                StatusText = $"Unknown control in event handler map: {entry.ControlName}.";
+                return false;
+            }
+
+            if (target.IsLocked)
+            {
+                StatusText = $"Cannot edit event handlers for locked control: {target.DisplayName}.";
+                return false;
+            }
+
+            if (!DesignerEventHandlerRuntime.IsSupportedEventForControl(
+                    target.Visual.GetType().Name,
+                    entry.EventName))
+            {
+                StatusText = $"{entry.EventName} is not supported by {target.TypeName}.";
+                return false;
+            }
+
+            if (!proposed.TryGetValue(target, out var handlers))
+            {
+                handlers = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+                proposed[target] = handlers;
+            }
+
+            handlers[entry.EventName] = entry.HandlerName;
+        }
+
+        var changed = Canvas.Elements
+            .Where(element => !element.IsLocked)
+            .Any(element => !DictionaryEquals(
+                DesignerEventHandlerRuntime.Read(element.Visual),
+                proposed.TryGetValue(element, out var handlers)
+                    ? handlers
+                    : new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)));
+        if (!changed)
+        {
+            StatusText = "Event handler map is unchanged.";
+            return true;
+        }
+
+        BeginCanvasMutation(HistoryActionType.EditProperty, "Updated event handler map.");
+        foreach (var element in Canvas.Elements.Where(element => !element.IsLocked))
+        {
+            DesignerEventHandlerRuntime.ReplaceForMap(
+                element.Visual,
+                proposed.TryGetValue(element, out var handlers)
+                    ? handlers
+                    : new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase));
+        }
+
+        CommitCanvasMutation();
+        StatusText = $"Updated {entries.Count} event handler(s) across {proposed.Count} control(s).";
+        return true;
+    }
+
     public bool TryGetSelectedButtonClickHandler(out string buttonName, out string handlerName)
     {
         if (Canvas.SelectedElement is not { IsLocked: false, Visual: Button button } target)
@@ -8978,6 +9054,7 @@ public partial class MainWindowViewModel : ViewModelBase
             ? new Dictionary<string, string>(StringComparer.Ordinal)
             : new Dictionary<string, string>(properties, StringComparer.Ordinal);
         CaptureCommonAppearanceProperties(result, visual);
+        DesignerEventHandlerRuntime.Capture(visual, result);
         DesignerLayoutRuntime.Capture(visual, result);
         DesignerTypographyRuntime.Capture(visual, result);
         DesignerTransformRuntime.Capture(visual, result);
@@ -10622,6 +10699,7 @@ public partial class MainWindowViewModel : ViewModelBase
         var map = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         var tagName = element.Name.LocalName;
         var bindings = new List<DesignerBindingDefinition>();
+        var eventHandlers = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
 
         foreach (var attr in element.Attributes())
         {
@@ -10644,7 +10722,8 @@ public partial class MainWindowViewModel : ViewModelBase
                 continue;
             }
 
-            if (tagName == "Button" && name == "Click")
+            if (string.Equals(tagName, "Button", StringComparison.OrdinalIgnoreCase)
+                && string.Equals(name, "Click", StringComparison.OrdinalIgnoreCase))
             {
                 if (DesignerButtonRuntime.TryNormalizeClickHandler(
                         attr.Value,
@@ -10657,6 +10736,30 @@ public partial class MainWindowViewModel : ViewModelBase
                 {
                     warnings.Add(
                         $"Ignored Button.Click: {clickHandlerError}");
+                }
+
+                continue;
+            }
+
+            if (DesignerEventHandlerRuntime.IsSupportedEventForControl(tagName, name))
+            {
+                if (!DesignerEventHandlerRuntime.TryNormalizeEventName(
+                        name,
+                        out var eventName,
+                        out var eventError))
+                {
+                    warnings.Add($"Ignored {tagName}.{name}: {eventError}");
+                }
+                else if (!DesignerEventHandlerRuntime.TryNormalizeHandlerName(
+                             attr.Value,
+                             out var handlerName,
+                             out var handlerError))
+                {
+                    warnings.Add($"Ignored {tagName}.{name}: {handlerError}");
+                }
+                else
+                {
+                    eventHandlers[eventName] = handlerName;
                 }
 
                 continue;
@@ -11316,6 +11419,11 @@ public partial class MainWindowViewModel : ViewModelBase
         if (bindings.Count > 0)
         {
             map["__bindings"] = DesignerBindingRuntime.Serialize(bindings);
+        }
+
+        if (eventHandlers.Count > 0)
+        {
+            map["__eventHandlers"] = DesignerEventHandlerRuntime.Serialize(eventHandlers);
         }
 
         return map.Count == 0 ? null : map;
@@ -13676,6 +13784,12 @@ public partial class MainWindowViewModel : ViewModelBase
         AppendCommonAccessibilityAttributes(sb, element.Visual);
         AppendCommonInteractionAttributes(sb, element.Visual);
         AppendCommonEffectAttributes(sb, element.Visual);
+        var eventProperties = new Dictionary<string, string>(StringComparer.Ordinal);
+        DesignerEventHandlerRuntime.Capture(element.Visual, eventProperties);
+        foreach (var attribute in DesignerEventHandlerRuntime.GetAxamlAttributes(eventProperties))
+        {
+            AppendAttribute(sb, attribute.Name, attribute.Value);
+        }
 
     }
 

@@ -69,6 +69,7 @@ dotnet run --project src/AvaloniaUIDesigner.App/AvaloniaUIDesigner.App.csproj
 - **ContentControl·UserControl 계층**: ContentControl과 UserControl을 Toolbox에서 배치하고 단일 디자이너 자식 또는 fallback TextBlock 콘텐츠를 편집하며, Content Binding·Undo/Redo·Preview·Draft·Full·UserControl AXAML 왕복에 보존
 - **Image Source & Rendering 속성**: Image의 로컬 Source 선택·해제, Stretch·StretchDirection, bitmap interpolation·edge·blending 모드를 원자적으로 편집하고 Undo/Redo, 복제, Preview, Source Binding, Draft·Full·UserControl AXAML 왕복에 보존
 - **Button Actions & Commands 속성**: Button의 Content·ClickMode·HotKey·Window 기본/취소 동작·CommandParameter·Click 핸들러를 통합 편집하고 Command Binding, Undo/Redo, 복제, Preview, Draft·Full·UserControl AXAML 왕복에 보존
+- **Event Handler Map**: `ControlName | EventName | HandlerName` 형식으로 공통 포인터·키보드·포커스·수명 이벤트와 Button·TextBox·선택 컨트롤 등의 타입별 이벤트 핸들러를 일괄 편집하고, 잠금 보호·유효성 검증·Undo/Redo·Preview·AXAML 왕복을 지원
 - **선택 요소 AXAML 재사용**: 선택한 컨트롤을 하위 계층·리소스·스타일·바인딩·컨트롤 전용 선언과 함께 독립 UserControl AXAML로 클립보드 복사하거나 파일로 내보냄
 - **문서 루트 속성**: Window/UserControl 루트 종류와 Window 제목·리사이즈·시작 위치, 루트 Min/Max 크기를 편집하고 Undo/Redo, Preview, Draft·Full AXAML 왕복에 보존
 - **벡터 Shape 편집**: Rectangle, Ellipse, Line, Path의 Fill·Stroke·대시·끝점·결합 스타일과 반지름·점 좌표를 편집하고, 검증된 Path geometry를 리소스·Undo/Redo·복제·미리보기·AXAML 왕복에 보존
@@ -168,6 +169,7 @@ dotnet run --project src/AvaloniaUIDesigner.App/AvaloniaUIDesigner.App.csproj
 65. 레이아웃 컨테이너를 선택한 뒤 Edit > `Break Selected Layout`을 선택하면 컨테이너를 제거하고 자식 컨트롤을 원래 계층·좌표·순서로 복원
 66. 같은 선택 상태에서 `DockPanel (Horizontal/Vertical)` 또는 `WrapPanel (Horizontal/Vertical)`을 선택하면 선택 순서 기반 자동 레이아웃을 만들고 도킹 방향·행/열·간격을 AXAML과 Preview에서 확인
 67. Edit > `Edit Tab Order Map...`에서 `TabIndex | ControlName` 형식으로 전체 포커스 순서를 편집하고, `auto`/`-1`로 자동 순서를 복원하며 캔버스의 `TAB #` 배지를 확인
+68. Edit > `Edit Event Handler Map...`에서 `ControlName | EventName | HandlerName` 형식으로 여러 컨트롤의 이벤트 핸들러를 일괄 편집하고, 지원되지 않는 이벤트·잠긴 컨트롤·중복 항목 검증 결과를 확인
 
 DataGrid가 포함된 생성 AXAML을 다른 프로젝트에서 사용할 때는 같은 Avalonia 버전의 `Avalonia.Controls.DataGrid` 패키지와 `avares://Avalonia.Controls.DataGrid/Themes/Fluent.xaml` 스타일 include가 필요합니다.
 
@@ -234,6 +236,8 @@ Canvas 그룹화는 같은 부모를 공유하는 형제 컨트롤만 대상으�
 `DockPanel (Horizontal/Vertical)`은 선택 순서대로 가로 방향에는 `Left`, 세로 방향에는 `Top`으로 도킹하고 마지막 자식은 `LastChildFill`로 남겨 선택 컨트롤의 원래 주축 크기를 유지합니다. `WrapPanel (Horizontal/Vertical)`은 선택 컨트롤 중 가장 큰 크기를 항목 크기로 사용하고 8px의 항목·줄 간격과 제곱근 기반 행·열을 자동 계산합니다. 두 레이아웃 모두 root 또는 같은 Canvas 형제에서 실행할 수 있으며, Canvas 안에서는 컨테이너의 상대 좌표와 형제 순서를 보존하고 Undo/Redo·Preview·AXAML 왕복을 지원합니다.
 
 `Edit Tab Order Map...`은 `TabIndex | ControlName` 형식의 여러 줄 목록을 원자적으로 적용합니다. `0`, `1` 같은 명시적 값은 중복을 거부하고, `auto` 또는 `-1`은 Avalonia의 기본 자동 순서로 정규화합니다. 잠긴 컨트롤은 주석으로 표시되어 변경할 수 없으며, 적용된 값은 캔버스의 `TAB #` 배지·접근성 속성·AXAML·Undo/Redo에 함께 반영됩니다.
+
+`Edit Event Handler Map...`은 `ControlName | EventName | HandlerName` 형식의 여러 줄 목록을 원자적으로 적용합니다. 공통 `PointerPressed`, `PointerReleased`, `PointerEntered`, `PointerExited`, `KeyDown`, `KeyUp`, `GotFocus`, `LostFocus`, `Tapped`, `DoubleTapped`, `TextInput` 등의 이벤트와 Button `Click`, TextBox `TextChanged`, 선택 컨트롤 `SelectionChanged`, 범위 컨트롤 `ValueChanged`, Expander `Expanded`/`Collapsed` 등을 지원합니다. 이벤트 이름과 핸들러 식별자를 검증하고, 컨트롤별로 지원되지 않는 이벤트·잠긴 컨트롤·중복 이벤트는 적용하지 않습니다. 기존 Button `Click` 편집과도 호환되며, 적용 결과는 Preview 스냅샷·Draft/Full/UserControl AXAML·Undo/Redo에 보존됩니다. 실제 핸들러 메서드 구현과 ViewModel 연결은 생성 AXAML을 사용하는 호스트 프로젝트에서 담당합니다.
 
 `Break Selected Layout`은 선택한 컨테이너를 제거하고 직접 자식들을 root 또는 원래 Canvas에 다시 연결합니다. Grid·StackPanel·DockPanel·WrapPanel·UniformGrid는 현재 화면 bounds를 유지하고, Canvas 안의 레이아웃은 부모 상대 좌표와 형제 순서를 유지하며 해제된 자식들을 다시 선택합니다.
 
