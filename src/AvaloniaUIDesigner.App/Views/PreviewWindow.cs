@@ -23,6 +23,9 @@ public sealed class PreviewWindow : Window
 {
     private readonly Border _previewSurface;
     private readonly ScrollViewer _previewScrollViewer;
+    private readonly Border _interactionPanel;
+    private readonly TextBlock _interactionLog;
+    private readonly List<string> _interactionEntries = new();
 
     public PreviewWindow(DesignerCanvasDocument document)
     {
@@ -30,6 +33,22 @@ public sealed class PreviewWindow : Window
         {
             HorizontalScrollBarVisibility = Avalonia.Controls.Primitives.ScrollBarVisibility.Auto,
             VerticalScrollBarVisibility = Avalonia.Controls.Primitives.ScrollBarVisibility.Auto,
+        };
+        _interactionLog = new TextBlock
+        {
+            TextWrapping = TextWrapping.Wrap,
+            Foreground = Brush.Parse("#475569"),
+            FontSize = 12,
+            Text = "Preview interactions will appear here.",
+        };
+        _interactionPanel = new Border
+        {
+            IsHitTestVisible = false,
+            Padding = new Thickness(10, 8),
+            Background = Brush.Parse("#F8FAFC"),
+            BorderBrush = Brush.Parse("#CBD5E1"),
+            BorderThickness = new Thickness(1),
+            Child = _interactionLog,
         };
         _previewSurface = new Border
         {
@@ -49,7 +68,44 @@ public sealed class PreviewWindow : Window
         var rootSettings = document.RootSettings ?? new DesignerRootSettings();
         ApplyRootSettings(rootSettings, settings, resizeWindow);
         _previewSurface.Background = Brush.Parse(settings.Background);
-        _previewScrollViewer.Content = CreatePreviewCanvas(document);
+        _interactionEntries.Clear();
+        UpdateInteractionLog();
+        if (_interactionPanel.Parent is Panel previousParent)
+        {
+            previousParent.Children.Remove(_interactionPanel);
+        }
+
+        var previewCanvas = CreatePreviewCanvasWithInteractions(document, ReportInteraction);
+        Canvas.SetLeft(_interactionPanel, 0);
+        Canvas.SetTop(_interactionPanel, Math.Max(0, previewCanvas.Height - 56));
+        _interactionPanel.Width = previewCanvas.Width;
+        _interactionPanel.Height = 52;
+        _interactionPanel.ZIndex = int.MaxValue;
+        previewCanvas.Children.Add(_interactionPanel);
+        _previewScrollViewer.Content = previewCanvas;
+    }
+
+    private void ReportInteraction(DesignerPreviewInteraction interaction)
+    {
+        var handlerName = string.IsNullOrWhiteSpace(interaction.HandlerName)
+            ? "(handler not named)"
+            : interaction.HandlerName;
+        _interactionEntries.Insert(
+            0,
+            $"{interaction.ControlName}.{interaction.EventName} -> {handlerName}");
+        if (_interactionEntries.Count > 8)
+        {
+            _interactionEntries.RemoveAt(_interactionEntries.Count - 1);
+        }
+
+        UpdateInteractionLog();
+    }
+
+    private void UpdateInteractionLog()
+    {
+        _interactionLog.Text = _interactionEntries.Count == 0
+            ? "Preview interactions will appear here."
+            : string.Join(Environment.NewLine, _interactionEntries);
     }
 
     private void ApplyRootSettings(
@@ -90,6 +146,16 @@ public sealed class PreviewWindow : Window
     }
 
     internal static Canvas CreatePreviewCanvas(DesignerCanvasDocument document)
+        => CreatePreviewCanvasCore(document, interactionReporter: null);
+
+    private static Canvas CreatePreviewCanvasWithInteractions(
+        DesignerCanvasDocument document,
+        Action<DesignerPreviewInteraction> interactionReporter)
+        => CreatePreviewCanvasCore(document, interactionReporter);
+
+    private static Canvas CreatePreviewCanvasCore(
+        DesignerCanvasDocument document,
+        Action<DesignerPreviewInteraction>? interactionReporter)
     {
         var settings = document.Settings ?? new DesignerCanvasSettings();
         var colorResources = document.ColorResources ?? new Dictionary<string, string>(StringComparer.Ordinal);
@@ -132,6 +198,14 @@ public sealed class PreviewWindow : Window
                      element.ParentName is null || !containersByName.ContainsKey(element.ParentName)))
         {
             var control = CreateControl(element, colorResources, styles);
+            if (interactionReporter is not null)
+            {
+                DesignerPreviewInteractionRuntime.Wire(
+                    control,
+                    element.DisplayName,
+                    interactionReporter);
+            }
+
             control.Width = element.Width;
             control.Height = element.Height;
             Canvas.SetLeft(control, element.X);
@@ -195,6 +269,14 @@ public sealed class PreviewWindow : Window
             {
                 var childSnapshot = orderedChildren[index];
                 var child = CreateControl(childSnapshot, colorResources, styles);
+                if (interactionReporter is not null)
+                {
+                    DesignerPreviewInteractionRuntime.Wire(
+                        child,
+                        childSnapshot.DisplayName,
+                        interactionReporter);
+                }
+
                 switch (parent)
                 {
                     case Grid grid:
