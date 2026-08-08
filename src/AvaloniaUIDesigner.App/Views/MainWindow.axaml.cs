@@ -3929,6 +3929,49 @@ public partial class MainWindow : Window
         e.Handled = true;
     }
 
+    private void OnToolboxSearchKeyDown(object? sender, KeyEventArgs e)
+    {
+        if (Vm is null || e.Key != Key.Enter)
+        {
+            return;
+        }
+
+        if (!Vm.Toolbox.SelectFirstVisibleItem())
+        {
+            Vm.StatusText = "No Toolbox item matches the search.";
+            e.Handled = true;
+            return;
+        }
+
+        Vm.PlaceSelectedToolboxItemQuickly();
+        e.Handled = true;
+    }
+
+    private void OnToolboxKeyDown(object? sender, KeyEventArgs e)
+    {
+        if (Vm is null
+            || sender is not ListBox listBox
+            || listBox.SelectedItem is not ToolboxItemPresentation presentation)
+        {
+            return;
+        }
+
+        Vm.Toolbox.SelectedItem = presentation.Item;
+        if (e.Key == Key.Enter)
+        {
+            Vm.PlaceSelectedToolboxItemQuickly();
+            e.Handled = true;
+        }
+        else if (e.Key == Key.Space)
+        {
+            var isFavorite = Vm.Toolbox.ToggleFavorite(presentation.Item);
+            Vm.StatusText = isFavorite
+                ? $"Added {presentation.DisplayName} to Toolbox favorites."
+                : $"Removed {presentation.DisplayName} from Toolbox favorites.";
+            e.Handled = true;
+        }
+    }
+
     private async void OnToolboxItemPointerMoved(object? sender, PointerEventArgs e)
     {
         if (_pendingToolboxDragItem is not { } item)

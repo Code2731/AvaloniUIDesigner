@@ -90,6 +90,18 @@ public partial class ToolboxViewModel : ViewModelBase
     public bool IsFavorite(ToolboxItem item)
         => _favoriteNames.Contains(item.DisplayName);
 
+    public bool SelectFirstVisibleItem()
+    {
+        var item = Items.FirstOrDefault();
+        if (item is null)
+        {
+            return false;
+        }
+
+        SelectedItem = item;
+        return true;
+    }
+
     public bool ToggleFavorite(ToolboxItem item)
     {
         var displayName = item.DisplayName.Trim();

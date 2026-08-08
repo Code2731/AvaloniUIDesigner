@@ -64,3 +64,6 @@ Users should be able to place controls visually, inspect properties, and validat
 
 7. v1.1
 - ~~Toolbox Recent and Favorites with session restore~~
+
+8. v1.2
+- ~~Toolbox keyboard navigation and quick placement~~

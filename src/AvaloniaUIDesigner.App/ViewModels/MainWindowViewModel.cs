@@ -670,6 +670,32 @@ public partial class MainWindowViewModel : ViewModelBase
         PlaceToolboxItem(item, x, y);
     }
 
+    public bool PlaceSelectedToolboxItemQuickly()
+    {
+        if (Toolbox.SelectedItem is not { } item)
+        {
+            StatusText = "Select a control in Toolbox first.";
+            return false;
+        }
+
+        var width = item.DefaultWidth
+            ?? (item.IsPreset ? 240 : 120);
+        var height = item.DefaultHeight
+            ?? (item.IsPreset ? 120 : 40);
+        width = Math.Min(width, Canvas.ArtboardWidth);
+        height = Math.Min(height, Canvas.ArtboardHeight);
+
+        var placementIndex = Canvas.Elements.Count % 8;
+        var x = Math.Max(0, (Canvas.ArtboardWidth - width) / 2 + placementIndex * 24);
+        var y = Math.Max(0, (Canvas.ArtboardHeight - height) / 2 + placementIndex * 24);
+        x = Math.Min(x, Math.Max(0, Canvas.ArtboardWidth - width));
+        y = Math.Min(y, Math.Max(0, Canvas.ArtboardHeight - height));
+
+        PlaceToolboxItem(item, x, y);
+        StatusText = $"Quick-placed {item.DisplayName} at the artboard center.";
+        return true;
+    }
+
     public DesignElement? FindDropContainer(Point point)
         => Canvas.Elements
             .Where(element => !element.IsLocked
