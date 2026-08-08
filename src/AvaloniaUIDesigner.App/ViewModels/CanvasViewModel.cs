@@ -193,6 +193,11 @@ public partial class CanvasViewModel : ViewModelBase
         DesignerStyleRuntime.ApplyStyles(visual, _documentStyles, _colorResources, previewStates);
     }
 
+    public void ApplyStyleClipboardProperties(
+        Control visual,
+        IReadOnlyDictionary<string, string> properties)
+        => ApplyVisualProperties(visual, properties);
+
     public void SetStylePreviewState(Control visual, string? pseudoClass)
     {
         var previousControl = _stylePreviewControl;

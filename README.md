@@ -71,6 +71,7 @@ dotnet run --project src/AvaloniaUIDesigner.App/AvaloniaUIDesigner.App.csproj
 - **Button Actions & Commands 속성**: Button의 Content·ClickMode·HotKey·Window 기본/취소 동작·CommandParameter·Click 핸들러를 통합 편집하고 Command Binding, Undo/Redo, 복제, Preview, Draft·Full·UserControl AXAML 왕복에 보존
 - **Event Handler Map**: `ControlName | EventName | HandlerName` 형식으로 공통 포인터·키보드·포커스·수명 이벤트와 Button·TextBox·선택 컨트롤 등의 타입별 이벤트 핸들러를 일괄 편집하고, 잠금 보호·유효성 검증·Undo/Redo·Preview·AXAML 왕복을 지원
 - **Preview Interaction Log**: Live Preview에서 연결된 Button·TextBox·선택·토글·포인터·키보드·포커스 이벤트를 발생시키고 `Control.Event -> HandlerName` 형식의 최근 로그로 디자인 타임 연결을 즉시 확인
+- **Style Clipboard**: 선택 컨트롤의 외형·타이포그래피·렌더링·효과·상호작용·스타일 클래스와 리소스 참조만 복사해 하나 또는 여러 대상에 붙여넣고, 콘텐츠·위치·크기·계층·바인딩·이벤트는 보존
 - **선택 요소 AXAML 재사용**: 선택한 컨트롤을 하위 계층·리소스·스타일·바인딩·컨트롤 전용 선언과 함께 독립 UserControl AXAML로 클립보드 복사하거나 파일로 내보냄
 - **문서 루트 속성**: Window/UserControl 루트 종류와 Window 제목·리사이즈·시작 위치, 루트 Min/Max 크기를 편집하고 Undo/Redo, Preview, Draft·Full AXAML 왕복에 보존
 - **벡터 Shape 편집**: Rectangle, Ellipse, Line, Path의 Fill·Stroke·대시·끝점·결합 스타일과 반지름·점 좌표를 편집하고, 검증된 Path geometry를 리소스·Undo/Redo·복제·미리보기·AXAML 왕복에 보존
@@ -172,6 +173,7 @@ dotnet run --project src/AvaloniaUIDesigner.App/AvaloniaUIDesigner.App.csproj
 67. Edit > `Edit Tab Order Map...`에서 `TabIndex | ControlName` 형식으로 전체 포커스 순서를 편집하고, `auto`/`-1`로 자동 순서를 복원하며 캔버스의 `TAB #` 배지를 확인
 68. Edit > `Edit Event Handler Map...`에서 `ControlName | EventName | HandlerName` 형식으로 여러 컨트롤의 이벤트 핸들러를 일괄 편집하고, 지원되지 않는 이벤트·잠긴 컨트롤·중복 항목 검증 결과를 확인
 69. View > `Live Preview`에서 컨트롤을 클릭하거나 입력·선택·토글·포인터·키보드·포커스 동작을 수행하고, 창 하단 Interaction Log에서 `Control.Event -> HandlerName` 연결 결과를 확인
+70. 한 컨트롤을 선택해 Edit > `Copy Style` 또는 `Ctrl+Shift+C`를 실행한 뒤 하나 이상의 대상 컨트롤을 선택해 Edit > `Paste Style` 또는 `Ctrl+Shift+V`를 실행하고, 잠긴 대상은 건너뛴 결과를 확인
 
 DataGrid가 포함된 생성 AXAML을 다른 프로젝트에서 사용할 때는 같은 Avalonia 버전의 `Avalonia.Controls.DataGrid` 패키지와 `avares://Avalonia.Controls.DataGrid/Themes/Fluent.xaml` 스타일 include가 필요합니다.
 
@@ -242,6 +244,8 @@ Canvas 그룹화는 같은 부모를 공유하는 형제 컨트롤만 대상으�
 `Edit Event Handler Map...`은 `ControlName | EventName | HandlerName` 형식의 여러 줄 목록을 원자적으로 적용합니다. 공통 `PointerPressed`, `PointerReleased`, `PointerEntered`, `PointerExited`, `KeyDown`, `KeyUp`, `GotFocus`, `LostFocus`, `Tapped`, `DoubleTapped`, `TextInput` 등의 이벤트와 Button `Click`, TextBox `TextChanged`, 선택 컨트롤 `SelectionChanged`, 범위 컨트롤 `ValueChanged`, Expander `Expanded`/`Collapsed` 등을 지원합니다. 이벤트 이름과 핸들러 식별자를 검증하고, 컨트롤별로 지원되지 않는 이벤트·잠긴 컨트롤·중복 이벤트는 적용하지 않습니다. 기존 Button `Click` 편집과도 호환되며, 적용 결과는 Preview 스냅샷·Draft/Full/UserControl AXAML·Undo/Redo에 보존됩니다. 실제 핸들러 메서드 구현과 ViewModel 연결은 생성 AXAML을 사용하는 호스트 프로젝트에서 담당합니다.
 
 Live Preview 하단의 `Interaction Log`는 위 이벤트 메타데이터를 안전한 디자인 타임 방식으로 확인합니다. Preview에서 발생한 이벤트는 최대 최근 8개까지 기록하며 컨트롤 이름·이벤트 이름·핸들러 이름을 보여주지만, 호스트 프로젝트의 실제 핸들러 메서드나 ViewModel 명령을 실행하지 않습니다. 따라서 AXAML을 호스트 프로젝트에 연결하기 전에 이벤트 선언과 대상 컨트롤이 올바른지 빠르게 검증할 수 있습니다.
+
+`Copy Style`은 하나의 잠금 해제 컨트롤에서 외형·타이포그래피·렌더링·효과·상호작용 속성, 스타일 클래스와 DynamicResource 참조만 캡처합니다. `Paste Style`은 선택된 잠금 해제 대상에 해당 값을 한 번의 Undo 작업으로 적용하며 Text/Content, 위치·크기, 부모 계층, 바인딩, 이벤트 핸들러, 항목 정의는 변경하지 않습니다. 서로 다른 컨트롤 타입에 붙여넣으면 해당 타입이 지원하는 스타일 속성만 적용하고 나머지는 안전하게 무시합니다.
 
 `Break Selected Layout`은 선택한 컨테이너를 제거하고 직접 자식들을 root 또는 원래 Canvas에 다시 연결합니다. Grid·StackPanel·DockPanel·WrapPanel·UniformGrid는 현재 화면 bounds를 유지하고, Canvas 안의 레이아웃은 부모 상대 좌표와 형제 순서를 유지하며 해제된 자식들을 다시 선택합니다.
 

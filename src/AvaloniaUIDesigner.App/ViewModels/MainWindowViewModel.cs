@@ -540,6 +540,7 @@ public partial class MainWindowViewModel : ViewModelBase
     private string? _currentDocumentPath;
     private DesignerCanvasDocument _lastSavedSnapshot = new(Array.Empty<DesignerElementSnapshot>());
     private List<DesignerElementSnapshot>? _clipboardSnapshots;
+    private IReadOnlyDictionary<string, string>? _styleClipboard;
     private string? _sampleDataJson;
     private DesignerSampleObject? _sampleDataRoot;
     private DesignerRootSettings _rootSettings = new();
@@ -589,6 +590,7 @@ public partial class MainWindowViewModel : ViewModelBase
         : "Redo";
     public string HistorySummary => $"{UndoMenuLabel} | {RedoMenuLabel}";
     public bool CanPaste => _clipboardSnapshots is { Count: > 0 };
+    public bool CanPasteStyle => _styleClipboard is { Count: > 0 };
     public string? CurrentDocumentPath => _currentDocumentPath;
     public string WindowTitle => $"Avalonia UI Designer - {GetDisplayDocumentName()}{(IsDirty ? "*" : string.Empty)}";
     public bool HasStylePreviewOptions => StylePreviewOptions.Count > 1;
@@ -7984,6 +7986,57 @@ public partial class MainWindowViewModel : ViewModelBase
         _clipboardSnapshots = CaptureElementSnapshots(CollectSelectionSubtree(selected));
         OnPropertyChanged(nameof(CanPaste));
         StatusText = $"Copied {_clipboardSnapshots.Count} control(s)";
+    }
+
+    public bool CopySelectedStyle()
+    {
+        if (Canvas.SelectedElements.Count != 1
+            || Canvas.SelectedElement is not { IsLocked: false } target)
+        {
+            StatusText = "Select one unlocked control to copy its style.";
+            return false;
+        }
+
+        _styleClipboard = DesignerStyleClipboardRuntime.Filter(
+            CaptureVisualProperties(target.Visual));
+        OnPropertyChanged(nameof(CanPasteStyle));
+        if (_styleClipboard.Count == 0)
+        {
+            StatusText = "The selected control has no reusable style properties.";
+            return false;
+        }
+
+        StatusText = $"Copied style from {target.DisplayName}.";
+        return true;
+    }
+
+    public bool PasteSelectedStyle()
+    {
+        if (_styleClipboard is not { Count: > 0 })
+        {
+            StatusText = "Style clipboard is empty.";
+            return false;
+        }
+
+        var targets = Canvas.SelectedElements
+            .Where(element => !element.IsLocked)
+            .ToList();
+        if (targets.Count == 0)
+        {
+            StatusText = "Select at least one unlocked control to paste the style.";
+            return false;
+        }
+
+        BeginCanvasMutation(HistoryActionType.EditProperty, "Pasted visual style.");
+        foreach (var target in targets)
+        {
+            Canvas.ApplyStyleClipboardProperties(target.Visual, _styleClipboard);
+            Canvas.RefreshDocumentStyles(target.Visual);
+        }
+
+        CommitCanvasMutation();
+        StatusText = $"Pasted style to {targets.Count} control(s).";
+        return true;
     }
 
     public void CutSelectedElement()

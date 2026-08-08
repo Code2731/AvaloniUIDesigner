@@ -40,6 +40,8 @@ public partial class MainWindow : Window
         Ctrl+C              Copy selection
         Ctrl+X              Cut selection
         Ctrl+V              Paste selection
+        Ctrl+Shift+C        Copy visual style
+        Ctrl+Shift+V        Paste visual style
         Ctrl+Shift+G        Clear design guides
         Tab                 Select next visible control on the canvas
         Shift+Tab           Select previous visible control on the canvas
@@ -860,6 +862,12 @@ public partial class MainWindow : Window
         Vm?.CopySelectedElement();
     }
 
+    private void OnCopyStyleMenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        FlushPendingPropertyHistory();
+        Vm?.CopySelectedStyle();
+    }
+
     private void OnCutMenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
         FlushPendingPropertyHistory();
@@ -870,6 +878,12 @@ public partial class MainWindow : Window
     {
         FlushPendingPropertyHistory();
         Vm?.PasteElement();
+    }
+
+    private void OnPasteStyleMenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        FlushPendingPropertyHistory();
+        Vm?.PasteSelectedStyle();
     }
 
     private void OnDuplicateMenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
@@ -2814,6 +2828,14 @@ public partial class MainWindow : Window
             return;
         }
 
+        if (ctrl && shift && e.Key == Key.C)
+        {
+            FlushPendingPropertyHistory();
+            Vm.CopySelectedStyle();
+            e.Handled = true;
+            return;
+        }
+
         if (ctrl && e.Key == Key.C)
         {
             FlushPendingPropertyHistory();
@@ -2826,6 +2848,14 @@ public partial class MainWindow : Window
         {
             FlushPendingPropertyHistory();
             Vm.CutSelectedElement();
+            e.Handled = true;
+            return;
+        }
+
+        if (ctrl && shift && e.Key == Key.V)
+        {
+            FlushPendingPropertyHistory();
+            Vm.PasteSelectedStyle();
             e.Handled = true;
             return;
         }
