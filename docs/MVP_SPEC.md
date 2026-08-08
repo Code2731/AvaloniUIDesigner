@@ -60,4 +60,4 @@ Users should be able to place controls visually, inspect properties, and validat
 - ~~Multi-selection common property editing~~
 
 6. v1.0
-- ~~Categorized Toolbox and category filter~~
+- ~~Categorized Toolbox ordering, metadata chips, and category filter~~

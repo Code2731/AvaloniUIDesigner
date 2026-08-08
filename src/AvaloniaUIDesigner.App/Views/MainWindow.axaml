@@ -381,11 +381,34 @@
                              BorderThickness="0">
                         <ListBox.ItemTemplate>
                             <DataTemplate>
-                                <TextBlock Text="{Binding DisplayName}"
-                                           Padding="4,2"
-                                           PointerPressed="OnToolboxItemPointerPressed"
-                                           PointerMoved="OnToolboxItemPointerMoved"
-                                           PointerReleased="OnToolboxItemPointerReleased"/>
+                                <Border Padding="5,4"
+                                        Margin="3,1"
+                                        Background="#2A2D2E"
+                                        CornerRadius="3"
+                                        PointerPressed="OnToolboxItemPointerPressed"
+                                        PointerMoved="OnToolboxItemPointerMoved"
+                                        PointerReleased="OnToolboxItemPointerReleased">
+                                    <Grid ColumnDefinitions="Auto,*">
+                                        <Border Background="#3A3F41"
+                                                CornerRadius="2"
+                                                Padding="4,1"
+                                                VerticalAlignment="Top">
+                                            <TextBlock Text="{Binding CategoryLabel}"
+                                                       FontSize="9"
+                                                       Foreground="#9CDCFE"/>
+                                        </Border>
+                                        <StackPanel Grid.Column="1"
+                                                    Margin="6,0,0,0">
+                                            <TextBlock Text="{Binding DisplayName}"
+                                                       FontWeight="SemiBold"
+                                                       Foreground="#E6E6E6"/>
+                                            <TextBlock Text="{Binding AvaloniaTypeName}"
+                                                       FontSize="9"
+                                                       Foreground="#8B949E"
+                                                       TextTrimming="CharacterEllipsis"/>
+                                        </StackPanel>
+                                    </Grid>
+                                </Border>
                             </DataTemplate>
                         </ListBox.ItemTemplate>
                     </ListBox>

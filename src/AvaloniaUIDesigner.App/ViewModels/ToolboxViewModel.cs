@@ -55,9 +55,10 @@ public partial class ToolboxViewModel : ViewModelBase
             ],
             Category: "Presets"));
 
-        Items = new ObservableCollection<ToolboxItem>(_allItems);
+        Items = new ObservableCollection<ToolboxItem>();
         CategoryOptions = new ObservableCollection<string>();
         RefreshCategoryOptions();
+        ApplyFilter();
     }
 
     public ObservableCollection<ToolboxItem> Items { get; }
@@ -187,15 +188,19 @@ public partial class ToolboxViewModel : ViewModelBase
     {
         var selected = SelectedItem;
         var query = SearchText.Trim();
-        var matches = _allItems.Where(item =>
-        {
-            var matchesCategory = string.Equals(CategoryFilter, AllCategories, StringComparison.Ordinal)
-                || string.Equals(item.Category, CategoryFilter, StringComparison.OrdinalIgnoreCase);
-            var matchesQuery = string.IsNullOrWhiteSpace(query)
-                || item.DisplayName.Contains(query, StringComparison.OrdinalIgnoreCase)
-                || item.AvaloniaTypeName.Contains(query, StringComparison.OrdinalIgnoreCase);
-            return matchesCategory && matchesQuery;
-        });
+        var matches = _allItems
+            .Where(item =>
+            {
+                var matchesCategory = string.Equals(CategoryFilter, AllCategories, StringComparison.Ordinal)
+                    || string.Equals(item.Category, CategoryFilter, StringComparison.OrdinalIgnoreCase);
+                var matchesQuery = string.IsNullOrWhiteSpace(query)
+                    || item.DisplayName.Contains(query, StringComparison.OrdinalIgnoreCase)
+                    || item.AvaloniaTypeName.Contains(query, StringComparison.OrdinalIgnoreCase);
+                return matchesCategory && matchesQuery;
+            })
+            .OrderBy(item => GetCategoryOrder(item.CategoryLabel))
+            .ThenBy(item => item.CategoryLabel, StringComparer.OrdinalIgnoreCase)
+            .ThenBy(item => item.DisplayName, StringComparer.OrdinalIgnoreCase);
 
         Items.Clear();
         foreach (var item in matches)
@@ -220,7 +225,8 @@ public partial class ToolboxViewModel : ViewModelBase
             .Where(category => !string.IsNullOrWhiteSpace(category))
             .Select(category => category!.Trim())
             .Distinct(StringComparer.OrdinalIgnoreCase)
-            .OrderBy(category => category, StringComparer.OrdinalIgnoreCase)
+            .OrderBy(GetCategoryOrder)
+            .ThenBy(category => category, StringComparer.OrdinalIgnoreCase)
             .ToList();
 
         CategoryOptions.Clear();
@@ -235,6 +241,18 @@ public partial class ToolboxViewModel : ViewModelBase
             : AllCategories;
         OnPropertyChanged(nameof(CategoryOptions));
     }
+
+    private static int GetCategoryOrder(string category)
+        => category switch
+        {
+            "Layout" => 0,
+            "Containers" => 1,
+            "Input" => 2,
+            "Display" => 3,
+            "Shapes" => 4,
+            "Presets" => 5,
+            _ => 100,
+        };
 
     private static ToolboxItem CreateToolboxItem(DesignerComponentDefinition definition) => new(
         definition.DisplayName,

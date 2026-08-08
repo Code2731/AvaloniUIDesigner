@@ -15,4 +15,8 @@ public sealed record ToolboxItem(
     string? Category = null)
 {
     public bool IsPreset => PresetElements is { Count: > 0 };
+
+    public string CategoryLabel => string.IsNullOrWhiteSpace(Category)
+        ? "General"
+        : Category.Trim();
 }
