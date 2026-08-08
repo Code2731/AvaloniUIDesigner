@@ -106,6 +106,23 @@ public partial class ObjectTreeViewModel : ViewModelBase
         SelectedNode = null;
     }
 
+    public void SetDropFeedback(ObjectNodeViewModel? target, bool accepted)
+    {
+        foreach (var node in _allChildren)
+        {
+            node.IsDropTarget = false;
+            node.IsDropRejected = false;
+        }
+
+        if (target is not null)
+        {
+            target.IsDropTarget = accepted;
+            target.IsDropRejected = !accepted;
+        }
+    }
+
+    public void ClearDropFeedback() => SetDropFeedback(null, accepted: false);
+
     private void ExpandAncestors(ObjectNodeViewModel node)
     {
         Root.IsExpanded = true;
@@ -306,4 +323,10 @@ public partial class ObjectNodeViewModel : ViewModelBase
 
     [ObservableProperty]
     private bool _isExpanded;
+
+    [ObservableProperty]
+    private bool _isDropTarget;
+
+    [ObservableProperty]
+    private bool _isDropRejected;
 }

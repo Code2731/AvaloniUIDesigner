@@ -727,6 +727,7 @@
                                   BorderThickness="0"
                                   DragDrop.AllowDrop="True"
                                   DragDrop.DragOver="OnObjectTreeDragOver"
+                                  DragDrop.DragLeave="OnObjectTreeDragLeave"
                                   DragDrop.Drop="OnObjectTreeDrop">
                             <TreeView.Styles>
                                 <Style Selector="TreeViewItem">
@@ -734,12 +735,23 @@
                                 </Style>
                             </TreeView.Styles>
                             <TreeView.ItemTemplate>
-                                <TreeDataTemplate ItemsSource="{Binding Children}">
-                                    <StackPanel Orientation="Horizontal"
-                                                Spacing="4"
-                                                PointerPressed="OnObjectTreeNodePointerPressed"
-                                                PointerMoved="OnObjectTreeNodePointerMoved"
-                                                PointerReleased="OnObjectTreeNodePointerReleased">
+                            <TreeDataTemplate ItemsSource="{Binding Children}">
+                                    <Grid>
+                                        <Border Background="#163B2A"
+                                                BorderBrush="#4ADE80"
+                                                BorderThickness="1"
+                                                CornerRadius="2"
+                                                IsVisible="{Binding IsDropTarget}"/>
+                                        <Border Background="#452020"
+                                                BorderBrush="#F87171"
+                                                BorderThickness="1"
+                                                CornerRadius="2"
+                                                IsVisible="{Binding IsDropRejected}"/>
+                                        <StackPanel Orientation="Horizontal"
+                                                    Spacing="4"
+                                                    PointerPressed="OnObjectTreeNodePointerPressed"
+                                                    PointerMoved="OnObjectTreeNodePointerMoved"
+                                                    PointerReleased="OnObjectTreeNodePointerReleased">
                                         <StackPanel.ContextMenu>
                                             <ContextMenu>
                                                 <MenuItem Header="Rename..." Click="OnRenameSelectedControlMenuClicked"/>
@@ -778,7 +790,8 @@
                                                 IsVisible="{Binding Element.IsLocked}">
                                             <TextBlock Text="LOCK" FontSize="9" FontWeight="SemiBold" Foreground="White"/>
                                         </Border>
-                                    </StackPanel>
+                                        </StackPanel>
+                                    </Grid>
                                 </TreeDataTemplate>
                             </TreeView.ItemTemplate>
                         </TreeView>

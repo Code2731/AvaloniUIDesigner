@@ -2462,6 +2462,7 @@ public partial class MainWindow : Window
         var data = new DataTransfer();
         data.Add(DataTransferItem.Create(ObjectTreeDragDataFormat, element.DisplayName));
         await DragDrop.DoDragDropAsync(e, data, DragDropEffects.Move);
+        Vm?.ObjectTree.ClearDropFeedback();
         e.Handled = true;
     }
 
@@ -2469,18 +2470,36 @@ public partial class MainWindow : Window
     {
         _pendingObjectTreeDragElement = null;
         e.Pointer.Capture(null);
+        Vm?.ObjectTree.ClearDropFeedback();
     }
 
     private void OnObjectTreeDragOver(object? sender, DragEventArgs e)
     {
-        e.DragEffects = TryGetObjectTreeDropElements(e, out _, out _)
+        var targetNode = FindObjectTreeNode(e.Source);
+        if (e.DataTransfer.TryGetValue(ObjectTreeDragDataFormat) is not string)
+        {
+            Vm?.ObjectTree.ClearDropFeedback();
+            e.DragEffects = DragDropEffects.None;
+            e.Handled = true;
+            return;
+        }
+
+        var accepted = TryGetObjectTreeDropElements(e, out _, out _);
+        Vm?.ObjectTree.SetDropFeedback(targetNode, accepted);
+        e.DragEffects = accepted
             ? DragDropEffects.Move
             : DragDropEffects.None;
         e.Handled = true;
     }
 
+    private void OnObjectTreeDragLeave(object? sender, DragEventArgs e)
+    {
+        Vm?.ObjectTree.ClearDropFeedback();
+    }
+
     private void OnObjectTreeDrop(object? sender, DragEventArgs e)
     {
+        Vm?.ObjectTree.ClearDropFeedback();
         if (Vm is null || !TryGetObjectTreeDropElements(e, out var source, out var target))
         {
             e.DragEffects = DragDropEffects.None;
