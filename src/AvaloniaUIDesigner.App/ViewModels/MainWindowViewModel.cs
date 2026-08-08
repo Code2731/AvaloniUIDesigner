@@ -7364,6 +7364,51 @@ public partial class MainWindowViewModel : ViewModelBase
         return true;
     }
 
+    public bool BreakSelectedLayout()
+    {
+        if (Canvas.SelectedElement is not { } target)
+        {
+            StatusText = "Select a layout container to break.";
+            return false;
+        }
+
+        if (target.IsLocked)
+        {
+            StatusText = "Unlock the selected layout before breaking it.";
+            return false;
+        }
+
+        BeginCanvasMutation(HistoryActionType.TransformElement, "Broke selected layout.");
+        IReadOnlyList<DesignElement> children;
+        string error;
+        var changed = target.Visual is Avalonia.Controls.Canvas
+            ? Canvas.TryUngroupCanvas(target, out children, out error)
+            : Canvas.TryBreakLayout(target, out children, out error);
+        if (!changed)
+        {
+            _pendingMutation = null;
+            StatusText = error;
+            return false;
+        }
+
+        _isSyncingSelection = true;
+        try
+        {
+            ObjectTree.RebuildFrom(Canvas.Elements);
+            Canvas.SelectMany(children);
+            ObjectTree.SelectByElement(Canvas.SelectedElement);
+        }
+        finally
+        {
+            _isSyncingSelection = false;
+        }
+
+        RefreshStylePreviewOptions();
+        CommitCanvasMutation();
+        StatusText = $"Broke {target.DisplayName} into {children.Count} control(s).";
+        return true;
+    }
+
     public void CenterSelectedElementsOnArtboard(bool horizontally, bool vertically)
     {
         var targets = Canvas.SelectedElements.Where(element => !element.IsLocked).ToList();

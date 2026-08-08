@@ -2418,6 +2418,14 @@ public partial class MainWindow : Window
         Vm?.UngroupSelectedCanvas();
     }
 
+    private void OnBreakSelectedLayoutMenuClicked(
+        object? sender,
+        Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        FlushPendingPropertyHistory();
+        Vm?.BreakSelectedLayout();
+    }
+
     private void CenterSelectedElementsOnArtboard(bool horizontally, bool vertically)
     {
         FlushPendingPropertyHistory();

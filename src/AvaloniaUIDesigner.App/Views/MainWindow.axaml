@@ -209,6 +209,7 @@
                 </MenuItem>
                 <Separator/>
                 <MenuItem Header="Group Selected into Canvas" Click="OnGroupSelectedMenuClicked" IsEnabled="{Binding Canvas.HasMultipleSelection}"/>
+                <MenuItem Header="Break Selected Layout" Click="OnBreakSelectedLayoutMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
                 <MenuItem Header="Ungroup Selected Canvas" Click="OnUngroupSelectedMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
             </MenuItem>
             <MenuItem Header="View">
@@ -538,6 +539,7 @@
                                                     </MenuItem>
                                                     <Separator/>
                                                     <MenuItem Header="Group Selected into Canvas" Click="OnGroupSelectedMenuClicked"/>
+                                                    <MenuItem Header="Break Selected Layout" Click="OnBreakSelectedLayoutMenuClicked"/>
                                                     <MenuItem Header="Ungroup Selected Canvas" Click="OnUngroupSelectedMenuClicked"/>
                                                 </ContextMenu>
                                             </Border.ContextMenu>

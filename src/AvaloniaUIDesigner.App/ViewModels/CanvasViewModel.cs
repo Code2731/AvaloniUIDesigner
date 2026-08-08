@@ -1790,6 +1790,110 @@ public partial class CanvasViewModel : ViewModelBase
         return true;
     }
 
+    public bool TryBreakLayout(
+        DesignElement requested,
+        out IReadOnlyList<DesignElement> children,
+        out string error)
+    {
+        children = Array.Empty<DesignElement>();
+        error = string.Empty;
+        if (!Elements.Contains(requested)
+            || requested.IsLocked
+            || requested.Visual is not (Grid or StackPanel or DockPanel or WrapPanel or UniformGrid))
+        {
+            error = "Select an unlocked Grid, StackPanel, DockPanel, WrapPanel, or UniformGrid layout.";
+            return false;
+        }
+
+        var layoutChildren = GetDirectChildren(requested)
+            .Where(child => child.IsContainerChild)
+            .OrderBy(child => requested.Visual switch
+            {
+                Grid => (child.GridRow * 10000) + child.GridColumn,
+                StackPanel => child.StackPanelIndex,
+                DockPanel => child.DockPanelIndex,
+                WrapPanel => child.WrapPanelIndex,
+                UniformGrid => child.UniformGridIndex,
+                _ => Elements.IndexOf(child),
+            })
+            .ThenBy(Elements.IndexOf)
+            .ToList();
+        if (layoutChildren.Count == 0)
+        {
+            error = "The selected layout has no direct children to break.";
+            return false;
+        }
+
+        var parent = FindParent(requested);
+        if (parent is not null && parent.Visual is not Canvas)
+        {
+            error = "Only a root layout or a layout inside a Canvas can be broken.";
+            return false;
+        }
+
+        var layoutIndex = Elements.IndexOf(requested);
+        var formerParentChildren = parent is null
+            ? null
+            : GetDirectChildren(parent)
+                .Where(child => !ReferenceEquals(child, requested))
+                .OrderBy(child => child.CanvasChildIndex)
+                .ThenBy(Elements.IndexOf)
+                .ToList();
+
+        _isReflowingContainerChildren = true;
+        try
+        {
+            Elements.Remove(requested);
+            if (parent is null)
+            {
+                foreach (var child in layoutChildren)
+                {
+                    Elements.Remove(child);
+                    ResetContainerRelationship(child);
+                }
+
+                var insertionIndex = Math.Clamp(layoutIndex, 0, Elements.Count);
+                foreach (var child in layoutChildren)
+                {
+                    Elements.Insert(insertionIndex++, child);
+                }
+            }
+            else if (formerParentChildren is not null)
+            {
+                var parentIndex = Math.Clamp(requested.CanvasChildIndex, 0, formerParentChildren.Count);
+                foreach (var child in layoutChildren)
+                {
+                    SetCanvasChildRelationship(
+                        child,
+                        parent,
+                        parentIndex++,
+                        child.X - parent.X,
+                        child.Y - parent.Y);
+                }
+
+                formerParentChildren.InsertRange(
+                    Math.Clamp(requested.CanvasChildIndex, 0, formerParentChildren.Count),
+                    layoutChildren);
+                SetCanvasChildOrder(parent, formerParentChildren);
+            }
+        }
+        finally
+        {
+            _isReflowingContainerChildren = false;
+        }
+
+        if (requested.Visual is Panel panel)
+        {
+            panel.Children.Clear();
+        }
+
+        NormalizeContainerRelationships();
+        ReflowContainerChildren();
+        ResolveLabelTargets();
+        children = layoutChildren;
+        return true;
+    }
+
     public DesignElement? SetTabControlChild(
         DesignElement parent,
         DesignElement child,
