@@ -259,7 +259,7 @@ public partial class MainWindow : Window
         await using var stream = await files[0].OpenReadAsync();
         using var reader = new StreamReader(stream);
         var json = await reader.ReadToEndAsync();
-        if (!Vm.TryLoadComponentPack(json, out var result))
+        if (!Vm.TryLoadComponentPack(json, files[0].Path.LocalPath, out var result))
         {
             Vm.StatusText = $"Could not load component pack: {result}";
         }
@@ -292,7 +292,7 @@ public partial class MainWindow : Window
         await using var stream = await files[0].OpenReadAsync();
         using var reader = new StreamReader(stream);
         var json = await reader.ReadToEndAsync();
-        if (!Vm.TryLoadToolboxPresetPack(json, out var result))
+        if (!Vm.TryLoadToolboxPresetPack(json, files[0].Path.LocalPath, out var result))
         {
             Vm.StatusText = $"Could not load Toolbox preset pack: {result}";
         }

@@ -535,6 +535,8 @@ public partial class MainWindowViewModel : ViewModelBase
     private readonly IDesignerSerializer _serializer;
     private readonly ComponentPackLoader _componentPackLoader = new();
     private readonly ToolboxPresetPackLoader _toolboxPresetPackLoader = new();
+    private readonly List<string> _componentPackPaths = new();
+    private readonly List<string> _toolboxPresetPackPaths = new();
     private readonly Stack<HistoryEntry> _undoStack = new();
     private readonly Stack<HistoryEntry> _redoStack = new();
     private readonly Dictionary<string, string> _colorResources = new(StringComparer.Ordinal);
@@ -594,6 +596,8 @@ public partial class MainWindowViewModel : ViewModelBase
     public ObservableCollection<string> RecentFiles { get; }
     public ObservableCollection<StylePreviewOption> StylePreviewOptions { get; }
     public ObservableCollection<DocumentTabViewModel> DocumentTabs { get; }
+    public IReadOnlyList<string> ComponentPackPaths => _componentPackPaths;
+    public IReadOnlyList<string> ToolboxPresetPackPaths => _toolboxPresetPackPaths;
 
     public event EventHandler? DocumentChanged;
 
@@ -707,6 +711,9 @@ public partial class MainWindowViewModel : ViewModelBase
     }
 
     public bool TryLoadComponentPack(string json, out string result)
+        => TryLoadComponentPack(json, sourcePath: null, out result);
+
+    public bool TryLoadComponentPack(string json, string? sourcePath, out string result)
     {
         if (!_componentPackLoader.TryLoad(
                 json,
@@ -720,12 +727,16 @@ public partial class MainWindowViewModel : ViewModelBase
         }
 
         Toolbox.AddComponents(pack.Definitions);
+        TrackPackPath(_componentPackPaths, sourcePath);
         result = $"Loaded {pack.Definitions.Count} component(s) from {pack.Name}.";
         StatusText = result;
         return true;
     }
 
     public bool TryLoadToolboxPresetPack(string json, out string result)
+        => TryLoadToolboxPresetPack(json, sourcePath: null, out result);
+
+    public bool TryLoadToolboxPresetPack(string json, string? sourcePath, out string result)
     {
         if (!_toolboxPresetPackLoader.TryLoad(
                 json,
@@ -744,6 +755,7 @@ public partial class MainWindowViewModel : ViewModelBase
             return false;
         }
 
+        TrackPackPath(_toolboxPresetPackPaths, sourcePath);
         result = $"Loaded {pack.Presets.Count} Toolbox preset(s) from {pack.Name}.";
         StatusText = result;
         return true;
@@ -8211,7 +8223,11 @@ public partial class MainWindowViewModel : ViewModelBase
             ? 0
             : Math.Max(0, DocumentTabs.IndexOf(_selectedDocumentTab));
         return JsonSerializer.Serialize(
-            new PersistedDocumentSession(tabs, activeTabIndex),
+            new PersistedDocumentSession(
+                tabs,
+                activeTabIndex,
+                _componentPackPaths.ToList(),
+                _toolboxPresetPackPaths.ToList()),
             new JsonSerializerOptions { WriteIndented = true });
     }
 
@@ -8283,6 +8299,9 @@ public partial class MainWindowViewModel : ViewModelBase
             return false;
         }
 
+        var packWarnings = new List<string>();
+        RestoreComponentPackFiles(session.ComponentPackPaths, packWarnings);
+        RestoreToolboxPresetPackFiles(session.ToolboxPresetPackPaths, packWarnings);
         ClearDocumentTabsForSessionRestore();
         var restoredTabs = new List<DocumentTabViewModel>();
         foreach (var restoredDocument in restoredDocuments)
@@ -8313,7 +8332,8 @@ public partial class MainWindowViewModel : ViewModelBase
         var activeIndex = Math.Clamp(session.ActiveTabIndex, 0, restoredTabs.Count - 1);
         ActivateDocumentTab(restoredTabs[activeIndex]);
         UpdateDocumentTabPresentations();
-        StatusText = $"Restored {restoredTabs.Count} document tab(s) from the previous session.";
+        StatusText = $"Restored {restoredTabs.Count} document tab(s) from the previous session."
+            + (packWarnings.Count == 0 ? string.Empty : $" {string.Join(" ", packWarnings)}");
         return true;
     }
 
@@ -12301,6 +12321,126 @@ public partial class MainWindowViewModel : ViewModelBase
         OnPropertyChanged(nameof(WindowTitle));
     }
 
+    private void RestoreComponentPackFiles(
+        IEnumerable<string>? paths,
+        ICollection<string> warnings)
+    {
+        foreach (var path in NormalizePackPaths(paths, warnings, "component pack"))
+        {
+            if (_componentPackPaths.Any(existing => string.Equals(
+                    existing,
+                    path,
+                    StringComparison.OrdinalIgnoreCase)))
+            {
+                continue;
+            }
+
+            if (!File.Exists(path))
+            {
+                warnings.Add($"Component pack '{Path.GetFileName(path)}' was not found and was skipped.");
+                continue;
+            }
+
+            try
+            {
+                if (!TryLoadComponentPack(File.ReadAllText(path), path, out var result))
+                {
+                    warnings.Add($"Component pack '{Path.GetFileName(path)}' was skipped: {result}");
+                }
+            }
+            catch (Exception ex)
+            {
+                warnings.Add($"Component pack '{Path.GetFileName(path)}' was skipped: {ex.Message}");
+            }
+        }
+    }
+
+    private void RestoreToolboxPresetPackFiles(
+        IEnumerable<string>? paths,
+        ICollection<string> warnings)
+    {
+        foreach (var path in NormalizePackPaths(paths, warnings, "Toolbox preset pack"))
+        {
+            if (_toolboxPresetPackPaths.Any(existing => string.Equals(
+                    existing,
+                    path,
+                    StringComparison.OrdinalIgnoreCase)))
+            {
+                continue;
+            }
+
+            if (!File.Exists(path))
+            {
+                warnings.Add($"Toolbox preset pack '{Path.GetFileName(path)}' was not found and was skipped.");
+                continue;
+            }
+
+            try
+            {
+                if (!TryLoadToolboxPresetPack(File.ReadAllText(path), path, out var result))
+                {
+                    warnings.Add($"Toolbox preset pack '{Path.GetFileName(path)}' was skipped: {result}");
+                }
+            }
+            catch (Exception ex)
+            {
+                warnings.Add($"Toolbox preset pack '{Path.GetFileName(path)}' was skipped: {ex.Message}");
+            }
+        }
+    }
+
+    private static IEnumerable<string> NormalizePackPaths(
+        IEnumerable<string>? paths,
+        ICollection<string> warnings,
+        string packKind)
+    {
+        var normalizedPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var rawPath in paths ?? Enumerable.Empty<string>())
+        {
+            if (!TryNormalizePackPath(rawPath, out var path))
+            {
+                warnings.Add($"A {packKind} path was invalid and was skipped.");
+                continue;
+            }
+
+            if (normalizedPaths.Add(path))
+            {
+                yield return path;
+            }
+        }
+    }
+
+    private static void TrackPackPath(ICollection<string> paths, string? sourcePath)
+    {
+        if (TryNormalizePackPath(sourcePath, out var path)
+            && !paths.Any(existing => string.Equals(
+                existing,
+                path,
+                StringComparison.OrdinalIgnoreCase)))
+        {
+            paths.Add(path);
+        }
+    }
+
+    private static bool TryNormalizePackPath(string? sourcePath, out string path)
+    {
+        path = string.Empty;
+        if (string.IsNullOrWhiteSpace(sourcePath))
+        {
+            return false;
+        }
+
+        try
+        {
+            path = Path.GetFullPath(sourcePath.Trim());
+            return !string.IsNullOrWhiteSpace(path);
+        }
+        catch (Exception)
+        {
+            return false;
+        }
+    }
+
     private void UpdateDocumentTabPresentations()
     {
         foreach (var state in _documentTabStates.Values)
@@ -15253,7 +15393,9 @@ public partial class MainWindowViewModel : ViewModelBase
 
     private sealed record PersistedDocumentSession(
         List<PersistedDocumentTab> Tabs,
-        int ActiveTabIndex);
+        int ActiveTabIndex,
+        List<string>? ComponentPackPaths = null,
+        List<string>? ToolboxPresetPackPaths = null);
 
     private sealed record PersistedDocumentTab(
         string? DocumentPath,
