@@ -747,6 +747,16 @@
                                                 BorderThickness="1"
                                                 CornerRadius="2"
                                                 IsVisible="{Binding IsDropRejected}"/>
+                                        <Border Background="#67E8F9"
+                                                Height="2"
+                                                HorizontalAlignment="Stretch"
+                                                VerticalAlignment="Top"
+                                                IsVisible="{Binding IsDropBefore}"/>
+                                        <Border Background="#67E8F9"
+                                                Height="2"
+                                                HorizontalAlignment="Stretch"
+                                                VerticalAlignment="Bottom"
+                                                IsVisible="{Binding IsDropAfter}"/>
                                         <StackPanel Orientation="Horizontal"
                                                     Spacing="4"
                                                     PointerPressed="OnObjectTreeNodePointerPressed"

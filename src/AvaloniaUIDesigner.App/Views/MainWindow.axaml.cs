@@ -2484,8 +2484,14 @@ public partial class MainWindow : Window
             return;
         }
 
-        var accepted = TryGetObjectTreeDropElements(e, out _, out _);
-        Vm?.ObjectTree.SetDropFeedback(targetNode, accepted);
+        var accepted = TryGetObjectTreeDropElements(e, out var source, out var target);
+        var siblingDrop = accepted && IsObjectTreeSiblingDrop(source, target);
+        var insertAfter = siblingDrop && IsObjectTreeDropAfter(e);
+        Vm?.ObjectTree.SetDropFeedback(
+            targetNode,
+            accepted,
+            insertBefore: siblingDrop && !insertAfter,
+            insertAfter: insertAfter);
         e.DragEffects = accepted
             ? DragDropEffects.Move
             : DragDropEffects.None;
@@ -2507,9 +2513,13 @@ public partial class MainWindow : Window
             return;
         }
 
+        var siblingDrop = IsObjectTreeSiblingDrop(source, target);
+        var insertAfter = siblingDrop && IsObjectTreeDropAfter(e);
         Vm.SelectElement(source);
-        var changed = IsObjectTreeSiblingDrop(source, target)
-            ? Vm.ReorderSelectedElementBefore(target)
+        var changed = siblingDrop
+            ? insertAfter
+                ? Vm.ReorderSelectedElementAfter(target)
+                : Vm.ReorderSelectedElementBefore(target)
             : Vm.TryReparentSelectedElementTo(target);
         e.DragEffects = changed
             ? DragDropEffects.Move
@@ -2560,13 +2570,24 @@ public partial class MainWindow : Window
                 or DesignerParentLayoutKind.Canvas)
             && string.Equals(source.ParentName, target.ParentName, StringComparison.OrdinalIgnoreCase);
 
+    private static bool IsObjectTreeDropAfter(DragEventArgs e)
+    {
+        var targetControl = FindObjectTreeNodeControl(e.Source);
+        return targetControl is not null
+            && targetControl.Bounds.Height > 0
+            && e.GetPosition(targetControl).Y >= targetControl.Bounds.Height / 2;
+    }
+
     private static ObjectNodeViewModel? FindObjectTreeNode(object? source)
+        => FindObjectTreeNodeControl(source)?.DataContext as ObjectNodeViewModel;
+
+    private static Control? FindObjectTreeNodeControl(object? source)
     {
         for (var current = source as Visual; current is not null; current = current.GetVisualParent())
         {
-            if (current is Control { DataContext: ObjectNodeViewModel node })
+            if (current is Control { DataContext: ObjectNodeViewModel })
             {
-                return node;
+                return (Control)current;
             }
         }
 

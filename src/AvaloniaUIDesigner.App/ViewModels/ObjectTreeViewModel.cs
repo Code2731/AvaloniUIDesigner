@@ -107,17 +107,28 @@ public partial class ObjectTreeViewModel : ViewModelBase
     }
 
     public void SetDropFeedback(ObjectNodeViewModel? target, bool accepted)
+        => SetDropFeedback(target, accepted, insertBefore: false, insertAfter: false);
+
+    public void SetDropFeedback(
+        ObjectNodeViewModel? target,
+        bool accepted,
+        bool insertBefore,
+        bool insertAfter)
     {
         foreach (var node in _allChildren)
         {
             node.IsDropTarget = false;
             node.IsDropRejected = false;
+            node.IsDropBefore = false;
+            node.IsDropAfter = false;
         }
 
         if (target is not null)
         {
             target.IsDropTarget = accepted;
             target.IsDropRejected = !accepted;
+            target.IsDropBefore = accepted && insertBefore;
+            target.IsDropAfter = accepted && insertAfter;
         }
     }
 
@@ -329,4 +340,10 @@ public partial class ObjectNodeViewModel : ViewModelBase
 
     [ObservableProperty]
     private bool _isDropRejected;
+
+    [ObservableProperty]
+    private bool _isDropBefore;
+
+    [ObservableProperty]
+    private bool _isDropAfter;
 }

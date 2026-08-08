@@ -1205,6 +1205,12 @@ public partial class MainWindowViewModel : ViewModelBase
     }
 
     public bool ReorderSelectedElementBefore(DesignElement target)
+        => ReorderSelectedElement(target, insertAfter: false);
+
+    public bool ReorderSelectedElementAfter(DesignElement target)
+        => ReorderSelectedElement(target, insertAfter: true);
+
+    private bool ReorderSelectedElement(DesignElement target, bool insertAfter)
     {
         if (Canvas.SelectedElement is not { IsLocked: false, IsContainerChild: true } source)
         {
@@ -1245,7 +1251,8 @@ public partial class MainWindowViewModel : ViewModelBase
         }
 
         siblings.Remove(source);
-        siblings.Insert(siblings.IndexOf(target), source);
+        var targetIndex = siblings.IndexOf(target);
+        siblings.Insert(insertAfter ? targetIndex + 1 : targetIndex, source);
         var parent = Canvas.Elements.FirstOrDefault(element =>
             string.Equals(element.DisplayName, source.ParentName, StringComparison.OrdinalIgnoreCase));
         if (parent is null)
@@ -1279,7 +1286,7 @@ public partial class MainWindowViewModel : ViewModelBase
         ObjectTree.RebuildFrom(Canvas.Elements);
         ObjectTree.SelectByElement(source);
         CommitCanvasMutation();
-        StatusText = $"Moved {source.DisplayName} before {target.DisplayName}.";
+        StatusText = $"Moved {source.DisplayName} {(insertAfter ? "after" : "before")} {target.DisplayName}.";
         return true;
     }
 
