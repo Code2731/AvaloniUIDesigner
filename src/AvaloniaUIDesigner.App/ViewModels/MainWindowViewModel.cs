@@ -666,7 +666,10 @@ public partial class MainWindowViewModel : ViewModelBase
         ObjectTree.Add(element);
         var placedInContainer = dropParent is not null
             && CanReparentElementTo(element, dropParent)
-            && TryReparentSelectedElementTo(dropParent, recordHistory: false);
+            && TryReparentSelectedElementTo(
+                dropParent,
+                recordHistory: false,
+                dropPoint: new Point(snappedX, snappedY));
         if (!placedInContainer)
         {
             ObjectTree.SelectByElement(element);
@@ -1305,9 +1308,12 @@ public partial class MainWindowViewModel : ViewModelBase
     }
 
     public bool TryReparentSelectedElementTo(DesignElement parent)
-        => TryReparentSelectedElementTo(parent, recordHistory: true);
+        => TryReparentSelectedElementTo(parent, recordHistory: true, dropPoint: null);
 
-    private bool TryReparentSelectedElementTo(DesignElement parent, bool recordHistory)
+    private bool TryReparentSelectedElementTo(
+        DesignElement parent,
+        bool recordHistory,
+        Point? dropPoint)
     {
         if (Canvas.SelectedElement is not { IsLocked: false } source)
         {
@@ -1323,7 +1329,8 @@ public partial class MainWindowViewModel : ViewModelBase
 
         var gridRow = 0;
         var gridColumn = 0;
-        if (parent.Visual is Grid && !TryFindAvailableGridCell(parent, source, out gridRow, out gridColumn))
+        if (parent.Visual is Grid
+            && !TryFindGridCellForDrop(parent, source, dropPoint, out gridRow, out gridColumn))
         {
             StatusText = $"Grid '{parent.DisplayName}' has no available cell.";
             return false;
@@ -1385,7 +1392,7 @@ public partial class MainWindowViewModel : ViewModelBase
                 source.StackPanelItemSize = source.IsStackPanelChild
                     ? Math.Max(10, source.StackPanelItemSize)
                     : Math.Max(10, stackPanel.Orientation == Orientation.Vertical ? source.Height : source.Width);
-                siblings.Add(source);
+                siblings.Insert(GetContainerInsertionIndex(parent, siblings, dropPoint), source);
                 Canvas.SetStackPanelChildOrder(parent, siblings);
                 Canvas.MoveElementsToFrontInOrder(siblings);
                 break;
@@ -1404,7 +1411,7 @@ public partial class MainWindowViewModel : ViewModelBase
                     : Math.Max(10, source.DockPanelDock is DesignerDockSide.Top or DesignerDockSide.Bottom
                         ? source.Height
                         : source.Width);
-                siblings.Add(source);
+                siblings.Insert(GetContainerInsertionIndex(parent, siblings, dropPoint), source);
                 Canvas.SetDockPanelChildOrder(parent, siblings);
                 Canvas.MoveElementsToFrontInOrder(siblings);
                 break;
@@ -1417,7 +1424,7 @@ public partial class MainWindowViewModel : ViewModelBase
                     .OrderBy(child => child.WrapPanelIndex)
                     .ThenBy(Canvas.Elements.IndexOf)
                     .ToList();
-                siblings.Add(source);
+                siblings.Insert(GetContainerInsertionIndex(parent, siblings, dropPoint), source);
                 Canvas.SetWrapPanelChildOrder(parent, siblings);
                 Canvas.MoveElementsToFrontInOrder(siblings);
                 break;
@@ -1430,7 +1437,7 @@ public partial class MainWindowViewModel : ViewModelBase
                     .OrderBy(child => child.UniformGridIndex)
                     .ThenBy(Canvas.Elements.IndexOf)
                     .ToList();
-                siblings.Add(source);
+                siblings.Insert(GetContainerInsertionIndex(parent, siblings, dropPoint), source);
                 Canvas.SetUniformGridChildOrder(parent, siblings);
                 Canvas.MoveElementsToFrontInOrder(siblings);
                 break;
@@ -1516,6 +1523,171 @@ public partial class MainWindowViewModel : ViewModelBase
         }
 
         return false;
+    }
+
+    private bool TryFindGridCellForDrop(
+        DesignElement parent,
+        DesignElement source,
+        Point? dropPoint,
+        out int row,
+        out int column)
+    {
+        if (dropPoint is null || parent.Visual is not Grid grid)
+        {
+            return TryFindAvailableGridCell(parent, source, out row, out column);
+        }
+
+        var rowCount = DesignerGridDefinitionRuntime.GetRowCount(grid);
+        var columnCount = DesignerGridDefinitionRuntime.GetColumnCount(grid);
+        var occupied = Canvas.Elements
+            .Where(child => !ReferenceEquals(child, source)
+                && child.IsGridChild
+                && string.Equals(child.ParentName, parent.DisplayName, StringComparison.OrdinalIgnoreCase))
+            .ToList();
+        var availableCells = new List<(int Row, int Column, Rect Bounds)>();
+        for (var candidateRow = 0; candidateRow < rowCount; candidateRow++)
+        {
+            for (var candidateColumn = 0; candidateColumn < columnCount; candidateColumn++)
+            {
+                if (occupied.Any(child => candidateRow < child.GridRow + child.GridRowSpan
+                    && candidateRow + 1 > child.GridRow
+                    && candidateColumn < child.GridColumn + child.GridColumnSpan
+                    && candidateColumn + 1 > child.GridColumn))
+                {
+                    continue;
+                }
+
+                availableCells.Add((
+                    candidateRow,
+                    candidateColumn,
+                    DesignerGridDefinitionRuntime.GetCellBounds(
+                        grid,
+                        new Rect(parent.X, parent.Y, parent.Width, parent.Height),
+                        candidateRow,
+                        candidateColumn,
+                        1,
+                        1)));
+            }
+        }
+
+        if (availableCells.Count == 0)
+        {
+            row = 0;
+            column = 0;
+            return false;
+        }
+
+        var point = dropPoint.Value;
+        var selectedCell = availableCells.FirstOrDefault(cell => cell.Bounds.Contains(point));
+        if (selectedCell.Bounds.Width > 0 && selectedCell.Bounds.Height > 0)
+        {
+            row = selectedCell.Row;
+            column = selectedCell.Column;
+            return true;
+        }
+
+        var nearestCell = availableCells
+            .OrderBy(cell => DistanceSquared(cell.Bounds.Center, point))
+            .First();
+        row = nearestCell.Row;
+        column = nearestCell.Column;
+        return true;
+    }
+
+    private int GetContainerInsertionIndex(
+        DesignElement parent,
+        IReadOnlyList<DesignElement> siblings,
+        Point? dropPoint)
+    {
+        if (dropPoint is null || siblings.Count == 0)
+        {
+            return siblings.Count;
+        }
+
+        if (parent.Visual is StackPanel stackPanel)
+        {
+            var vertical = stackPanel.Orientation == Orientation.Vertical;
+            var coordinate = vertical ? dropPoint.Value.Y : dropPoint.Value.X;
+            for (var index = 0; index < siblings.Count; index++)
+            {
+                var center = vertical
+                    ? siblings[index].Y + (siblings[index].Height / 2)
+                    : siblings[index].X + (siblings[index].Width / 2);
+                if (coordinate < center)
+                {
+                    return index;
+                }
+            }
+
+            return siblings.Count;
+        }
+
+        if (parent.Visual is WrapPanel wrapPanel)
+        {
+            return GetSpatialInsertionIndex(
+                siblings,
+                dropPoint.Value,
+                wrapPanel.Orientation == Orientation.Horizontal);
+        }
+
+        var nearestIndex = 0;
+        var nearestDistance = double.PositiveInfinity;
+        for (var index = 0; index < siblings.Count; index++)
+        {
+            var sibling = siblings[index];
+            var center = new Point(
+                sibling.X + (sibling.Width / 2),
+                sibling.Y + (sibling.Height / 2));
+            var distance = DistanceSquared(center, dropPoint.Value);
+            if (distance < nearestDistance)
+            {
+                nearestIndex = index;
+                nearestDistance = distance;
+            }
+        }
+
+        var nearest = siblings[nearestIndex];
+        return dropPoint.Value.X >= nearest.X + (nearest.Width / 2)
+            || dropPoint.Value.Y >= nearest.Y + (nearest.Height / 2)
+            ? nearestIndex + 1
+            : nearestIndex;
+    }
+
+    private static int GetSpatialInsertionIndex(
+        IReadOnlyList<DesignElement> siblings,
+        Point point,
+        bool horizontalFlow)
+    {
+        var nearestIndex = 0;
+        var nearestDistance = double.PositiveInfinity;
+        for (var index = 0; index < siblings.Count; index++)
+        {
+            var sibling = siblings[index];
+            var center = new Point(
+                sibling.X + (sibling.Width / 2),
+                sibling.Y + (sibling.Height / 2));
+            var distance = DistanceSquared(center, point);
+            if (distance < nearestDistance)
+            {
+                nearestIndex = index;
+                nearestDistance = distance;
+            }
+        }
+
+        var nearest = siblings[nearestIndex];
+        var centerX = nearest.X + (nearest.Width / 2);
+        var centerY = nearest.Y + (nearest.Height / 2);
+        var after = horizontalFlow
+            ? point.Y > centerY || point.X >= centerX
+            : point.X > centerX || point.Y >= centerY;
+        return after ? nearestIndex + 1 : nearestIndex;
+    }
+
+    private static double DistanceSquared(Point left, Point right)
+    {
+        var deltaX = left.X - right.X;
+        var deltaY = left.Y - right.Y;
+        return (deltaX * deltaX) + (deltaY * deltaY);
     }
 
     private bool TryFindAvailableTabIndex(
