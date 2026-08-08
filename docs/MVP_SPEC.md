@@ -55,3 +55,6 @@ Users should be able to place controls visually, inspect properties, and validat
 
 4. v0.8
 - ~~Component Pack management and safe removal~~
+
+5. v0.9
+- ~~Multi-selection common property editing~~

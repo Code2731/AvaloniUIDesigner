@@ -31,6 +31,7 @@ dotnet run --project src/AvaloniaUIDesigner.App/AvaloniaUIDesigner.App.csproj
 - **디자인 가이드**: 가로·세로 룰러에서 드래그해 가이드라인을 만들고 캔버스 이동·리사이즈 Smart Snap 후보로 사용하며, 캔버스 밖으로 드래그하면 제거합니다. View 메뉴에서 표시·가이드 스냅을 각각 끄거나 전체 가이드를 지울 수 있습니다.
 - **리사이즈 Smart Snap**: 8방향 핸들로 크기를 조정할 때 아트보드 경계·중앙선, 디자인 가이드, 다른 컨트롤의 모서리·중앙선에 맞추고 스냅 기준선을 표시하며 최소 10px 크기를 보호합니다. 크기 변경은 이동과 같은 Undo·AXAML 왕복 흐름을 사용합니다.
 - **다중 선택 리사이즈**: 같은 root 또는 같은 Canvas의 여러 컨트롤을 선택하면 bounding box 핸들로 위치·크기를 비율 조정하고 Canvas 자식의 로컬 좌표도 동기화합니다. Grid·StackPanel·Content 자식이나 서로 다른 부모를 섞은 선택은 좌표 손실을 막기 위해 리사이즈를 차단합니다.
+- **다중 선택 공통 속성**: `Edit > Edit Common Properties...`에서 선택된 여러 컨트롤의 공통 Margin·정렬·Opacity·입력/표시 상태를 한 번에 적용하고, 서로 다른 값은 비워 둔 채 개별 값을 유지하며 하나의 Undo 작업으로 기록
 - **리사이즈 비율 잠금**: 코너 핸들을 `Shift`와 함께 드래그하면 단일 컨트롤과 다중 선택 bounding box의 원래 가로·세로 비율을 유지하며, 잠금 중에는 Smart Snap보다 비율을 우선합니다.
 - **디자인 그리드**: 그리드 표시·Snap to Grid를 전환하고 4·8·16px 프리셋 또는 4~32px 사용자 지정 간격을 편집하며 문서 설정·Undo/Redo·Preview·AXAML 메타데이터에 보존
 - **계층 클립보드**: 컨테이너를 선택해 복사·잘라내기·붙여넣기·복제하면 내부 자식 계층과 부모별 배치 메타데이터를 함께 보존하고, 붙여넣은 부모 이름을 새 이름으로 재매핑
@@ -189,6 +190,7 @@ dotnet run --project src/AvaloniaUIDesigner.App/AvaloniaUIDesigner.App.csproj
 76. 외부 프로젝트의 컨트롤은 Component Pack 항목에 `designOnly: true`, `avaloniaTypeName`, `previewText`, `defaultProperties`를 지정해 등록합니다. 디자이너에서는 타입명 플레이스홀더로 편집하고, 생성 AXAML에는 원래 커스텀 타입과 속성을 출력합니다. 예시는 [custom-component-pack.example.json](docs/custom-component-pack.example.json)을 참고하세요.
 77. `File > Load Component Pack Plugin...`에서 `IComponentPackPlugin`을 구현한 신뢰할 수 있는 DLL을 선택하면 플러그인이 제공한 Component Pack을 Toolbox에 등록합니다. DLL 경로는 세션 JSON의 `ComponentPluginPaths`에 저장되고, 앱 재시작 시 플러그인·JSON 팩·프리셋 팩 순서로 복원됩니다.
 78. `File > Manage Component Packs...`에서 로드된 JSON/DLL 팩의 출처와 컴포넌트를 확인하고 `Remove Pack`으로 Toolbox 등록과 세션 경로를 제거합니다. 현재 문서나 프리셋에서 사용 중인 커스텀 타입은 AXAML 타입명을 유지하는 디자인 전용 placeholder로 남으며, 플러그인 DLL 자체는 앱 재시작 전까지 프로세스에 로드된 상태입니다.
+79. 여러 컨트롤을 선택한 뒤 `Edit > Edit Common Properties...`를 열면 공통 Margin·Horizontal/VerticalAlignment·Opacity·IsEnabled·IsVisible·IsHitTestVisible을 일괄 편집합니다. 혼합 값은 빈 입력 또는 3상태 체크박스로 표시되며, 빈 값은 각 컨트롤의 기존 값을 유지합니다.
 
 DataGrid가 포함된 생성 AXAML을 다른 프로젝트에서 사용할 때는 같은 Avalonia 버전의 `Avalonia.Controls.DataGrid` 패키지와 `avares://Avalonia.Controls.DataGrid/Themes/Fluent.xaml` 스타일 include가 필요합니다.
 
@@ -291,6 +293,7 @@ AXAML 소스 편집기의 `Validate`와 `Preview`는 현재 디자인과 Undo �
 - ~~v0.5: .axaml 저장/로드~~ ✅
 - ~~v0.6: 실제 드래그&드롭, 삭제, 언두~~ ✅
 - ~~v0.8: Component Pack 관리 및 안전한 제거~~ ✅
+- ~~v0.9: 다중 선택 공통 속성 편집~~ ✅
 
 ## 컴포넌트 팩
 

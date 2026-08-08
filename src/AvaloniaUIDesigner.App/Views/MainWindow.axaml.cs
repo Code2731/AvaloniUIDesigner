@@ -71,6 +71,14 @@ public partial class MainWindow : Window
     private enum UnsavedChoice { Save, Discard, Cancel }
     private sealed record ComponentPackExportOptions(string PackName, string DisplayName, string NamePrefix);
     private sealed record ComponentPackManagementAction(string SourceId);
+    private sealed record CommonPropertiesDialogResult(
+        string Margin,
+        string HorizontalAlignment,
+        string VerticalAlignment,
+        string Opacity,
+        bool? IsEnabled,
+        bool? IsVisible,
+        bool? IsHitTestVisible);
     private sealed record ColorResourceApplicationOptions(string ResourceName, string PropertyName);
     private sealed record GridDefinitionOptions(string RowDefinitions, string ColumnDefinitions, bool ShowGridLines);
     private sealed record GridCellAssignmentOptions(
@@ -1138,6 +1146,30 @@ public partial class MainWindow : Window
         if (updatedBindings is not null)
         {
             Vm.SetSelectedBindings(updatedBindings);
+        }
+    }
+
+    private async void OnEditCommonPropertiesMenuClicked(
+        object? sender,
+        Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        FlushPendingPropertyHistory();
+        if (Vm is null || !Vm.TryGetSelectedCommonProperties(out var state))
+        {
+            return;
+        }
+
+        var updated = await ShowCommonPropertiesDialogAsync(state);
+        if (updated is not null)
+        {
+            Vm.SetSelectedCommonProperties(
+                updated.Margin,
+                updated.HorizontalAlignment,
+                updated.VerticalAlignment,
+                updated.Opacity,
+                updated.IsEnabled,
+                updated.IsVisible,
+                updated.IsHitTestVisible);
         }
     }
 
@@ -9058,6 +9090,168 @@ public partial class MainWindow : Window
             Grid.SetColumn(field, column);
             Grid.SetColumnSpan(field, columnSpan);
             owner.Children.Add(field);
+        }
+    }
+
+    private async Task<CommonPropertiesDialogResult?> ShowCommonPropertiesDialogAsync(
+        CommonPropertiesEditorState state)
+    {
+        if (Vm is null)
+        {
+            return null;
+        }
+
+        var marginEditor = new TextBox
+        {
+            Text = state.Margin,
+            Watermark = "Leave unchanged if blank",
+        };
+        var horizontalEditor = new ComboBox
+        {
+            ItemsSource = new[] { string.Empty }.Concat(Enum.GetNames<HorizontalAlignment>()),
+            SelectedItem = state.HorizontalAlignment,
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+        };
+        var verticalEditor = new ComboBox
+        {
+            ItemsSource = new[] { string.Empty }.Concat(Enum.GetNames<VerticalAlignment>()),
+            SelectedItem = state.VerticalAlignment,
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+        };
+        var opacityEditor = new TextBox
+        {
+            Text = state.Opacity,
+            Watermark = "0 to 1; blank keeps each value",
+        };
+        var enabledEditor = new CheckBox
+        {
+            Content = "Enabled",
+            IsThreeState = true,
+            IsChecked = state.IsEnabled,
+        };
+        var visibleEditor = new CheckBox
+        {
+            Content = "Visible",
+            IsThreeState = true,
+            IsChecked = state.IsVisible,
+        };
+        var hitTestEditor = new CheckBox
+        {
+            Content = "Hit test visible",
+            IsThreeState = true,
+            IsChecked = state.IsHitTestVisible,
+        };
+        var errorText = new TextBlock
+        {
+            Foreground = Avalonia.Media.Brushes.IndianRed,
+            TextWrapping = Avalonia.Media.TextWrapping.Wrap,
+        };
+        var dialog = new Window
+        {
+            Title = "Edit Common Properties",
+            Width = 620,
+            Height = 470,
+            MinWidth = 520,
+            MinHeight = 400,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner,
+        };
+        var applyButton = new Button { Content = "Apply", MinWidth = 84 };
+        applyButton.Click += (_, _) =>
+        {
+            var updated = new CommonPropertiesDialogResult(
+                marginEditor.Text ?? string.Empty,
+                horizontalEditor.SelectedItem?.ToString() ?? string.Empty,
+                verticalEditor.SelectedItem?.ToString() ?? string.Empty,
+                opacityEditor.Text ?? string.Empty,
+                enabledEditor.IsChecked,
+                visibleEditor.IsChecked,
+                hitTestEditor.IsChecked);
+            if (!Vm.SetSelectedCommonProperties(
+                    updated.Margin,
+                    updated.HorizontalAlignment,
+                    updated.VerticalAlignment,
+                    updated.Opacity,
+                    updated.IsEnabled,
+                    updated.IsVisible,
+                    updated.IsHitTestVisible))
+            {
+                errorText.Text = Vm.StatusText;
+                return;
+            }
+
+            dialog.Close(updated);
+        };
+        var cancelButton = new Button { Content = "Cancel", MinWidth = 84 };
+        cancelButton.Click += (_, _) => dialog.Close(null);
+        var buttons = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            Spacing = 8,
+            HorizontalAlignment = HorizontalAlignment.Right,
+            Children = { cancelButton, applyButton },
+        };
+        var fields = new Grid
+        {
+            ColumnDefinitions = new ColumnDefinitions("*,*"),
+            RowDefinitions = new RowDefinitions("Auto,Auto,Auto,Auto"),
+            ColumnSpacing = 12,
+            RowSpacing = 10,
+        };
+        AddField("Margin", marginEditor, 0, 0);
+        AddField("Horizontal alignment", horizontalEditor, 0, 1);
+        AddField("Vertical alignment", verticalEditor, 1, 0);
+        AddField("Opacity", opacityEditor, 1, 1);
+        AddField("Boolean values (three-state)", new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            Spacing = 10,
+            Children = { enabledEditor, visibleEditor, hitTestEditor },
+        }, 2, 0, 2);
+
+        var content = new Grid
+        {
+            Margin = new Thickness(16),
+            RowDefinitions = new RowDefinitions("Auto,Auto,*,Auto,Auto"),
+            RowSpacing = 12,
+            Children =
+            {
+                new TextBlock
+                {
+                    Text = state.SelectionLabel,
+                    FontWeight = FontWeight.SemiBold,
+                },
+                new TextBlock
+                {
+                    Text = "Mixed values are blank. Blank fields keep each selected control's current value; tri-state checkboxes leave mixed values unchanged.",
+                    TextWrapping = Avalonia.Media.TextWrapping.Wrap,
+                },
+                fields,
+                errorText,
+                buttons,
+            },
+        };
+        Grid.SetRow(content.Children[1], 1);
+        Grid.SetRow(fields, 2);
+        Grid.SetRow(errorText, 3);
+        Grid.SetRow(buttons, 4);
+        dialog.Content = content;
+        return await dialog.ShowDialog<CommonPropertiesDialogResult?>(this);
+
+        void AddField(string label, Control editor, int row, int column, int columnSpan = 1)
+        {
+            var field = new StackPanel
+            {
+                Spacing = 4,
+                Children =
+                {
+                    new TextBlock { Text = label },
+                    editor,
+                },
+            };
+            Grid.SetRow(field, row);
+            Grid.SetColumn(field, column);
+            Grid.SetColumnSpan(field, columnSpan);
+            fields.Children.Add(field);
         }
     }
 

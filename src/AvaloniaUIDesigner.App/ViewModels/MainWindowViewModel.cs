@@ -90,6 +90,16 @@ public sealed record LayoutEditorState(
     string MaxWidth,
     string MaxHeight);
 
+public sealed record CommonPropertiesEditorState(
+    string SelectionLabel,
+    string Margin,
+    string HorizontalAlignment,
+    string VerticalAlignment,
+    string Opacity,
+    bool? IsEnabled,
+    bool? IsVisible,
+    bool? IsHitTestVisible);
+
 public sealed record RootEditorState(
     string RootKind,
     string Title,
@@ -4069,6 +4079,220 @@ public partial class MainWindowViewModel : ViewModelBase
             DesignerLayoutRuntime.FormatMaximum(values.MaxWidth),
             DesignerLayoutRuntime.FormatMaximum(values.MaxHeight));
         return true;
+    }
+
+    public bool TryGetSelectedCommonProperties(out CommonPropertiesEditorState state)
+    {
+        var targets = Canvas.SelectedElements
+            .Where(element => !element.IsLocked)
+            .ToList();
+        if (targets.Count == 0)
+        {
+            state = new CommonPropertiesEditorState(
+                string.Empty,
+                string.Empty,
+                string.Empty,
+                string.Empty,
+                string.Empty,
+                null,
+                null,
+                null);
+            StatusText = "Select at least one unlocked control before editing common properties.";
+            return false;
+        }
+
+        var first = targets[0];
+        var firstLayout = DesignerLayoutRuntime.Read(first.Visual);
+        var firstMargin = DesignerLayoutRuntime.FormatThickness(firstLayout.Margin);
+        var firstHorizontalAlignment = firstLayout.HorizontalAlignment.ToString();
+        var firstVerticalAlignment = firstLayout.VerticalAlignment.ToString();
+        var firstOpacity = first.Visual.Opacity.ToString("0.###", CultureInfo.InvariantCulture);
+        state = new CommonPropertiesEditorState(
+            $"{targets.Count} unlocked control(s) selected"
+                + (targets.Count != Canvas.SelectedElements.Count
+                    ? $" ({Canvas.SelectedElements.Count - targets.Count} locked skipped)"
+                    : string.Empty),
+            targets.All(target => DesignerLayoutRuntime.FormatThickness(
+                    DesignerLayoutRuntime.Read(target.Visual).Margin) == firstMargin)
+                ? firstMargin
+                : string.Empty,
+            targets.All(target => DesignerLayoutRuntime.Read(target.Visual).HorizontalAlignment
+                                  == firstLayout.HorizontalAlignment)
+                ? firstHorizontalAlignment
+                : string.Empty,
+            targets.All(target => DesignerLayoutRuntime.Read(target.Visual).VerticalAlignment
+                                  == firstLayout.VerticalAlignment)
+                ? firstVerticalAlignment
+                : string.Empty,
+            targets.All(target => Math.Abs(target.Visual.Opacity - first.Visual.Opacity) < 0.0005)
+                ? firstOpacity
+                : string.Empty,
+            GetCommonValue(targets, target => target.Visual.IsEnabled),
+            GetCommonValue(targets, target => target.Visual.IsVisible),
+            GetCommonValue(targets, target => target.Visual.IsHitTestVisible));
+        return true;
+    }
+
+    public bool SetSelectedCommonProperties(
+        string margin,
+        string horizontalAlignment,
+        string verticalAlignment,
+        string opacity,
+        bool? isEnabled,
+        bool? isVisible,
+        bool? isHitTestVisible)
+    {
+        var targets = Canvas.SelectedElements
+            .Where(element => !element.IsLocked)
+            .ToList();
+        if (targets.Count == 0)
+        {
+            StatusText = "Select at least one unlocked control before editing common properties.";
+            return false;
+        }
+
+        var normalizedMargin = string.Empty;
+        if (!string.IsNullOrWhiteSpace(margin))
+        {
+            if (!DesignerLayoutRuntime.TryNormalizeProperty(
+                    targets[0].Visual.GetType().Name,
+                    "Margin",
+                    margin,
+                    out _,
+                    out normalizedMargin,
+                    out var error))
+            {
+                StatusText = $"Common properties were not changed. Margin: {error}";
+                return false;
+            }
+        }
+
+        var normalizedHorizontalAlignment = string.Empty;
+        if (!string.IsNullOrWhiteSpace(horizontalAlignment))
+        {
+            if (!DesignerLayoutRuntime.TryNormalizeProperty(
+                    targets[0].Visual.GetType().Name,
+                    "HorizontalAlignment",
+                    horizontalAlignment,
+                    out _,
+                    out normalizedHorizontalAlignment,
+                    out var error))
+            {
+                StatusText = $"Common properties were not changed. HorizontalAlignment: {error}";
+                return false;
+            }
+        }
+
+        var normalizedVerticalAlignment = string.Empty;
+        if (!string.IsNullOrWhiteSpace(verticalAlignment))
+        {
+            if (!DesignerLayoutRuntime.TryNormalizeProperty(
+                    targets[0].Visual.GetType().Name,
+                    "VerticalAlignment",
+                    verticalAlignment,
+                    out _,
+                    out normalizedVerticalAlignment,
+                    out var error))
+            {
+                StatusText = $"Common properties were not changed. VerticalAlignment: {error}";
+                return false;
+            }
+        }
+
+        var normalizedOpacity = string.Empty;
+        if (!string.IsNullOrWhiteSpace(opacity))
+        {
+            if (!double.TryParse(
+                    opacity.Trim(),
+                    NumberStyles.Float,
+                    CultureInfo.InvariantCulture,
+                    out var parsedOpacity)
+                || !double.IsFinite(parsedOpacity)
+                || parsedOpacity is < 0 or > 1)
+            {
+                StatusText = "Common properties were not changed. Opacity must be a finite number from 0 to 1.";
+                return false;
+            }
+
+            normalizedOpacity = parsedOpacity.ToString("0.###", CultureInfo.InvariantCulture);
+        }
+
+        if (normalizedMargin.Length == 0
+            && normalizedHorizontalAlignment.Length == 0
+            && normalizedVerticalAlignment.Length == 0
+            && normalizedOpacity.Length == 0
+            && isEnabled is null
+            && isVisible is null
+            && isHitTestVisible is null)
+        {
+            StatusText = "No common property changes were specified.";
+            return false;
+        }
+
+        var layoutProperties = new Dictionary<string, string>(StringComparer.Ordinal);
+        if (normalizedMargin.Length > 0)
+        {
+            layoutProperties["Margin"] = normalizedMargin;
+        }
+
+        if (normalizedHorizontalAlignment.Length > 0)
+        {
+            layoutProperties["HorizontalAlignment"] = normalizedHorizontalAlignment;
+        }
+
+        if (normalizedVerticalAlignment.Length > 0)
+        {
+            layoutProperties["VerticalAlignment"] = normalizedVerticalAlignment;
+        }
+
+        var interactionProperties = new Dictionary<string, string>(StringComparer.Ordinal);
+        if (normalizedOpacity.Length > 0)
+        {
+            interactionProperties["Opacity"] = normalizedOpacity;
+        }
+
+        if (isEnabled is { } enabled)
+        {
+            interactionProperties["__isEnabled"] = enabled.ToString();
+        }
+
+        if (isVisible is { } visible)
+        {
+            interactionProperties["__isVisible"] = visible.ToString();
+        }
+
+        if (isHitTestVisible is { } hitTestVisible)
+        {
+            interactionProperties["__isHitTestVisible"] = hitTestVisible.ToString();
+        }
+
+        BeginCanvasMutation(HistoryActionType.EditProperty, "Updated common properties for selection.");
+        foreach (var target in targets)
+        {
+            if (layoutProperties.Count > 0)
+            {
+                DesignerLayoutRuntime.Apply(target.Visual, layoutProperties);
+            }
+
+            if (interactionProperties.Count > 0)
+            {
+                DesignerInteractionRuntime.Apply(target.Visual, interactionProperties);
+                DesignerStyleApplicationMetadata.ClearApplied(target.Visual, "Opacity");
+                Canvas.RefreshDocumentStyles(target.Visual);
+            }
+        }
+
+        CommitCanvasMutation();
+        StatusText = $"Updated common properties for {targets.Count} control(s).";
+        return true;
+    }
+
+    private static bool? GetCommonValue(
+        IReadOnlyList<DesignElement> targets,
+        Func<DesignElement, bool> selector)
+    {
+        var value = selector(targets[0]);
+        return targets.All(target => selector(target) == value) ? value : null;
     }
 
     public bool SetSelectedLayoutProperties(
