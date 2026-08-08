@@ -1611,6 +1611,22 @@ public partial class MainWindow : Window
         Vm?.ToggleSelectedTabStop();
     }
 
+    private void OnMoveSelectedElementEarlierMenuClicked(
+        object? sender,
+        Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        FlushPendingPropertyHistory();
+        Vm?.MoveSelectedElementInParentOrder(-1);
+    }
+
+    private void OnMoveSelectedElementLaterMenuClicked(
+        object? sender,
+        Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        FlushPendingPropertyHistory();
+        Vm?.MoveSelectedElementInParentOrder(1);
+    }
+
     private void OnBringToFrontMenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
         => MoveSelectedElementsInLayerOrder(MainWindowViewModel.LayerOrderAction.BringToFront);
 

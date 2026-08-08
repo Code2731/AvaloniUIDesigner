@@ -746,6 +746,8 @@
                                                     <MenuItem Header="Container Content..." Click="OnAssignAsContainerContentMenuClicked"/>
                                                 </MenuItem>
                                                 <MenuItem Header="Remove from Container" Click="OnRemoveFromContainerMenuClicked"/>
+                                                <MenuItem Header="Move Earlier" Click="OnMoveSelectedElementEarlierMenuClicked"/>
+                                                <MenuItem Header="Move Later" Click="OnMoveSelectedElementLaterMenuClicked"/>
                                                 <Separator/>
                                                 <MenuItem Header="Copy" Click="OnCopyMenuClicked"/>
                                                 <MenuItem Header="Cut" Click="OnCutMenuClicked"/>

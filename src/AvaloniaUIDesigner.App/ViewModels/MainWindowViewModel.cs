@@ -1152,6 +1152,44 @@ public partial class MainWindowViewModel : ViewModelBase
         return true;
     }
 
+    public bool MoveSelectedElementInParentOrder(int offset)
+    {
+        if (offset is not (-1 or 1))
+        {
+            StatusText = "Parent order movement must be one position at a time.";
+            return false;
+        }
+
+        if (Canvas.SelectedElement is not { IsLocked: false, IsContainerChild: true } target)
+        {
+            StatusText = "Select an unlocked container child to change its order.";
+            return false;
+        }
+
+        return target.ParentLayout switch
+        {
+            DesignerParentLayoutKind.StackPanel => MoveSelectedStackPanelItem(offset),
+            DesignerParentLayoutKind.DockPanel => MoveSelectedDockPanelItem(offset),
+            DesignerParentLayoutKind.WrapPanel => MoveSelectedWrapPanelItem(offset),
+            DesignerParentLayoutKind.UniformGrid => MoveSelectedUniformGridItem(offset),
+            DesignerParentLayoutKind.Canvas => MoveSelectedCanvasItem(offset),
+            _ => ReportUnsupportedParentOrder(target),
+        };
+    }
+
+    private bool ReportUnsupportedParentOrder(DesignElement target)
+    {
+        StatusText = target.ParentLayout switch
+        {
+            DesignerParentLayoutKind.Grid => "Grid children use row and column placement instead of sibling order.",
+            DesignerParentLayoutKind.TabControl => "TabControl children use tab assignment instead of sibling order.",
+            DesignerParentLayoutKind.Content => "Content containers support one child and have no sibling order.",
+            DesignerParentLayoutKind.SplitView => "SplitView children use Pane or Content slots instead of sibling order.",
+            _ => "The selected parent does not support sibling ordering.",
+        };
+        return false;
+    }
+
     public void SetSelectedOpacity(double opacity)
     {
         var targets = Canvas.SelectedElements.Where(element => !element.IsLocked).ToList();
