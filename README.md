@@ -41,6 +41,7 @@ dotnet run --project src/AvaloniaUIDesigner.App/AvaloniaUIDesigner.App.csproj
 - **다중 선택 StackPanel 레이아웃**: 같은 root 또는 같은 Canvas의 형제 컨트롤을 가로·세로 StackPanel로 한 번에 감싸고, bounding box·Canvas 상대 좌표·기존 순서·Object Tree·Undo/Redo·Preview·AXAML 왕복을 보존
 - **다중 선택 Grid 레이아웃**: 같은 root 또는 같은 Canvas의 형제 컨트롤을 자동 행·열 Grid로 한 번에 감싸고, 선택 순서에 따른 셀 배치·Canvas 상대 좌표·Object Tree·Undo/Redo·Preview·AXAML 왕복을 보존
 - **다중 선택 UniformGrid 레이아웃**: 같은 root 또는 같은 Canvas의 형제 컨트롤을 자동 행·열 UniformGrid로 한 번에 감싸고, 동일 셀 크기·간격·선택 순서·Object Tree·Undo/Redo·Preview·AXAML 왕복을 보존
+- **다중 선택 DockPanel/WrapPanel 레이아웃**: 같은 root 또는 같은 Canvas의 형제 컨트롤을 가로·세로 DockPanel 또는 WrapPanel로 한 번에 감싸고, 도킹 방향·LastChildFill·항목 간격·자동 행/열·선택 순서·Object Tree·Undo/Redo·Preview·AXAML 왕복을 보존
 - **레이아웃 해제**: 선택한 Canvas·Grid·StackPanel·DockPanel·WrapPanel·UniformGrid 컨테이너를 `Break Selected Layout`으로 제거하고 자식을 독립 컨트롤 또는 원래 Canvas 형제로 복원하며 좌표·순서·다중 선택을 보존
 - **다중 선택 레이아웃 안전성**: Arrange와 Center on Artboard를 root 또는 같은 Canvas의 형제에 적용하고, 부모가 좌표를 관리하는 Grid·StackPanel·DockPanel·WrapPanel·UniformGrid·TabControl·SplitView·Content 자식은 부모 전용 배치 명령으로 보호
 - **데이터 바인딩**: 선택 컨트롤의 지원 속성에 Path·Mode·Fallback을 여러 개 선언하고, 디자인 샘플을 유지한 채 ReflectionBinding·Undo/Redo·복제·미리보기·AXAML 왕복에 보존
@@ -164,6 +165,7 @@ dotnet run --project src/AvaloniaUIDesigner.App/AvaloniaUIDesigner.App.csproj
 63. 같은 선택 상태에서 `Grid (Auto)`를 선택하면 자동 행·열 Grid를 만들고 선택 순서대로 컨트롤을 셀에 배치하며, AXAML 검증에서 `Grid.Row`·`Grid.Column`과 행/열 정의를 확인
 64. 같은 선택 상태에서 `UniformGrid (Auto)`를 선택하면 동일 크기 셀과 8px 간격의 UniformGrid를 만들고 Rows·Columns·자식 순서를 AXAML과 Preview에서 확인
 65. 레이아웃 컨테이너를 선택한 뒤 Edit > `Break Selected Layout`을 선택하면 컨테이너를 제거하고 자식 컨트롤을 원래 계층·좌표·순서로 복원
+66. 같은 선택 상태에서 `DockPanel (Horizontal/Vertical)` 또는 `WrapPanel (Horizontal/Vertical)`을 선택하면 선택 순서 기반 자동 레이아웃을 만들고 도킹 방향·행/열·간격을 AXAML과 Preview에서 확인
 
 DataGrid가 포함된 생성 AXAML을 다른 프로젝트에서 사용할 때는 같은 Avalonia 버전의 `Avalonia.Controls.DataGrid` 패키지와 `avares://Avalonia.Controls.DataGrid/Themes/Fluent.xaml` 스타일 include가 필요합니다.
 
@@ -226,6 +228,8 @@ Canvas 그룹화는 같은 부모를 공유하는 형제 컨트롤만 대상으�
 같은 메뉴의 `Grid (Auto)`는 선택 개수의 제곱근을 기준으로 행·열을 만들고 선택 순서대로 셀을 채웁니다. 새 Grid는 선택 영역의 좌상단에 배치되며 Canvas 자식으로 실행할 때 부모 상대 좌표와 형제 순서를 보존하고, 각 컨트롤의 `Grid.Row`·`Grid.Column`과 Grid definitions를 AXAML에 출력합니다.
 
 `UniformGrid (Auto)`는 같은 자동 행·열 계산을 사용하되 모든 셀을 같은 크기로 만들고 8px의 RowSpacing·ColumnSpacing을 적용합니다. 선택 순서와 Canvas 부모 상대 좌표를 보존하며, Rows·Columns·FirstColumn·spacing과 자식 순서를 AXAML에 기록합니다.
+
+`DockPanel (Horizontal/Vertical)`은 선택 순서대로 가로 방향에는 `Left`, 세로 방향에는 `Top`으로 도킹하고 마지막 자식은 `LastChildFill`로 남겨 선택 컨트롤의 원래 주축 크기를 유지합니다. `WrapPanel (Horizontal/Vertical)`은 선택 컨트롤 중 가장 큰 크기를 항목 크기로 사용하고 8px의 항목·줄 간격과 제곱근 기반 행·열을 자동 계산합니다. 두 레이아웃 모두 root 또는 같은 Canvas 형제에서 실행할 수 있으며, Canvas 안에서는 컨테이너의 상대 좌표와 형제 순서를 보존하고 Undo/Redo·Preview·AXAML 왕복을 지원합니다.
 
 `Break Selected Layout`은 선택한 컨테이너를 제거하고 직접 자식들을 root 또는 원래 Canvas에 다시 연결합니다. Grid·StackPanel·DockPanel·WrapPanel·UniformGrid는 현재 화면 bounds를 유지하고, Canvas 안의 레이아웃은 부모 상대 좌표와 형제 순서를 유지하며 해제된 자식들을 다시 선택합니다.
 

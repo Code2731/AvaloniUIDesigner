@@ -206,6 +206,14 @@
                               Click="OnLayoutSelectedGridMenuClicked"/>
                     <MenuItem Header="UniformGrid (Auto)"
                               Click="OnLayoutSelectedUniformGridMenuClicked"/>
+                    <MenuItem Header="DockPanel (Horizontal)"
+                              Click="OnLayoutSelectedDockPanelHorizontallyMenuClicked"/>
+                    <MenuItem Header="DockPanel (Vertical)"
+                              Click="OnLayoutSelectedDockPanelVerticallyMenuClicked"/>
+                    <MenuItem Header="WrapPanel (Horizontal)"
+                              Click="OnLayoutSelectedWrapPanelHorizontallyMenuClicked"/>
+                    <MenuItem Header="WrapPanel (Vertical)"
+                              Click="OnLayoutSelectedWrapPanelVerticallyMenuClicked"/>
                 </MenuItem>
                 <Separator/>
                 <MenuItem Header="Group Selected into Canvas" Click="OnGroupSelectedMenuClicked" IsEnabled="{Binding Canvas.HasMultipleSelection}"/>
@@ -536,6 +544,14 @@
                                                                   Click="OnLayoutSelectedGridMenuClicked"/>
                                                         <MenuItem Header="UniformGrid (Auto)"
                                                                   Click="OnLayoutSelectedUniformGridMenuClicked"/>
+                                                        <MenuItem Header="DockPanel (Horizontal)"
+                                                                  Click="OnLayoutSelectedDockPanelHorizontallyMenuClicked"/>
+                                                        <MenuItem Header="DockPanel (Vertical)"
+                                                                  Click="OnLayoutSelectedDockPanelVerticallyMenuClicked"/>
+                                                        <MenuItem Header="WrapPanel (Horizontal)"
+                                                                  Click="OnLayoutSelectedWrapPanelHorizontallyMenuClicked"/>
+                                                        <MenuItem Header="WrapPanel (Vertical)"
+                                                                  Click="OnLayoutSelectedWrapPanelVerticallyMenuClicked"/>
                                                     </MenuItem>
                                                     <Separator/>
                                                     <MenuItem Header="Group Selected into Canvas" Click="OnGroupSelectedMenuClicked"/>

@@ -2394,6 +2394,38 @@ public partial class MainWindow : Window
         Vm?.LayoutSelectedIntoUniformGrid();
     }
 
+    private void OnLayoutSelectedDockPanelHorizontallyMenuClicked(
+        object? sender,
+        Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        FlushPendingPropertyHistory();
+        Vm?.LayoutSelectedIntoDockPanel(Orientation.Horizontal);
+    }
+
+    private void OnLayoutSelectedDockPanelVerticallyMenuClicked(
+        object? sender,
+        Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        FlushPendingPropertyHistory();
+        Vm?.LayoutSelectedIntoDockPanel(Orientation.Vertical);
+    }
+
+    private void OnLayoutSelectedWrapPanelHorizontallyMenuClicked(
+        object? sender,
+        Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        FlushPendingPropertyHistory();
+        Vm?.LayoutSelectedIntoWrapPanel(Orientation.Horizontal);
+    }
+
+    private void OnLayoutSelectedWrapPanelVerticallyMenuClicked(
+        object? sender,
+        Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        FlushPendingPropertyHistory();
+        Vm?.LayoutSelectedIntoWrapPanel(Orientation.Vertical);
+    }
+
     private void LayoutSelectedControls(Orientation orientation)
     {
         FlushPendingPropertyHistory();

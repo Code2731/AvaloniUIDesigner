@@ -1691,6 +1691,238 @@ public partial class CanvasViewModel : ViewModelBase
         return true;
     }
 
+    public bool TryCreateDockPanelLayout(
+        IEnumerable<DesignElement> requested,
+        Orientation orientation,
+        out DesignElement? layout,
+        out string error)
+    {
+        layout = null;
+        error = string.Empty;
+        if (orientation is not (Orientation.Horizontal or Orientation.Vertical))
+        {
+            error = "DockPanel layout orientation is not supported.";
+            return false;
+        }
+
+        if (!TryPrepareAutomaticLayoutTargets(
+                requested,
+                "DockPanel",
+                out var orderedTargets,
+                out var parent,
+                out var originalSiblings,
+                out var originalLayoutIndex,
+                out error))
+        {
+            return false;
+        }
+
+        var left = orderedTargets.Min(element => element.X);
+        var top = orderedTargets.Min(element => element.Y);
+        var width = orientation == Orientation.Horizontal
+            ? orderedTargets.Sum(element => element.Width)
+            : orderedTargets.Max(element => element.Width);
+        var height = orientation == Orientation.Vertical
+            ? orderedTargets.Sum(element => element.Height)
+            : orderedTargets.Max(element => element.Height);
+        var layoutName = BuildUniqueDisplayName("DockPanel");
+        var dockPanel = new DockPanel { LastChildFill = true };
+        layout = new DesignElement(
+            layoutName,
+            "Avalonia.Controls.DockPanel",
+            dockPanel,
+            left,
+            top,
+            Math.Max(10, width),
+            Math.Max(10, height));
+        layout.PropertyChanged += OnDesignElementPropertyChanged;
+
+        var insertIndex = Math.Clamp(orderedTargets.Min(Elements.IndexOf), 0, Elements.Count);
+        Elements.Insert(insertIndex, layout);
+        _isReflowingContainerChildren = true;
+        try
+        {
+            for (var index = 0; index < orderedTargets.Count; index++)
+            {
+                var target = orderedTargets[index];
+                target.GridRow = 0;
+                target.GridColumn = 0;
+                target.GridRowSpan = 1;
+                target.GridColumnSpan = 1;
+                target.StackPanelIndex = -1;
+                target.StackPanelItemSize = 40;
+                target.DockPanelIndex = index;
+                target.DockPanelDock = orientation == Orientation.Horizontal
+                    ? DesignerDockSide.Left
+                    : DesignerDockSide.Top;
+                target.DockPanelItemSize = orientation == Orientation.Horizontal
+                    ? Math.Max(10, target.Width)
+                    : Math.Max(10, target.Height);
+                target.WrapPanelIndex = -1;
+                target.UniformGridIndex = -1;
+                target.CanvasChildIndex = -1;
+                target.CanvasChildLeft = 0;
+                target.CanvasChildTop = 0;
+                target.TabIndex = -1;
+                target.TabHeader = null;
+                target.SplitViewSlot = DesignerSplitViewSlot.Content;
+                target.ParentLayout = DesignerParentLayoutKind.DockPanel;
+                target.ParentName = layout.DisplayName;
+            }
+
+            SetDockPanelChildOrder(layout, orderedTargets);
+
+            if (parent is not null)
+            {
+                var siblings = originalSiblings
+                    .Where(child => !orderedTargets.Contains(child))
+                    .ToList();
+                var layoutIndex = Math.Clamp(
+                    originalSiblings.Take(originalLayoutIndex).Count(child => !orderedTargets.Contains(child)),
+                    0,
+                    siblings.Count);
+                siblings.Insert(layoutIndex, layout);
+                SetCanvasChildRelationship(
+                    layout,
+                    parent,
+                    layoutIndex,
+                    left - parent.X,
+                    top - parent.Y);
+                SetCanvasChildOrder(parent, siblings);
+            }
+        }
+        finally
+        {
+            _isReflowingContainerChildren = false;
+        }
+
+        RefreshDocumentStyles(layout.Visual);
+        NormalizeContainerRelationships();
+        ReflowContainerChildren();
+        ResolveLabelTargets();
+        return true;
+    }
+
+    public bool TryCreateWrapPanelLayout(
+        IEnumerable<DesignElement> requested,
+        Orientation orientation,
+        out DesignElement? layout,
+        out string error)
+    {
+        layout = null;
+        error = string.Empty;
+        if (orientation is not (Orientation.Horizontal or Orientation.Vertical))
+        {
+            error = "WrapPanel layout orientation is not supported.";
+            return false;
+        }
+
+        if (!TryPrepareAutomaticLayoutTargets(
+                requested,
+                "WrapPanel",
+                out var orderedTargets,
+                out var parent,
+                out var originalSiblings,
+                out var originalLayoutIndex,
+                out error))
+        {
+            return false;
+        }
+
+        const double spacing = 8;
+        var columnCount = Math.Clamp(
+            (int)Math.Ceiling(Math.Sqrt(orderedTargets.Count)),
+            1,
+            orderedTargets.Count);
+        var rowCount = (int)Math.Ceiling((double)orderedTargets.Count / columnCount);
+        var itemWidth = Math.Max(10, orderedTargets.Max(element => element.Width));
+        var itemHeight = Math.Max(10, orderedTargets.Max(element => element.Height));
+        var left = orderedTargets.Min(element => element.X);
+        var top = orderedTargets.Min(element => element.Y);
+        var width = itemWidth * columnCount + spacing * (columnCount - 1);
+        var height = itemHeight * rowCount + spacing * (rowCount - 1);
+        var layoutName = BuildUniqueDisplayName("WrapPanel");
+        var wrapPanel = new WrapPanel
+        {
+            Orientation = orientation,
+            ItemWidth = itemWidth,
+            ItemHeight = itemHeight,
+            ItemSpacing = spacing,
+            LineSpacing = spacing,
+            ItemsAlignment = WrapPanelItemsAlignment.Start,
+        };
+        layout = new DesignElement(
+            layoutName,
+            "Avalonia.Controls.WrapPanel",
+            wrapPanel,
+            left,
+            top,
+            Math.Max(10, width),
+            Math.Max(10, height));
+        layout.PropertyChanged += OnDesignElementPropertyChanged;
+
+        var insertIndex = Math.Clamp(orderedTargets.Min(Elements.IndexOf), 0, Elements.Count);
+        Elements.Insert(insertIndex, layout);
+        _isReflowingContainerChildren = true;
+        try
+        {
+            for (var index = 0; index < orderedTargets.Count; index++)
+            {
+                var target = orderedTargets[index];
+                target.GridRow = 0;
+                target.GridColumn = 0;
+                target.GridRowSpan = 1;
+                target.GridColumnSpan = 1;
+                target.StackPanelIndex = -1;
+                target.StackPanelItemSize = 40;
+                target.DockPanelIndex = -1;
+                target.DockPanelDock = DesignerDockSide.Left;
+                target.DockPanelItemSize = 40;
+                target.WrapPanelIndex = index;
+                target.UniformGridIndex = -1;
+                target.CanvasChildIndex = -1;
+                target.CanvasChildLeft = 0;
+                target.CanvasChildTop = 0;
+                target.TabIndex = -1;
+                target.TabHeader = null;
+                target.SplitViewSlot = DesignerSplitViewSlot.Content;
+                target.ParentLayout = DesignerParentLayoutKind.WrapPanel;
+                target.ParentName = layout.DisplayName;
+            }
+
+            SetWrapPanelChildOrder(layout, orderedTargets);
+
+            if (parent is not null)
+            {
+                var siblings = originalSiblings
+                    .Where(child => !orderedTargets.Contains(child))
+                    .ToList();
+                var layoutIndex = Math.Clamp(
+                    originalSiblings.Take(originalLayoutIndex).Count(child => !orderedTargets.Contains(child)),
+                    0,
+                    siblings.Count);
+                siblings.Insert(layoutIndex, layout);
+                SetCanvasChildRelationship(
+                    layout,
+                    parent,
+                    layoutIndex,
+                    left - parent.X,
+                    top - parent.Y);
+                SetCanvasChildOrder(parent, siblings);
+            }
+        }
+        finally
+        {
+            _isReflowingContainerChildren = false;
+        }
+
+        RefreshDocumentStyles(layout.Visual);
+        NormalizeContainerRelationships();
+        ReflowContainerChildren();
+        ResolveLabelTargets();
+        return true;
+    }
+
     public bool TryUngroupCanvas(
         DesignElement requested,
         out IReadOnlyList<DesignElement> children,
@@ -4067,6 +4299,90 @@ public partial class CanvasViewModel : ViewModelBase
                 stackPanel.Children.Add(control);
             }
         }
+    }
+
+    private bool TryPrepareAutomaticLayoutTargets(
+        IEnumerable<DesignElement> requested,
+        string layoutKind,
+        out List<DesignElement> orderedTargets,
+        out DesignElement? parent,
+        out List<DesignElement> originalSiblings,
+        out int originalLayoutIndex,
+        out string error)
+    {
+        orderedTargets = new List<DesignElement>();
+        parent = null;
+        originalSiblings = new List<DesignElement>();
+        originalLayoutIndex = 0;
+        error = string.Empty;
+
+        var targets = requested
+            .Where(Elements.Contains)
+            .Distinct()
+            .ToList();
+        if (targets.Count < 2)
+        {
+            error = $"Select at least two controls to create a {layoutKind} layout.";
+            return false;
+        }
+
+        if (targets.Any(element => element.IsLocked))
+        {
+            error = $"Locked controls cannot be placed into a {layoutKind} layout.";
+            return false;
+        }
+
+        var parentName = targets[0].ParentName;
+        if (targets.Any(element => !string.Equals(
+                element.ParentName,
+                parentName,
+                StringComparison.OrdinalIgnoreCase)))
+        {
+            error = "Layout controls must share the same root or Canvas parent.";
+            return false;
+        }
+
+        parent = parentName is null
+            ? null
+            : Elements.FirstOrDefault(element => string.Equals(
+                element.DisplayName,
+                parentName,
+                StringComparison.OrdinalIgnoreCase));
+        if (parentName is not null
+            && (parent?.Visual is not Canvas || targets.Any(element => !element.IsCanvasChild)))
+        {
+            error = "Only root controls or siblings inside the same Canvas can be laid out.";
+            return false;
+        }
+
+        if (parentName is null && targets.Any(element => element.IsContainerChild))
+        {
+            error = "The selected controls have an invalid parent relationship.";
+            return false;
+        }
+
+        orderedTargets = parent is null
+            ? targets.OrderBy(Elements.IndexOf).ToList()
+            : targets
+                .OrderBy(element => element.CanvasChildIndex)
+                .ThenBy(Elements.IndexOf)
+                .ToList();
+        if (parent is null)
+        {
+            return true;
+        }
+
+        var siblings = GetDirectChildren(parent)
+            .OrderBy(child => child.CanvasChildIndex)
+            .ThenBy(Elements.IndexOf)
+            .ToList();
+        originalSiblings = siblings;
+        originalLayoutIndex = orderedTargets
+            .Select(child => siblings.IndexOf(child))
+            .Where(index => index >= 0)
+            .DefaultIfEmpty(siblings.Count)
+            .Min();
+        return true;
     }
 
     private string BuildUniqueDisplayName(string displayPrefix)
