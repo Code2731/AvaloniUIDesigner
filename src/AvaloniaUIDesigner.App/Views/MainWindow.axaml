@@ -562,6 +562,27 @@
                             <views:DesignerGridOverlay GridSize="{Binding Canvas.GridSize}"
                                                       IsGridVisible="{Binding Canvas.IsGridVisible}"
                                                       IsHitTestVisible="False"/>
+                            <Border Name="ToolboxPlacementPreview"
+                                    Background="#3034D399"
+                                    BorderBrush="#22D3EE"
+                                    BorderThickness="1"
+                                    CornerRadius="3"
+                                    Padding="4"
+                                    ZIndex="45"
+                                    IsHitTestVisible="False"
+                                    IsVisible="False">
+                                <StackPanel Spacing="1">
+                                    <TextBlock Name="ToolboxPlacementPreviewLabel"
+                                               FontSize="11"
+                                               FontWeight="SemiBold"
+                                               Foreground="#E0F2FE"
+                                               TextTrimming="CharacterEllipsis"/>
+                                    <TextBlock Name="ToolboxPlacementPreviewDetails"
+                                               FontSize="9"
+                                               Foreground="#BAE6FD"
+                                               TextTrimming="CharacterEllipsis"/>
+                                </StackPanel>
+                            </Border>
                             <Border Name="ToolboxDropHint"
                                     Background="#243078D7"
                                     BorderBrush="DodgerBlue"

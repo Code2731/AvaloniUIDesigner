@@ -2994,6 +2994,7 @@ public partial class MainWindow : Window
             _isMarqueeSelecting = false;
             MarqueeRectangle.IsVisible = false;
             Vm.Toolbox.SelectedItem = null;
+            HideToolboxPlacementPreview();
             Vm.SelectElements(Array.Empty<DesignElement>());
             Vm.StatusText = "Selection tool active.";
             e.Handled = true;
@@ -3918,6 +3919,7 @@ public partial class MainWindow : Window
         }
 
         Vm?.Toolbox.SelectedItem = item;
+        HideToolboxPlacementPreview();
         _pendingToolboxDragItem = item;
         _toolboxDragStart = e.GetPosition(this);
         e.Pointer.Capture(control);
@@ -3979,6 +3981,7 @@ public partial class MainWindow : Window
         }
 
         Vm.Toolbox.CancelPlacementMode();
+        HideToolboxPlacementPreview();
         Vm.StatusText = "Toolbox placement mode cancelled.";
         e.Handled = true;
     }
@@ -3993,6 +3996,7 @@ public partial class MainWindow : Window
         }
 
         Vm.Toolbox.SelectedItem = presentation.Item;
+        HideToolboxPlacementPreview();
         if (e.Key == Key.Enter)
         {
             Vm.PlaceSelectedToolboxItemQuickly();
@@ -4036,8 +4040,35 @@ public partial class MainWindow : Window
         e.Pointer.Capture(null);
     }
 
+    private void UpdateToolboxPlacementPreview(Point point)
+    {
+        if (Vm is null
+            || Vm.Toolbox.SelectedItem is null
+            || !new Rect(0, 0, Vm.Canvas.ArtboardWidth, Vm.Canvas.ArtboardHeight).Contains(point)
+            || Vm.GetToolboxPlacementPreview(point.X, point.Y) is not { } preview)
+        {
+            HideToolboxPlacementPreview();
+            return;
+        }
+
+        Canvas.SetLeft(ToolboxPlacementPreview, preview.X);
+        Canvas.SetTop(ToolboxPlacementPreview, preview.Y);
+        ToolboxPlacementPreview.Width = preview.Width;
+        ToolboxPlacementPreview.Height = preview.Height;
+        ToolboxPlacementPreviewLabel.Text = preview.DisplayName;
+        ToolboxPlacementPreviewDetails.Text =
+            $"{preview.Width:0} x {preview.Height:0} at {preview.X:0}, {preview.Y:0}";
+        ToolboxPlacementPreview.IsVisible = true;
+    }
+
+    private void HideToolboxPlacementPreview()
+    {
+        ToolboxPlacementPreview.IsVisible = false;
+    }
+
     private void OnDesignSurfaceDragEnter(object? sender, DragEventArgs e)
     {
+        HideToolboxPlacementPreview();
         if (e.DataTransfer.Contains(ToolboxDragDataFormat))
         {
             ToolboxDropHint.Width = 0;
@@ -4049,6 +4080,7 @@ public partial class MainWindow : Window
 
     private void OnDesignSurfaceDragLeave(object? sender, DragEventArgs e)
     {
+        HideToolboxPlacementPreview();
         ToolboxDropHint.IsVisible = false;
         ToolboxDropHint.Width = 0;
         ToolboxDropHint.Height = 0;
@@ -4094,6 +4126,7 @@ public partial class MainWindow : Window
 
     private void OnDesignSurfaceDrop(object? sender, DragEventArgs e)
     {
+        HideToolboxPlacementPreview();
         ToolboxDropHint.IsVisible = false;
         if (Vm is null || sender is not Control host
             || e.DataTransfer.TryGetValue(ToolboxDragDataFormat) is not string displayName
@@ -4133,6 +4166,7 @@ public partial class MainWindow : Window
         if (Vm.Toolbox.SelectedItem is not null)
         {
             Vm.PlaceFromToolbox(point.X, point.Y);
+            UpdateToolboxPlacementPreview(point);
             e.Handled = true;
             return;
         }
@@ -4451,6 +4485,7 @@ public partial class MainWindow : Window
         var point = e.GetPosition(DesignScrollViewer);
         if (_isDraggingGuide)
         {
+            HideToolboxPlacementPreview();
             UpdateGuidePosition(point);
             e.Handled = true;
             return;
@@ -4459,9 +4494,11 @@ public partial class MainWindow : Window
         UpdateViewportCursor(point);
         if (!_isPanningViewport)
         {
+            UpdateToolboxPlacementPreview(e.GetPosition(DesignSurface));
             return;
         }
 
+        HideToolboxPlacementPreview();
         UpdateViewportPan(point);
         e.Handled = true;
     }
@@ -4472,6 +4509,8 @@ public partial class MainWindow : Window
         {
             ClearViewportCursor();
         }
+
+        HideToolboxPlacementPreview();
     }
 
     private void OnDesignViewportPointerReleased(object? sender, PointerReleasedEventArgs e)
@@ -4568,6 +4607,7 @@ public partial class MainWindow : Window
     {
         if (_isPanningViewport)
         {
+            HideToolboxPlacementPreview();
             UpdateViewportPan(e.GetPosition(DesignScrollViewer));
             e.Handled = true;
             return;
@@ -4575,15 +4615,18 @@ public partial class MainWindow : Window
 
         if (_isMarqueeSelecting)
         {
+            HideToolboxPlacementPreview();
             UpdateMarquee(e.GetPosition(DesignHost));
             return;
         }
 
         if (_dragMode == DragMode.None || _dragTarget is null)
         {
+            UpdateToolboxPlacementPreview(e.GetPosition(DesignHost));
             return;
         }
 
+        HideToolboxPlacementPreview();
         var p = e.GetPosition(DesignHost);
         var dx = p.X - _dragStart.X;
         var dy = p.Y - _dragStart.Y;

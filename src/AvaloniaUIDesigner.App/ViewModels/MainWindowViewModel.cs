@@ -35,6 +35,13 @@ public sealed record HistoryTimelineEntry(
     bool IsUndo,
     int Steps);
 
+public sealed record ToolboxPlacementPreview(
+    string DisplayName,
+    double X,
+    double Y,
+    double Width,
+    double Height);
+
 public enum ItemsEditorMode
 {
     Flat,
@@ -670,6 +677,22 @@ public partial class MainWindowViewModel : ViewModelBase
         PlaceToolboxItem(item, x, y);
     }
 
+    public ToolboxPlacementPreview? GetToolboxPlacementPreview(double x, double y)
+    {
+        if (Toolbox.SelectedItem is not { } item)
+        {
+            return null;
+        }
+
+        var (width, height) = GetToolboxItemDesignSize(item);
+        return new ToolboxPlacementPreview(
+            item.DisplayName,
+            Canvas.SnapPosition(x),
+            Canvas.SnapPosition(y),
+            width,
+            height);
+    }
+
     public bool PlaceSelectedToolboxItemQuickly()
     {
         if (Toolbox.SelectedItem is not { } item)
@@ -678,12 +701,7 @@ public partial class MainWindowViewModel : ViewModelBase
             return false;
         }
 
-        var width = item.DefaultWidth
-            ?? (item.IsPreset ? 240 : 120);
-        var height = item.DefaultHeight
-            ?? (item.IsPreset ? 120 : 40);
-        width = Math.Min(width, Canvas.ArtboardWidth);
-        height = Math.Min(height, Canvas.ArtboardHeight);
+        var (width, height) = GetToolboxItemDesignSize(item);
 
         var placementIndex = Canvas.Elements.Count % 8;
         var x = Math.Max(0, (Canvas.ArtboardWidth - width) / 2 + placementIndex * 24);
@@ -694,6 +712,17 @@ public partial class MainWindowViewModel : ViewModelBase
         PlaceToolboxItem(item, x, y);
         StatusText = $"Quick-placed {item.DisplayName} at the artboard center.";
         return true;
+    }
+
+    private (double Width, double Height) GetToolboxItemDesignSize(ToolboxItem item)
+    {
+        var width = item.DefaultWidth
+            ?? (item.IsPreset ? 240 : 120);
+        var height = item.DefaultHeight
+            ?? (item.IsPreset ? 120 : 40);
+        return (
+            Math.Min(width, Canvas.ArtboardWidth),
+            Math.Min(height, Canvas.ArtboardHeight));
     }
 
     public DesignElement? FindDropContainer(Point point)

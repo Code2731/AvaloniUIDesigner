@@ -70,3 +70,6 @@ Users should be able to place controls visually, inspect properties, and validat
 
 9. v1.3
 - ~~Toolbox search focus shortcuts and explicit placement mode~~
+
+10. v1.4
+- ~~Canvas Toolbox placement preview with snapped coordinates~~
