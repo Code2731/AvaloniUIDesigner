@@ -47,6 +47,11 @@ public sealed record ToolboxPlacementTargetPreview(
     string TargetLabel,
     Rect Bounds);
 
+public sealed record PropertyInspectorState(
+    string FilterText,
+    bool CategoriesVisible,
+    bool AllCategoriesExpanded);
+
 public enum ItemsEditorMode
 {
     Flat,
@@ -645,6 +650,37 @@ public partial class MainWindowViewModel : ViewModelBase
     public string? CurrentDocumentPath => _currentDocumentPath;
     public string WindowTitle => $"Avalonia UI Designer - {GetDisplayDocumentName()}{(IsDirty ? "*" : string.Empty)}";
     public DocumentTabViewModel? SelectedDocumentTab => _selectedDocumentTab;
+
+    public PropertyInspectorState GetPropertyInspectorState()
+    {
+        if (_selectedDocumentTab is not null
+            && _documentTabStates.TryGetValue(_selectedDocumentTab, out var state))
+        {
+            return new PropertyInspectorState(
+                state.PropertyInspectorFilterText,
+                state.PropertyInspectorCategoriesVisible,
+                state.PropertyInspectorAllCategoriesExpanded);
+        }
+
+        return new PropertyInspectorState(string.Empty, true, true);
+    }
+
+    public void SetPropertyInspectorState(
+        string? filterText,
+        bool categoriesVisible,
+        bool allCategoriesExpanded)
+    {
+        if (_selectedDocumentTab is null
+            || !_documentTabStates.TryGetValue(_selectedDocumentTab, out var state))
+        {
+            return;
+        }
+
+        state.PropertyInspectorFilterText = filterText?.Trim() ?? string.Empty;
+        state.PropertyInspectorCategoriesVisible = categoriesVisible;
+        state.PropertyInspectorAllCategoriesExpanded = allCategoriesExpanded;
+    }
+
     public bool HasMultipleDocumentTabs => DocumentTabs.Count > 1;
     public bool CanCloseCurrentDocumentTab => HasMultipleDocumentTabs;
     public bool HasStylePreviewOptions => StylePreviewOptions.Count > 1;
@@ -8833,7 +8869,10 @@ public partial class MainWindowViewModel : ViewModelBase
                     ExportPersistedHistory(state.UndoStack),
                     ExportPersistedHistory(state.RedoStack),
                     state.ZoomScale,
-                    state.SelectedElementNames.ToList());
+                    state.SelectedElementNames.ToList(),
+                    state.PropertyInspectorFilterText,
+                    state.PropertyInspectorCategoriesVisible,
+                    state.PropertyInspectorAllCategoriesExpanded);
             })
             .ToList();
         var activeTabIndex = _selectedDocumentTab is null
@@ -8910,6 +8949,8 @@ public partial class MainWindowViewModel : ViewModelBase
                     .Distinct(StringComparer.OrdinalIgnoreCase)
                     .ToList()
                     ?? new List<string>();
+                var propertyInspectorFilterText = persistedTab.PropertyInspectorFilterText?.Trim()
+                    ?? string.Empty;
                 restoredDocuments.Add(new RestoredDocumentTab(
                     persistedTab.DocumentPath,
                     displayName,
@@ -8918,7 +8959,10 @@ public partial class MainWindowViewModel : ViewModelBase
                     undoHistory,
                     redoHistory,
                     zoomScale,
-                    selectedElementNames));
+                    selectedElementNames,
+                    propertyInspectorFilterText,
+                    persistedTab.PropertyInspectorCategoriesVisible,
+                    persistedTab.PropertyInspectorAllCategoriesExpanded));
             }
         }
         catch (Exception ex)
@@ -8945,6 +8989,9 @@ public partial class MainWindowViewModel : ViewModelBase
             state.ZoomScale = restoredDocument.ZoomScale;
             state.SelectedElementNames.Clear();
             state.SelectedElementNames.AddRange(restoredDocument.SelectedElementNames);
+            state.PropertyInspectorFilterText = restoredDocument.PropertyInspectorFilterText;
+            state.PropertyInspectorCategoriesVisible = restoredDocument.PropertyInspectorCategoriesVisible;
+            state.PropertyInspectorAllCategoriesExpanded = restoredDocument.PropertyInspectorAllCategoriesExpanded;
             tab.Update(
                 restoredDocument.DocumentPath,
                 restoredDocument.DisplayName,
@@ -16230,6 +16277,9 @@ public partial class MainWindowViewModel : ViewModelBase
         public PendingMutation? PendingMutation { get; set; } = pendingMutation;
         public double ZoomScale { get; set; } = zoomScale;
         public List<string> SelectedElementNames { get; } = selectedElementNames;
+        public string PropertyInspectorFilterText { get; set; } = string.Empty;
+        public bool PropertyInspectorCategoriesVisible { get; set; } = true;
+        public bool PropertyInspectorAllCategoriesExpanded { get; set; } = true;
     }
 
     private sealed record PersistedDocumentSession(
@@ -16250,7 +16300,10 @@ public partial class MainWindowViewModel : ViewModelBase
         List<PersistedHistoryEntry>? UndoHistory = null,
         List<PersistedHistoryEntry>? RedoHistory = null,
         double ZoomScale = 1,
-        List<string>? SelectedElementNames = null);
+        List<string>? SelectedElementNames = null,
+        string? PropertyInspectorFilterText = null,
+        bool PropertyInspectorCategoriesVisible = true,
+        bool PropertyInspectorAllCategoriesExpanded = true);
 
     private sealed record PersistedHistoryEntry(
         string BeforeAxaml,
@@ -16270,7 +16323,10 @@ public partial class MainWindowViewModel : ViewModelBase
         List<HistoryEntry> UndoHistory,
         List<HistoryEntry> RedoHistory,
         double ZoomScale,
-        List<string> SelectedElementNames);
+        List<string> SelectedElementNames,
+        string PropertyInspectorFilterText,
+        bool PropertyInspectorCategoriesVisible,
+        bool PropertyInspectorAllCategoriesExpanded);
 
     private sealed record PendingMutation(DesignerCanvasDocument Before, HistoryActionType ActionType, string Message);
 

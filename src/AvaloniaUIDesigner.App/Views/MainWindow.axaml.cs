@@ -914,6 +914,7 @@ public partial class MainWindow : Window
         Avalonia.Interactivity.RoutedEventArgs e)
     {
         PropGrid.IsCategoryVisible = true;
+        CapturePropertyInspectorState();
         Vm?.StatusText = "Property categories shown.";
     }
 
@@ -922,6 +923,7 @@ public partial class MainWindow : Window
         Avalonia.Interactivity.RoutedEventArgs e)
     {
         PropGrid.IsCategoryVisible = false;
+        CapturePropertyInspectorState();
         Vm?.StatusText = "Property categories hidden.";
     }
 
@@ -930,6 +932,7 @@ public partial class MainWindow : Window
         Avalonia.Interactivity.RoutedEventArgs e)
     {
         PropGrid.AllCategoriesExpanded = true;
+        CapturePropertyInspectorState();
         Vm?.StatusText = "All property categories expanded.";
     }
 
@@ -938,11 +941,15 @@ public partial class MainWindow : Window
         Avalonia.Interactivity.RoutedEventArgs e)
     {
         PropGrid.AllCategoriesExpanded = false;
+        CapturePropertyInspectorState();
         Vm?.StatusText = "All property categories collapsed.";
     }
 
     private void OnPropertyInspectorFilterChanged(object? sender, TextChangedEventArgs e)
-        => ApplyPropertyInspectorFilter();
+    {
+        ApplyPropertyInspectorFilter();
+        CapturePropertyInspectorState();
+    }
 
     private void OnPropertyInspectorDescriptorFilter(
         object? sender,
@@ -982,6 +989,27 @@ public partial class MainWindow : Window
         _propertyInspectorFilterText = PropertyInspectorFilter.Text?.Trim() ?? string.Empty;
         PropGrid.Content = null;
         PropGrid.Content = _boundElement?.Visual;
+    }
+
+    private void CapturePropertyInspectorState()
+        => Vm?.SetPropertyInspectorState(
+            PropertyInspectorFilter.Text,
+            PropGrid.IsCategoryVisible,
+            PropGrid.AllCategoriesExpanded);
+
+    private void ApplyPropertyInspectorState()
+    {
+        if (Vm is null)
+        {
+            return;
+        }
+
+        var state = Vm.GetPropertyInspectorState();
+        _propertyInspectorFilterText = state.FilterText;
+        PropGrid.IsCategoryVisible = state.CategoriesVisible;
+        PropGrid.AllCategoriesExpanded = state.AllCategoriesExpanded;
+        PropertyInspectorFilter.Text = state.FilterText;
+        ApplyPropertyInspectorFilter();
     }
 
     private void OnOpacity100MenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
@@ -3345,6 +3373,7 @@ public partial class MainWindow : Window
 
         RebuildRecentFilesMenu();
         UpdateDocumentBackupMenu();
+        ApplyPropertyInspectorState();
         RebindSelection();
         UpdateViewportRulers();
     }
@@ -3356,6 +3385,11 @@ public partial class MainWindow : Window
 
     private void OnViewModelPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
+        if (e.PropertyName == nameof(MainWindowViewModel.SelectedDocumentTab))
+        {
+            ApplyPropertyInspectorState();
+        }
+
         if (e.PropertyName == nameof(MainWindowViewModel.CurrentDocumentPath))
         {
             UpdateDocumentBackupMenu();

@@ -84,7 +84,10 @@ Users should be able to place controls visually, inspect properties, and validat
 - ~~Object Tree keyboard navigation and inline editing shortcuts~~
 
 14. v1.8
-- Property Inspector category/flat view and expand/collapse navigation controls
+- ~~Property Inspector category/flat view and expand/collapse navigation controls~~
 
 15. v1.9
-- Property Inspector dedicated filter, clear action, and focus shortcut
+- ~~Property Inspector dedicated filter, clear action, and focus shortcut~~
+
+16. v1.10
+- Per-document-tab Property Inspector filter, category, and expansion state with session restore
