@@ -1178,6 +1178,7 @@ public partial class MainWindowViewModel : ViewModelBase
                     DefaultProperties = properties,
                     DesignOnly = targetDefinition.IsDesignOnly,
                     PreviewText = targetDefinition.PreviewText,
+                    Category = targetDefinition.Category,
                 }
             ]
         };

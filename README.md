@@ -300,7 +300,7 @@ AXAML 소스 편집기의 `Validate`와 `Preview`는 현재 디자인과 Undo �
 
 ## 컴포넌트 팩
 
-`File > Load Component Pack...`에서 JSON 팩을 불러오면 현재 세션의 Toolbox에 별칭 컨트롤을 추가할 수 있습니다. 각 항목은 이미 지원되는 Avalonia 타입을 기반으로 하며, 표시 이름, 기본 크기, 기본 속성, 선택적 `category`를 지정합니다. `category`를 생략하면 내장 타입은 기본 카테고리로 분류되고, 외부 디자인 전용 타입은 `General`로 표시됩니다. 예시는 [component-pack.example.json](docs/component-pack.example.json)을 참고하세요. 캔버스에서 컨트롤 하나를 선택한 뒤 `File > Export Selected as Component Pack...`을 사용하면 해당 크기와 시각 속성을 재사용 가능한 JSON 팩으로 저장할 수 있습니다. 파일 경로는 워크스페이스 세션에 함께 저장되므로 앱을 다시 실행해도 팩을 다시 선택할 필요가 없습니다.
+`File > Load Component Pack...`에서 JSON 팩을 불러오면 현재 세션의 Toolbox에 별칭 컨트롤을 추가할 수 있습니다. 각 항목은 이미 지원되는 Avalonia 타입을 기반으로 하며, 표시 이름, 기본 크기, 기본 속성, 선택적 `category`를 지정합니다. `category`를 생략하면 내장 타입은 기본 카테고리로 분류되고, 외부 디자인 전용 타입은 `General`로 표시됩니다. 예시는 [component-pack.example.json](docs/component-pack.example.json)을 참고하세요. 캔버스에서 컨트롤 하나를 선택한 뒤 `File > Export Selected as Component Pack...`을 사용하면 해당 크기·시각 속성과 원본 Component Pack의 `category`를 재사용 가능한 JSON 팩으로 저장할 수 있습니다. 파일 경로는 워크스페이스 세션에 함께 저장되므로 앱을 다시 실행해도 팩을 다시 선택할 필요가 없습니다.
 
 외부 프로젝트의 커스텀 컨트롤은 `designOnly: true`를 사용해야 합니다. 디자이너는 실제 외부 assembly를 실행하지 않고 청색 플레이스홀더를 렌더링하며, 플레이스홀더에 표시할 문구는 `previewText`, 원래 컨트롤에 전달할 기본 AXAML 속성은 `defaultProperties`, Toolbox 필터 이름은 `category`로 정의합니다. `DesignOnly`가 없는 알 수 없는 타입은 팩 로드를 거부해 잘못된 AXAML 생성을 방지합니다. 예시는 [custom-component-pack.example.json](docs/custom-component-pack.example.json)을 참고하세요.
 
