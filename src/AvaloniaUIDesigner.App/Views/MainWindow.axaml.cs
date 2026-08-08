@@ -1610,6 +1610,26 @@ public partial class MainWindow : Window
         Vm.SetSelectedTabIndex(parsedTabIndex);
     }
 
+    private async void OnEditTabOrderMapMenuClicked(
+        object? sender,
+        Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        FlushPendingPropertyHistory();
+        if (Vm is null)
+        {
+            return;
+        }
+
+        var updated = await ShowTextEditorDialogAsync(
+            "Edit Tab Order Map",
+            Vm.GetTabOrderEditorText(),
+            "Enter one control per line using TabIndex | ControlName. Use -1 for automatic order; duplicate non-negative indexes are rejected.");
+        if (updated is not null)
+        {
+            Vm.SetTabOrderFromText(updated);
+        }
+    }
+
     private void OnToggleTabStopMenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
         FlushPendingPropertyHistory();

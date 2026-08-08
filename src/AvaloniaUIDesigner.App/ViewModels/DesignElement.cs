@@ -221,4 +221,15 @@ public partial class DesignElement : ViewModelBase
 
     public string ContainerLayoutLabel
         => IsContentChild ? "CONTENT" : string.Empty;
+
+    public bool HasTabOrder => Visual.TabIndex >= 0 && Visual.TabIndex < int.MaxValue;
+
+    public string TabOrderLabel
+        => HasTabOrder ? $"TAB #{Visual.TabIndex}" : string.Empty;
+
+    public void RefreshTabOrderLabel()
+    {
+        OnPropertyChanged(nameof(HasTabOrder));
+        OnPropertyChanged(nameof(TabOrderLabel));
+    }
 }

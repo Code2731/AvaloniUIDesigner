@@ -5049,6 +5049,7 @@ public partial class MainWindowViewModel : ViewModelBase
             HistoryActionType.EditProperty,
             "Updated accessibility and navigation properties.");
         DesignerAccessibilityRuntime.Apply(target.Visual, values);
+        target.RefreshTabOrderLabel();
         CommitCanvasMutation();
         StatusText = $"Updated accessibility and navigation for {target.DisplayName}.";
         return true;
@@ -6934,16 +6935,162 @@ public partial class MainWindowViewModel : ViewModelBase
             return;
         }
 
-        if (target.Visual.TabIndex == tabIndex)
+        var normalizedTabIndex = tabIndex < 0 ? int.MaxValue : tabIndex;
+        if (target.Visual.TabIndex == normalizedTabIndex)
         {
             StatusText = "Tab order is unchanged.";
             return;
         }
 
         BeginCanvasMutation(HistoryActionType.EditProperty, "Updated control tab order.");
-        target.Visual.TabIndex = tabIndex;
+        target.Visual.TabIndex = normalizedTabIndex;
+        target.RefreshTabOrderLabel();
         CommitCanvasMutation();
-        StatusText = $"Set tab order to {tabIndex} for {target.DisplayName}.";
+        StatusText = normalizedTabIndex == int.MaxValue
+            ? $"Reset tab order for {target.DisplayName}."
+            : $"Set tab order to {normalizedTabIndex} for {target.DisplayName}.";
+    }
+
+    public string GetTabOrderEditorText()
+    {
+        var lines = new List<string>
+        {
+            "# TabIndex | ControlName",
+            "# Use auto or -1 for automatic order. Locked controls are read-only comments.",
+        };
+        var ordered = Canvas.Elements
+            .OrderBy(element => element.Visual.TabIndex >= 0 ? 0 : 1)
+            .ThenBy(element => element.Visual.TabIndex >= 0
+                ? element.Visual.TabIndex
+                : Canvas.Elements.IndexOf(element))
+            .ThenBy(Canvas.Elements.IndexOf)
+            .ToList();
+        foreach (var element in ordered)
+        {
+            var indexText = element.Visual.TabIndex == int.MaxValue
+                ? "auto"
+                : element.Visual.TabIndex.ToString(CultureInfo.InvariantCulture);
+            var line = $"{indexText} | {element.DisplayName}";
+            lines.Add(element.IsLocked ? $"# LOCKED | {line}" : line);
+        }
+
+        return string.Join(Environment.NewLine, lines);
+    }
+
+    public bool SetTabOrderFromText(string text)
+    {
+        var elementsByName = Canvas.Elements.ToDictionary(
+            element => element.DisplayName,
+            StringComparer.OrdinalIgnoreCase);
+        var updates = new Dictionary<DesignElement, int>();
+        var usedIndexes = new HashSet<int>();
+        var errors = new List<string>();
+        var meaningfulLineCount = 0;
+
+        foreach (var rawLine in (text ?? string.Empty).Split(
+                     new[] { "\r\n", "\n", "\r" },
+                     StringSplitOptions.None))
+        {
+            var line = rawLine.Trim();
+            if (line.Length == 0 || line.StartsWith('#'))
+            {
+                continue;
+            }
+
+            meaningfulLineCount++;
+            var separator = line.IndexOf('|');
+            if (separator <= 0 || separator >= line.Length - 1)
+            {
+                errors.Add($"Line {meaningfulLineCount}: use TabIndex | ControlName.");
+                continue;
+            }
+
+            var indexText = line[..separator].Trim();
+            var name = line[(separator + 1)..].Trim();
+            var isAutomatic = string.Equals(indexText, "auto", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(indexText, "-1", StringComparison.Ordinal);
+            if (!isAutomatic
+                && (!int.TryParse(indexText, NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsedTabIndex)
+                    || parsedTabIndex < 0
+                    || parsedTabIndex > 10000))
+            {
+                errors.Add($"Line {meaningfulLineCount}: TabIndex must be auto, -1, or between 0 and 10000.");
+                continue;
+            }
+            var tabIndex = isAutomatic
+                ? int.MaxValue
+                : int.Parse(indexText, NumberStyles.Integer, CultureInfo.InvariantCulture);
+
+            if (!elementsByName.TryGetValue(name, out var element))
+            {
+                errors.Add($"Line {meaningfulLineCount}: control '{name}' was not found.");
+                continue;
+            }
+
+            if (element.IsLocked)
+            {
+                errors.Add($"Line {meaningfulLineCount}: control '{name}' is locked.");
+                continue;
+            }
+
+            if (!updates.TryAdd(element, tabIndex))
+            {
+                errors.Add($"Line {meaningfulLineCount}: control '{name}' is listed more than once.");
+                continue;
+            }
+
+            if (tabIndex >= 0 && !usedIndexes.Add(tabIndex))
+            {
+                errors.Add($"Line {meaningfulLineCount}: TabIndex {tabIndex} is used more than once.");
+            }
+        }
+
+        if (errors.Count > 0)
+        {
+            StatusText = $"Tab Order map was not changed. {errors[0]}";
+            return false;
+        }
+
+        if (meaningfulLineCount == 0)
+        {
+            foreach (var element in Canvas.Elements.Where(element => !element.IsLocked))
+            {
+                updates[element] = int.MaxValue;
+            }
+        }
+
+        var duplicateFinalIndex = Canvas.Elements
+            .Select(element => updates.TryGetValue(element, out var updatedIndex)
+                ? updatedIndex
+                : element.Visual.TabIndex)
+            .Where(tabIndex => tabIndex >= 0 && tabIndex < int.MaxValue)
+            .GroupBy(tabIndex => tabIndex)
+            .FirstOrDefault(group => group.Count() > 1);
+        if (duplicateFinalIndex is not null)
+        {
+            StatusText = $"Tab Order map was not changed. TabIndex {duplicateFinalIndex.Key} is used more than once.";
+            return false;
+        }
+
+        var changed = updates
+            .Where(pair => pair.Key.Visual.TabIndex != pair.Value)
+            .ToList();
+        if (changed.Count == 0)
+        {
+            StatusText = "Tab Order map is unchanged.";
+            return true;
+        }
+
+        BeginCanvasMutation(HistoryActionType.EditProperty, "Updated Tab Order map.");
+        foreach (var (element, tabIndex) in changed)
+        {
+            element.Visual.TabIndex = tabIndex;
+            element.RefreshTabOrderLabel();
+        }
+
+        CommitCanvasMutation();
+        StatusText = $"Updated tab order for {changed.Count} control(s).";
+        return true;
     }
 
     public void ToggleSelectedTabStop()

@@ -125,6 +125,7 @@
                 <MenuItem Header="Toggle Multiline TextBox" Click="OnToggleTextBoxMultilineMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
                 <MenuItem Header="Edit Label Target..." Click="OnEditLabelTargetMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
                 <MenuItem Header="Edit Tab Order..." Click="OnEditTabOrderMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
+                <MenuItem Header="Edit Tab Order Map..." Click="OnEditTabOrderMapMenuClicked"/>
                 <MenuItem Header="Include / Exclude from Tab Navigation" Click="OnToggleTabStopMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
                 <MenuItem Header="Choose Image..." Click="OnChooseImageMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
                 <MenuItem Header="Edit Path Data..." Click="OnEditPathDataMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
@@ -571,6 +572,18 @@
                                                             HorizontalAlignment="Right"
                                                             IsVisible="{Binding IsLocked}">
                                                         <TextBlock Text="LOCK" FontSize="9" FontWeight="Bold" Foreground="White"/>
+                                                    </Border>
+                                                    <Border Background="#0F766E"
+                                                            BorderBrush="#5EEAD4"
+                                                            BorderThickness="1"
+                                                            CornerRadius="3"
+                                                            Padding="4,1"
+                                                            HorizontalAlignment="Right"
+                                                            IsVisible="{Binding HasTabOrder}">
+                                                        <TextBlock Text="{Binding TabOrderLabel}"
+                                                                   FontSize="9"
+                                                                   FontWeight="SemiBold"
+                                                                   Foreground="White"/>
                                                     </Border>
                                                     <Border Background="#1D4ED8"
                                                             BorderBrush="#60A5FA"
