@@ -75,6 +75,7 @@ dotnet run --project src/AvaloniaUIDesigner.App/AvaloniaUIDesigner.App.csproj
 - **Object Tree 계층 편집**: 트리 행의 컨텍스트 메뉴에서 지원 컨테이너 할당과 부모 컨테이너 해제를 바로 실행
 - **Object Tree 순서 편집**: StackPanel·DockPanel·WrapPanel·UniformGrid·Canvas 자식의 순서를 `Move Earlier/Later`로 바로 변경
 - **Object Tree 탐색 상태**: 트리 노드의 펼침 상태를 계층 재빌드 후에도 보존하고, Canvas에서 자식을 선택하면 접힌 부모 경로를 자동으로 펼침
+- **Object Tree 드래그 재배치**: 지원 컨테이너의 자식 행을 같은 부모의 다른 행 앞에 드래그해 순서를 변경하고, 다른 부모 드롭은 거부
 - **Object Tree 검색 순환**: 검색 결과를 `Enter`로 다음, `Shift+Enter`로 이전 항목으로 순환하고 현재 위치/전체 개수를 표시
 - **이동/리사이즈 기즈모**: 선택된 요소를 드래그로 이동, 8방향 핸들로 리사이즈 (최소 10px)
 - **PropertyGrid 연동**: 선택된 컨트롤의 속성을 bodong PropertyGrid로 실시간 편집
@@ -151,6 +152,7 @@ dotnet run --project src/AvaloniaUIDesigner.App/AvaloniaUIDesigner.App.csproj
 57. Object Tree 행의 `Assign to Container`에서 Grid·StackPanel·DockPanel·WrapPanel·UniformGrid·Canvas·TabControl·SplitView·Content를 선택하거나 `Remove from Container`로 부모를 해제
 58. 컨테이너 자식 행에서 `Move Earlier`/`Move Later`를 선택하면 지원되는 부모의 형제 순서가 바뀌고, Grid·TabControl·Content·SplitView는 전용 배치 방식을 안내함
 59. Object Tree에서 컨테이너를 펼치거나 접으면 순서 변경·Undo/Redo·AXAML 적용 뒤에도 상태가 유지되고, Canvas에서 하위 컨트롤을 선택하면 부모가 자동으로 펼쳐짐
+60. Object Tree의 잠기지 않은 컨테이너 자식 행을 같은 부모의 다른 자식 행 위로 드래그하면 해당 위치 앞으로 이동하고, 다른 부모로의 드롭은 거부됨
 
 DataGrid가 포함된 생성 AXAML을 다른 프로젝트에서 사용할 때는 같은 Avalonia 버전의 `Avalonia.Controls.DataGrid` 패키지와 `avares://Avalonia.Controls.DataGrid/Themes/Fluent.xaml` 스타일 include가 필요합니다.
 

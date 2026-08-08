@@ -1177,6 +1177,96 @@ public partial class MainWindowViewModel : ViewModelBase
         };
     }
 
+    public bool ReorderSelectedElementBefore(DesignElement target)
+    {
+        if (Canvas.SelectedElement is not { IsLocked: false, IsContainerChild: true } source)
+        {
+            StatusText = "Select an unlocked container child to reorder it.";
+            return false;
+        }
+
+        if (!Canvas.Elements.Contains(target)
+            || ReferenceEquals(source, target)
+            || !target.IsContainerChild
+            || target.ParentLayout != source.ParentLayout
+            || !string.Equals(target.ParentName, source.ParentName, StringComparison.OrdinalIgnoreCase))
+        {
+            StatusText = "Drop onto a sibling in the same supported container to reorder it.";
+            return false;
+        }
+
+        if (source.ParentLayout is not (DesignerParentLayoutKind.StackPanel
+            or DesignerParentLayoutKind.DockPanel
+            or DesignerParentLayoutKind.WrapPanel
+            or DesignerParentLayoutKind.UniformGrid
+            or DesignerParentLayoutKind.Canvas))
+        {
+            return ReportUnsupportedParentOrder(source);
+        }
+
+        var siblings = Canvas.Elements
+            .Where(element => element.IsContainerChild
+                && element.ParentLayout == source.ParentLayout
+                && string.Equals(element.ParentName, source.ParentName, StringComparison.OrdinalIgnoreCase))
+            .OrderBy(GetParentOrderIndex)
+            .ThenBy(Canvas.Elements.IndexOf)
+            .ToList();
+        if (!siblings.Contains(source) || !siblings.Contains(target))
+        {
+            StatusText = "The selected controls are not valid siblings for reordering.";
+            return false;
+        }
+
+        siblings.Remove(source);
+        siblings.Insert(siblings.IndexOf(target), source);
+        var parent = Canvas.Elements.FirstOrDefault(element =>
+            string.Equals(element.DisplayName, source.ParentName, StringComparison.OrdinalIgnoreCase));
+        if (parent is null)
+        {
+            StatusText = "The parent container is no longer available.";
+            return false;
+        }
+
+        BeginCanvasMutation(HistoryActionType.EditProperty, "Reordered container child.");
+        switch (source.ParentLayout)
+        {
+            case DesignerParentLayoutKind.StackPanel:
+                Canvas.SetStackPanelChildOrder(parent, siblings);
+                break;
+            case DesignerParentLayoutKind.DockPanel:
+                Canvas.SetDockPanelChildOrder(parent, siblings);
+                break;
+            case DesignerParentLayoutKind.WrapPanel:
+                Canvas.SetWrapPanelChildOrder(parent, siblings);
+                break;
+            case DesignerParentLayoutKind.UniformGrid:
+                Canvas.SetUniformGridChildOrder(parent, siblings);
+                break;
+            case DesignerParentLayoutKind.Canvas:
+                Canvas.SetCanvasChildOrder(parent, siblings);
+                break;
+        }
+
+        Canvas.MoveElementsToFrontInOrder(siblings);
+        Canvas.NormalizeContainerRelationships();
+        ObjectTree.RebuildFrom(Canvas.Elements);
+        ObjectTree.SelectByElement(source);
+        CommitCanvasMutation();
+        StatusText = $"Moved {source.DisplayName} before {target.DisplayName}.";
+        return true;
+    }
+
+    private static int GetParentOrderIndex(DesignElement element)
+        => element.ParentLayout switch
+        {
+            DesignerParentLayoutKind.StackPanel => element.StackPanelIndex,
+            DesignerParentLayoutKind.DockPanel => element.DockPanelIndex,
+            DesignerParentLayoutKind.WrapPanel => element.WrapPanelIndex,
+            DesignerParentLayoutKind.UniformGrid => element.UniformGridIndex,
+            DesignerParentLayoutKind.Canvas => element.CanvasChildIndex,
+            _ => int.MaxValue,
+        };
+
     private bool ReportUnsupportedParentOrder(DesignElement target)
     {
         StatusText = target.ParentLayout switch

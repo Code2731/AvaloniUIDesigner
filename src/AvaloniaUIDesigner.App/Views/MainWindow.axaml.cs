@@ -15,6 +15,7 @@ using Avalonia.Layout;
 using Avalonia.Media;
 using Avalonia.Platform.Storage;
 using Avalonia.Threading;
+using Avalonia.VisualTree;
 using AvaloniaUIDesigner.App.Designer.Core;
 using AvaloniaUIDesigner.App.Designer.Services;
 using AvaloniaUIDesigner.App.Models;
@@ -104,6 +105,8 @@ public partial class MainWindow : Window
     private const double GuideHitThreshold = 8;
     private static readonly DataFormat<string> ToolboxDragDataFormat =
         DataFormat.CreateStringApplicationFormat("AvaloniaUIDesigner.ToolboxItem");
+    private static readonly DataFormat<string> ObjectTreeDragDataFormat =
+        DataFormat.CreateStringApplicationFormat("AvaloniaUIDesigner.ObjectTreeElement");
 
     private enum GuideOrientation { Horizontal, Vertical }
     private DragMode _dragMode = DragMode.None;
@@ -130,6 +133,8 @@ public partial class MainWindow : Window
     private int _guideIndex = -1;
     private ToolboxItem? _pendingToolboxDragItem;
     private Point _toolboxDragStart;
+    private DesignElement? _pendingObjectTreeDragElement;
+    private Point _objectTreeDragStart;
 
     private CanvasViewModel? _boundCanvas;
     private DesignElement? _boundElement;
@@ -2428,7 +2433,110 @@ public partial class MainWindow : Window
 
         var toggleSelection = e.KeyModifiers.HasFlag(KeyModifiers.Control);
         Vm.SelectElement(element, toggleSelection);
+        if (!element.IsLocked)
+        {
+            _pendingObjectTreeDragElement = element;
+            _objectTreeDragStart = e.GetPosition(this);
+            e.Pointer.Capture((Control)sender);
+        }
+
         e.Handled = true;
+    }
+
+    private async void OnObjectTreeNodePointerMoved(object? sender, PointerEventArgs e)
+    {
+        if (_pendingObjectTreeDragElement is not { } element)
+        {
+            return;
+        }
+
+        var point = e.GetPosition(this);
+        if (Math.Abs(point.X - _objectTreeDragStart.X) < MarqueeThreshold
+            && Math.Abs(point.Y - _objectTreeDragStart.Y) < MarqueeThreshold)
+        {
+            return;
+        }
+
+        _pendingObjectTreeDragElement = null;
+        e.Pointer.Capture(null);
+        var data = new DataTransfer();
+        data.Add(DataTransferItem.Create(ObjectTreeDragDataFormat, element.DisplayName));
+        await DragDrop.DoDragDropAsync(e, data, DragDropEffects.Move);
+        e.Handled = true;
+    }
+
+    private void OnObjectTreeNodePointerReleased(object? sender, PointerReleasedEventArgs e)
+    {
+        _pendingObjectTreeDragElement = null;
+        e.Pointer.Capture(null);
+    }
+
+    private void OnObjectTreeDragOver(object? sender, DragEventArgs e)
+    {
+        e.DragEffects = TryGetObjectTreeDropElements(e, out _, out _)
+            ? DragDropEffects.Move
+            : DragDropEffects.None;
+        e.Handled = true;
+    }
+
+    private void OnObjectTreeDrop(object? sender, DragEventArgs e)
+    {
+        if (Vm is null || !TryGetObjectTreeDropElements(e, out var source, out var target))
+        {
+            e.DragEffects = DragDropEffects.None;
+            e.Handled = true;
+            return;
+        }
+
+        Vm.SelectElement(source);
+        e.DragEffects = Vm.ReorderSelectedElementBefore(target)
+            ? DragDropEffects.Move
+            : DragDropEffects.None;
+        e.Handled = true;
+    }
+
+    private bool TryGetObjectTreeDropElements(
+        DragEventArgs e,
+        out DesignElement source,
+        out DesignElement target)
+    {
+        source = null!;
+        target = null!;
+        if (Vm is null
+            || e.DataTransfer.TryGetValue(ObjectTreeDragDataFormat) is not string sourceName
+            || FindObjectTreeNode(e.Source)?.Element is not { } targetElement)
+        {
+            return false;
+        }
+
+        var sourceElement = Vm.Canvas.Elements.FirstOrDefault(element =>
+            string.Equals(element.DisplayName, sourceName, StringComparison.OrdinalIgnoreCase));
+        if (sourceElement is null
+            || ReferenceEquals(sourceElement, targetElement)
+            || !sourceElement.IsContainerChild
+            || !targetElement.IsContainerChild
+            || sourceElement.ParentLayout != targetElement.ParentLayout
+            || !string.Equals(sourceElement.ParentName, targetElement.ParentName, StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        source = sourceElement;
+        target = targetElement;
+        return true;
+    }
+
+    private static ObjectNodeViewModel? FindObjectTreeNode(object? source)
+    {
+        for (var current = source as Visual; current is not null; current = current.GetVisualParent())
+        {
+            if (current is Control { DataContext: ObjectNodeViewModel node })
+            {
+                return node;
+            }
+        }
+
+        return null;
     }
 
     private async void OnWindowKeyDown(object? sender, KeyEventArgs e)
