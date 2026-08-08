@@ -727,7 +727,9 @@
                                   BorderThickness="0">
                             <TreeView.ItemTemplate>
                                 <TreeDataTemplate ItemsSource="{Binding Children}">
-                                    <StackPanel Orientation="Horizontal" Spacing="4">
+                                    <StackPanel Orientation="Horizontal"
+                                                Spacing="4"
+                                                PointerPressed="OnObjectTreeNodePointerPressed">
                                         <Border Background="#1D4ED8"
                                                 CornerRadius="2"
                                                 Padding="3,0"

@@ -2390,6 +2390,26 @@ public partial class MainWindow : Window
         }
     }
 
+    private void OnObjectTreeNodePointerPressed(object? sender, PointerPressedEventArgs e)
+    {
+        if (Vm is null
+            || sender is not Control { DataContext: ObjectNodeViewModel node }
+            || node.Element is not { } element)
+        {
+            return;
+        }
+
+        var point = e.GetCurrentPoint((Control)sender);
+        if (!point.Properties.IsLeftButtonPressed)
+        {
+            return;
+        }
+
+        var toggleSelection = e.KeyModifiers.HasFlag(KeyModifiers.Control);
+        Vm.SelectElement(element, toggleSelection);
+        e.Handled = true;
+    }
+
     private async void OnWindowKeyDown(object? sender, KeyEventArgs e)
     {
         if (Vm is null)
