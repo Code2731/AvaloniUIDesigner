@@ -4,6 +4,7 @@
     {
       "displayName": "Primary Button",
       "avaloniaTypeName": "Avalonia.Controls.Button",
+      "category": "Input",
       "defaultWidth": 160,
       "defaultHeight": 40,
       "defaultProperties": {
@@ -13,6 +14,7 @@
     {
       "displayName": "Email Input",
       "avaloniaTypeName": "Avalonia.Controls.TextBox",
+      "category": "Input",
       "defaultWidth": 280,
       "defaultHeight": 36,
       "defaultProperties": {
@@ -22,6 +24,7 @@
     {
       "displayName": "Section Heading",
       "avaloniaTypeName": "Avalonia.Controls.TextBlock",
+      "category": "Display",
       "defaultWidth": 280,
       "defaultHeight": 32,
       "defaultProperties": {

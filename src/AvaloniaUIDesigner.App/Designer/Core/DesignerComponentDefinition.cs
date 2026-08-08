@@ -14,4 +14,5 @@ public sealed record DesignerComponentDefinition(
     string? NamePrefix = null,
     bool IsDesignOnly = false,
     string? PreviewText = null,
-    string? SourceId = null);
+    string? SourceId = null,
+    string? Category = null);

@@ -5,6 +5,7 @@
       "displayName": "Analytics Card",
       "avaloniaTypeName": "Acme.Controls.AnalyticsCard",
       "designOnly": true,
+      "category": "Analytics",
       "previewText": "Analytics Card",
       "defaultWidth": 320,
       "defaultHeight": 120,

@@ -58,3 +58,6 @@ Users should be able to place controls visually, inspect properties, and validat
 
 5. v0.9
 - ~~Multi-selection common property editing~~
+
+6. v1.0
+- ~~Categorized Toolbox and category filter~~

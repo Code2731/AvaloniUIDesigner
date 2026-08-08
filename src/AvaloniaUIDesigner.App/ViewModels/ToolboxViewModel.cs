@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
@@ -11,6 +12,8 @@ namespace AvaloniaUIDesigner.App.ViewModels;
 
 public partial class ToolboxViewModel : ViewModelBase
 {
+    public const string AllCategories = "All categories";
+
     private readonly List<ToolboxItem> _allItems;
 
     public ToolboxViewModel()
@@ -33,7 +36,8 @@ public partial class ToolboxViewModel : ViewModelBase
                     new System.Collections.Generic.Dictionary<string, string> { ["Text"] = "Label" }),
                 new DesignerElementSnapshot("Input", "Avalonia.Controls.TextBox", 0, 28, 220, 32,
                     new System.Collections.Generic.Dictionary<string, string> { ["Watermark"] = "Enter value" }),
-            ]));
+            ],
+            Category: "Presets"));
 
         _allItems.Add(new ToolboxItem(
             "Preset: Volume Control",
@@ -48,12 +52,17 @@ public partial class ToolboxViewModel : ViewModelBase
                         ["Maximum"] = "100",
                         ["Value"] = "50",
                     }),
-            ]));
+            ],
+            Category: "Presets"));
 
         Items = new ObservableCollection<ToolboxItem>(_allItems);
+        CategoryOptions = new ObservableCollection<string>();
+        RefreshCategoryOptions();
     }
 
     public ObservableCollection<ToolboxItem> Items { get; }
+
+    public ObservableCollection<string> CategoryOptions { get; }
 
     public ToolboxItem? FindItemByDisplayName(string displayName) =>
         _allItems.FirstOrDefault(item => string.Equals(
@@ -64,6 +73,7 @@ public partial class ToolboxViewModel : ViewModelBase
     public void AddComponents(IEnumerable<DesignerComponentDefinition> definitions)
     {
         _allItems.AddRange(definitions.Select(CreateToolboxItem));
+        RefreshCategoryOptions();
         ApplyFilter();
     }
 
@@ -84,6 +94,7 @@ public partial class ToolboxViewModel : ViewModelBase
             SelectedItem = null;
         }
 
+        RefreshCategoryOptions();
         ApplyFilter();
         return removed;
     }
@@ -119,15 +130,19 @@ public partial class ToolboxViewModel : ViewModelBase
                 return false;
             }
 
-            normalizedPresets.Add(string.Equals(
+            var normalizedPreset = string.Equals(
                     preset.DisplayName,
                     displayName,
-                    System.StringComparison.Ordinal)
+                    StringComparison.Ordinal)
                 ? preset
-                : preset with { DisplayName = displayName });
+                : preset with { DisplayName = displayName };
+            normalizedPresets.Add(string.IsNullOrWhiteSpace(normalizedPreset.Category)
+                ? normalizedPreset with { Category = "Presets" }
+                : normalizedPreset);
         }
 
         _allItems.AddRange(normalizedPresets);
+        RefreshCategoryOptions();
         ApplyFilter();
         if (normalizedPresets.Count == 1 && Items.Contains(normalizedPresets[0]))
         {
@@ -137,9 +152,12 @@ public partial class ToolboxViewModel : ViewModelBase
         return true;
     }
 
-    public string SearchResultText => string.IsNullOrWhiteSpace(SearchText)
+    public string SearchResultText => !HasActiveFilter
         ? $"{Items.Count} controls"
         : $"{Items.Count} of {_allItems.Count} controls";
+
+    public bool HasActiveFilter => !string.IsNullOrWhiteSpace(SearchText)
+        || !string.Equals(CategoryFilter, AllCategories, StringComparison.Ordinal);
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsPresetSelected))]
@@ -148,9 +166,19 @@ public partial class ToolboxViewModel : ViewModelBase
     public bool IsPresetSelected => SelectedItem?.IsPreset == true;
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasActiveFilter), nameof(SearchResultText))]
     private string _searchText = string.Empty;
 
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasActiveFilter), nameof(SearchResultText))]
+    private string _categoryFilter = AllCategories;
+
     partial void OnSearchTextChanged(string value)
+    {
+        ApplyFilter();
+    }
+
+    partial void OnCategoryFilterChanged(string value)
     {
         ApplyFilter();
     }
@@ -159,10 +187,15 @@ public partial class ToolboxViewModel : ViewModelBase
     {
         var selected = SelectedItem;
         var query = SearchText.Trim();
-        var matches = string.IsNullOrWhiteSpace(query)
-            ? _allItems
-            : _allItems.Where(item => item.DisplayName.Contains(query, System.StringComparison.OrdinalIgnoreCase)
-                || item.AvaloniaTypeName.Contains(query, System.StringComparison.OrdinalIgnoreCase));
+        var matches = _allItems.Where(item =>
+        {
+            var matchesCategory = string.Equals(CategoryFilter, AllCategories, StringComparison.Ordinal)
+                || string.Equals(item.Category, CategoryFilter, StringComparison.OrdinalIgnoreCase);
+            var matchesQuery = string.IsNullOrWhiteSpace(query)
+                || item.DisplayName.Contains(query, StringComparison.OrdinalIgnoreCase)
+                || item.AvaloniaTypeName.Contains(query, StringComparison.OrdinalIgnoreCase);
+            return matchesCategory && matchesQuery;
+        });
 
         Items.Clear();
         foreach (var item in matches)
@@ -179,6 +212,30 @@ public partial class ToolboxViewModel : ViewModelBase
         OnPropertyChanged(nameof(SearchResultText));
     }
 
+    private void RefreshCategoryOptions()
+    {
+        var current = CategoryFilter;
+        var categories = _allItems
+            .Select(item => item.Category)
+            .Where(category => !string.IsNullOrWhiteSpace(category))
+            .Select(category => category!.Trim())
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .OrderBy(category => category, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        CategoryOptions.Clear();
+        CategoryOptions.Add(AllCategories);
+        foreach (var category in categories)
+        {
+            CategoryOptions.Add(category);
+        }
+
+        CategoryFilter = CategoryOptions.Contains(current, StringComparer.OrdinalIgnoreCase)
+            ? current
+            : AllCategories;
+        OnPropertyChanged(nameof(CategoryOptions));
+    }
+
     private static ToolboxItem CreateToolboxItem(DesignerComponentDefinition definition) => new(
         definition.DisplayName,
         definition.AvaloniaTypeName,
@@ -186,5 +243,58 @@ public partial class ToolboxViewModel : ViewModelBase
         DefaultHeight: definition.DefaultHeight,
         DefaultProperties: definition.DefaultProperties,
         NamePrefix: definition.NamePrefix,
-        SourceId: definition.SourceId);
+        SourceId: definition.SourceId,
+        Category: string.IsNullOrWhiteSpace(definition.Category)
+            ? GetDefaultCategory(definition.AvaloniaTypeName)
+            : definition.Category.Trim());
+
+    private static string GetDefaultCategory(string typeName)
+        => typeName switch
+        {
+            "Avalonia.Controls.Grid"
+                or "Avalonia.Controls.StackPanel"
+                or "Avalonia.Controls.DockPanel"
+                or "Avalonia.Controls.WrapPanel"
+                or "Avalonia.Controls.Primitives.UniformGrid"
+                or "Avalonia.Controls.Canvas"
+                or "Avalonia.Controls.GridSplitter" => "Layout",
+            "Avalonia.Controls.Border"
+                or "Avalonia.Controls.ContentControl"
+                or "Avalonia.Controls.UserControl"
+                or "Avalonia.Controls.ScrollViewer"
+                or "Avalonia.Controls.Expander"
+                or "Avalonia.Controls.TabControl"
+                or "Avalonia.Controls.SplitView" => "Containers",
+            "Avalonia.Controls.TextBox"
+                or "Avalonia.Controls.Button"
+                or "Avalonia.Controls.MaskedTextBox"
+                or "Avalonia.Controls.AutoCompleteBox"
+                or "Avalonia.Controls.ComboBox"
+                or "Avalonia.Controls.ListBox"
+                or "Avalonia.Controls.CheckBox"
+                or "Avalonia.Controls.RadioButton"
+                or "Avalonia.Controls.ToggleSwitch"
+                or "Avalonia.Controls.Primitives.ToggleButton"
+                or "Avalonia.Controls.Slider"
+                or "Avalonia.Controls.NumericUpDown"
+                or "Avalonia.Controls.DatePicker"
+                or "Avalonia.Controls.CalendarDatePicker"
+                or "Avalonia.Controls.Calendar"
+                or "Avalonia.Controls.TimePicker"
+                or "Avalonia.Controls.ColorPicker" => "Input",
+            "Avalonia.Controls.TextBlock"
+                or "Avalonia.Controls.SelectableTextBlock"
+                or "Avalonia.Controls.Label"
+                or "Avalonia.Controls.Image"
+                or "Avalonia.Controls.ProgressBar"
+                or "Avalonia.Controls.ItemsControl"
+                or "Avalonia.Controls.TreeView"
+                or "Avalonia.Controls.Menu"
+                or "Avalonia.Controls.DataGrid" => "Display",
+            "Avalonia.Controls.Shapes.Rectangle"
+                or "Avalonia.Controls.Shapes.Ellipse"
+                or "Avalonia.Controls.Shapes.Line"
+                or "Avalonia.Controls.Shapes.Path" => "Shapes",
+            _ => "General",
+        };
 }

@@ -11,7 +11,8 @@ public sealed record ToolboxItem(
     double? DefaultHeight = null,
     IReadOnlyDictionary<string, string>? DefaultProperties = null,
     string? NamePrefix = null,
-    string? SourceId = null)
+    string? SourceId = null,
+    string? Category = null)
 {
     public bool IsPreset => PresetElements is { Count: > 0 };
 }

@@ -20,6 +20,7 @@ dotnet run --project src/AvaloniaUIDesigner.App/AvaloniaUIDesigner.App.csproj
 
 - 4-Pane 레이아웃 (Toolbox / Canvas / Object Tree / Property Inspector)
 - **Toolbox**: 내장 컨트롤, 복합 프리셋, JSON 컴포넌트 팩. 외부 팩 파일 경로도 워크스페이스 세션에 기록해 재시작 후 자동 복원
+- **Toolbox 카테고리 필터**: 내장 컨트롤을 Layout·Containers·Input·Display·Shapes로 자동 분류하고, Component Pack의 선택적 `category` 메타데이터와 이름/타입 검색을 함께 적용
 - **Component Pack Plugins**: `IComponentPackPlugin`을 구현한 외부 DLL을 `File > Load Component Pack Plugin...`에서 로드하고, 플러그인 경로를 세션에 저장해 Toolbox 정의를 재사용
 - **Component Pack 관리**: `File > Manage Component Packs...`에서 JSON/DLL 팩의 출처·컴포넌트 목록을 확인하고 Toolbox에서 제거하며, 현재 문서가 사용하는 타입은 디자인 전용 placeholder로 보존
 - **Custom Control Metadata**: `DesignOnly: true` 컴포넌트 팩으로 외부 Avalonia 타입을 디자인 타임 플레이스홀더로 등록하고, 커스텀 기본 속성·Preview 문구·AXAML 타입명을 보존
@@ -191,6 +192,7 @@ dotnet run --project src/AvaloniaUIDesigner.App/AvaloniaUIDesigner.App.csproj
 77. `File > Load Component Pack Plugin...`에서 `IComponentPackPlugin`을 구현한 신뢰할 수 있는 DLL을 선택하면 플러그인이 제공한 Component Pack을 Toolbox에 등록합니다. DLL 경로는 세션 JSON의 `ComponentPluginPaths`에 저장되고, 앱 재시작 시 플러그인·JSON 팩·프리셋 팩 순서로 복원됩니다.
 78. `File > Manage Component Packs...`에서 로드된 JSON/DLL 팩의 출처와 컴포넌트를 확인하고 `Remove Pack`으로 Toolbox 등록과 세션 경로를 제거합니다. 현재 문서나 프리셋에서 사용 중인 커스텀 타입은 AXAML 타입명을 유지하는 디자인 전용 placeholder로 남으며, 플러그인 DLL 자체는 앱 재시작 전까지 프로세스에 로드된 상태입니다.
 79. 여러 컨트롤을 선택한 뒤 `Edit > Edit Common Properties...`를 열면 공통 Margin·Horizontal/VerticalAlignment·Opacity·IsEnabled·IsVisible·IsHitTestVisible을 일괄 편집합니다. 혼합 값은 빈 입력 또는 3상태 체크박스로 표시되며, 빈 값은 각 컨트롤의 기존 값을 유지합니다.
+80. Toolbox 상단 카테고리 선택기에서 `All categories`, Layout, Containers, Input, Display, Shapes 또는 외부 팩이 제공한 카테고리를 고르고, 검색어를 입력해 표시 이름·Avalonia 타입명으로 결과를 좁힙니다.
 
 DataGrid가 포함된 생성 AXAML을 다른 프로젝트에서 사용할 때는 같은 Avalonia 버전의 `Avalonia.Controls.DataGrid` 패키지와 `avares://Avalonia.Controls.DataGrid/Themes/Fluent.xaml` 스타일 include가 필요합니다.
 
@@ -294,12 +296,13 @@ AXAML 소스 편집기의 `Validate`와 `Preview`는 현재 디자인과 Undo �
 - ~~v0.6: 실제 드래그&드롭, 삭제, 언두~~ ✅
 - ~~v0.8: Component Pack 관리 및 안전한 제거~~ ✅
 - ~~v0.9: 다중 선택 공통 속성 편집~~ ✅
+- ~~v1.0: 카테고리화된 Toolbox 및 카테고리 필터~~ ✅
 
 ## 컴포넌트 팩
 
-`File > Load Component Pack...`에서 JSON 팩을 불러오면 현재 세션의 Toolbox에 별칭 컨트롤을 추가할 수 있습니다. 각 항목은 이미 지원되는 Avalonia 타입을 기반으로 하며, 표시 이름, 기본 크기, 기본 속성을 지정합니다. 예시는 [component-pack.example.json](docs/component-pack.example.json)을 참고하세요. 캔버스에서 컨트롤 하나를 선택한 뒤 `File > Export Selected as Component Pack...`을 사용하면 해당 크기와 시각 속성을 재사용 가능한 JSON 팩으로 저장할 수 있습니다. 파일 경로는 워크스페이스 세션에 함께 저장되므로 앱을 다시 실행해도 팩을 다시 선택할 필요가 없습니다.
+`File > Load Component Pack...`에서 JSON 팩을 불러오면 현재 세션의 Toolbox에 별칭 컨트롤을 추가할 수 있습니다. 각 항목은 이미 지원되는 Avalonia 타입을 기반으로 하며, 표시 이름, 기본 크기, 기본 속성, 선택적 `category`를 지정합니다. `category`를 생략하면 내장 타입은 기본 카테고리로 분류되고, 외부 디자인 전용 타입은 `General`로 표시됩니다. 예시는 [component-pack.example.json](docs/component-pack.example.json)을 참고하세요. 캔버스에서 컨트롤 하나를 선택한 뒤 `File > Export Selected as Component Pack...`을 사용하면 해당 크기와 시각 속성을 재사용 가능한 JSON 팩으로 저장할 수 있습니다. 파일 경로는 워크스페이스 세션에 함께 저장되므로 앱을 다시 실행해도 팩을 다시 선택할 필요가 없습니다.
 
-외부 프로젝트의 커스텀 컨트롤은 `designOnly: true`를 사용해야 합니다. 디자이너는 실제 외부 assembly를 실행하지 않고 청색 플레이스홀더를 렌더링하며, 플레이스홀더에 표시할 문구는 `previewText`, 원래 컨트롤에 전달할 기본 AXAML 속성은 `defaultProperties`로 정의합니다. `DesignOnly`가 없는 알 수 없는 타입은 팩 로드를 거부해 잘못된 AXAML 생성을 방지합니다. 예시는 [custom-component-pack.example.json](docs/custom-component-pack.example.json)을 참고하세요.
+외부 프로젝트의 커스텀 컨트롤은 `designOnly: true`를 사용해야 합니다. 디자이너는 실제 외부 assembly를 실행하지 않고 청색 플레이스홀더를 렌더링하며, 플레이스홀더에 표시할 문구는 `previewText`, 원래 컨트롤에 전달할 기본 AXAML 속성은 `defaultProperties`, Toolbox 필터 이름은 `category`로 정의합니다. `DesignOnly`가 없는 알 수 없는 타입은 팩 로드를 거부해 잘못된 AXAML 생성을 방지합니다. 예시는 [custom-component-pack.example.json](docs/custom-component-pack.example.json)을 참고하세요.
 
 `File > Load Component Pack Plugin...`은 선택한 DLL에서 public parameterless `IComponentPackPlugin` 구현을 정확히 하나 찾아 `CreatePack()` 결과를 기존 Component Pack 검증기로 등록합니다. 플러그인 assembly는 로드 시 코드를 실행할 수 있으므로 신뢰할 수 있는 빌드만 불러와야 하며, 예제 구현은 [component-pack-plugin.example.cs](docs/component-pack-plugin.example.cs)을 참고하세요. 플러그인에서 제공하는 커스텀 타입은 `DesignOnly: true`와 `PreviewText`를 사용하면 외부 assembly의 실제 컨트롤을 디자이너 프로세스에서 실행하지 않고도 설계할 수 있습니다.
 

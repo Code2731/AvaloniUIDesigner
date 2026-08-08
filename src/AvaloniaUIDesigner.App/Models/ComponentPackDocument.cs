@@ -18,4 +18,5 @@ public sealed class ComponentPackComponent
     public Dictionary<string, string?>? DefaultProperties { get; set; }
     public bool DesignOnly { get; set; }
     public string? PreviewText { get; set; }
+    public string? Category { get; set; }
 }

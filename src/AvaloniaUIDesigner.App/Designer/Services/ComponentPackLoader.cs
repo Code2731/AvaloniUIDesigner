@@ -105,6 +105,9 @@ public sealed class ComponentPackLoader
             var previewText = string.IsNullOrWhiteSpace(component.PreviewText)
                 ? component.DisplayName.Trim()
                 : component.PreviewText.Trim();
+            var category = string.IsNullOrWhiteSpace(component.Category)
+                ? null
+                : component.Category.Trim();
             var visualFactory = isDesignOnly
                 ? () => DesignerCustomControlRuntime.CreatePlaceholder(
                     typeName,
@@ -122,7 +125,8 @@ public sealed class ComponentPackLoader
                 namePrefix,
                 isDesignOnly,
                 previewText,
-                sourceId));
+                sourceId,
+                category));
         }
 
         foreach (var definition in definitions)
