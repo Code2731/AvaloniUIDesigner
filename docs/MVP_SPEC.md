@@ -52,3 +52,6 @@ Users should be able to place controls visually, inspect properties, and validat
 - ~~Custom control metadata extension model~~
 - ~~Plugin-based component packs~~
 - ~~Style and resource editing support~~
+
+4. v0.8
+- ~~Component Pack management and safe removal~~

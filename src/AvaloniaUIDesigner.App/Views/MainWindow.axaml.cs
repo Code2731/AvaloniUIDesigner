@@ -70,6 +70,7 @@ public partial class MainWindow : Window
     private enum DragMode { None, Move, N, S, E, W, NE, NW, SE, SW }
     private enum UnsavedChoice { Save, Discard, Cancel }
     private sealed record ComponentPackExportOptions(string PackName, string DisplayName, string NamePrefix);
+    private sealed record ComponentPackManagementAction(string SourceId);
     private sealed record ColorResourceApplicationOptions(string ResourceName, string PropertyName);
     private sealed record GridDefinitionOptions(string RowDefinitions, string ColumnDefinitions, bool ShowGridLines);
     private sealed record GridCellAssignmentOptions(
@@ -292,6 +293,31 @@ public partial class MainWindow : Window
         if (!Vm.TryLoadComponentPackPlugin(files[0].Path.LocalPath, out var result))
         {
             Vm.StatusText = $"Could not load component pack plugin: {result}";
+        }
+    }
+
+    private async void OnManageComponentPacksMenuClicked(
+        object? sender,
+        Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        if (Vm is null)
+        {
+            return;
+        }
+
+        while (true)
+        {
+            var action = await ShowComponentPackManagerDialogAsync(Vm.ComponentPacks);
+            if (action is null)
+            {
+                return;
+            }
+
+            if (!Vm.TryRemoveComponentPack(action.SourceId, out var result))
+            {
+                Vm.StatusText = $"Could not remove component pack: {result}";
+                return;
+            }
         }
     }
 
@@ -10769,6 +10795,93 @@ public partial class MainWindow : Window
         dialog.Content = layout;
 
         return await dialog.ShowDialog<ComponentPackExportOptions?>(this);
+    }
+
+    private async Task<ComponentPackManagementAction?> ShowComponentPackManagerDialogAsync(
+        IReadOnlyList<ComponentPackInfo> packs)
+    {
+        var packSelector = new ListBox
+        {
+            ItemsSource = packs,
+            SelectedIndex = packs.Count > 0 ? 0 : -1,
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+            MinHeight = 150,
+        };
+        var sourceText = new TextBlock { TextWrapping = TextWrapping.Wrap };
+        var componentText = new TextBlock { TextWrapping = TextWrapping.Wrap };
+        var dialog = new Window
+        {
+            Title = "Manage Component Packs",
+            Width = 680,
+            Height = 460,
+            MinWidth = 520,
+            MinHeight = 360,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner,
+        };
+
+        void UpdateDetails()
+        {
+            if (packSelector.SelectedItem is not ComponentPackInfo pack)
+            {
+                sourceText.Text = "No external component packs are loaded.";
+                componentText.Text = string.Empty;
+                return;
+            }
+
+            sourceText.Text = $"{pack.SourceKindLabel}: {pack.SourceLabel}";
+            componentText.Text = $"Components: {pack.ComponentSummary}";
+        }
+
+        packSelector.SelectionChanged += (_, _) => UpdateDetails();
+        UpdateDetails();
+
+        var removeButton = new Button
+        {
+            Content = "Remove Pack",
+            MinWidth = 108,
+            IsEnabled = packs.Count > 0,
+        };
+        removeButton.Click += (_, _) =>
+        {
+            if (packSelector.SelectedItem is ComponentPackInfo pack)
+            {
+                dialog.Close(new ComponentPackManagementAction(pack.SourceId));
+            }
+        };
+        var closeButton = new Button { Content = "Close", MinWidth = 84 };
+        closeButton.Click += (_, _) => dialog.Close(null);
+        var buttons = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            Spacing = 8,
+            HorizontalAlignment = HorizontalAlignment.Right,
+            Children = { closeButton, removeButton },
+        };
+        var content = new Grid
+        {
+            Margin = new Thickness(16),
+            RowDefinitions = new RowDefinitions("Auto,*,Auto,Auto,Auto"),
+            RowSpacing = 10,
+            Children =
+            {
+                new TextBlock
+                {
+                    Text = "Select a JSON or plugin pack to remove its Toolbox entries.",
+                    TextWrapping = TextWrapping.Wrap,
+                },
+                packSelector,
+                sourceText,
+                componentText,
+                buttons,
+            },
+        };
+        Grid.SetRow(packSelector, 1);
+        Grid.SetRow(sourceText, 2);
+        Grid.SetRow(componentText, 3);
+        Grid.SetRow(buttons, 4);
+        dialog.Content = content;
+
+        return await dialog.ShowDialog<ComponentPackManagementAction?>(this);
     }
 
     private async Task<IReadOnlyDictionary<string, string>?> ShowAppearanceEditorDialogAsync(

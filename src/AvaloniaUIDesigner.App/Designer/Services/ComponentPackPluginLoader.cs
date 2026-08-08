@@ -22,6 +22,21 @@ public sealed class ComponentPackPluginLoader
         Func<string, bool> isDisplayNameAvailable,
         out ComponentPackLoadResult pack,
         out string error)
+        => TryLoad(
+            assemblyPath,
+            catalog,
+            isDisplayNameAvailable,
+            sourceId: null,
+            out pack,
+            out error);
+
+    public bool TryLoad(
+        string assemblyPath,
+        IComponentCatalog catalog,
+        Func<string, bool> isDisplayNameAvailable,
+        string? sourceId,
+        out ComponentPackLoadResult pack,
+        out string error)
     {
         pack = default!;
         error = string.Empty;
@@ -93,6 +108,7 @@ public sealed class ComponentPackPluginLoader
                 json,
                 catalog,
                 isDisplayNameAvailable,
+                sourceId,
                 out pack,
                 out error);
         }

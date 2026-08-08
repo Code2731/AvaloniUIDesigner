@@ -67,6 +67,27 @@ public partial class ToolboxViewModel : ViewModelBase
         ApplyFilter();
     }
 
+    public int RemoveComponentsBySourceId(string sourceId)
+    {
+        var removed = _allItems.RemoveAll(item => string.Equals(
+            item.SourceId,
+            sourceId,
+            System.StringComparison.OrdinalIgnoreCase));
+        if (removed == 0)
+        {
+            return 0;
+        }
+
+        if (SelectedItem?.SourceId is { } selectedSourceId
+            && string.Equals(selectedSourceId, sourceId, System.StringComparison.OrdinalIgnoreCase))
+        {
+            SelectedItem = null;
+        }
+
+        ApplyFilter();
+        return removed;
+    }
+
     public bool TryAddPreset(ToolboxItem preset, out string error)
         => TryAddPresets(new[] { preset }, out error);
 
@@ -164,5 +185,6 @@ public partial class ToolboxViewModel : ViewModelBase
         DefaultWidth: definition.DefaultWidth,
         DefaultHeight: definition.DefaultHeight,
         DefaultProperties: definition.DefaultProperties,
-        NamePrefix: definition.NamePrefix);
+        NamePrefix: definition.NamePrefix,
+        SourceId: definition.SourceId);
 }

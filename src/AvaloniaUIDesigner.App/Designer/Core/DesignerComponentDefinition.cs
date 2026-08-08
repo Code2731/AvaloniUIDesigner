@@ -13,4 +13,5 @@ public sealed record DesignerComponentDefinition(
     IReadOnlyDictionary<string, string>? DefaultProperties = null,
     string? NamePrefix = null,
     bool IsDesignOnly = false,
-    string? PreviewText = null);
+    string? PreviewText = null,
+    string? SourceId = null);

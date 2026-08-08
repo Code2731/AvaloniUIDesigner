@@ -16,6 +16,21 @@ public sealed class ComponentPackLoader
         Func<string, bool> isDisplayNameAvailable,
         out ComponentPackLoadResult pack,
         out string error)
+        => TryLoad(
+            json,
+            catalog,
+            isDisplayNameAvailable,
+            sourceId: null,
+            out pack,
+            out error);
+
+    public bool TryLoad(
+        string json,
+        IComponentCatalog catalog,
+        Func<string, bool> isDisplayNameAvailable,
+        string? sourceId,
+        out ComponentPackLoadResult pack,
+        out string error)
     {
         pack = default!;
         error = string.Empty;
@@ -106,7 +121,8 @@ public sealed class ComponentPackLoader
                 properties,
                 namePrefix,
                 isDesignOnly,
-                previewText));
+                previewText,
+                sourceId));
         }
 
         foreach (var definition in definitions)

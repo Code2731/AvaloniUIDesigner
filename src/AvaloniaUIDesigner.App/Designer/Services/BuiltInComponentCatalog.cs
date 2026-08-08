@@ -436,11 +436,11 @@ public sealed class BuiltInComponentCatalog : IComponentCatalog
             })
     };
 
-    private readonly Dictionary<string, DesignerComponentDefinition> _baseDefinitions;
+    private readonly Dictionary<string, DesignerComponentDefinition> _builtInDefinitions;
 
     public BuiltInComponentCatalog()
     {
-        _baseDefinitions = _definitions.ToDictionary(
+        _builtInDefinitions = _definitions.ToDictionary(
             definition => definition.AvaloniaTypeName,
             StringComparer.Ordinal);
     }
@@ -449,7 +449,20 @@ public sealed class BuiltInComponentCatalog : IComponentCatalog
 
     public bool TryGet(string avaloniaTypeName, out DesignerComponentDefinition definition)
     {
-        return _baseDefinitions.TryGetValue(avaloniaTypeName, out definition!);
+        for (var index = _definitions.Count - 1; index >= 0; index--)
+        {
+            if (string.Equals(
+                    _definitions[index].AvaloniaTypeName,
+                    avaloniaTypeName,
+                    StringComparison.Ordinal))
+            {
+                definition = _definitions[index];
+                return true;
+            }
+        }
+
+        definition = default!;
+        return false;
     }
 
     public bool TryRegister(DesignerComponentDefinition definition, out string error)
@@ -460,10 +473,13 @@ public sealed class BuiltInComponentCatalog : IComponentCatalog
             return false;
         }
 
-        var hasBaseDefinition = _baseDefinitions.TryGetValue(
+        var hasBaseDefinition = _builtInDefinitions.TryGetValue(
             definition.AvaloniaTypeName,
             out var baseDefinition);
-        if (!hasBaseDefinition && !definition.IsDesignOnly)
+        var hasExistingDefinition = TryGet(definition.AvaloniaTypeName, out var existingDefinition);
+        if (!hasBaseDefinition
+            && (!hasExistingDefinition || !existingDefinition.IsDesignOnly)
+            && !definition.IsDesignOnly)
         {
             error = $"Unsupported Avalonia type: {definition.AvaloniaTypeName}";
             return false;
@@ -482,11 +498,40 @@ public sealed class BuiltInComponentCatalog : IComponentCatalog
             ? definition with { VisualFactory = baseDefinition!.VisualFactory }
             : definition;
         _definitions.Add(registered);
-        if (!hasBaseDefinition || definition.IsDesignOnly)
-        {
-            _baseDefinitions[registered.AvaloniaTypeName] = registered;
-        }
         error = string.Empty;
+        return true;
+    }
+
+    public bool TryUnregister(
+        string sourceId,
+        out IReadOnlyList<DesignerComponentDefinition> definitions,
+        out string error)
+    {
+        definitions = Array.Empty<DesignerComponentDefinition>();
+        error = string.Empty;
+        if (string.IsNullOrWhiteSpace(sourceId))
+        {
+            error = "Component pack source id is required.";
+            return false;
+        }
+
+        var removed = _definitions
+            .Where(definition => string.Equals(
+                definition.SourceId,
+                sourceId,
+                StringComparison.OrdinalIgnoreCase))
+            .ToList();
+        if (removed.Count == 0)
+        {
+            error = $"No component pack is registered for '{sourceId}'.";
+            return false;
+        }
+
+        _definitions.RemoveAll(definition => string.Equals(
+            definition.SourceId,
+            sourceId,
+            StringComparison.OrdinalIgnoreCase));
+        definitions = removed;
         return true;
     }
 

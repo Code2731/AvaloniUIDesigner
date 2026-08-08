@@ -518,6 +518,7 @@ public sealed record ContentAssignmentEditorState(
 public partial class MainWindowViewModel : ViewModelBase
 {
     private const string DesignerMetadataPrefix = "AvaloniaUIDesigner:";
+    private const string MissingComponentSourcePrefix = "missing-component:";
     private static readonly string[] StylePreviewStateOrder =
     [
         "pointerover",
@@ -579,6 +580,7 @@ public partial class MainWindowViewModel : ViewModelBase
         RecentFiles = new ObservableCollection<string>();
         StylePreviewOptions = new ObservableCollection<StylePreviewOption>();
         DocumentTabs = new ObservableCollection<DocumentTabViewModel>();
+        ComponentPacks = new ObservableCollection<ComponentPackInfo>();
 
         ObjectTree.PropertyChanged += OnObjectTreePropertyChanged;
         Canvas.PropertyChanged += OnDesignerCanvasPropertyChanged;
@@ -598,6 +600,7 @@ public partial class MainWindowViewModel : ViewModelBase
     public ObservableCollection<string> RecentFiles { get; }
     public ObservableCollection<StylePreviewOption> StylePreviewOptions { get; }
     public ObservableCollection<DocumentTabViewModel> DocumentTabs { get; }
+    public ObservableCollection<ComponentPackInfo> ComponentPacks { get; }
     public IReadOnlyList<string> ComponentPackPaths => _componentPackPaths;
     public IReadOnlyList<string> ComponentPluginPaths => _componentPluginPaths;
     public IReadOnlyList<string> ToolboxPresetPackPaths => _toolboxPresetPackPaths;
@@ -718,10 +721,17 @@ public partial class MainWindowViewModel : ViewModelBase
 
     public bool TryLoadComponentPack(string json, string? sourcePath, out string result)
     {
+        var normalizedPath = TryNormalizePackPath(sourcePath, out var fullPath)
+            ? fullPath
+            : string.Empty;
+        var sourceId = string.IsNullOrWhiteSpace(normalizedPath)
+            ? CreateInMemoryPackSourceId(ComponentPackSourceKind.Json)
+            : normalizedPath;
         if (!_componentPackLoader.TryLoad(
                 json,
                 _componentCatalog,
                 displayName => Toolbox.FindItemByDisplayName(displayName) is null,
+                sourceId,
                 out var pack,
                 out var error))
         {
@@ -731,6 +741,7 @@ public partial class MainWindowViewModel : ViewModelBase
 
         Toolbox.AddComponents(pack.Definitions);
         TrackPackPath(_componentPackPaths, sourcePath);
+        AddLoadedComponentPack(pack, sourceId, ComponentPackSourceKind.Json, normalizedPath);
         result = $"Loaded {pack.Definitions.Count} component(s) from {pack.Name}.";
         StatusText = result;
         return true;
@@ -750,6 +761,7 @@ public partial class MainWindowViewModel : ViewModelBase
                 fullPath,
                 _componentCatalog,
                 displayName => Toolbox.FindItemByDisplayName(displayName) is null,
+                fullPath,
                 out var pack,
                 out var error))
         {
@@ -760,7 +772,42 @@ public partial class MainWindowViewModel : ViewModelBase
 
         Toolbox.AddComponents(pack.Definitions);
         TrackPackPath(_componentPluginPaths, fullPath);
+        AddLoadedComponentPack(pack, fullPath, ComponentPackSourceKind.Plugin, fullPath);
         result = $"Loaded {pack.Definitions.Count} component(s) from plugin {pack.Name}.";
+        StatusText = result;
+        return true;
+    }
+
+    public bool TryRemoveComponentPack(string sourceId, out string result)
+    {
+        result = string.Empty;
+        var pack = ComponentPacks.FirstOrDefault(candidate => string.Equals(
+            candidate.SourceId,
+            sourceId,
+            StringComparison.OrdinalIgnoreCase));
+        if (pack is null)
+        {
+            result = "The selected component pack is no longer loaded.";
+            StatusText = result;
+            return false;
+        }
+
+        if (!_componentCatalog.TryUnregister(
+                pack.SourceId,
+                out var removedDefinitions,
+                out var error))
+        {
+            result = error;
+            StatusText = result;
+            return false;
+        }
+
+        Toolbox.RemoveComponentsBySourceId(pack.SourceId);
+        RemovePackPath(pack.SourceKind, pack.SourcePath);
+        ComponentPacks.Remove(pack);
+        PreserveRemovedComponentTypes(removedDefinitions);
+
+        result = $"Removed component pack {pack.Name}.";
         StatusText = result;
         return true;
     }
@@ -8290,8 +8337,8 @@ public partial class MainWindowViewModel : ViewModelBase
         var packWarnings = new List<string>();
         RestoreComponentPluginFiles(session.ComponentPluginPaths, packWarnings);
         RestoreComponentPackFiles(session.ComponentPackPaths, packWarnings);
-        RestoreToolboxPresetPackFiles(session.ToolboxPresetPackPaths, packWarnings);
         RestoreMissingComponentTypes(session.ComponentTypes, packWarnings);
+        RestoreToolboxPresetPackFiles(session.ToolboxPresetPackPaths, packWarnings);
 
         var restoredDocuments = new List<RestoredDocumentTab>();
         try
@@ -12340,6 +12387,9 @@ public partial class MainWindowViewModel : ViewModelBase
                 .Concat(state.LastSavedSnapshot.Elements)
                 .Concat(state.UndoStack.SelectMany(entry => entry.Before.Elements.Concat(entry.After.Elements)))
                 .Concat(state.RedoStack.SelectMany(entry => entry.Before.Elements.Concat(entry.After.Elements))))
+            .Concat(Toolbox.Items
+                .Where(item => item.IsPreset)
+                .SelectMany(item => item.PresetElements ?? Array.Empty<DesignerElementSnapshot>()))
             .ToList();
         var types = new Dictionary<string, PersistedComponentType>(StringComparer.OrdinalIgnoreCase);
         foreach (var snapshot in snapshots)
@@ -12436,6 +12486,108 @@ public partial class MainWindowViewModel : ViewModelBase
         }
     }
 
+    private void AddLoadedComponentPack(
+        ComponentPackLoadResult pack,
+        string sourceId,
+        ComponentPackSourceKind sourceKind,
+        string sourcePath)
+    {
+        ComponentPacks.Add(new ComponentPackInfo(
+            sourceId,
+            pack.Name,
+            sourceKind,
+            sourcePath,
+            pack.Definitions.Count,
+            pack.Definitions.Select(definition => definition.DisplayName).ToList()));
+    }
+
+    private static string CreateInMemoryPackSourceId(ComponentPackSourceKind sourceKind)
+        => $"memory:{sourceKind}:{Guid.NewGuid():N}";
+
+    private void RemovePackPath(ComponentPackSourceKind sourceKind, string sourcePath)
+    {
+        if (string.IsNullOrWhiteSpace(sourcePath))
+        {
+            return;
+        }
+
+        var paths = sourceKind == ComponentPackSourceKind.Plugin
+            ? _componentPluginPaths
+            : _componentPackPaths;
+        var existing = paths.FirstOrDefault(path => string.Equals(
+            path,
+            sourcePath,
+            StringComparison.OrdinalIgnoreCase));
+        if (existing is not null)
+        {
+            paths.Remove(existing);
+        }
+    }
+
+    private void PreserveRemovedComponentTypes(
+        IEnumerable<DesignerComponentDefinition> definitions)
+    {
+        foreach (var definition in definitions
+                     .Where(candidate => IsComponentTypeReferenced(candidate.AvaloniaTypeName))
+                     .GroupBy(candidate => candidate.AvaloniaTypeName, StringComparer.OrdinalIgnoreCase)
+                     .Select(group => group.First()))
+        {
+            if (_componentCatalog.TryGet(definition.AvaloniaTypeName, out _))
+            {
+                continue;
+            }
+
+            var tagName = GetTypeTagName(definition.AvaloniaTypeName);
+            _componentCatalog.TryRegister(
+                CreateMissingComponentDefinition(
+                    definition.AvaloniaTypeName,
+                    tagName,
+                    sourceId: MissingComponentSourcePrefix + definition.AvaloniaTypeName),
+                out _);
+        }
+    }
+
+    private bool IsComponentTypeReferenced(string typeName)
+    {
+        if (Canvas.Elements.Any(element => string.Equals(
+                element.TypeName,
+                typeName,
+                StringComparison.OrdinalIgnoreCase)))
+        {
+            return true;
+        }
+
+        if (_documentTabStates.Values
+            .SelectMany(state => state.Document.Elements
+                .Concat(state.LastSavedSnapshot.Elements)
+                .Concat(state.UndoStack.SelectMany(entry => entry.Before.Elements.Concat(entry.After.Elements)))
+                .Concat(state.RedoStack.SelectMany(entry => entry.Before.Elements.Concat(entry.After.Elements))))
+            .Any(snapshot => string.Equals(snapshot.TypeName, typeName, StringComparison.OrdinalIgnoreCase)))
+        {
+            return true;
+        }
+
+        return Toolbox.Items
+            .Where(item => item.IsPreset)
+            .SelectMany(item => item.PresetElements ?? Array.Empty<DesignerElementSnapshot>())
+            .Any(snapshot => string.Equals(snapshot.TypeName, typeName, StringComparison.OrdinalIgnoreCase));
+    }
+
+    private static DesignerComponentDefinition CreateMissingComponentDefinition(
+        string typeName,
+        string tagName,
+        string sourceId)
+        => new(
+            $"Missing {typeName}",
+            typeName,
+            240,
+            96,
+            () => DesignerCustomControlRuntime.CreatePlaceholder(typeName, tagName),
+            NamePrefix: tagName,
+            IsDesignOnly: true,
+            PreviewText: tagName,
+            SourceId: sourceId);
+
     private void RestoreMissingComponentTypes(
         IEnumerable<PersistedComponentType>? types,
         ICollection<string> warnings)
@@ -12454,17 +12606,10 @@ public partial class MainWindowViewModel : ViewModelBase
                 continue;
             }
 
-            var definition = new DesignerComponentDefinition(
-                $"Missing {persistedType.TypeName}",
+            var definition = CreateMissingComponentDefinition(
                 persistedType.TypeName,
-                240,
-                96,
-                () => DesignerCustomControlRuntime.CreatePlaceholder(
-                    persistedType.TypeName,
-                    persistedType.TagName),
-                NamePrefix: persistedType.TagName,
-                IsDesignOnly: true,
-                PreviewText: persistedType.TagName);
+                persistedType.TagName,
+                MissingComponentSourcePrefix + persistedType.TypeName);
             if (!_componentCatalog.TryRegister(definition, out var error))
             {
                 warnings.Add($"Persisted custom component '{persistedType.TypeName}' could not be restored: {error}");

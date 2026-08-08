@@ -21,6 +21,7 @@ dotnet run --project src/AvaloniaUIDesigner.App/AvaloniaUIDesigner.App.csproj
 - 4-Pane 레이아웃 (Toolbox / Canvas / Object Tree / Property Inspector)
 - **Toolbox**: 내장 컨트롤, 복합 프리셋, JSON 컴포넌트 팩. 외부 팩 파일 경로도 워크스페이스 세션에 기록해 재시작 후 자동 복원
 - **Component Pack Plugins**: `IComponentPackPlugin`을 구현한 외부 DLL을 `File > Load Component Pack Plugin...`에서 로드하고, 플러그인 경로를 세션에 저장해 Toolbox 정의를 재사용
+- **Component Pack 관리**: `File > Manage Component Packs...`에서 JSON/DLL 팩의 출처·컴포넌트 목록을 확인하고 Toolbox에서 제거하며, 현재 문서가 사용하는 타입은 디자인 전용 placeholder로 보존
 - **Custom Control Metadata**: `DesignOnly: true` 컴포넌트 팩으로 외부 Avalonia 타입을 디자인 타임 플레이스홀더로 등록하고, 커스텀 기본 속성·Preview 문구·AXAML 타입명을 보존
 - **선택 영역 Toolbox 프리셋**: 여러 root 컨트롤을 상대 좌표·현재 속성과 함께 Toolbox에 등록하고 JSON 팩으로 저장·불러오기
 - **배치**: 클릭-투-플레이스와 드래그 앤 드롭으로 실제 Avalonia 컨트롤 생성
@@ -187,6 +188,7 @@ dotnet run --project src/AvaloniaUIDesigner.App/AvaloniaUIDesigner.App.csproj
 75. `File > Load Component Pack...` 또는 `File > Load Toolbox Preset Pack...`으로 외부 Toolbox 팩을 추가하면 파일 경로가 세션에 등록되어 다음 실행 때 자동으로 다시 로드됩니다. 파일이 없어도 문서 탭 복원은 계속되며 상태바에 경고가 표시됩니다.
 76. 외부 프로젝트의 컨트롤은 Component Pack 항목에 `designOnly: true`, `avaloniaTypeName`, `previewText`, `defaultProperties`를 지정해 등록합니다. 디자이너에서는 타입명 플레이스홀더로 편집하고, 생성 AXAML에는 원래 커스텀 타입과 속성을 출력합니다. 예시는 [custom-component-pack.example.json](docs/custom-component-pack.example.json)을 참고하세요.
 77. `File > Load Component Pack Plugin...`에서 `IComponentPackPlugin`을 구현한 신뢰할 수 있는 DLL을 선택하면 플러그인이 제공한 Component Pack을 Toolbox에 등록합니다. DLL 경로는 세션 JSON의 `ComponentPluginPaths`에 저장되고, 앱 재시작 시 플러그인·JSON 팩·프리셋 팩 순서로 복원됩니다.
+78. `File > Manage Component Packs...`에서 로드된 JSON/DLL 팩의 출처와 컴포넌트를 확인하고 `Remove Pack`으로 Toolbox 등록과 세션 경로를 제거합니다. 현재 문서나 프리셋에서 사용 중인 커스텀 타입은 AXAML 타입명을 유지하는 디자인 전용 placeholder로 남으며, 플러그인 DLL 자체는 앱 재시작 전까지 프로세스에 로드된 상태입니다.
 
 DataGrid가 포함된 생성 AXAML을 다른 프로젝트에서 사용할 때는 같은 Avalonia 버전의 `Avalonia.Controls.DataGrid` 패키지와 `avares://Avalonia.Controls.DataGrid/Themes/Fluent.xaml` 스타일 include가 필요합니다.
 
@@ -288,6 +290,7 @@ AXAML 소스 편집기의 `Validate`와 `Preview`는 현재 디자인과 Undo �
 - ~~v0.4: bodong PropertyGrid 실제 연동~~ ✅
 - ~~v0.5: .axaml 저장/로드~~ ✅
 - ~~v0.6: 실제 드래그&드롭, 삭제, 언두~~ ✅
+- ~~v0.8: Component Pack 관리 및 안전한 제거~~ ✅
 
 ## 컴포넌트 팩
 
