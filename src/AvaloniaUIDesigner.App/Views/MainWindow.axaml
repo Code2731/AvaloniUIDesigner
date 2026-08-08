@@ -734,6 +734,18 @@
                                             <ContextMenu>
                                                 <MenuItem Header="Rename..." Click="OnRenameSelectedControlMenuClicked"/>
                                                 <MenuItem Header="Lock / Unlock" Click="OnToggleLockMenuClicked"/>
+                                                <MenuItem Header="Assign to Container">
+                                                    <MenuItem Header="Grid Cell..." Click="OnAssignToGridCellMenuClicked"/>
+                                                    <MenuItem Header="StackPanel..." Click="OnAssignToStackPanelMenuClicked"/>
+                                                    <MenuItem Header="DockPanel..." Click="OnAssignToDockPanelMenuClicked"/>
+                                                    <MenuItem Header="WrapPanel..." Click="OnAssignToWrapPanelMenuClicked"/>
+                                                    <MenuItem Header="UniformGrid..." Click="OnAssignToUniformGridMenuClicked"/>
+                                                    <MenuItem Header="Canvas..." Click="OnAssignToCanvasMenuClicked"/>
+                                                    <MenuItem Header="TabControl..." Click="OnAssignToTabControlMenuClicked"/>
+                                                    <MenuItem Header="SplitView..." Click="OnAssignToSplitViewMenuClicked"/>
+                                                    <MenuItem Header="Container Content..." Click="OnAssignAsContainerContentMenuClicked"/>
+                                                </MenuItem>
+                                                <MenuItem Header="Remove from Container" Click="OnRemoveFromContainerMenuClicked"/>
                                                 <Separator/>
                                                 <MenuItem Header="Copy" Click="OnCopyMenuClicked"/>
                                                 <MenuItem Header="Cut" Click="OnCutMenuClicked"/>
