@@ -152,7 +152,8 @@ dotnet run --project src/AvaloniaUIDesigner.App/AvaloniaUIDesigner.App.csproj
 57. Object Tree 행의 `Assign to Container`에서 Grid·StackPanel·DockPanel·WrapPanel·UniformGrid·Canvas·TabControl·SplitView·Content를 선택하거나 `Remove from Container`로 부모를 해제
 58. 컨테이너 자식 행에서 `Move Earlier`/`Move Later`를 선택하면 지원되는 부모의 형제 순서가 바뀌고, Grid·TabControl·Content·SplitView는 전용 배치 방식을 안내함
 59. Object Tree에서 컨테이너를 펼치거나 접으면 순서 변경·Undo/Redo·AXAML 적용 뒤에도 상태가 유지되고, Canvas에서 하위 컨트롤을 선택하면 부모가 자동으로 펼쳐짐
-60. Object Tree의 잠기지 않은 컨테이너 자식 행을 같은 부모의 다른 자식 행 위로 드래그하면 해당 위치 앞으로 이동하고, 다른 부모로의 드롭은 거부됨
+60. Object Tree의 잠기지 않은 컨테이너 자식 행을 같은 부모의 다른 자식 행 위로 드래그하면 해당 위치 앞으로 이동하고, 컨테이너 행으로 드래그하면 유효한 부모로 재배치됨
+61. Toolbox 컨트롤을 Canvas 위로 드래그하면 포인터 아래 가장 안쪽의 수용 가능한 컨테이너를 강조하고, 드롭 시 해당 부모에 한 번의 Undo 작업으로 배치함
 
 DataGrid가 포함된 생성 AXAML을 다른 프로젝트에서 사용할 때는 같은 Avalonia 버전의 `Avalonia.Controls.DataGrid` 패키지와 `avares://Avalonia.Controls.DataGrid/Themes/Fluent.xaml` 스타일 include가 필요합니다.
 

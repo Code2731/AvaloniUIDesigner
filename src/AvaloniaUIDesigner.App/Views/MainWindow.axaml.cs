@@ -3516,6 +3516,8 @@ public partial class MainWindow : Window
     {
         if (e.DataTransfer.Contains(ToolboxDragDataFormat))
         {
+            ToolboxDropHint.Width = 0;
+            ToolboxDropHint.Height = 0;
             ToolboxDropHint.IsVisible = true;
             Vm?.StatusText = "Drop the Toolbox item onto the artboard.";
         }
@@ -3524,13 +3526,45 @@ public partial class MainWindow : Window
     private void OnDesignSurfaceDragLeave(object? sender, DragEventArgs e)
     {
         ToolboxDropHint.IsVisible = false;
+        ToolboxDropHint.Width = 0;
+        ToolboxDropHint.Height = 0;
     }
 
     private void OnDesignSurfaceDragOver(object? sender, DragEventArgs e)
     {
-        e.DragEffects = e.DataTransfer.Contains(ToolboxDragDataFormat)
-            ? DragDropEffects.Copy
-            : DragDropEffects.None;
+        if (Vm is null
+            || sender is not Control host
+            || e.DataTransfer.TryGetValue(ToolboxDragDataFormat) is not string displayName
+            || Vm.Toolbox.FindItemByDisplayName(displayName) is not { } item)
+        {
+            e.DragEffects = DragDropEffects.None;
+            ToolboxDropHint.IsVisible = false;
+            return;
+        }
+
+        var parent = item.IsPreset
+            ? null
+            : Vm.FindDropContainer(e.GetPosition(host));
+        if (parent is not null)
+        {
+            Canvas.SetLeft(ToolboxDropHint, parent.X);
+            Canvas.SetTop(ToolboxDropHint, parent.Y);
+            ToolboxDropHint.Width = parent.Width;
+            ToolboxDropHint.Height = parent.Height;
+            ToolboxDropHint.IsVisible = true;
+            Vm.StatusText = $"Drop {item.DisplayName} into {parent.DisplayName}.";
+        }
+        else
+        {
+            ToolboxDropHint.Width = 0;
+            ToolboxDropHint.Height = 0;
+            ToolboxDropHint.IsVisible = false;
+            Vm.StatusText = item.IsPreset
+                ? "Drop the preset onto the artboard."
+                : "Drop the Toolbox item onto the artboard.";
+        }
+
+        e.DragEffects = DragDropEffects.Copy;
         e.Handled = true;
     }
 
@@ -3546,7 +3580,8 @@ public partial class MainWindow : Window
         }
 
         var point = e.GetPosition(host);
-        Vm.PlaceToolboxItem(item, point.X, point.Y);
+        var parent = item.IsPreset ? null : Vm.FindDropContainer(point);
+        Vm.PlaceToolboxItem(item, point.X, point.Y, parent);
         e.DragEffects = DragDropEffects.Copy;
         e.Handled = true;
     }

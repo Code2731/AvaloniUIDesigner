@@ -626,7 +626,22 @@ public partial class MainWindowViewModel : ViewModelBase
         PlaceToolboxItem(item, x, y);
     }
 
-    public void PlaceToolboxItem(ToolboxItem item, double x, double y)
+    public DesignElement? FindDropContainer(Point point)
+        => Canvas.Elements
+            .Where(element => !element.IsLocked
+                && element.IsVisibleOnArtboard
+                && IsDesignerDropContainer(element.Visual)
+                && CanAcceptToolboxDrop(element)
+                && new Rect(element.X, element.Y, element.Width, element.Height).Contains(point))
+            .OrderBy(element => element.Width * element.Height)
+            .ThenByDescending(Canvas.Elements.IndexOf)
+            .FirstOrDefault();
+
+    public void PlaceToolboxItem(
+        ToolboxItem item,
+        double x,
+        double y,
+        DesignElement? dropParent = null)
     {
         var snappedX = Canvas.SnapPosition(x);
         var snappedY = Canvas.SnapPosition(y);
@@ -649,10 +664,19 @@ public partial class MainWindowViewModel : ViewModelBase
 
         var element = Canvas.PlaceElement(item, snappedX, snappedY);
         ObjectTree.Add(element);
-        ObjectTree.SelectByElement(element);
+        var placedInContainer = dropParent is not null
+            && CanReparentElementTo(element, dropParent)
+            && TryReparentSelectedElementTo(dropParent, recordHistory: false);
+        if (!placedInContainer)
+        {
+            ObjectTree.SelectByElement(element);
+        }
+
         CommitCanvasMutation();
 
-        StatusText = $"Placed {element.DisplayName} ({snappedX:0}, {snappedY:0})";
+        StatusText = placedInContainer
+            ? $"Placed {element.DisplayName} into {dropParent!.DisplayName}."
+            : $"Placed {element.DisplayName} ({snappedX:0}, {snappedY:0})";
     }
 
     public bool TryLoadComponentPack(string json, out string result)
@@ -1281,6 +1305,9 @@ public partial class MainWindowViewModel : ViewModelBase
     }
 
     public bool TryReparentSelectedElementTo(DesignElement parent)
+        => TryReparentSelectedElementTo(parent, recordHistory: true);
+
+    private bool TryReparentSelectedElementTo(DesignElement parent, bool recordHistory)
     {
         if (Canvas.SelectedElement is not { IsLocked: false } source)
         {
@@ -1318,7 +1345,11 @@ public partial class MainWindowViewModel : ViewModelBase
             return false;
         }
 
-        BeginCanvasMutation(HistoryActionType.EditProperty, "Reparented control in Object Tree.");
+        if (recordHistory)
+        {
+            BeginCanvasMutation(HistoryActionType.EditProperty, "Reparented control in Object Tree.");
+        }
+
         switch (parent.Visual)
         {
             case Grid:
@@ -1439,14 +1470,18 @@ public partial class MainWindowViewModel : ViewModelBase
         Canvas.NormalizeContainerRelationships();
         ObjectTree.RebuildFrom(Canvas.Elements);
         ObjectTree.SelectByElement(source);
-        CommitCanvasMutation();
+        if (recordHistory)
+        {
+            CommitCanvasMutation();
+        }
+
         StatusText = $"Moved {source.DisplayName} into {parent.DisplayName}.";
         return true;
     }
 
     private bool TryFindAvailableGridCell(
         DesignElement parent,
-        DesignElement source,
+        DesignElement? source,
         out int row,
         out int column)
     {
@@ -1485,7 +1520,7 @@ public partial class MainWindowViewModel : ViewModelBase
 
     private bool TryFindAvailableTabIndex(
         DesignElement parent,
-        DesignElement source,
+        DesignElement? source,
         TabControl tabControl,
         out int tabIndex)
     {
@@ -1508,7 +1543,7 @@ public partial class MainWindowViewModel : ViewModelBase
 
     private bool TryFindAvailableSplitViewSlot(
         DesignElement parent,
-        DesignElement source,
+        DesignElement? source,
         out DesignerSplitViewSlot slot)
     {
         if (!Canvas.Elements.Any(child => !ReferenceEquals(child, source)
@@ -1533,9 +1568,20 @@ public partial class MainWindowViewModel : ViewModelBase
         return false;
     }
 
-    private bool HasOtherDirectChild(DesignElement parent, DesignElement source)
+    private bool HasOtherDirectChild(DesignElement parent, DesignElement? source)
         => Canvas.Elements.Any(child => !ReferenceEquals(child, source)
             && string.Equals(child.ParentName, parent.DisplayName, StringComparison.OrdinalIgnoreCase));
+
+    private bool CanAcceptToolboxDrop(DesignElement parent)
+        => parent.Visual switch
+        {
+            Grid => TryFindAvailableGridCell(parent, null, out _, out _),
+            StackPanel or DockPanel or WrapPanel or UniformGrid or Avalonia.Controls.Canvas => true,
+            TabControl tabControl => TryFindAvailableTabIndex(parent, null, tabControl, out _),
+            SplitView => TryFindAvailableSplitViewSlot(parent, null, out _),
+            _ when IsDesignerContentContainer(parent.Visual) => !HasOtherDirectChild(parent, null),
+            _ => false,
+        };
 
     private IEnumerable<DesignElement> GetDirectChildren(DesignElement parent)
         => Canvas.Elements.Where(child => string.Equals(
@@ -13053,6 +13099,11 @@ public partial class MainWindowViewModel : ViewModelBase
     private static bool IsDesignerContentContainer(Control visual)
         => visual is Border or ScrollViewer or Expander or UserControl
             || visual.GetType() == typeof(ContentControl);
+
+    private static bool IsDesignerDropContainer(Control visual)
+        => visual is Grid or StackPanel or DockPanel or WrapPanel or UniformGrid
+            or Avalonia.Controls.Canvas or TabControl or SplitView
+            || IsDesignerContentContainer(visual);
 
     private bool TryGetDockPanelParent(
         DesignElement element,
