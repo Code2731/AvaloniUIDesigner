@@ -197,6 +197,12 @@
                     <MenuItem Header="Make Same Height" Click="OnMakeSameHeightMenuClicked"/>
                     <MenuItem Header="Make Same Size" Click="OnMakeSameSizeMenuClicked"/>
                 </MenuItem>
+                <MenuItem Header="Lay Out Selected" IsEnabled="{Binding Canvas.HasMultipleSelection}">
+                    <MenuItem Header="Horizontally (StackPanel)"
+                              Click="OnLayoutSelectedHorizontallyMenuClicked"/>
+                    <MenuItem Header="Vertically (StackPanel)"
+                              Click="OnLayoutSelectedVerticallyMenuClicked"/>
+                </MenuItem>
                 <Separator/>
                 <MenuItem Header="Group Selected into Canvas" Click="OnGroupSelectedMenuClicked" IsEnabled="{Binding Canvas.HasMultipleSelection}"/>
                 <MenuItem Header="Ungroup Selected Canvas" Click="OnUngroupSelectedMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
@@ -515,6 +521,12 @@
                                                         <MenuItem Header="Make Same Width" Click="OnMakeSameWidthMenuClicked"/>
                                                         <MenuItem Header="Make Same Height" Click="OnMakeSameHeightMenuClicked"/>
                                                         <MenuItem Header="Make Same Size" Click="OnMakeSameSizeMenuClicked"/>
+                                                    </MenuItem>
+                                                    <MenuItem Header="Lay Out Selected">
+                                                        <MenuItem Header="Horizontally (StackPanel)"
+                                                                  Click="OnLayoutSelectedHorizontallyMenuClicked"/>
+                                                        <MenuItem Header="Vertically (StackPanel)"
+                                                                  Click="OnLayoutSelectedVerticallyMenuClicked"/>
                                                     </MenuItem>
                                                     <Separator/>
                                                     <MenuItem Header="Group Selected into Canvas" Click="OnGroupSelectedMenuClicked"/>

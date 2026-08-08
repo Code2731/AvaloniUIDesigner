@@ -2368,6 +2368,22 @@ public partial class MainWindow : Window
     private void OnCenterOnArtboardMenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
         => CenterSelectedElementsOnArtboard(horizontally: true, vertically: true);
 
+    private void OnLayoutSelectedHorizontallyMenuClicked(
+        object? sender,
+        Avalonia.Interactivity.RoutedEventArgs e)
+        => LayoutSelectedControls(Orientation.Horizontal);
+
+    private void OnLayoutSelectedVerticallyMenuClicked(
+        object? sender,
+        Avalonia.Interactivity.RoutedEventArgs e)
+        => LayoutSelectedControls(Orientation.Vertical);
+
+    private void LayoutSelectedControls(Orientation orientation)
+    {
+        FlushPendingPropertyHistory();
+        Vm?.LayoutSelectedIntoStackPanel(orientation);
+    }
+
     private void ArrangeSelectedElements(MainWindowViewModel.SelectionLayoutAction action)
     {
         FlushPendingPropertyHistory();

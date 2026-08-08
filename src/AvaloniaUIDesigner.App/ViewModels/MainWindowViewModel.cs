@@ -7148,6 +7148,58 @@ public partial class MainWindowViewModel : ViewModelBase
         StatusText = $"{DescribeLayoutAction(action)} {targets.Count} control(s)";
     }
 
+    public bool LayoutSelectedIntoStackPanel(Orientation orientation)
+    {
+        var targets = Canvas.SelectedElements.ToList();
+        if (targets.Count < 2)
+        {
+            StatusText = "Select at least two controls to create a StackPanel layout.";
+            return false;
+        }
+
+        if (targets.Any(element => element.IsLocked))
+        {
+            StatusText = "Unlock all selected controls before creating a StackPanel layout.";
+            return false;
+        }
+
+        if (!TryValidateRootOrCanvasSiblingSelection(targets, "StackPanel layout", out var selectionError))
+        {
+            StatusText = selectionError;
+            return false;
+        }
+
+        BeginCanvasMutation(
+            HistoryActionType.TransformElement,
+            "Created StackPanel layout from selected controls.");
+        if (!Canvas.TryCreateStackPanelLayout(targets, orientation, out var layout, out var error)
+            || layout is null)
+        {
+            _pendingMutation = null;
+            StatusText = error;
+            return false;
+        }
+
+        _isSyncingSelection = true;
+        try
+        {
+            ObjectTree.RebuildFrom(Canvas.Elements);
+            Canvas.Select(layout);
+            ObjectTree.SelectByElement(layout);
+        }
+        finally
+        {
+            _isSyncingSelection = false;
+        }
+
+        RefreshStylePreviewOptions();
+        CommitCanvasMutation();
+        StatusText = orientation == Orientation.Horizontal
+            ? $"Laid out {targets.Count} control(s) horizontally in {layout.DisplayName}."
+            : $"Laid out {targets.Count} control(s) vertically in {layout.DisplayName}.";
+        return true;
+    }
+
     public bool GroupSelectedElements()
     {
         var targets = Canvas.SelectedElements.ToList();

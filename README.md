@@ -38,6 +38,7 @@ dotnet run --project src/AvaloniaUIDesigner.App/AvaloniaUIDesigner.App.csproj
 - **DataGrid Behavior 속성**: 헤더·그리드선·선택·클립보드, 열 조작, 읽기 전용, 고정 열, 행·열 크기, 스크롤 정책을 전용 편집기로 검증하고 열 정의·Undo/Redo·Preview·Binding·AXAML 왕복에 보존
 - **GridSplitter Behavior 속성**: GridSplitter를 Toolbox에서 배치하고 행/열 방향·인접 track 동작·미리보기·키보드/드래그 증분을 편집해 Grid 셀 배치·Undo/Redo·Preview·Binding·AXAML 왕복에 보존
 - **Canvas 그룹화**: 다중 선택한 같은 root 또는 같은 Canvas의 형제 컨트롤을 실제 Canvas 그룹으로 묶고 해제하며, bounding box·로컬 좌표·z-order·Object Tree·Undo/Redo·Preview·AXAML 왕복을 보존
+- **다중 선택 StackPanel 레이아웃**: 같은 root 또는 같은 Canvas의 형제 컨트롤을 가로·세로 StackPanel로 한 번에 감싸고, bounding box·Canvas 상대 좌표·기존 순서·Object Tree·Undo/Redo·Preview·AXAML 왕복을 보존
 - **다중 선택 레이아웃 안전성**: Arrange와 Center on Artboard를 root 또는 같은 Canvas의 형제에 적용하고, 부모가 좌표를 관리하는 Grid·StackPanel·DockPanel·WrapPanel·UniformGrid·TabControl·SplitView·Content 자식은 부모 전용 배치 명령으로 보호
 - **데이터 바인딩**: 선택 컨트롤의 지원 속성에 Path·Mode·Fallback을 여러 개 선언하고, 디자인 샘플을 유지한 채 ReflectionBinding·Undo/Redo·복제·미리보기·AXAML 왕복에 보존
 - **샘플 DataContext**: 문서 단위 JSON을 바인딩 Path에 연결해 Text·상태·숫자·선택·ItemsSource를 캔버스와 Preview에서 확인하고, 원래 디자인 값·Undo/Redo·AXAML 왕복에 보존
@@ -156,6 +157,7 @@ dotnet run --project src/AvaloniaUIDesigner.App/AvaloniaUIDesigner.App.csproj
 59. Object Tree에서 컨테이너를 펼치거나 접으면 순서 변경·Undo/Redo·AXAML 적용 뒤에도 상태가 유지되고, Canvas에서 하위 컨트롤을 선택하면 부모가 자동으로 펼쳐짐
 60. Object Tree의 잠기지 않은 컨테이너 자식 행을 같은 부모의 다른 자식 행 위로 드래그하면 해당 위치 앞으로 이동하고, 컨테이너 행으로 드래그하면 유효한 부모로 재배치됨
 61. Toolbox 컨트롤을 Canvas 위로 드래그하면 포인터 아래 가장 안쪽의 수용 가능한 컨테이너를 강조하고, StackPanel·DockPanel·WrapPanel·UniformGrid의 삽입 위치와 Grid 셀을 포인터에 맞춰 한 번의 Undo 작업으로 배치함
+62. 같은 root 또는 같은 Canvas의 형제 컨트롤을 여러 개 선택한 뒤 Edit > `Lay Out Selected`에서 `Horizontally (StackPanel)` 또는 `Vertically (StackPanel)`을 선택하면 새 레이아웃 컨테이너로 감싸고 Object Tree·Preview·Undo/Redo 결과를 확인
 
 DataGrid가 포함된 생성 AXAML을 다른 프로젝트에서 사용할 때는 같은 Avalonia 버전의 `Avalonia.Controls.DataGrid` 패키지와 `avares://Avalonia.Controls.DataGrid/Themes/Fluent.xaml` 스타일 include가 필요합니다.
 
@@ -212,6 +214,8 @@ GridSplitter Behavior 편집기는 `ResizeDirection`의 Auto·Columns·Rows, `Re
 Canvas 그룹화는 같은 부모를 공유하는 형제 컨트롤만 대상으로 합니다. root 컨트롤을 묶으면 bounding box 위치에 새 Canvas가 생성되고, Canvas 자식을 묶으면 원래 Canvas 안에 중첩됩니다. 그룹을 해제해도 자식의 화면 좌표와 형제 z-order를 유지하며, 서로 다른 Grid·StackPanel·Content 슬롯을 섞는 작업은 레이아웃 좌표 손실을 막기 위해 거부합니다.
 
 다중 선택 Arrange는 root 요소 또는 같은 Canvas의 직접 자식만 대상으로 합니다. Grid·StackPanel·DockPanel·WrapPanel·UniformGrid·TabControl·SplitView·Content 자식은 부모가 좌표와 크기를 관리하므로 정렬을 거부하고, 해당 컨테이너의 전용 할당·순서 편집기를 사용하도록 안내합니다. Canvas 형제의 정렬은 `Canvas.Left`·`Canvas.Top` 로컬 좌표를 갱신하므로 부모를 이동해도 정렬 결과가 유지됩니다.
+
+다중 선택 `Edit > Lay Out Selected`는 같은 root 또는 같은 Canvas의 잠금 해제된 형제 컨트롤을 새 StackPanel로 감쌉니다. `Horizontally`는 기존 너비를 주축 크기로, `Vertically`는 기존 높이를 주축 크기로 사용하고 8px 간격을 적용합니다. 새 컨테이너는 선택 영역 위치에 배치되며 Canvas 안에서 실행해도 자식의 화면 위치와 부모 상대 좌표를 보존하고, 전체 작업은 하나의 Undo 항목으로 기록됩니다.
 
 선택 영역 Toolbox 프리셋은 두 개 이상의 root 컨트롤 또는 같은 Canvas의 직접 형제 컨트롤을 선택한 뒤 `File > Add Selection to Toolbox...`에서 등록합니다. 선택 영역의 좌상단을 기준으로 상대 좌표를 저장하고, root 선택은 컨트롤 목록으로, Canvas 형제 선택은 bounding box Canvas와 로컬 자식 계층으로 보존합니다. 등록 시점의 크기·시각 속성·텍스트·콘텐츠도 함께 복원하며, 배치 후 생성된 Canvas와 자식 컨트롤을 모두 선택합니다. 등록된 프리셋은 현재 세션의 Toolbox 검색 결과에 즉시 나타나며, `File > Export Selected Toolbox Preset...`으로 `*.toolbox-preset.json` 팩을 저장할 수 있습니다. `File > Load Toolbox Preset Pack...`은 JSON 문법·중복 이름·지원 타입·bounds·root/Canvas 계층을 검증한 뒤 일괄 등록하므로 실패한 팩이 Toolbox를 부분적으로 변경하지 않습니다. Grid·StackPanel·DockPanel·WrapPanel·UniformGrid·TabControl·SplitView·Content 자식은 현재 프리셋 배치 경로가 부모 전용 메타데이터를 복원하지 않으므로 등록을 거부합니다. 예시는 [toolbox-preset.example.json](docs/toolbox-preset.example.json)을 참고하세요.
 
