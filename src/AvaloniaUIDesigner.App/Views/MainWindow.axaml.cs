@@ -265,6 +265,36 @@ public partial class MainWindow : Window
         }
     }
 
+    private async void OnLoadComponentPackPluginMenuClicked(
+        object? sender,
+        Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        if (Vm is null)
+        {
+            return;
+        }
+
+        var files = await StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
+        {
+            Title = "Load Component Pack Plugin",
+            AllowMultiple = false,
+            FileTypeFilter =
+            [
+                new FilePickerFileType("Component Pack Plugin DLL") { Patterns = ["*.dll"] }
+            ]
+        });
+
+        if (files.Count == 0)
+        {
+            return;
+        }
+
+        if (!Vm.TryLoadComponentPackPlugin(files[0].Path.LocalPath, out var result))
+        {
+            Vm.StatusText = $"Could not load component pack plugin: {result}";
+        }
+    }
+
     private async void OnLoadToolboxPresetPackMenuClicked(
         object? sender,
         Avalonia.Interactivity.RoutedEventArgs e)

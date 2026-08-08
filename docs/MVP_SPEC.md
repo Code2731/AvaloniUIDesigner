@@ -50,5 +50,5 @@ Users should be able to place controls visually, inspect properties, and validat
 
 3. v0.7
 - ~~Custom control metadata extension model~~
-- Plugin-based component packs
+- ~~Plugin-based component packs~~
 - ~~Style and resource editing support~~

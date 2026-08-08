@@ -32,6 +32,7 @@
                     <MenuItem Header="Dashboard" Tag="Dashboard" Click="OnTemplateMenuClicked"/>
                 </MenuItem>
                 <MenuItem Header="Load Component Pack..." Click="OnLoadComponentPackMenuClicked"/>
+                <MenuItem Header="Load Component Pack Plugin..." Click="OnLoadComponentPackPluginMenuClicked"/>
                 <MenuItem Header="Load Toolbox Preset Pack..." Click="OnLoadToolboxPresetPackMenuClicked"/>
                 <MenuItem Header="Export Selected as Component Pack..." Click="OnExportSelectedComponentPackMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
                 <MenuItem Header="Export Selected Toolbox Preset..." Click="OnExportSelectedToolboxPresetMenuClicked" IsEnabled="{Binding Toolbox.IsPresetSelected}"/>

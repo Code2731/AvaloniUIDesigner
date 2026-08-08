@@ -534,8 +534,10 @@ public partial class MainWindowViewModel : ViewModelBase
     private readonly IComponentCatalog _componentCatalog;
     private readonly IDesignerSerializer _serializer;
     private readonly ComponentPackLoader _componentPackLoader = new();
+    private readonly ComponentPackPluginLoader _componentPackPluginLoader = new();
     private readonly ToolboxPresetPackLoader _toolboxPresetPackLoader = new();
     private readonly List<string> _componentPackPaths = new();
+    private readonly List<string> _componentPluginPaths = new();
     private readonly List<string> _toolboxPresetPackPaths = new();
     private readonly Stack<HistoryEntry> _undoStack = new();
     private readonly Stack<HistoryEntry> _redoStack = new();
@@ -597,6 +599,7 @@ public partial class MainWindowViewModel : ViewModelBase
     public ObservableCollection<StylePreviewOption> StylePreviewOptions { get; }
     public ObservableCollection<DocumentTabViewModel> DocumentTabs { get; }
     public IReadOnlyList<string> ComponentPackPaths => _componentPackPaths;
+    public IReadOnlyList<string> ComponentPluginPaths => _componentPluginPaths;
     public IReadOnlyList<string> ToolboxPresetPackPaths => _toolboxPresetPackPaths;
 
     public event EventHandler? DocumentChanged;
@@ -729,6 +732,35 @@ public partial class MainWindowViewModel : ViewModelBase
         Toolbox.AddComponents(pack.Definitions);
         TrackPackPath(_componentPackPaths, sourcePath);
         result = $"Loaded {pack.Definitions.Count} component(s) from {pack.Name}.";
+        StatusText = result;
+        return true;
+    }
+
+    public bool TryLoadComponentPackPlugin(string assemblyPath, out string result)
+    {
+        result = string.Empty;
+        if (!TryNormalizePackPath(assemblyPath, out var fullPath))
+        {
+            result = "Component pack plugin path is invalid.";
+            StatusText = result;
+            return false;
+        }
+
+        if (!_componentPackPluginLoader.TryLoad(
+                fullPath,
+                _componentCatalog,
+                displayName => Toolbox.FindItemByDisplayName(displayName) is null,
+                out var pack,
+                out var error))
+        {
+            result = error;
+            StatusText = result;
+            return false;
+        }
+
+        Toolbox.AddComponents(pack.Definitions);
+        TrackPackPath(_componentPluginPaths, fullPath);
+        result = $"Loaded {pack.Definitions.Count} component(s) from plugin {pack.Name}.";
         StatusText = result;
         return true;
     }
@@ -8229,7 +8261,9 @@ public partial class MainWindowViewModel : ViewModelBase
                 tabs,
                 activeTabIndex,
                 _componentPackPaths.ToList(),
-                _toolboxPresetPackPaths.ToList()),
+                _toolboxPresetPackPaths.ToList(),
+                _componentPluginPaths.ToList(),
+                ExportPersistedComponentTypes()),
             new JsonSerializerOptions { WriteIndented = true });
     }
 
@@ -8252,6 +8286,12 @@ public partial class MainWindowViewModel : ViewModelBase
             error = "Session data does not contain any document tabs.";
             return false;
         }
+
+        var packWarnings = new List<string>();
+        RestoreComponentPluginFiles(session.ComponentPluginPaths, packWarnings);
+        RestoreComponentPackFiles(session.ComponentPackPaths, packWarnings);
+        RestoreToolboxPresetPackFiles(session.ToolboxPresetPackPaths, packWarnings);
+        RestoreMissingComponentTypes(session.ComponentTypes, packWarnings);
 
         var restoredDocuments = new List<RestoredDocumentTab>();
         try
@@ -8301,9 +8341,6 @@ public partial class MainWindowViewModel : ViewModelBase
             return false;
         }
 
-        var packWarnings = new List<string>();
-        RestoreComponentPackFiles(session.ComponentPackPaths, packWarnings);
-        RestoreToolboxPresetPackFiles(session.ToolboxPresetPackPaths, packWarnings);
         ClearDocumentTabsForSessionRestore();
         var restoredTabs = new List<DocumentTabViewModel>();
         foreach (var restoredDocument in restoredDocuments)
@@ -12296,6 +12333,35 @@ public partial class MainWindowViewModel : ViewModelBase
                 entry.Message))
             .ToList();
 
+    private List<PersistedComponentType> ExportPersistedComponentTypes()
+    {
+        var snapshots = _documentTabStates.Values
+            .SelectMany(state => state.Document.Elements
+                .Concat(state.LastSavedSnapshot.Elements)
+                .Concat(state.UndoStack.SelectMany(entry => entry.Before.Elements.Concat(entry.After.Elements)))
+                .Concat(state.RedoStack.SelectMany(entry => entry.Before.Elements.Concat(entry.After.Elements))))
+            .ToList();
+        var types = new Dictionary<string, PersistedComponentType>(StringComparer.OrdinalIgnoreCase);
+        foreach (var snapshot in snapshots)
+        {
+            if (_componentCatalog.TryGet(snapshot.TypeName, out var definition)
+                && !definition.IsDesignOnly)
+            {
+                continue;
+            }
+
+            var tagName = GetTypeTagName(snapshot.TypeName);
+            if (string.IsNullOrWhiteSpace(tagName))
+            {
+                continue;
+            }
+
+            types[snapshot.TypeName] = new PersistedComponentType(tagName, snapshot.TypeName);
+        }
+
+        return types.Values.ToList();
+    }
+
     private List<HistoryEntry> ParsePersistedHistory(
         IEnumerable<PersistedHistoryEntry>? persistedHistory)
     {
@@ -12341,6 +12407,69 @@ public partial class MainWindowViewModel : ViewModelBase
         OnPropertyChanged(nameof(SelectedDocumentTab));
         OnPropertyChanged(nameof(CurrentDocumentPath));
         OnPropertyChanged(nameof(WindowTitle));
+    }
+
+    private void RestoreComponentPluginFiles(
+        IEnumerable<string>? paths,
+        ICollection<string> warnings)
+    {
+        foreach (var path in NormalizePackPaths(paths, warnings, "component pack plugin"))
+        {
+            if (_componentPluginPaths.Any(existing => string.Equals(
+                    existing,
+                    path,
+                    StringComparison.OrdinalIgnoreCase)))
+            {
+                continue;
+            }
+
+            if (!File.Exists(path))
+            {
+                warnings.Add($"Component pack plugin '{Path.GetFileName(path)}' was not found and was skipped.");
+                continue;
+            }
+
+            if (!TryLoadComponentPackPlugin(path, out var result))
+            {
+                warnings.Add($"Component pack plugin '{Path.GetFileName(path)}' was skipped: {result}");
+            }
+        }
+    }
+
+    private void RestoreMissingComponentTypes(
+        IEnumerable<PersistedComponentType>? types,
+        ICollection<string> warnings)
+    {
+        foreach (var persistedType in types ?? Enumerable.Empty<PersistedComponentType>())
+        {
+            if (string.IsNullOrWhiteSpace(persistedType.TypeName)
+                || string.IsNullOrWhiteSpace(persistedType.TagName))
+            {
+                warnings.Add("A persisted custom component type mapping was invalid and was skipped.");
+                continue;
+            }
+
+            if (_componentCatalog.TryGet(persistedType.TypeName, out _))
+            {
+                continue;
+            }
+
+            var definition = new DesignerComponentDefinition(
+                $"Missing {persistedType.TypeName}",
+                persistedType.TypeName,
+                240,
+                96,
+                () => DesignerCustomControlRuntime.CreatePlaceholder(
+                    persistedType.TypeName,
+                    persistedType.TagName),
+                NamePrefix: persistedType.TagName,
+                IsDesignOnly: true,
+                PreviewText: persistedType.TagName);
+            if (!_componentCatalog.TryRegister(definition, out var error))
+            {
+                warnings.Add($"Persisted custom component '{persistedType.TypeName}' could not be restored: {error}");
+            }
+        }
     }
 
     private void RestoreComponentPackFiles(
@@ -12461,6 +12590,12 @@ public partial class MainWindowViewModel : ViewModelBase
         {
             return false;
         }
+    }
+
+    private static string GetTypeTagName(string typeName)
+    {
+        var separator = typeName.LastIndexOf('.');
+        return separator >= 0 ? typeName[(separator + 1)..] : typeName;
     }
 
     private void UpdateDocumentTabPresentations()
@@ -15417,7 +15552,9 @@ public partial class MainWindowViewModel : ViewModelBase
         List<PersistedDocumentTab> Tabs,
         int ActiveTabIndex,
         List<string>? ComponentPackPaths = null,
-        List<string>? ToolboxPresetPackPaths = null);
+        List<string>? ToolboxPresetPackPaths = null,
+        List<string>? ComponentPluginPaths = null,
+        List<PersistedComponentType>? ComponentTypes = null);
 
     private sealed record PersistedDocumentTab(
         string? DocumentPath,
@@ -15434,6 +15571,10 @@ public partial class MainWindowViewModel : ViewModelBase
         string AfterAxaml,
         HistoryActionType ActionType,
         string? Message);
+
+    private sealed record PersistedComponentType(
+        string TagName,
+        string TypeName);
 
     private sealed record RestoredDocumentTab(
         string? DocumentPath,
