@@ -76,3 +76,6 @@ Users should be able to place controls visually, inspect properties, and validat
 
 11. v1.5
 - ~~Toolbox placement target highlighting and click-to-insert containers~~
+
+12. v1.6
+- ~~Precise container cell, insertion-line, and slot placement feedback~~

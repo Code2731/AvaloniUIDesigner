@@ -4056,25 +4056,28 @@ public partial class MainWindow : Window
         ToolboxPlacementPreview.Width = preview.Width;
         ToolboxPlacementPreview.Height = preview.Height;
         ToolboxPlacementPreviewLabel.Text = preview.DisplayName;
-        ToolboxPlacementPreviewDetails.Text =
-            $"{preview.Width:0} x {preview.Height:0} at {preview.X:0}, {preview.Y:0}";
-        UpdateToolboxPlacementTargetHint(point);
+        var targetPreview = UpdateToolboxPlacementTargetHint(point);
+        var placementDetails = $"{preview.Width:0} x {preview.Height:0} at {preview.X:0}, {preview.Y:0}";
+        ToolboxPlacementPreviewDetails.Text = targetPreview is null
+            ? placementDetails
+            : $"{placementDetails} -> {targetPreview.TargetLabel}";
         ToolboxPlacementPreview.IsVisible = true;
     }
 
-    private void UpdateToolboxPlacementTargetHint(Point point)
+    private ToolboxPlacementTargetPreview? UpdateToolboxPlacementTargetHint(Point point)
     {
-        if (Vm?.GetToolboxPlacementTarget(point.X, point.Y) is not { } target)
+        if (Vm?.GetToolboxPlacementTargetPreview(point.X, point.Y) is not { } target)
         {
             ToolboxPlacementTargetHint.IsVisible = false;
-            return;
+            return null;
         }
 
-        Canvas.SetLeft(ToolboxPlacementTargetHint, target.X);
-        Canvas.SetTop(ToolboxPlacementTargetHint, target.Y);
-        ToolboxPlacementTargetHint.Width = target.Width;
-        ToolboxPlacementTargetHint.Height = target.Height;
+        Canvas.SetLeft(ToolboxPlacementTargetHint, target.Bounds.X);
+        Canvas.SetTop(ToolboxPlacementTargetHint, target.Bounds.Y);
+        ToolboxPlacementTargetHint.Width = target.Bounds.Width;
+        ToolboxPlacementTargetHint.Height = target.Bounds.Height;
         ToolboxPlacementTargetHint.IsVisible = true;
+        return target;
     }
 
     private void HideToolboxPlacementPreview()

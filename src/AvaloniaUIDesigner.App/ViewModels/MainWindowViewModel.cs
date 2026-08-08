@@ -42,6 +42,11 @@ public sealed record ToolboxPlacementPreview(
     double Width,
     double Height);
 
+public sealed record ToolboxPlacementTargetPreview(
+    string ParentName,
+    string TargetLabel,
+    Rect Bounds);
+
 public enum ItemsEditorMode
 {
     Flat,
@@ -685,6 +690,96 @@ public partial class MainWindowViewModel : ViewModelBase
         }
 
         return FindDropContainer(new Point(x, y));
+    }
+
+    public ToolboxPlacementTargetPreview? GetToolboxPlacementTargetPreview(double x, double y)
+    {
+        var parent = GetToolboxPlacementTarget(x, y);
+        if (parent is null)
+        {
+            return null;
+        }
+
+        var point = new Point(x, y);
+        var parentBounds = new Rect(parent.X, parent.Y, parent.Width, parent.Height);
+        switch (parent.Visual)
+        {
+            case Grid:
+                if (TryFindGridCellPreview(parent, source: null, point, out var gridRow, out var gridColumn, out var gridBounds))
+                {
+                    return new ToolboxPlacementTargetPreview(
+                        parent.DisplayName,
+                        $"Grid R{gridRow + 1} C{gridColumn + 1}",
+                        gridBounds);
+                }
+
+                break;
+            case StackPanel stackPanel:
+            {
+                var siblings = GetDirectChildren(parent)
+                    .Where(child => child.IsStackPanelChild)
+                    .OrderBy(child => child.StackPanelIndex)
+                    .ThenBy(Canvas.Elements.IndexOf)
+                    .ToList();
+                var index = GetContainerInsertionIndex(parent, siblings, point);
+                return new ToolboxPlacementTargetPreview(
+                    parent.DisplayName,
+                    $"StackPanel insert #{index + 1}",
+                    GetContainerInsertionLineBounds(parent, siblings, index, stackPanel.Orientation == Orientation.Vertical));
+            }
+            case DockPanel:
+            {
+                var siblings = GetDirectChildren(parent)
+                    .Where(child => child.IsDockPanelChild)
+                    .OrderBy(child => child.DockPanelIndex)
+                    .ThenBy(Canvas.Elements.IndexOf)
+                    .ToList();
+                var index = GetContainerInsertionIndex(parent, siblings, point);
+                return new ToolboxPlacementTargetPreview(
+                    parent.DisplayName,
+                    $"DockPanel insert #{index + 1}",
+                    GetContainerInsertionLineBounds(parent, siblings, index, flowVertical: false));
+            }
+            case WrapPanel wrapPanel:
+            {
+                var siblings = GetDirectChildren(parent)
+                    .Where(child => child.IsWrapPanelChild)
+                    .OrderBy(child => child.WrapPanelIndex)
+                    .ThenBy(Canvas.Elements.IndexOf)
+                    .ToList();
+                var index = GetContainerInsertionIndex(parent, siblings, point);
+                return new ToolboxPlacementTargetPreview(
+                    parent.DisplayName,
+                    $"WrapPanel insert #{index + 1}",
+                    GetContainerInsertionLineBounds(parent, siblings, index, wrapPanel.Orientation == Orientation.Vertical));
+            }
+            case UniformGrid uniformGrid:
+            {
+                var siblings = GetDirectChildren(parent)
+                    .Where(child => child.IsUniformGridChild)
+                    .OrderBy(child => child.UniformGridIndex)
+                    .ThenBy(Canvas.Elements.IndexOf)
+                    .ToList();
+                var index = GetContainerInsertionIndex(parent, siblings, point);
+                if (TryGetUniformGridCellBounds(parent, uniformGrid, index, siblings.Count + 1, out var row, out var column, out var bounds))
+                {
+                    return new ToolboxPlacementTargetPreview(
+                        parent.DisplayName,
+                        $"UniformGrid R{row + 1} C{column + 1}",
+                        bounds);
+                }
+
+                break;
+            }
+            case Avalonia.Controls.Canvas:
+                return new ToolboxPlacementTargetPreview(parent.DisplayName, "Canvas child", parentBounds);
+            case TabControl:
+                return new ToolboxPlacementTargetPreview(parent.DisplayName, "TabControl next tab", parentBounds);
+            case SplitView:
+                return new ToolboxPlacementTargetPreview(parent.DisplayName, "SplitView content", parentBounds);
+        }
+
+        return new ToolboxPlacementTargetPreview(parent.DisplayName, "Content slot", parentBounds);
     }
 
     public ToolboxPlacementPreview? GetToolboxPlacementPreview(double x, double y)
@@ -1725,6 +1820,155 @@ public partial class MainWindowViewModel : ViewModelBase
         }
 
         return false;
+    }
+
+    private bool TryFindGridCellPreview(
+        DesignElement parent,
+        DesignElement? source,
+        Point point,
+        out int row,
+        out int column,
+        out Rect bounds)
+    {
+        row = 0;
+        column = 0;
+        bounds = default;
+        if (parent.Visual is not Grid grid)
+        {
+            return false;
+        }
+
+        var rowCount = DesignerGridDefinitionRuntime.GetRowCount(grid);
+        var columnCount = DesignerGridDefinitionRuntime.GetColumnCount(grid);
+        var occupied = Canvas.Elements
+            .Where(child => !ReferenceEquals(child, source)
+                && child.IsGridChild
+                && string.Equals(child.ParentName, parent.DisplayName, StringComparison.OrdinalIgnoreCase))
+            .ToList();
+        var availableCells = new List<(int Row, int Column, Rect Bounds)>();
+        for (var candidateRow = 0; candidateRow < rowCount; candidateRow++)
+        {
+            for (var candidateColumn = 0; candidateColumn < columnCount; candidateColumn++)
+            {
+                if (occupied.Any(child => candidateRow < child.GridRow + child.GridRowSpan
+                    && candidateRow + 1 > child.GridRow
+                    && candidateColumn < child.GridColumn + child.GridColumnSpan
+                    && candidateColumn + 1 > child.GridColumn))
+                {
+                    continue;
+                }
+
+                availableCells.Add((
+                    candidateRow,
+                    candidateColumn,
+                    DesignerGridDefinitionRuntime.GetCellBounds(
+                        grid,
+                        new Rect(parent.X, parent.Y, parent.Width, parent.Height),
+                        candidateRow,
+                        candidateColumn,
+                        1,
+                        1)));
+            }
+        }
+
+        if (availableCells.Count == 0)
+        {
+            return false;
+        }
+
+        var selectedCell = availableCells.FirstOrDefault(cell => cell.Bounds.Contains(point));
+        var cell = selectedCell.Bounds.Width > 0 && selectedCell.Bounds.Height > 0
+            ? selectedCell
+            : availableCells.OrderBy(cell => DistanceSquared(cell.Bounds.Center, point)).First();
+        row = cell.Row;
+        column = cell.Column;
+        bounds = cell.Bounds;
+        return true;
+    }
+
+    private static bool TryGetUniformGridCellBounds(
+        DesignElement parent,
+        UniformGrid uniformGrid,
+        int insertionIndex,
+        int itemCount,
+        out int row,
+        out int column,
+        out Rect bounds)
+    {
+        row = 0;
+        column = 0;
+        bounds = default;
+        var rows = Math.Max(0, uniformGrid.Rows);
+        var columns = Math.Max(0, uniformGrid.Columns);
+        var firstColumn = Math.Max(0, uniformGrid.FirstColumn);
+        if (rows == 0 && columns == 0)
+        {
+            columns = Math.Max(1, (int)Math.Ceiling(Math.Sqrt(itemCount + firstColumn)));
+            firstColumn = Math.Min(firstColumn, columns - 1);
+            rows = Math.Max(1, (int)Math.Ceiling((itemCount + firstColumn) / (double)columns));
+        }
+        else if (columns == 0)
+        {
+            rows = Math.Max(1, rows);
+            columns = Math.Max(1, (int)Math.Ceiling((itemCount + firstColumn) / (double)rows));
+            firstColumn = Math.Min(firstColumn, columns - 1);
+        }
+        else
+        {
+            columns = Math.Max(1, columns);
+            firstColumn = Math.Min(firstColumn, columns - 1);
+            rows = rows == 0
+                ? Math.Max(1, (int)Math.Ceiling((itemCount + firstColumn) / (double)columns))
+                : Math.Max(rows, (int)Math.Ceiling((itemCount + firstColumn) / (double)columns));
+        }
+
+        var cellIndex = Math.Max(0, firstColumn + insertionIndex);
+        row = cellIndex / columns;
+        column = cellIndex % columns;
+        if (row >= rows)
+        {
+            return false;
+        }
+
+        var rowSpacing = Math.Max(0, uniformGrid.RowSpacing);
+        var columnSpacing = Math.Max(0, uniformGrid.ColumnSpacing);
+        var cellWidth = Math.Max(10, (parent.Width - ((columns - 1) * columnSpacing)) / columns);
+        var cellHeight = Math.Max(10, (parent.Height - ((rows - 1) * rowSpacing)) / rows);
+        bounds = new Rect(
+            parent.X + (column * (cellWidth + columnSpacing)),
+            parent.Y + (row * (cellHeight + rowSpacing)),
+            cellWidth,
+            cellHeight);
+        return true;
+    }
+
+    private static Rect GetContainerInsertionLineBounds(
+        DesignElement parent,
+        IReadOnlyList<DesignElement> siblings,
+        int insertionIndex,
+        bool flowVertical)
+    {
+        const double thickness = 4;
+        if (flowVertical)
+        {
+            var y = siblings.Count == 0
+                ? parent.Y + ((parent.Height - thickness) / 2)
+                : insertionIndex <= 0
+                    ? siblings[0].Y - (thickness / 2)
+                    : insertionIndex >= siblings.Count
+                        ? siblings[^1].Y + siblings[^1].Height - (thickness / 2)
+                        : siblings[insertionIndex].Y - (thickness / 2);
+            return new Rect(parent.X, y, Math.Max(4, parent.Width), thickness);
+        }
+
+        var x = siblings.Count == 0
+            ? parent.X + ((parent.Width - thickness) / 2)
+            : insertionIndex <= 0
+                ? siblings[0].X - (thickness / 2)
+                : insertionIndex >= siblings.Count
+                    ? siblings[^1].X + siblings[^1].Width - (thickness / 2)
+                    : siblings[insertionIndex].X - (thickness / 2);
+        return new Rect(x, parent.Y, thickness, Math.Max(4, parent.Height));
     }
 
     private bool TryFindGridCellForDrop(
