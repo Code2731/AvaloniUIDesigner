@@ -1635,6 +1635,9 @@ public partial class MainWindowViewModel : ViewModelBase
     {
         var candidates = Canvas.Elements
             .Where(element => element.IsVisibleOnArtboard)
+            .OrderBy(element => element.HasTabOrder ? 0 : 1)
+            .ThenBy(element => element.HasTabOrder ? element.Visual.TabIndex : int.MaxValue)
+            .ThenBy(Canvas.Elements.IndexOf)
             .ToList();
         if (candidates.Count == 0)
         {
