@@ -97,3 +97,6 @@ Users should be able to place controls visually, inspect properties, and validat
 
 18. v1.12
 - Document tab drag reordering with active-order session restore
+
+19. v1.13
+- Document tab keyboard movement and context-menu operations

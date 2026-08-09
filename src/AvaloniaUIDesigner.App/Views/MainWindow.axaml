@@ -330,6 +330,20 @@
                                     DragDrop.DragOver="OnDocumentTabDragOver"
                                     DragDrop.DragLeave="OnDocumentTabDragLeave"
                                     DragDrop.Drop="OnDocumentTabDrop">
+                                <Border.ContextMenu>
+                                    <ContextMenu>
+                                        <MenuItem Header="Move Tab Left"
+                                                  Tag="{Binding}"
+                                                  Click="OnMoveDocumentTabLeftMenuClicked"/>
+                                        <MenuItem Header="Move Tab Right"
+                                                  Tag="{Binding}"
+                                                  Click="OnMoveDocumentTabRightMenuClicked"/>
+                                        <Separator/>
+                                        <MenuItem Header="Close Tab"
+                                                  Tag="{Binding}"
+                                                  Click="OnCloseDocumentTabMenuClicked"/>
+                                    </ContextMenu>
+                                </Border.ContextMenu>
                                 <StackPanel Orientation="Horizontal" Spacing="2">
                                     <Button Content="{Binding Header}"
                                             Tag="{Binding}"

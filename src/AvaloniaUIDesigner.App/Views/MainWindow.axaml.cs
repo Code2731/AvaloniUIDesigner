@@ -33,6 +33,8 @@ public partial class MainWindow : Window
         Ctrl+W              Close active document tab
         Ctrl+Tab            Next document tab
         Ctrl+Shift+Tab      Previous document tab
+        Ctrl+Shift+PageUp   Move active tab left
+        Ctrl+Shift+PageDown Move active tab right
         Ctrl+F              Focus Object Tree search
         Ctrl+Alt+I          Focus Property Inspector filter
         Ctrl+Alt+T          Focus Toolbox search
@@ -324,6 +326,43 @@ public partial class MainWindow : Window
     {
         _documentTabDropTarget?.SetDropTarget(false);
         _documentTabDropTarget = null;
+    }
+
+    private void OnMoveDocumentTabLeftMenuClicked(
+        object? sender,
+        Avalonia.Interactivity.RoutedEventArgs e)
+        => MoveDocumentTabFromMenu(sender, -1);
+
+    private void OnMoveDocumentTabRightMenuClicked(
+        object? sender,
+        Avalonia.Interactivity.RoutedEventArgs e)
+        => MoveDocumentTabFromMenu(sender, 1);
+
+    private async void OnCloseDocumentTabMenuClicked(
+        object? sender,
+        Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        if (sender is MenuItem { Tag: DocumentTabViewModel tab })
+        {
+            await CloseDocumentTabAsync(tab);
+        }
+    }
+
+    private void MoveDocumentTabFromMenu(object? sender, int offset)
+    {
+        if (Vm is null
+            || sender is not MenuItem { Tag: DocumentTabViewModel tab })
+        {
+            return;
+        }
+
+        var currentIndex = Vm.DocumentTabs.IndexOf(tab);
+        if (currentIndex < 0)
+        {
+            return;
+        }
+
+        Vm.MoveDocumentTab(tab, currentIndex + offset);
     }
 
     private async void OnDocumentTabCloseClicked(
@@ -3484,6 +3523,19 @@ public partial class MainWindow : Window
         if (ctrl && e.Key == Key.Tab)
         {
             Vm.ActivateNextDocumentTab(reverse: shift);
+            e.Handled = true;
+            return;
+        }
+
+        if (ctrl && shift && e.Key is (Key.PageUp or Key.PageDown))
+        {
+            if (Vm.SelectedDocumentTab is { } tab)
+            {
+                var currentIndex = Vm.DocumentTabs.IndexOf(tab);
+                var offset = e.Key == Key.PageUp ? -1 : 1;
+                Vm.MoveDocumentTab(tab, currentIndex + offset);
+            }
+
             e.Handled = true;
             return;
         }
