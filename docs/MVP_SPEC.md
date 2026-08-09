@@ -154,3 +154,6 @@ Users should be able to place controls visually, inspect properties, and validat
 
 37. v1.31
 - Provide keyboard shortcuts for centering root selections horizontally, vertically, or on both axes of the artboard
+
+38. v1.32
+- Provide separate keyboard shortcuts for toggling the design grid and grid snapping without changing the design-guide clear shortcut

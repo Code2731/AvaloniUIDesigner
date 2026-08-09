@@ -281,7 +281,7 @@
                     <MenuItem Header="Custom..." Click="OnCustomArtboardBackgroundMenuClicked"/>
                 </MenuItem>
                 <Separator/>
-                <MenuItem Header="Show Grid"
+                <MenuItem Header="Show Grid (Ctrl+Alt+G)"
                           ToggleType="CheckBox"
                           IsChecked="{Binding Canvas.IsGridVisible, Mode=OneWay}"
                           Click="OnShowGridMenuClicked"/>
@@ -292,7 +292,7 @@
                     <Separator/>
                     <MenuItem Header="Custom..." Click="OnCustomGridSizeMenuClicked"/>
                 </MenuItem>
-                <MenuItem Header="Snap to Grid"
+                <MenuItem Header="Snap to Grid (Ctrl+Alt+Shift+G)"
                           ToggleType="CheckBox"
                           IsChecked="{Binding Canvas.SnapToGrid, Mode=OneWay}"
                           Click="OnSnapToGridMenuClicked"/>

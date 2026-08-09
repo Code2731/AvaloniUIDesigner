@@ -49,6 +49,8 @@ public partial class MainWindow : Window
         Ctrl+Alt+Shift+W/H/S Match selected control widths/heights/sizes
         Ctrl+Alt+Shift+X/Y Center selection on artboard horizontally/vertically
         Ctrl+Alt+Shift+C   Center selection on artboard on both axes
+        Ctrl+Alt+G          Toggle design grid
+        Ctrl+Alt+Shift+G    Toggle snap to grid
         Ctrl+]              Bring selected controls forward
         Ctrl+[              Send selected controls backward
         Ctrl+Shift+]        Bring selected controls to front
@@ -4252,7 +4254,21 @@ public partial class MainWindow : Window
             return;
         }
 
-        if (ctrl && shift && e.Key == Key.G)
+        if (ctrl && alt && !shift && e.Key == Key.G)
+        {
+            Vm.SetCanvasGridVisibility(!Vm.Canvas.IsGridVisible);
+            e.Handled = true;
+            return;
+        }
+
+        if (ctrl && alt && shift && e.Key == Key.G)
+        {
+            Vm.SetCanvasSnapToGrid(!Vm.Canvas.SnapToGrid);
+            e.Handled = true;
+            return;
+        }
+
+        if (ctrl && shift && !alt && e.Key == Key.G)
         {
             ClearDesignGuides();
             Vm.StatusText = "Design guides cleared.";
