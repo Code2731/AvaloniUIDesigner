@@ -201,9 +201,9 @@
                 </MenuItem>
                 <Separator/>
                 <MenuItem Header="Center on Artboard" IsEnabled="{Binding Canvas.IsSelectionActive}">
-                    <MenuItem Header="Horizontally" Click="OnCenterHorizontallyOnArtboardMenuClicked"/>
-                    <MenuItem Header="Vertically" Click="OnCenterVerticallyOnArtboardMenuClicked"/>
-                    <MenuItem Header="Both" Click="OnCenterOnArtboardMenuClicked"/>
+                    <MenuItem Header="Horizontally (Ctrl+Alt+Shift+X)" Click="OnCenterHorizontallyOnArtboardMenuClicked"/>
+                    <MenuItem Header="Vertically (Ctrl+Alt+Shift+Y)" Click="OnCenterVerticallyOnArtboardMenuClicked"/>
+                    <MenuItem Header="Both (Ctrl+Alt+Shift+C)" Click="OnCenterOnArtboardMenuClicked"/>
                 </MenuItem>
                 <MenuItem Header="Arrange" IsEnabled="{Binding Canvas.HasMultipleSelection}">
                     <MenuItem Header="Align Left (Ctrl+Shift+Left)" Click="OnAlignLeftMenuClicked"/>

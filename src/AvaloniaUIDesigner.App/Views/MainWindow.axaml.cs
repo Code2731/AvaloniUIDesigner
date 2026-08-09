@@ -47,6 +47,8 @@ public partial class MainWindow : Window
         Ctrl+Shift+E/M      Align selected controls center/middle
         Ctrl+Alt+H/V        Distribute selected controls horizontally/vertically
         Ctrl+Alt+Shift+W/H/S Match selected control widths/heights/sizes
+        Ctrl+Alt+Shift+X/Y Center selection on artboard horizontally/vertically
+        Ctrl+Alt+Shift+C   Center selection on artboard on both axes
         Ctrl+]              Bring selected controls forward
         Ctrl+[              Send selected controls backward
         Ctrl+Shift+]        Bring selected controls to front
@@ -4225,6 +4227,20 @@ public partial class MainWindow : Window
         if (ctrl && !alt && keyboardLayerAction is { } layerAction)
         {
             MoveSelectedElementsInLayerOrder(layerAction);
+            e.Handled = true;
+            return;
+        }
+
+        var keyboardArtboardCenter = e.Key switch
+        {
+            Key.X => (Horizontally: true, Vertically: false),
+            Key.Y => (Horizontally: false, Vertically: true),
+            Key.C => (Horizontally: true, Vertically: true),
+            _ => ((bool Horizontally, bool Vertically)?)null,
+        };
+        if (ctrl && alt && shift && keyboardArtboardCenter is { } center)
+        {
+            CenterSelectedElementsOnArtboard(center.Horizontally, center.Vertically);
             e.Handled = true;
             return;
         }

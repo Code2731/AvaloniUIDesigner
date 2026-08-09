@@ -151,3 +151,6 @@ Users should be able to place controls visually, inspect properties, and validat
 
 36. v1.30
 - Provide keyboard shortcuts for moving selected controls forward, backward, to front, or to back in z-order
+
+37. v1.31
+- Provide keyboard shortcuts for centering root selections horizontally, vertically, or on both axes of the artboard
