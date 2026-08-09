@@ -169,3 +169,6 @@ Users should be able to place controls visually, inspect properties, and validat
 
 42. v1.36
 - Use direction-aware marquee selection with containment for left-to-right drags and intersection for right-to-left drags
+
+43. v1.37
+- Provide keyboard shortcuts for applying supported selection layouts and breaking the selected layout

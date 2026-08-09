@@ -221,27 +221,27 @@
                     <MenuItem Header="Make Same Height (Ctrl+Alt+Shift+H)" Click="OnMakeSameHeightMenuClicked"/>
                     <MenuItem Header="Make Same Size (Ctrl+Alt+Shift+S)" Click="OnMakeSameSizeMenuClicked"/>
                 </MenuItem>
-                <MenuItem Header="Lay Out Selected" IsEnabled="{Binding Canvas.HasMultipleSelection}">
-                    <MenuItem Header="Horizontally (StackPanel)"
+                <MenuItem Header="Lay Out Selected (Ctrl+Alt+Shift+1..8)" IsEnabled="{Binding Canvas.HasMultipleSelection}">
+                    <MenuItem Header="Horizontally (StackPanel, Ctrl+Alt+Shift+1)"
                               Click="OnLayoutSelectedHorizontallyMenuClicked"/>
-                    <MenuItem Header="Vertically (StackPanel)"
+                    <MenuItem Header="Vertically (StackPanel, Ctrl+Alt+Shift+2)"
                               Click="OnLayoutSelectedVerticallyMenuClicked"/>
-                    <MenuItem Header="Grid (Auto)"
+                    <MenuItem Header="Grid (Auto, Ctrl+Alt+Shift+3)"
                               Click="OnLayoutSelectedGridMenuClicked"/>
-                    <MenuItem Header="UniformGrid (Auto)"
+                    <MenuItem Header="UniformGrid (Auto, Ctrl+Alt+Shift+4)"
                               Click="OnLayoutSelectedUniformGridMenuClicked"/>
-                    <MenuItem Header="DockPanel (Horizontal)"
+                    <MenuItem Header="DockPanel (Horizontal, Ctrl+Alt+Shift+5)"
                               Click="OnLayoutSelectedDockPanelHorizontallyMenuClicked"/>
-                    <MenuItem Header="DockPanel (Vertical)"
+                    <MenuItem Header="DockPanel (Vertical, Ctrl+Alt+Shift+6)"
                               Click="OnLayoutSelectedDockPanelVerticallyMenuClicked"/>
-                    <MenuItem Header="WrapPanel (Horizontal)"
+                    <MenuItem Header="WrapPanel (Horizontal, Ctrl+Alt+Shift+7)"
                               Click="OnLayoutSelectedWrapPanelHorizontallyMenuClicked"/>
-                    <MenuItem Header="WrapPanel (Vertical)"
+                    <MenuItem Header="WrapPanel (Vertical, Ctrl+Alt+Shift+8)"
                               Click="OnLayoutSelectedWrapPanelVerticallyMenuClicked"/>
                 </MenuItem>
                 <Separator/>
                 <MenuItem Header="Group Selected into Canvas (Ctrl+G)" Click="OnGroupSelectedMenuClicked" IsEnabled="{Binding Canvas.HasMultipleSelection}"/>
-                <MenuItem Header="Break Selected Layout" Click="OnBreakSelectedLayoutMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
+                <MenuItem Header="Break Selected Layout (Ctrl+Shift+B)" Click="OnBreakSelectedLayoutMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
                 <MenuItem Header="Ungroup Selected Canvas (Ctrl+Shift+U)" Click="OnUngroupSelectedMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
             </MenuItem>
             <MenuItem Header="View">
@@ -788,27 +788,27 @@
                                                         <MenuItem Header="Make Same Height" Click="OnMakeSameHeightMenuClicked"/>
                                                         <MenuItem Header="Make Same Size" Click="OnMakeSameSizeMenuClicked"/>
                                                     </MenuItem>
-                                                    <MenuItem Header="Lay Out Selected">
-                                                        <MenuItem Header="Horizontally (StackPanel)"
+                                                    <MenuItem Header="Lay Out Selected (Ctrl+Alt+Shift+1..8)">
+                                                        <MenuItem Header="Horizontally (StackPanel, Ctrl+Alt+Shift+1)"
                                                                   Click="OnLayoutSelectedHorizontallyMenuClicked"/>
-                                                        <MenuItem Header="Vertically (StackPanel)"
+                                                        <MenuItem Header="Vertically (StackPanel, Ctrl+Alt+Shift+2)"
                                                                   Click="OnLayoutSelectedVerticallyMenuClicked"/>
-                                                        <MenuItem Header="Grid (Auto)"
+                                                        <MenuItem Header="Grid (Auto, Ctrl+Alt+Shift+3)"
                                                                   Click="OnLayoutSelectedGridMenuClicked"/>
-                                                        <MenuItem Header="UniformGrid (Auto)"
+                                                        <MenuItem Header="UniformGrid (Auto, Ctrl+Alt+Shift+4)"
                                                                   Click="OnLayoutSelectedUniformGridMenuClicked"/>
-                                                        <MenuItem Header="DockPanel (Horizontal)"
+                                                        <MenuItem Header="DockPanel (Horizontal, Ctrl+Alt+Shift+5)"
                                                                   Click="OnLayoutSelectedDockPanelHorizontallyMenuClicked"/>
-                                                        <MenuItem Header="DockPanel (Vertical)"
+                                                        <MenuItem Header="DockPanel (Vertical, Ctrl+Alt+Shift+6)"
                                                                   Click="OnLayoutSelectedDockPanelVerticallyMenuClicked"/>
-                                                        <MenuItem Header="WrapPanel (Horizontal)"
+                                                        <MenuItem Header="WrapPanel (Horizontal, Ctrl+Alt+Shift+7)"
                                                                   Click="OnLayoutSelectedWrapPanelHorizontallyMenuClicked"/>
-                                                        <MenuItem Header="WrapPanel (Vertical)"
+                                                        <MenuItem Header="WrapPanel (Vertical, Ctrl+Alt+Shift+8)"
                                                                   Click="OnLayoutSelectedWrapPanelVerticallyMenuClicked"/>
                                                     </MenuItem>
                                                     <Separator/>
                                                     <MenuItem Header="Group Selected into Canvas (Ctrl+G)" Click="OnGroupSelectedMenuClicked"/>
-                                                    <MenuItem Header="Break Selected Layout" Click="OnBreakSelectedLayoutMenuClicked"/>
+                                                    <MenuItem Header="Break Selected Layout (Ctrl+Shift+B)" Click="OnBreakSelectedLayoutMenuClicked"/>
                                                     <MenuItem Header="Ungroup Selected Canvas (Ctrl+Shift+U)" Click="OnUngroupSelectedMenuClicked"/>
                                                 </ContextMenu>
                                             </Border.ContextMenu>

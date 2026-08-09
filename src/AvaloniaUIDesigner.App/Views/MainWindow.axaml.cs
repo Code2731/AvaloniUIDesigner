@@ -47,6 +47,15 @@ public partial class MainWindow : Window
         Ctrl+Shift+E/M      Align selected controls center/middle
         Ctrl+G              Group selected controls into a Canvas
         Ctrl+Shift+U        Ungroup selected Canvas
+        Ctrl+Shift+B        Break selected layout
+        Ctrl+Alt+Shift+1    Lay out selected controls horizontally in a StackPanel
+        Ctrl+Alt+Shift+2    Lay out selected controls vertically in a StackPanel
+        Ctrl+Alt+Shift+3    Lay out selected controls in a Grid
+        Ctrl+Alt+Shift+4    Lay out selected controls in a UniformGrid
+        Ctrl+Alt+Shift+5    Lay out selected controls in a horizontal DockPanel
+        Ctrl+Alt+Shift+6    Lay out selected controls in a vertical DockPanel
+        Ctrl+Alt+Shift+7    Lay out selected controls in a horizontal WrapPanel
+        Ctrl+Alt+Shift+8    Lay out selected controls in a vertical WrapPanel
         Ctrl+Alt+H/V        Distribute selected controls horizontally/vertically
         Ctrl+Alt+Shift+W/H/S Match selected control widths/heights/sizes
         Ctrl+Alt+Shift+X/Y Center selection on artboard horizontally/vertically
@@ -3820,6 +3829,53 @@ public partial class MainWindow : Window
         Vm?.LayoutSelectedIntoStackPanel(orientation);
     }
 
+    private bool ApplyKeyboardLayoutShortcut(Key key)
+    {
+        switch (key)
+        {
+            case Key.D1:
+            case Key.NumPad1:
+                LayoutSelectedControls(Orientation.Horizontal);
+                return true;
+            case Key.D2:
+            case Key.NumPad2:
+                LayoutSelectedControls(Orientation.Vertical);
+                return true;
+            case Key.D3:
+            case Key.NumPad3:
+                FlushPendingPropertyHistory();
+                Vm?.LayoutSelectedIntoGrid();
+                return true;
+            case Key.D4:
+            case Key.NumPad4:
+                FlushPendingPropertyHistory();
+                Vm?.LayoutSelectedIntoUniformGrid();
+                return true;
+            case Key.D5:
+            case Key.NumPad5:
+                FlushPendingPropertyHistory();
+                Vm?.LayoutSelectedIntoDockPanel(Orientation.Horizontal);
+                return true;
+            case Key.D6:
+            case Key.NumPad6:
+                FlushPendingPropertyHistory();
+                Vm?.LayoutSelectedIntoDockPanel(Orientation.Vertical);
+                return true;
+            case Key.D7:
+            case Key.NumPad7:
+                FlushPendingPropertyHistory();
+                Vm?.LayoutSelectedIntoWrapPanel(Orientation.Horizontal);
+                return true;
+            case Key.D8:
+            case Key.NumPad8:
+                FlushPendingPropertyHistory();
+                Vm?.LayoutSelectedIntoWrapPanel(Orientation.Vertical);
+                return true;
+            default:
+                return false;
+        }
+    }
+
     private void ArrangeSelectedElements(MainWindowViewModel.SelectionLayoutAction action)
     {
         FlushPendingPropertyHistory();
@@ -4316,6 +4372,20 @@ public partial class MainWindow : Window
         {
             FlushPendingPropertyHistory();
             Vm.UngroupSelectedCanvas();
+            e.Handled = true;
+            return;
+        }
+
+        if (ctrl && shift && !alt && e.Key == Key.B)
+        {
+            FlushPendingPropertyHistory();
+            Vm.BreakSelectedLayout();
+            e.Handled = true;
+            return;
+        }
+
+        if (ctrl && alt && shift && ApplyKeyboardLayoutShortcut(e.Key))
+        {
             e.Handled = true;
             return;
         }
