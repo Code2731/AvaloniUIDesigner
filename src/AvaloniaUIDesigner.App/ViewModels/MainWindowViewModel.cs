@@ -8887,22 +8887,10 @@ public partial class MainWindowViewModel : ViewModelBase
     {
         SyncActiveDocumentTabState();
         var tabs = DocumentTabs
-            .Select(tab =>
-            {
-                var state = _documentTabStates[tab];
-                return new PersistedDocumentTab(
-                    state.DocumentPath,
-                    tab.DisplayName,
-                    _serializer.Serialize(state.Document),
-                    _serializer.Serialize(state.LastSavedSnapshot),
-                    ExportPersistedHistory(state.UndoStack),
-                    ExportPersistedHistory(state.RedoStack),
-                    state.ZoomScale,
-                    state.SelectedElementNames.ToList(),
-                    state.PropertyInspectorFilterText,
-                    state.PropertyInspectorCategoriesVisible,
-                    state.PropertyInspectorAllCategoriesExpanded);
-            })
+            .Select(tab => ExportPersistedDocumentTab(_documentTabStates[tab]))
+            .ToList();
+        var closedTabs = _closedDocumentTabs
+            .Select(ExportPersistedDocumentTab)
             .ToList();
         var activeTabIndex = _selectedDocumentTab is null
             ? 0
@@ -8923,9 +8911,24 @@ public partial class MainWindowViewModel : ViewModelBase
                     _workspacePanelState.PropertyInspectorVisible,
                     _workspacePanelState.ToolboxWidth,
                     _workspacePanelState.InspectorWidth,
-                    _workspacePanelState.ObjectTreeHeight)),
+                    _workspacePanelState.ObjectTreeHeight),
+                closedTabs),
             new JsonSerializerOptions { WriteIndented = true });
     }
+
+    private PersistedDocumentTab ExportPersistedDocumentTab(DocumentTabState state)
+        => new(
+            state.DocumentPath,
+            state.Tab.DisplayName,
+            _serializer.Serialize(state.Document),
+            _serializer.Serialize(state.LastSavedSnapshot),
+            ExportPersistedHistory(state.UndoStack),
+            ExportPersistedHistory(state.RedoStack),
+            state.ZoomScale,
+            state.SelectedElementNames.ToList(),
+            state.PropertyInspectorFilterText,
+            state.PropertyInspectorCategoriesVisible,
+            state.PropertyInspectorAllCategoriesExpanded);
 
     public bool TryRestoreSessionJson(string json, out string error)
     {
@@ -8955,50 +8958,17 @@ public partial class MainWindowViewModel : ViewModelBase
         Toolbox.RestoreUsageState(session.FavoriteToolboxItems, session.RecentToolboxItems);
 
         var restoredDocuments = new List<RestoredDocumentTab>();
+        var restoredClosedDocuments = new List<RestoredDocumentTab>();
         try
         {
             foreach (var persistedTab in session.Tabs)
             {
-                if (string.IsNullOrWhiteSpace(persistedTab.CurrentAxaml))
-                {
-                    throw new InvalidOperationException("A session tab is missing its current AXAML snapshot.");
-                }
+                restoredDocuments.Add(ParseRestoredDocumentTab(persistedTab));
+            }
 
-                var currentDocument = ParseDraftDocument(
-                    persistedTab.CurrentAxaml,
-                    new List<string>());
-                var savedDocument = string.IsNullOrWhiteSpace(persistedTab.SavedAxaml)
-                    ? currentDocument
-                    : ParseDraftDocument(persistedTab.SavedAxaml, new List<string>());
-                var displayName = string.IsNullOrWhiteSpace(persistedTab.DisplayName)
-                    ? string.IsNullOrWhiteSpace(persistedTab.DocumentPath)
-                        ? "Untitled"
-                        : Path.GetFileName(persistedTab.DocumentPath!)
-                    : persistedTab.DisplayName;
-                var undoHistory = ParsePersistedHistory(persistedTab.UndoHistory);
-                var redoHistory = ParsePersistedHistory(persistedTab.RedoHistory);
-                var zoomScale = double.IsFinite(persistedTab.ZoomScale)
-                    ? Math.Clamp(persistedTab.ZoomScale, 0.25, 2)
-                    : 1;
-                var selectedElementNames = persistedTab.SelectedElementNames?
-                    .Where(name => !string.IsNullOrWhiteSpace(name))
-                    .Distinct(StringComparer.OrdinalIgnoreCase)
-                    .ToList()
-                    ?? new List<string>();
-                var propertyInspectorFilterText = persistedTab.PropertyInspectorFilterText?.Trim()
-                    ?? string.Empty;
-                restoredDocuments.Add(new RestoredDocumentTab(
-                    persistedTab.DocumentPath,
-                    displayName,
-                    currentDocument,
-                    savedDocument,
-                    undoHistory,
-                    redoHistory,
-                    zoomScale,
-                    selectedElementNames,
-                    propertyInspectorFilterText,
-                    persistedTab.PropertyInspectorCategoriesVisible,
-                    persistedTab.PropertyInspectorAllCategoriesExpanded));
+            foreach (var persistedTab in session.ClosedTabs ?? [])
+            {
+                restoredClosedDocuments.Add(ParseRestoredDocumentTab(persistedTab));
             }
         }
         catch (Exception ex)
@@ -9050,10 +9020,81 @@ public partial class MainWindowViewModel : ViewModelBase
 
         var activeIndex = Math.Clamp(session.ActiveTabIndex, 0, restoredTabs.Count - 1);
         ActivateDocumentTab(restoredTabs[activeIndex]);
+        foreach (var restoredClosedDocument in restoredClosedDocuments
+            .Take(MaxClosedDocumentTabs)
+            .Reverse())
+        {
+            _closedDocumentTabs.Push(CreateRestoredDocumentTabState(restoredClosedDocument));
+        }
+
+        OnPropertyChanged(nameof(CanReopenClosedDocumentTab));
         UpdateDocumentTabPresentations();
         StatusText = $"Restored {restoredTabs.Count} document tab(s) from the previous session."
             + (packWarnings.Count == 0 ? string.Empty : $" {string.Join(" ", packWarnings)}");
         return true;
+    }
+
+    private RestoredDocumentTab ParseRestoredDocumentTab(PersistedDocumentTab persistedTab)
+    {
+        if (string.IsNullOrWhiteSpace(persistedTab.CurrentAxaml))
+        {
+            throw new InvalidOperationException("A session tab is missing its current AXAML snapshot.");
+        }
+
+        var currentDocument = ParseDraftDocument(
+            persistedTab.CurrentAxaml,
+            new List<string>());
+        var savedDocument = string.IsNullOrWhiteSpace(persistedTab.SavedAxaml)
+            ? currentDocument
+            : ParseDraftDocument(persistedTab.SavedAxaml, new List<string>());
+        var displayName = string.IsNullOrWhiteSpace(persistedTab.DisplayName)
+            ? string.IsNullOrWhiteSpace(persistedTab.DocumentPath)
+                ? "Untitled"
+                : Path.GetFileName(persistedTab.DocumentPath!)
+            : persistedTab.DisplayName;
+        var undoHistory = ParsePersistedHistory(persistedTab.UndoHistory);
+        var redoHistory = ParsePersistedHistory(persistedTab.RedoHistory);
+        var zoomScale = double.IsFinite(persistedTab.ZoomScale)
+            ? Math.Clamp(persistedTab.ZoomScale, 0.25, 2)
+            : 1;
+        var selectedElementNames = persistedTab.SelectedElementNames?
+            .Where(name => !string.IsNullOrWhiteSpace(name))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList()
+            ?? new List<string>();
+        var propertyInspectorFilterText = persistedTab.PropertyInspectorFilterText?.Trim()
+            ?? string.Empty;
+        return new RestoredDocumentTab(
+            persistedTab.DocumentPath,
+            displayName,
+            currentDocument,
+            savedDocument,
+            undoHistory,
+            redoHistory,
+            zoomScale,
+            selectedElementNames,
+            propertyInspectorFilterText,
+            persistedTab.PropertyInspectorCategoriesVisible,
+            persistedTab.PropertyInspectorAllCategoriesExpanded);
+    }
+
+    private static DocumentTabState CreateRestoredDocumentTabState(
+        RestoredDocumentTab restoredDocument)
+    {
+        var state = new DocumentTabState(
+            new DocumentTabViewModel(restoredDocument.DisplayName),
+            restoredDocument.CurrentDocument,
+            restoredDocument.SavedDocument,
+            restoredDocument.DocumentPath,
+            CreateHistoryStack(restoredDocument.UndoHistory),
+            CreateHistoryStack(restoredDocument.RedoHistory),
+            pendingMutation: null,
+            restoredDocument.ZoomScale,
+            restoredDocument.SelectedElementNames.ToList());
+        state.PropertyInspectorFilterText = restoredDocument.PropertyInspectorFilterText;
+        state.PropertyInspectorCategoriesVisible = restoredDocument.PropertyInspectorCategoriesVisible;
+        state.PropertyInspectorAllCategoriesExpanded = restoredDocument.PropertyInspectorAllCategoriesExpanded;
+        return state;
     }
 
     private static WorkspacePanelState NormalizeWorkspacePanelState(WorkspacePanelState state)
@@ -16420,7 +16461,8 @@ public partial class MainWindowViewModel : ViewModelBase
         List<PersistedComponentType>? ComponentTypes = null,
         List<string>? FavoriteToolboxItems = null,
         List<string>? RecentToolboxItems = null,
-        PersistedWorkspacePanelState? WorkspacePanels = null);
+        PersistedWorkspacePanelState? WorkspacePanels = null,
+        List<PersistedDocumentTab>? ClosedTabs = null);
 
     private sealed record PersistedWorkspacePanelState(
         bool ToolboxVisible = true,

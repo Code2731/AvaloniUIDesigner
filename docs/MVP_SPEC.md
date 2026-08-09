@@ -112,3 +112,6 @@ Users should be able to place controls visually, inspect properties, and validat
 
 23. v1.17
 - Reopen recently closed document tabs with their editing state intact
+
+24. v1.18
+- Persist and restore the recently closed document tab history

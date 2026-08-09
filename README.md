@@ -204,6 +204,7 @@ dotnet run --project src/AvaloniaUIDesigner.App/AvaloniaUIDesigner.App.csproj
 75e. `File > Save All` 또는 `Ctrl+Alt+S`는 dirty 상태인 모든 문서 탭을 저장하고, 저장 중 취소하거나 실패하면 원래 활성 탭으로 돌아갑니다. 파일 경로가 없는 탭은 기존 `Save AXAML` 대화상자를 순서대로 사용합니다.
 75f. `File > Close All Tabs` 또는 `Ctrl+Shift+W`는 모든 문서 탭의 dirty 확인을 끝낸 뒤 탭을 닫고, 마지막 탭을 새 빈 `Untitled` 문서로 재사용합니다. 중간에 취소하거나 실패하면 탭 구성과 원래 활성 탭을 그대로 유지합니다.
 75g. `File > Reopen Closed Tab` 또는 `Ctrl+Shift+T`는 현재 세션에서 마지막으로 닫은 문서 탭을 복원하며, 문서 내용·dirty 기준·Undo/Redo·줌·선택·Property Inspector 상태를 함께 되살립니다. 닫힌 탭 기록은 최대 20개까지 유지됩니다.
+75h. 닫힌 탭 기록도 `%LocalAppData%/AvaloniaUIDesigner/session.json`의 `ClosedTabs`로 저장되므로 앱을 다시 실행한 뒤에도 `Reopen Closed Tab`으로 마지막 작업을 되살릴 수 있습니다. 이전 버전 세션에 이 필드가 없어도 문서 탭 복원은 정상 진행됩니다.
 76. `File > Load Component Pack...` 또는 `File > Load Toolbox Preset Pack...`으로 외부 Toolbox 팩을 추가하면 파일 경로가 세션에 등록되어 다음 실행 때 자동으로 다시 로드됩니다. 파일이 없어도 문서 탭 복원은 계속되며 상태바에 경고가 표시됩니다.
 77. 외부 프로젝트의 컨트롤은 Component Pack 항목에 `designOnly: true`, `avaloniaTypeName`, `previewText`, `defaultProperties`를 지정해 등록합니다. 디자이너에서는 타입명 플레이스홀더로 편집하고, 생성 AXAML에는 원래 커스텀 타입과 속성을 출력합니다. 예시는 [custom-component-pack.example.json](docs/custom-component-pack.example.json)을 참고하세요.
 78. `File > Load Component Pack Plugin...`에서 `IComponentPackPlugin`을 구현한 신뢰할 수 있는 DLL을 선택하면 플러그인이 제공한 Component Pack을 Toolbox에 등록합니다. DLL 경로는 세션 JSON의 `ComponentPluginPaths`에 저장되고, 앱 재시작 시 플러그인·JSON 팩·프리셋 팩 순서로 복원됩니다.
@@ -341,6 +342,7 @@ AXAML 소스 편집기의 `Validate`와 `Preview`는 현재 디자인과 Undo �
 - v1.15: 여러 문서 탭의 dirty 상태 일괄 저장
 - v1.16: 모든 문서 탭 닫기와 빈 문서 복원
 - v1.17: 닫힌 문서 탭 복원과 편집 상태 유지
+- v1.18: 닫힌 문서 탭 기록의 세션 저장·복원
 
 ## 컴포넌트 팩
 
