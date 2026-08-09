@@ -254,6 +254,17 @@
                 <MenuItem Header="Zoom Out (Ctrl+-)" Click="OnZoomOutMenuClicked"/>
                 <MenuItem Header="Actual Size (100%, Ctrl+0)" Click="OnResetZoomMenuClicked"/>
                 <MenuItem Header="Fit to View (F)" Click="OnFitToViewMenuClicked"/>
+                <MenuItem Header="Zoom Presets">
+                    <MenuItem Header="25%" Tag="0.25" Click="OnZoomPresetMenuClicked"/>
+                    <MenuItem Header="50%" Tag="0.5" Click="OnZoomPresetMenuClicked"/>
+                    <MenuItem Header="75%" Tag="0.75" Click="OnZoomPresetMenuClicked"/>
+                    <MenuItem Header="100%" Tag="1" Click="OnZoomPresetMenuClicked"/>
+                    <MenuItem Header="125%" Tag="1.25" Click="OnZoomPresetMenuClicked"/>
+                    <MenuItem Header="150%" Tag="1.5" Click="OnZoomPresetMenuClicked"/>
+                    <MenuItem Header="200%" Tag="2" Click="OnZoomPresetMenuClicked"/>
+                    <Separator/>
+                    <MenuItem Header="Custom..." Click="OnCustomZoomMenuClicked"/>
+                </MenuItem>
                 <Separator/>
                 <MenuItem Header="Artboard Size">
                     <MenuItem Header="Desktop (1280 x 800)" Click="OnDesktopArtboardMenuClicked"/>

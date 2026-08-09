@@ -133,3 +133,6 @@ Users should be able to place controls visually, inspect properties, and validat
 
 30. v1.24
 - Provide keyboard navigation for canvas zoom and viewport fitting while preserving per-document zoom state
+
+31. v1.25
+- Provide standard canvas zoom presets and validated custom zoom percentage input

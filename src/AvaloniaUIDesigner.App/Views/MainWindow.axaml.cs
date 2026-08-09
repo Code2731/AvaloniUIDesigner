@@ -51,6 +51,7 @@ public partial class MainWindow : Window
         Ctrl+Alt+P          Toggle Toolbox placement mode
         Ctrl+0              Actual size (100%)
         F                   Fit canvas to view
+        View > Zoom Presets Choose 25-200% or a custom zoom scale
         Ctrl+R              Open runtime Preview
         Ctrl+Z              Undo
         Ctrl+Y              Redo
@@ -2977,6 +2978,135 @@ public partial class MainWindow : Window
     {
         Vm?.Canvas.FitToViewport(DesignViewport.Bounds.Width, DesignViewport.Bounds.Height);
         UpdateZoomStatus();
+    }
+
+    private void OnZoomPresetMenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        if (Vm is null
+            || sender is not MenuItem { Tag: string rawScale }
+            || !double.TryParse(rawScale, NumberStyles.Float, CultureInfo.InvariantCulture, out var scale))
+        {
+            return;
+        }
+
+        Vm.Canvas.SetZoomScale(scale);
+        UpdateZoomStatus();
+    }
+
+    private async void OnCustomZoomMenuClicked(
+        object? sender,
+        Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        if (Vm is null)
+        {
+            return;
+        }
+
+        var zoomScale = await ShowZoomScaleDialogAsync(Vm.Canvas.ZoomScale);
+        if (zoomScale is double value)
+        {
+            Vm.Canvas.SetZoomScale(value);
+            UpdateZoomStatus();
+        }
+    }
+
+    private static bool TryParseZoomPercentage(string? text, out double zoomScale)
+    {
+        zoomScale = 0;
+        if (!double.TryParse(
+                text?.Trim(),
+                NumberStyles.Float,
+                CultureInfo.InvariantCulture,
+                out var percentage)
+            || !double.IsFinite(percentage)
+            || percentage < 25
+            || percentage > 200)
+        {
+            return false;
+        }
+
+        zoomScale = percentage / 100;
+        return true;
+    }
+
+    private async Task<double?> ShowZoomScaleDialogAsync(double currentZoomScale)
+    {
+        var dialog = new Window
+        {
+            Title = "Custom Zoom",
+            Width = 420,
+            Height = 230,
+            MinWidth = 360,
+            MinHeight = 210,
+            CanResize = false,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner,
+        };
+        var editor = new TextBox
+        {
+            Text = (currentZoomScale * 100).ToString("0.##", CultureInfo.InvariantCulture),
+            Watermark = "Zoom percentage (25-200)",
+            MinWidth = 260,
+        };
+        var errorText = new TextBlock
+        {
+            Foreground = Brush.Parse("#B91C1C"),
+            TextWrapping = TextWrapping.Wrap,
+        };
+
+        void ApplyZoom()
+        {
+            if (!TryParseZoomPercentage(editor.Text, out var zoomScale))
+            {
+                errorText.Text = "Enter a zoom percentage from 25 to 200.";
+                return;
+            }
+
+            dialog.Close(zoomScale);
+        }
+
+        var cancelButton = new Button { Content = "Cancel", MinWidth = 86 };
+        var applyButton = new Button { Content = "Apply", MinWidth = 86 };
+        cancelButton.Click += (_, _) => dialog.Close(null);
+        applyButton.Click += (_, _) => ApplyZoom();
+        editor.KeyDown += (_, e) =>
+        {
+            if (e.Key == Key.Enter)
+            {
+                ApplyZoom();
+                e.Handled = true;
+            }
+            else if (e.Key == Key.Escape)
+            {
+                dialog.Close(null);
+                e.Handled = true;
+            }
+        };
+        dialog.Opened += (_, _) =>
+        {
+            editor.Focus();
+            editor.SelectAll();
+        };
+
+        dialog.Content = new StackPanel
+        {
+            Margin = new Thickness(16),
+            Spacing = 10,
+            Children =
+            {
+                new TextBlock { Text = "Choose a custom canvas zoom percentage." },
+                editor,
+                errorText,
+                new StackPanel
+                {
+                    Orientation = Orientation.Horizontal,
+                    HorizontalAlignment = HorizontalAlignment.Right,
+                    Spacing = 8,
+                    Children = { cancelButton, applyButton },
+                },
+            },
+        };
+
+        return await dialog.ShowDialog<double?>(this);
     }
 
     private void OnGridSize4MenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
