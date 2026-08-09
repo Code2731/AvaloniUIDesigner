@@ -175,3 +175,6 @@ Users should be able to place controls visually, inspect properties, and validat
 
 44. v1.38
 - Exclude locked and hidden controls from marquee selection while preserving direct inspection of locked controls
+
+45. v1.39
+- Cycle through visible overlapping controls with Alt-click in z-order, preserving locked controls for inspection and excluding hidden controls

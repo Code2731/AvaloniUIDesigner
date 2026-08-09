@@ -97,6 +97,8 @@ public partial class MainWindow : Window
         Arrow keys           Nudge selection by 1 px
         Shift+Arrow keys     Nudge selection by 10 px
         Shift+corner handle  Lock aspect ratio while resizing
+        Alt+click           Cycle through overlapping controls at the pointer
+        Alt+Shift+click     Cycle backward through overlapping controls
         Double-click element Quick edit visible content
         Delete / Backspace   Remove selection
         Object Tree F2       Rename selected control
@@ -5740,6 +5742,15 @@ public partial class MainWindow : Window
             return;
         }
 
+        if (e.KeyModifiers.HasFlag(KeyModifiers.Alt)
+            && TryCycleSelectionAtPoint(
+                placementPoint,
+                e.KeyModifiers.HasFlag(KeyModifiers.Shift)))
+        {
+            e.Handled = true;
+            return;
+        }
+
         if (element.IsLocked)
         {
             Vm.SelectElement(element);
@@ -5775,6 +5786,32 @@ public partial class MainWindow : Window
 
         BeginDrag(DragMode.Move, element, e);
         e.Handled = true;
+    }
+
+    private bool TryCycleSelectionAtPoint(Point point, bool reverse)
+    {
+        if (Vm is null)
+        {
+            return false;
+        }
+
+        // ItemsControl renders later elements on top, so walk the hit stack from front to back.
+        var candidates = Vm.Canvas.GetVisibleElementsAt(point.X, point.Y).Reverse().ToList();
+        if (candidates.Count == 0)
+        {
+            return false;
+        }
+
+        var currentIndex = Vm.Canvas.SelectedElement is { } current
+            ? candidates.IndexOf(current)
+            : -1;
+        var nextIndex = reverse
+            ? currentIndex <= 0 ? candidates.Count - 1 : currentIndex - 1
+            : currentIndex < 0 || currentIndex == candidates.Count - 1 ? 0 : currentIndex + 1;
+        var next = candidates[nextIndex];
+        Vm.SelectElement(next);
+        Vm.StatusText = $"Selected {next.DisplayName} (overlap {nextIndex + 1}/{candidates.Count}).";
+        return true;
     }
 
     private async Task<bool> TryOpenQuickContentEditorAsync(DesignElement element)

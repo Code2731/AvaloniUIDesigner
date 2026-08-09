@@ -513,6 +513,15 @@ public partial class CanvasViewModel : ViewModelBase
     public void SelectMany(IEnumerable<DesignElement> elements)
         => ReplaceSelection(elements);
 
+    public IReadOnlyList<DesignElement> GetVisibleElementsAt(double x, double y)
+    {
+        var point = new Point(x, y);
+        return Elements
+            .Where(element => element.IsVisibleOnArtboard)
+            .Where(element => new Rect(element.X, element.Y, element.Width, element.Height).Contains(point))
+            .ToList();
+    }
+
     public void ClearSelection()
     {
         ClearStylePreviewState();
