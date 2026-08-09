@@ -8686,10 +8686,12 @@ public partial class MainWindowViewModel : ViewModelBase
 
     public void DuplicateSelectedElement()
     {
-        var selected = Canvas.SelectedElements.ToList();
+        var selected = Canvas.SelectedElements
+            .Where(element => !element.IsLocked)
+            .ToList();
         if (selected.Count == 0)
         {
-            StatusText = "No selected element to duplicate.";
+            StatusText = "No unlocked controls to duplicate.";
             return;
         }
 
@@ -8727,10 +8729,12 @@ public partial class MainWindowViewModel : ViewModelBase
 
     public void CopySelectedElement()
     {
-        var selected = Canvas.SelectedElements.ToList();
+        var selected = Canvas.SelectedElements
+            .Where(element => !element.IsLocked)
+            .ToList();
         if (selected.Count == 0)
         {
-            StatusText = "No selected element to copy.";
+            StatusText = "No unlocked controls to copy.";
             return;
         }
 
