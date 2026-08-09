@@ -85,6 +85,7 @@ public partial class MainWindow : Window
         Edit > History      Inspect and jump through Undo/Redo history
         Ctrl+A              Select all visible unlocked controls
         Ctrl/Shift+drag     Add marquee results to the current selection
+        Alt+drag             Remove marquee results from the current selection
         Ctrl+D              Duplicate selection
         Ctrl+C              Copy selection
         Ctrl+X              Cut selection
@@ -193,6 +194,7 @@ public partial class MainWindow : Window
     private bool _isSelectionResize;
     private bool _isMarqueeSelecting;
     private bool _marqueeAdditive;
+    private bool _marqueeSubtractive;
     private Point _marqueeStart;
     private bool _isPanningViewport;
     private Point _panStart;
@@ -5745,6 +5747,7 @@ public partial class MainWindow : Window
 
         _isMarqueeSelecting = true;
         _marqueeAdditive = IsAdditiveMarqueeModifier(e.KeyModifiers);
+        _marqueeSubtractive = IsSubtractiveMarqueeModifier(e.KeyModifiers);
         _marqueeStart = point;
         UpdateMarquee(point);
         e.Pointer.Capture(DesignHost);
@@ -6787,7 +6790,7 @@ public partial class MainWindow : Window
         var area = GetMarqueeArea(current);
         if (area.Width < MarqueeThreshold && area.Height < MarqueeThreshold)
         {
-            if (!_marqueeAdditive)
+            if (!_marqueeAdditive && !_marqueeSubtractive)
             {
                 Vm.SelectElements(Array.Empty<DesignElement>());
             }
@@ -6807,12 +6810,22 @@ public partial class MainWindow : Window
                     : area.Intersects(bounds);
             })
             .ToList();
-        Vm.SelectElements(selected, _marqueeAdditive);
+        if (_marqueeSubtractive)
+        {
+            Vm.SelectElements(Vm.Canvas.SelectedElements.Except(selected));
+        }
+        else
+        {
+            Vm.SelectElements(selected, _marqueeAdditive);
+        }
     }
 
     private static bool IsAdditiveMarqueeModifier(KeyModifiers modifiers)
         => modifiers.HasFlag(KeyModifiers.Control)
             || modifiers.HasFlag(KeyModifiers.Shift);
+
+    private static bool IsSubtractiveMarqueeModifier(KeyModifiers modifiers)
+        => modifiers.HasFlag(KeyModifiers.Alt);
 
     private Rect GetMarqueeArea(Point current)
     {
