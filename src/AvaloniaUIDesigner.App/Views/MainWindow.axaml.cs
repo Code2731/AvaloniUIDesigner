@@ -84,6 +84,7 @@ public partial class MainWindow : Window
         Ctrl+Y              Redo
         Edit > History      Inspect and jump through Undo/Redo history
         Ctrl+A              Select all visible unlocked controls
+        Ctrl/Shift+drag     Add marquee results to the current selection
         Ctrl+D              Duplicate selection
         Ctrl+C              Copy selection
         Ctrl+X              Cut selection
@@ -5743,7 +5744,7 @@ public partial class MainWindow : Window
         }
 
         _isMarqueeSelecting = true;
-        _marqueeAdditive = e.KeyModifiers.HasFlag(KeyModifiers.Control);
+        _marqueeAdditive = IsAdditiveMarqueeModifier(e.KeyModifiers);
         _marqueeStart = point;
         UpdateMarquee(point);
         e.Pointer.Capture(DesignHost);
@@ -6808,6 +6809,10 @@ public partial class MainWindow : Window
             .ToList();
         Vm.SelectElements(selected, _marqueeAdditive);
     }
+
+    private static bool IsAdditiveMarqueeModifier(KeyModifiers modifiers)
+        => modifiers.HasFlag(KeyModifiers.Control)
+            || modifiers.HasFlag(KeyModifiers.Shift);
 
     private Rect GetMarqueeArea(Point current)
     {
