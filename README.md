@@ -86,6 +86,7 @@ dotnet run --project src/AvaloniaUIDesigner.App/AvaloniaUIDesigner.App.csproj
 - **Undo History Timeline**: `Edit > History...`에서 현재 문서와 Undo·Redo 작업을 한 번에 확인하고 원하는 지점으로 이동
 - **Document Tabs**: 여러 AXAML 문서를 동시에 탭으로 열고 전환하며, 문서별 캔버스·dirty 상태·Undo/Redo history를 독립적으로 보존합니다. `Ctrl+N`/`File > New`는 새 탭, `Ctrl+W`/`File > Close Tab`은 현재 탭을 닫고, `File > Open...`은 문서를 새 탭으로 엽니다.
 - **Tab View Navigation**: `Ctrl+Tab`/`Ctrl+Shift+Tab`으로 문서 탭을 순환하고, 탭별 캔버스 줌과 Object Tree 선택을 전환·세션 복원 때 보존합니다.
+- **Workspace Panels**: `View > Panels`에서 Toolbox·Object Tree·Property Inspector를 독립적으로 숨기거나 다시 표시하고, 패널 크기와 가시성·Object Tree 분할 위치를 세션에 저장합니다. `Reset Panel Layout`으로 기본 작업 공간을 복원합니다.
 - **Workspace Session Restore**: 앱을 정상적으로 닫으면 열린 탭 목록·활성 탭·현재 AXAML·저장 기준 스냅샷·줌·Object Tree 선택·Property Inspector 탐색 상태를 로컬 세션에 저장하고, 다음 실행 시 dirty 문서를 포함해 복원합니다. 세션 JSON이 손상되면 현재 새 문서 상태를 유지하고 안전하게 시작합니다.
 - **선택 요소 AXAML 재사용**: 선택한 컨트롤을 하위 계층·리소스·스타일·바인딩·컨트롤 전용 선언과 함께 독립 UserControl AXAML로 클립보드 복사하거나 파일로 내보냄
 - **문서 루트 속성**: Window/UserControl 루트 종류와 Window 제목·리사이즈·시작 위치, 루트 Min/Max 크기를 편집하고 Undo/Redo, Preview, Draft·Full AXAML 왕복에 보존
@@ -196,6 +197,7 @@ dotnet run --project src/AvaloniaUIDesigner.App/AvaloniaUIDesigner.App.csproj
 73. `Ctrl+N` 또는 `File > New`로 새 문서 탭을 만들고 탭 제목을 클릭해 문서를 전환합니다. `File > Open...`은 AXAML을 새 탭으로 열며 `Ctrl+W` 또는 탭의 `x` 버튼으로 현재 탭을 닫습니다.
 74. 앱을 정상적으로 종료한 뒤 다시 실행하면 마지막 탭 구성과 dirty 편집 내용이 자동 복원됩니다. 복원 데이터는 `%LocalAppData%/AvaloniaUIDesigner/session.json`에 저장됩니다.
 75. `Ctrl+Tab`으로 다음 문서 탭, `Ctrl+Shift+Tab`으로 이전 문서 탭을 선택합니다. 각 탭은 마지막 줌 배율과 선택한 컨트롤을 독립적으로 유지합니다.
+75a. `View > Panels`에서 Toolbox·Object Tree·Property Inspector를 필요한 조합으로 표시하거나 숨기고, `Reset Panel Layout`으로 기본 크기와 표시 상태를 복원합니다. 패널 상태는 앱 종료 후 세션에 저장됩니다.
 76. `File > Load Component Pack...` 또는 `File > Load Toolbox Preset Pack...`으로 외부 Toolbox 팩을 추가하면 파일 경로가 세션에 등록되어 다음 실행 때 자동으로 다시 로드됩니다. 파일이 없어도 문서 탭 복원은 계속되며 상태바에 경고가 표시됩니다.
 77. 외부 프로젝트의 컨트롤은 Component Pack 항목에 `designOnly: true`, `avaloniaTypeName`, `previewText`, `defaultProperties`를 지정해 등록합니다. 디자이너에서는 타입명 플레이스홀더로 편집하고, 생성 AXAML에는 원래 커스텀 타입과 속성을 출력합니다. 예시는 [custom-component-pack.example.json](docs/custom-component-pack.example.json)을 참고하세요.
 78. `File > Load Component Pack Plugin...`에서 `IComponentPackPlugin`을 구현한 신뢰할 수 있는 DLL을 선택하면 플러그인이 제공한 Component Pack을 Toolbox에 등록합니다. DLL 경로는 세션 JSON의 `ComponentPluginPaths`에 저장되고, 앱 재시작 시 플러그인·JSON 팩·프리셋 팩 순서로 복원됩니다.
@@ -289,6 +291,8 @@ Workspace Session Restore는 종료 시 각 문서 탭의 현재 스냅샷과 �
 
 탭 전환은 문서 내용과 Undo/Redo history뿐 아니라 탭별 줌 배율·Object Tree 선택 이름·Property Inspector 필터/카테고리/확장 상태도 저장합니다. 따라서 여러 화면을 번갈아 편집할 때 작업 위치와 속성 탐색 맥락을 잃지 않으며, `Ctrl+Tab` 순환 전환과 앱 재시작 후에도 같은 편집 맥락을 유지합니다.
 
+Workspace 패널은 문서와 독립된 세션 전역 상태입니다. Toolbox·Object Tree·Property Inspector의 표시 여부, 마지막 패널 폭과 Object Tree 높이를 저장하며, 오래된 세션 JSON에는 이 필드가 없어도 기본 4-pane 레이아웃으로 복원합니다.
+
 `Break Selected Layout`은 선택한 컨테이너를 제거하고 직접 자식들을 root 또는 원래 Canvas에 다시 연결합니다. Grid·StackPanel·DockPanel·WrapPanel·UniformGrid는 현재 화면 bounds를 유지하고, Canvas 안의 레이아웃은 부모 상대 좌표와 형제 순서를 유지하며 해제된 자식들을 다시 선택합니다.
 
 선택 영역 Toolbox 프리셋은 두 개 이상의 root 컨트롤 또는 같은 Canvas의 직접 형제 컨트롤을 선택한 뒤 `File > Add Selection to Toolbox...`에서 등록합니다. 선택 영역의 좌상단을 기준으로 상대 좌표를 저장하고, root 선택은 컨트롤 목록으로, Canvas 형제 선택은 bounding box Canvas와 로컬 자식 계층으로 보존합니다. 등록 시점의 크기·시각 속성·텍스트·콘텐츠도 함께 복원하며, 배치 후 생성된 Canvas와 자식 컨트롤을 모두 선택합니다. 등록된 프리셋은 현재 세션의 Toolbox 검색 결과에 즉시 나타나며, `File > Export Selected Toolbox Preset...`으로 `*.toolbox-preset.json` 팩을 저장할 수 있습니다. `File > Load Toolbox Preset Pack...`은 JSON 문법·중복 이름·지원 타입·bounds·root/Canvas 계층을 검증한 뒤 일괄 등록하므로 실패한 팩이 Toolbox를 부분적으로 변경하지 않습니다. Grid·StackPanel·DockPanel·WrapPanel·UniformGrid·TabControl·SplitView·Content 자식은 현재 프리셋 배치 경로가 부모 전용 메타데이터를 복원하지 않으므로 등록을 거부합니다. 예시는 [toolbox-preset.example.json](docs/toolbox-preset.example.json)을 참고하세요.
@@ -323,7 +327,8 @@ AXAML 소스 편집기의 `Validate`와 `Preview`는 현재 디자인과 Undo �
 - ~~v1.7: Object Tree 키보드 탐색 및 이름 변경·삭제·잠금 단축키~~ ✅
 - ~~v1.8: Property Inspector 카테고리/평면 보기와 일괄 펼침 탐색~~ ✅
 - ~~v1.9: Property Inspector 전용 필터·Clear·포커스 단축키~~ ✅
-- v1.10: 문서 탭별 Property Inspector 필터·카테고리·확장 상태와 세션 복원
+- ~~v1.10: 문서 탭별 Property Inspector 필터·카테고리·확장 상태와 세션 복원~~ ✅
+- v1.11: Qt Designer식 Workspace 패널 표시/숨김·크기 복원·레이아웃 초기화
 
 ## 컴포넌트 팩
 

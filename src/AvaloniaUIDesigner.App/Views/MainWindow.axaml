@@ -278,6 +278,26 @@
                           IsChecked="True"
                           Click="OnSnapToGuidesMenuClicked"/>
                 <MenuItem Header="Clear Design Guides" Click="OnClearDesignGuidesMenuClicked"/>
+                <Separator/>
+                <MenuItem Header="Panels">
+                    <MenuItem Name="ShowToolboxMenu"
+                              Header="Toolbox"
+                              ToggleType="CheckBox"
+                              IsChecked="True"
+                              Click="OnShowToolboxMenuClicked"/>
+                    <MenuItem Name="ShowObjectTreeMenu"
+                              Header="Object Tree"
+                              ToggleType="CheckBox"
+                              IsChecked="True"
+                              Click="OnShowObjectTreeMenuClicked"/>
+                    <MenuItem Name="ShowPropertyInspectorMenu"
+                              Header="Property Inspector"
+                              ToggleType="CheckBox"
+                              IsChecked="True"
+                              Click="OnShowPropertyInspectorMenuClicked"/>
+                    <Separator/>
+                    <MenuItem Header="Reset Panel Layout" Click="OnResetPanelLayoutMenuClicked"/>
+                </MenuItem>
             </MenuItem>
             <MenuItem Header="Help">
                 <MenuItem Header="Keyboard Shortcuts..." Click="OnKeyboardShortcutsMenuClicked"/>
@@ -363,8 +383,8 @@
             </DockPanel>
         </Border>
 
-        <Grid ColumnDefinitions="220,4,*,4,280">
-            <Border Grid.Column="0" Background="#252526" BorderBrush="#3F3F46" BorderThickness="0,0,1,0">
+        <Grid Name="WorkspaceGrid" ColumnDefinitions="220,4,*,4,280">
+            <Border Name="ToolboxPane" Grid.Column="0" Background="#252526" BorderBrush="#3F3F46" BorderThickness="0,0,1,0">
                 <DockPanel>
                     <Border DockPanel.Dock="Top" Background="#2D2D30" Padding="8,6">
                         <DockPanel>
@@ -474,7 +494,7 @@
                 </DockPanel>
             </Border>
 
-            <GridSplitter Grid.Column="1" Background="#3F3F46" ResizeDirection="Columns"/>
+            <GridSplitter Name="ToolboxSplitter" Grid.Column="1" Background="#3F3F46" ResizeDirection="Columns"/>
 
             <Border Grid.Column="2" Background="#1E1E1E">
                 <DockPanel>
@@ -916,10 +936,10 @@
                 </DockPanel>
             </Border>
 
-            <GridSplitter Grid.Column="3" Background="#3F3F46" ResizeDirection="Columns"/>
+            <GridSplitter Name="InspectorSplitter" Grid.Column="3" Background="#3F3F46" ResizeDirection="Columns"/>
 
-            <Grid Grid.Column="4" RowDefinitions="*,4,*">
-                <Border Grid.Row="0" Background="#252526" BorderBrush="#3F3F46" BorderThickness="1,0,0,0">
+            <Grid Name="InspectorPane" Grid.Column="4" RowDefinitions="*,4,*">
+                <Border Name="ObjectTreePane" Grid.Row="0" Background="#252526" BorderBrush="#3F3F46" BorderThickness="1,0,0,0">
                     <DockPanel>
                         <Border DockPanel.Dock="Top" Background="#2D2D30" Padding="8,6">
                             <StackPanel Orientation="Horizontal" Spacing="8">
@@ -1031,9 +1051,9 @@
                     </DockPanel>
                 </Border>
 
-                <GridSplitter Grid.Row="1" Background="#3F3F46" ResizeDirection="Rows"/>
+                <GridSplitter Name="ObjectTreeSplitter" Grid.Row="1" Background="#3F3F46" ResizeDirection="Rows"/>
 
-                <Border Grid.Row="2" Background="#252526" BorderBrush="#3F3F46" BorderThickness="1,0,0,0">
+                <Border Name="PropertyInspectorPane" Grid.Row="2" Background="#252526" BorderBrush="#3F3F46" BorderThickness="1,0,0,0">
                     <DockPanel>
                     <Border DockPanel.Dock="Top" Background="#2D2D30" Padding="8,6">
                         <Grid RowDefinitions="Auto,Auto">

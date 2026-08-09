@@ -90,4 +90,7 @@ Users should be able to place controls visually, inspect properties, and validat
 - ~~Property Inspector dedicated filter, clear action, and focus shortcut~~
 
 16. v1.10
-- Per-document-tab Property Inspector filter, category, and expansion state with session restore
+- ~~Per-document-tab Property Inspector filter, category, and expansion state with session restore~~
+
+17. v1.11
+- Qt Designer-style workspace panel visibility, size restore, and layout reset

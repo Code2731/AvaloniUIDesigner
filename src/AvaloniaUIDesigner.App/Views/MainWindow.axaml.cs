@@ -168,6 +168,9 @@ public partial class MainWindow : Window
     private bool _hasPendingLayoutEdit;
     private bool _allowCloseWithoutPrompt;
     private string _propertyInspectorFilterText = string.Empty;
+    private double _toolboxPaneWidth = 220;
+    private double _inspectorPaneWidth = 280;
+    private double _objectTreePaneHeight;
 
     public MainWindow()
     {
@@ -1011,6 +1014,171 @@ public partial class MainWindow : Window
         PropertyInspectorFilter.Text = state.FilterText;
         ApplyPropertyInspectorFilter();
     }
+
+    private void OnShowToolboxMenuClicked(
+        object? sender,
+        Avalonia.Interactivity.RoutedEventArgs e)
+        => SetToolboxPaneVisible(!ToolboxPane.IsVisible);
+
+    private void OnShowObjectTreeMenuClicked(
+        object? sender,
+        Avalonia.Interactivity.RoutedEventArgs e)
+        => SetObjectTreePaneVisible(!ObjectTreePane.IsVisible);
+
+    private void OnShowPropertyInspectorMenuClicked(
+        object? sender,
+        Avalonia.Interactivity.RoutedEventArgs e)
+        => SetPropertyInspectorPaneVisible(!PropertyInspectorPane.IsVisible);
+
+    private void OnResetPanelLayoutMenuClicked(
+        object? sender,
+        Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        Vm?.SetWorkspacePanelState(WorkspacePanelState.Default);
+        ApplyWorkspacePanelState();
+        Vm?.StatusText = "Panel layout reset.";
+    }
+
+    private void SetToolboxPaneVisible(bool isVisible)
+    {
+        if (!isVisible)
+        {
+            CaptureWorkspacePanelDimensions();
+        }
+
+        ToolboxPane.IsVisible = isVisible;
+        ToolboxSplitter.IsVisible = isVisible;
+        UpdateWorkspacePanelLayout();
+        SyncWorkspacePanelState();
+        Vm?.StatusText = isVisible ? "Toolbox panel shown." : "Toolbox panel hidden.";
+    }
+
+    private void SetObjectTreePaneVisible(bool isVisible)
+    {
+        if (!isVisible)
+        {
+            CaptureWorkspacePanelDimensions();
+        }
+
+        ObjectTreePane.IsVisible = isVisible;
+        UpdateWorkspacePanelLayout();
+        SyncWorkspacePanelState();
+        Vm?.StatusText = isVisible ? "Object Tree panel shown." : "Object Tree panel hidden.";
+    }
+
+    private void SetPropertyInspectorPaneVisible(bool isVisible)
+    {
+        if (!isVisible)
+        {
+            CaptureWorkspacePanelDimensions();
+        }
+
+        PropertyInspectorPane.IsVisible = isVisible;
+        UpdateWorkspacePanelLayout();
+        SyncWorkspacePanelState();
+        Vm?.StatusText = isVisible
+            ? "Property Inspector panel shown."
+            : "Property Inspector panel hidden.";
+    }
+
+    private void ApplyWorkspacePanelState()
+    {
+        if (Vm is null)
+        {
+            return;
+        }
+
+        var state = Vm.GetWorkspacePanelState();
+        _toolboxPaneWidth = NormalizeToolboxPaneWidth(state.ToolboxWidth);
+        _inspectorPaneWidth = NormalizeInspectorPaneWidth(state.InspectorWidth);
+        _objectTreePaneHeight = NormalizeObjectTreePaneHeight(state.ObjectTreeHeight);
+        ToolboxPane.IsVisible = state.ToolboxVisible;
+        ToolboxSplitter.IsVisible = state.ToolboxVisible;
+        ObjectTreePane.IsVisible = state.ObjectTreeVisible;
+        PropertyInspectorPane.IsVisible = state.PropertyInspectorVisible;
+        UpdateWorkspacePanelLayout();
+        UpdateWorkspacePanelMenuChecks();
+    }
+
+    private void UpdateWorkspacePanelLayout()
+    {
+        var columnDefinitions = WorkspaceGrid.ColumnDefinitions;
+        columnDefinitions[0].Width = ToolboxPane.IsVisible
+            ? new GridLength(_toolboxPaneWidth, GridUnitType.Pixel)
+            : new GridLength(0, GridUnitType.Pixel);
+        columnDefinitions[1].Width = ToolboxPane.IsVisible
+            ? new GridLength(4, GridUnitType.Pixel)
+            : new GridLength(0, GridUnitType.Pixel);
+
+        var hasInspectorPane = ObjectTreePane.IsVisible || PropertyInspectorPane.IsVisible;
+        columnDefinitions[3].Width = hasInspectorPane
+            ? new GridLength(4, GridUnitType.Pixel)
+            : new GridLength(0, GridUnitType.Pixel);
+        columnDefinitions[4].Width = hasInspectorPane
+            ? new GridLength(_inspectorPaneWidth, GridUnitType.Pixel)
+            : new GridLength(0, GridUnitType.Pixel);
+
+        var rowDefinitions = InspectorPane.RowDefinitions;
+        rowDefinitions[0].Height = ObjectTreePane.IsVisible
+            ? PropertyInspectorPane.IsVisible && _objectTreePaneHeight > 0
+                ? new GridLength(_objectTreePaneHeight, GridUnitType.Pixel)
+                : new GridLength(1, GridUnitType.Star)
+            : new GridLength(0, GridUnitType.Pixel);
+        rowDefinitions[1].Height = ObjectTreePane.IsVisible && PropertyInspectorPane.IsVisible
+            ? new GridLength(4, GridUnitType.Pixel)
+            : new GridLength(0, GridUnitType.Pixel);
+        rowDefinitions[2].Height = PropertyInspectorPane.IsVisible
+            ? new GridLength(1, GridUnitType.Star)
+            : new GridLength(0, GridUnitType.Pixel);
+        ObjectTreeSplitter.IsVisible = ObjectTreePane.IsVisible && PropertyInspectorPane.IsVisible;
+        UpdateWorkspacePanelMenuChecks();
+    }
+
+    private void UpdateWorkspacePanelMenuChecks()
+    {
+        ShowToolboxMenu.IsChecked = ToolboxPane.IsVisible;
+        ShowObjectTreeMenu.IsChecked = ObjectTreePane.IsVisible;
+        ShowPropertyInspectorMenu.IsChecked = PropertyInspectorPane.IsVisible;
+    }
+
+    private void CaptureWorkspacePanelDimensions()
+    {
+        if (ToolboxPane.IsVisible && ToolboxPane.Bounds.Width > 0)
+        {
+            _toolboxPaneWidth = NormalizeToolboxPaneWidth(ToolboxPane.Bounds.Width);
+        }
+
+        if (InspectorPane.IsVisible && InspectorPane.Bounds.Width > 0)
+        {
+            _inspectorPaneWidth = NormalizeInspectorPaneWidth(InspectorPane.Bounds.Width);
+        }
+
+        if (ObjectTreePane.IsVisible && ObjectTreePane.Bounds.Height > 0)
+        {
+            _objectTreePaneHeight = NormalizeObjectTreePaneHeight(ObjectTreePane.Bounds.Height);
+        }
+    }
+
+    private void SyncWorkspacePanelState()
+    {
+        CaptureWorkspacePanelDimensions();
+        Vm?.SetWorkspacePanelState(new WorkspacePanelState(
+            ToolboxPane.IsVisible,
+            ObjectTreePane.IsVisible,
+            PropertyInspectorPane.IsVisible,
+            _toolboxPaneWidth,
+            _inspectorPaneWidth,
+            _objectTreePaneHeight));
+    }
+
+    private static double NormalizeToolboxPaneWidth(double value)
+        => double.IsFinite(value) ? Math.Clamp(value, 160, 520) : 220;
+
+    private static double NormalizeInspectorPaneWidth(double value)
+        => double.IsFinite(value) ? Math.Clamp(value, 220, 560) : 280;
+
+    private static double NormalizeObjectTreePaneHeight(double value)
+        => double.IsFinite(value) && value > 0 ? Math.Clamp(value, 140, 1200) : 0;
 
     private void OnOpacity100MenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
         => SetSelectionOpacity(1);
@@ -3373,6 +3541,7 @@ public partial class MainWindow : Window
 
         RebuildRecentFilesMenu();
         UpdateDocumentBackupMenu();
+        ApplyWorkspacePanelState();
         ApplyPropertyInspectorState();
         RebindSelection();
         UpdateViewportRulers();
@@ -11655,6 +11824,7 @@ public partial class MainWindow : Window
             }
         }
 
+        SyncWorkspacePanelState();
         Vm.SaveSession();
         _allowCloseWithoutPrompt = true;
         _previewWindow?.Close();

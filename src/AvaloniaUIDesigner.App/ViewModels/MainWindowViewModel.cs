@@ -52,6 +52,23 @@ public sealed record PropertyInspectorState(
     bool CategoriesVisible,
     bool AllCategoriesExpanded);
 
+public sealed record WorkspacePanelState(
+    bool ToolboxVisible,
+    bool ObjectTreeVisible,
+    bool PropertyInspectorVisible,
+    double ToolboxWidth,
+    double InspectorWidth,
+    double ObjectTreeHeight)
+{
+    public static WorkspacePanelState Default { get; } = new(
+        ToolboxVisible: true,
+        ObjectTreeVisible: true,
+        PropertyInspectorVisible: true,
+        ToolboxWidth: 220,
+        InspectorWidth: 280,
+        ObjectTreeHeight: 0);
+}
+
 public enum ItemsEditorMode
 {
     Flat,
@@ -586,6 +603,7 @@ public partial class MainWindowViewModel : ViewModelBase
     private DesignerRootSettings _rootSettings = new();
     private DesignElement? _standaloneAxamlElement;
     private DocumentTabViewModel? _selectedDocumentTab;
+    private WorkspacePanelState _workspacePanelState = WorkspacePanelState.Default;
 
     public MainWindowViewModel()
         : this(new BuiltInComponentCatalog(), new DefaultControlRenderer(), new AxamlDocumentSerializer())
@@ -680,6 +698,12 @@ public partial class MainWindowViewModel : ViewModelBase
         state.PropertyInspectorCategoriesVisible = categoriesVisible;
         state.PropertyInspectorAllCategoriesExpanded = allCategoriesExpanded;
     }
+
+    public WorkspacePanelState GetWorkspacePanelState()
+        => _workspacePanelState;
+
+    public void SetWorkspacePanelState(WorkspacePanelState state)
+        => _workspacePanelState = NormalizeWorkspacePanelState(state);
 
     public bool HasMultipleDocumentTabs => DocumentTabs.Count > 1;
     public bool CanCloseCurrentDocumentTab => HasMultipleDocumentTabs;
@@ -8887,7 +8911,14 @@ public partial class MainWindowViewModel : ViewModelBase
                 _componentPluginPaths.ToList(),
                 ExportPersistedComponentTypes(),
                 Toolbox.FavoriteItemNames.ToList(),
-                Toolbox.RecentItemNames.ToList()),
+                Toolbox.RecentItemNames.ToList(),
+                new PersistedWorkspacePanelState(
+                    _workspacePanelState.ToolboxVisible,
+                    _workspacePanelState.ObjectTreeVisible,
+                    _workspacePanelState.PropertyInspectorVisible,
+                    _workspacePanelState.ToolboxWidth,
+                    _workspacePanelState.InspectorWidth,
+                    _workspacePanelState.ObjectTreeHeight)),
             new JsonSerializerOptions { WriteIndented = true });
     }
 
@@ -8971,7 +9002,18 @@ public partial class MainWindowViewModel : ViewModelBase
             return false;
         }
 
+        var workspacePanelState = session.WorkspacePanels is { } persistedWorkspace
+            ? NormalizeWorkspacePanelState(new WorkspacePanelState(
+                persistedWorkspace.ToolboxVisible,
+                persistedWorkspace.ObjectTreeVisible,
+                persistedWorkspace.PropertyInspectorVisible,
+                persistedWorkspace.ToolboxWidth,
+                persistedWorkspace.InspectorWidth,
+                persistedWorkspace.ObjectTreeHeight))
+            : WorkspacePanelState.Default;
+
         ClearDocumentTabsForSessionRestore();
+        _workspacePanelState = workspacePanelState;
         var restoredTabs = new List<DocumentTabViewModel>();
         foreach (var restoredDocument in restoredDocuments)
         {
@@ -9008,6 +9050,24 @@ public partial class MainWindowViewModel : ViewModelBase
             + (packWarnings.Count == 0 ? string.Empty : $" {string.Join(" ", packWarnings)}");
         return true;
     }
+
+    private static WorkspacePanelState NormalizeWorkspacePanelState(WorkspacePanelState state)
+        => state with
+        {
+            ToolboxWidth = NormalizeWorkspaceDimension(state.ToolboxWidth, 220, 160, 520),
+            InspectorWidth = NormalizeWorkspaceDimension(state.InspectorWidth, 280, 220, 560),
+            ObjectTreeHeight = NormalizeWorkspaceDimension(state.ObjectTreeHeight, 0, 0, 1200),
+        };
+
+    private static double NormalizeWorkspaceDimension(
+        double value,
+        double fallback,
+        double minimum,
+        double maximum)
+        => !double.IsFinite(value)
+            || value < minimum
+            ? fallback
+            : Math.Clamp(value, minimum, maximum);
 
     public bool TryRestoreSession(out string error)
     {
@@ -16290,7 +16350,16 @@ public partial class MainWindowViewModel : ViewModelBase
         List<string>? ComponentPluginPaths = null,
         List<PersistedComponentType>? ComponentTypes = null,
         List<string>? FavoriteToolboxItems = null,
-        List<string>? RecentToolboxItems = null);
+        List<string>? RecentToolboxItems = null,
+        PersistedWorkspacePanelState? WorkspacePanels = null);
+
+    private sealed record PersistedWorkspacePanelState(
+        bool ToolboxVisible = true,
+        bool ObjectTreeVisible = true,
+        bool PropertyInspectorVisible = true,
+        double ToolboxWidth = 220,
+        double InspectorWidth = 280,
+        double ObjectTreeHeight = 0);
 
     private sealed record PersistedDocumentTab(
         string? DocumentPath,
