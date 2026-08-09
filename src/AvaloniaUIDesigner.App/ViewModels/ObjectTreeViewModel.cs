@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
 using AvaloniaUIDesigner.App.Designer.Core;
@@ -106,6 +107,26 @@ public partial class ObjectTreeViewModel : ViewModelBase
         SelectedNode = null;
     }
 
+    public bool TryGetVisibleElementRange(
+        DesignElement anchor,
+        DesignElement target,
+        out IReadOnlyList<DesignElement> range)
+    {
+        var visible = GetVisibleElements();
+        var anchorIndex = visible.IndexOf(anchor);
+        var targetIndex = visible.IndexOf(target);
+        if (anchorIndex < 0 || targetIndex < 0)
+        {
+            range = System.Array.Empty<DesignElement>();
+            return false;
+        }
+
+        var start = System.Math.Min(anchorIndex, targetIndex);
+        var end = System.Math.Max(anchorIndex, targetIndex);
+        range = visible.Skip(start).Take(end - start + 1).ToList();
+        return true;
+    }
+
     public void SetDropFeedback(ObjectNodeViewModel? target, bool accepted)
         => SetDropFeedback(target, accepted, insertBefore: false, insertAfter: false);
 
@@ -167,6 +188,37 @@ public partial class ObjectTreeViewModel : ViewModelBase
 
         SelectedNode = Root.Children[nextIndex];
         return true;
+    }
+
+    private List<DesignElement> GetVisibleElements()
+    {
+        var visible = new List<DesignElement>();
+        foreach (var node in Root.Children)
+        {
+            AppendVisibleElements(node, visible);
+        }
+
+        return visible;
+    }
+
+    private static void AppendVisibleElements(
+        ObjectNodeViewModel node,
+        ICollection<DesignElement> visible)
+    {
+        if (node.Element is { } element)
+        {
+            visible.Add(element);
+        }
+
+        if (!node.IsExpanded)
+        {
+            return;
+        }
+
+        foreach (var child in node.Children)
+        {
+            AppendVisibleElements(child, visible);
+        }
     }
 
     private void RefreshVisibleChildren()

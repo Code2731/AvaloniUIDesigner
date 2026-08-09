@@ -1512,6 +1512,23 @@ public partial class MainWindowViewModel : ViewModelBase
         StatusText = selection.Count == 0 ? "Ready" : $"Selected {selection.Count} control(s)";
     }
 
+    public bool TrySelectObjectTreeRange(
+        DesignElement anchor,
+        DesignElement target,
+        bool append = false)
+    {
+        if (!ObjectTree.TryGetVisibleElementRange(anchor, target, out var range))
+        {
+            return false;
+        }
+
+        SelectElements(range, append);
+        StatusText = append
+            ? $"Added Object Tree range ({range.Count} control(s))."
+            : $"Selected Object Tree range ({range.Count} control(s)).";
+        return true;
+    }
+
     public bool SelectNextVisibleElement(bool reverse = false)
     {
         var candidates = Canvas.Elements

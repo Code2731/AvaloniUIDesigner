@@ -178,3 +178,6 @@ Users should be able to place controls visually, inspect properties, and validat
 
 45. v1.39
 - Cycle through visible overlapping controls with Alt-click in z-order, preserving locked controls for inspection and excluding hidden controls
+
+46. v1.40
+- Select visible Object Tree row ranges with Shift-click and append ranges with Ctrl+Shift-click using expanded hierarchy and search order

@@ -103,6 +103,8 @@ public partial class MainWindow : Window
         Delete / Backspace   Remove selection
         Object Tree F2       Rename selected control
         Object Tree Ctrl+L   Lock / unlock selected control
+        Object Tree Shift+click Select a visible row range
+        Object Tree Ctrl+Shift+click Add a visible row range
         Object Tree arrows   Navigate the hierarchy without nudging the canvas
         """;
 
@@ -208,6 +210,8 @@ public partial class MainWindow : Window
     private DocumentTabViewModel? _pendingDocumentTabDrag;
     private Point _documentTabDragStart;
     private DocumentTabViewModel? _documentTabDropTarget;
+    private DesignElement? _objectTreeSelectionAnchor;
+    private bool _isObjectTreeSelectionGesture;
 
     private CanvasViewModel? _boundCanvas;
     private DesignElement? _boundElement;
@@ -3974,15 +3978,48 @@ public partial class MainWindow : Window
         {
             if (point.Properties.IsRightButtonPressed)
             {
-                Vm.SelectElement(element);
+                _isObjectTreeSelectionGesture = true;
+                try
+                {
+                    Vm.SelectElement(element);
+                }
+                finally
+                {
+                    _isObjectTreeSelectionGesture = false;
+                }
+
+                _objectTreeSelectionAnchor = element;
             }
 
             return;
         }
 
         var toggleSelection = e.KeyModifiers.HasFlag(KeyModifiers.Control);
-        Vm.SelectElement(element, toggleSelection);
-        if (!element.IsLocked)
+        var rangeSelection = false;
+        var anchor = _objectTreeSelectionAnchor ?? Vm.Canvas.SelectedElement;
+        _isObjectTreeSelectionGesture = true;
+        try
+        {
+            if (e.KeyModifiers.HasFlag(KeyModifiers.Shift)
+                && anchor is not null)
+            {
+                rangeSelection = Vm.TrySelectObjectTreeRange(anchor, element, toggleSelection);
+            }
+
+            if (!rangeSelection)
+            {
+                Vm.SelectElement(element, toggleSelection);
+            }
+        }
+        finally
+        {
+            _isObjectTreeSelectionGesture = false;
+        }
+
+        _objectTreeSelectionAnchor = rangeSelection && anchor is not null
+            ? anchor
+            : element;
+        if (!element.IsLocked && !toggleSelection && !e.KeyModifiers.HasFlag(KeyModifiers.Shift))
         {
             _pendingObjectTreeDragElement = element;
             _objectTreeDragStart = e.GetPosition(this);
@@ -4670,6 +4707,8 @@ public partial class MainWindow : Window
 
     private void OnDataContextChanged(object? sender, EventArgs e)
     {
+        _objectTreeSelectionAnchor = null;
+
         if (_boundCanvas is not null)
         {
             _boundCanvas.PropertyChanged -= OnCanvasPropertyChanged;
@@ -4813,6 +4852,11 @@ public partial class MainWindow : Window
     {
         if (e.PropertyName == nameof(CanvasViewModel.SelectedElement))
         {
+            if (!_isObjectTreeSelectionGesture)
+            {
+                _objectTreeSelectionAnchor = null;
+            }
+
             RebindSelection();
         }
 
@@ -5679,6 +5723,7 @@ public partial class MainWindow : Window
         }
 
         DesignHost.Focus();
+        _objectTreeSelectionAnchor = null;
 
         if (TryBeginViewportPan(host, e))
         {
@@ -5715,6 +5760,7 @@ public partial class MainWindow : Window
         }
 
         DesignHost.Focus();
+        _objectTreeSelectionAnchor = null;
 
         if (TryBeginViewportPan((Control)sender, e))
         {
