@@ -136,3 +136,6 @@ Users should be able to place controls visually, inspect properties, and validat
 
 31. v1.25
 - Provide standard canvas zoom presets and validated custom zoom percentage input
+
+32. v1.26
+- Provide edge-alignment keyboard shortcuts for multi-selected controls without overriding Object Tree arrow navigation
