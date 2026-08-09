@@ -1491,6 +1491,18 @@ public partial class MainWindowViewModel : ViewModelBase
             : $"Selected {Canvas.SelectedElements.Count} control(s)";
     }
 
+    public void AddElementToSelection(DesignElement element)
+    {
+        if (Canvas.SelectedElements.Contains(element))
+        {
+            StatusText = $"Selection unchanged ({Canvas.SelectedElements.Count} control(s)).";
+            return;
+        }
+
+        SelectElements([element], append: true);
+        StatusText = $"Added {element.DisplayName} to selection ({Canvas.SelectedElements.Count} control(s)).";
+    }
+
     public void SelectElements(IEnumerable<DesignElement> elements, bool append = false)
     {
         var selection = append

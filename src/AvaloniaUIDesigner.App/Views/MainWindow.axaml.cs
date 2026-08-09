@@ -99,6 +99,7 @@ public partial class MainWindow : Window
         Shift+corner handle  Lock aspect ratio while resizing
         Alt+click           Cycle through overlapping controls at the pointer
         Alt+Shift+click     Cycle backward through overlapping controls
+        Shift+click         Add a control to the current selection
         Double-click element Quick edit visible content
         Delete / Backspace   Remove selection
         Object Tree F2       Rename selected control
@@ -5796,13 +5797,34 @@ public partial class MainWindow : Window
 
         if (element.IsLocked)
         {
-            Vm.SelectElement(element);
-            Vm.StatusText = "Selected locked control.";
+            if (e.KeyModifiers.HasFlag(KeyModifiers.Control))
+            {
+                Vm.SelectElement(element, toggle: true);
+                Vm.StatusText = "Selected locked control.";
+            }
+            else if (e.KeyModifiers.HasFlag(KeyModifiers.Shift))
+            {
+                Vm.AddElementToSelection(element);
+            }
+            else
+            {
+                Vm.SelectElement(element);
+                Vm.StatusText = "Selected locked control.";
+            }
+
             e.Handled = true;
             return;
         }
 
         var toggleSelection = e.KeyModifiers.HasFlag(KeyModifiers.Control);
+        var additiveSelection = e.KeyModifiers.HasFlag(KeyModifiers.Shift);
+        if (additiveSelection && !toggleSelection)
+        {
+            Vm.AddElementToSelection(element);
+            e.Handled = true;
+            return;
+        }
+
         if (toggleSelection || !Vm.Canvas.SelectedElements.Contains(element))
         {
             Vm.SelectElement(element, toggleSelection);

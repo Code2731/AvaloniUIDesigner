@@ -114,6 +114,7 @@ dotnet run --project src/AvaloniaUIDesigner.App/AvaloniaUIDesigner.App.csproj
 - **Object Tree 자동 동기화**: 배치된 요소가 루트(Window) 아래에 추가
 - **Object Tree 다중 선택 표시**: 다중 선택 항목에는 `SEL`, 잠긴 항목에는 `LOCK` 마커를 표시하고 헤더에 선택 개수를 표시
 - **Object Tree 다중 선택 입력**: 트리에서 일반 클릭은 단일 선택, `Ctrl+클릭`은 선택 항목 추가/해제로 동작
+- **Canvas 다중 선택 입력**: 캔버스에서 일반 클릭은 단일 선택, `Ctrl+클릭`은 선택 항목을 토글하고 `Shift+클릭`은 기존 선택을 유지한 채 컨트롤을 추가하며 선택 추가 입력은 이동·더블클릭 편집으로 이어지지 않음
 - **Object Tree 범위 선택**: 트리의 현재 표시 순서에서 일반 클릭을 anchor로 삼아 `Shift+클릭`으로 행 범위를 선택하고, `Ctrl+Shift+클릭`으로 기존 선택에 범위를 추가하며 접힌 자식과 검색 결과 순서를 안전하게 반영
 - **Object Tree 컨텍스트 편집**: 트리 행을 우클릭해 Rename·Lock/Unlock·Copy·Cut·Duplicate·Delete 실행
 - **Object Tree 계층 편집**: 트리 행의 컨텍스트 메뉴에서 지원 컨테이너 할당과 부모 컨테이너 해제를 바로 실행
@@ -245,6 +246,7 @@ dotnet run --project src/AvaloniaUIDesigner.App/AvaloniaUIDesigner.App.csproj
 75aa. Object Tree에서 일반 클릭한 행이 선택 anchor가 됩니다. `Shift+클릭`은 현재 펼쳐진 계층과 검색 결과에 표시된 순서로 anchor부터 대상까지 선택하고, `Ctrl+Shift+클릭`은 기존 선택을 유지한 채 범위를 추가합니다. 접힌 부모 아래의 보이지 않는 자식은 범위에 포함하지 않습니다.
 75ab. Edit 메뉴, Canvas context menu, `Ctrl+A`의 Select All은 `IsVisibleOnArtboard=true`이고 `IsLocked=false`인 요소만 선택합니다. 선택 가능한 요소가 없으면 기존 선택을 비우고 상태바에 안내하며, Object Tree나 직접 클릭으로 잠긴·숨겨진 요소를 검사하는 기능은 바뀌지 않습니다.
 75ac. 잠긴 컨트롤을 직접 선택해도 Object Tree와 Property Inspector에서 검사할 수 있지만 `Edit > Copy`·`Duplicate`와 `Ctrl+C`·`Ctrl+D`는 잠금 해제 선택만 처리합니다. 잠금 해제 요소와 잠긴 요소를 함께 선택하면 잠금 해제 계층만 복사·복제하고, 잠긴 요소만 대상으로 한 명령은 문서와 기존 클립보드를 변경하지 않습니다.
+75ad. 캔버스에서 `Shift+클릭`은 기존 선택을 유지한 채 해당 컨트롤을 추가하고, 이미 선택된 컨트롤을 다시 눌러도 선택을 해제하지 않습니다. `Ctrl+클릭` 토글과 잠긴 컨트롤 직접 검사도 유지하며, Shift 선택 추가는 이동·Quick Edit를 시작하지 않습니다.
 76. `File > Load Component Pack...` 또는 `File > Load Toolbox Preset Pack...`으로 외부 Toolbox 팩을 추가하면 파일 경로가 세션에 등록되어 다음 실행 때 자동으로 다시 로드됩니다. 파일이 없어도 문서 탭 복원은 계속되며 상태바에 경고가 표시됩니다.
 77. 외부 프로젝트의 컨트롤은 Component Pack 항목에 `designOnly: true`, `avaloniaTypeName`, `previewText`, `defaultProperties`를 지정해 등록합니다. 디자이너에서는 타입명 플레이스홀더로 편집하고, 생성 AXAML에는 원래 커스텀 타입과 속성을 출력합니다. 예시는 [custom-component-pack.example.json](docs/custom-component-pack.example.json)을 참고하세요.
 78. `File > Load Component Pack Plugin...`에서 `IComponentPackPlugin`을 구현한 신뢰할 수 있는 DLL을 선택하면 플러그인이 제공한 Component Pack을 Toolbox에 등록합니다. DLL 경로는 세션 JSON의 `ComponentPluginPaths`에 저장되고, 앱 재시작 시 플러그인·JSON 팩·프리셋 팩 순서로 복원됩니다.
@@ -407,6 +409,7 @@ AXAML 소스 편집기의 `Validate`와 `Preview`는 현재 디자인과 Undo �
 - v1.40: Object Tree Shift 범위 선택
 - v1.41: 잠금/가시성 인식 Select All
 - v1.42: 잠금 인식 Copy/Duplicate
+- v1.43: Canvas Shift+클릭 다중 선택
 
 ## 컴포넌트 팩
 
