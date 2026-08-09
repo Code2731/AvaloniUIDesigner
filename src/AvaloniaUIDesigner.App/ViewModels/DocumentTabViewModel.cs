@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using Avalonia.Media;
 
@@ -11,12 +12,16 @@ public sealed class DocumentTabViewModel : ViewModelBase
     private static readonly IBrush InactiveTabBorderBrush = Brush.Parse("#CBD5E1");
     private static readonly IBrush ActiveTabForeground = Brush.Parse("#0F172A");
     private static readonly IBrush InactiveTabForeground = Brush.Parse("#475569");
+    private static readonly IBrush DropTargetTabBackground = Brush.Parse("#FEF3C7");
+    private static readonly IBrush DropTargetTabBorderBrush = Brush.Parse("#F59E0B");
 
+    private readonly string _dragId = Guid.NewGuid().ToString("N");
     private string? _documentPath;
     private string _displayName;
     private bool _isActive;
     private bool _isDirty;
     private bool _canClose;
+    private bool _isDropTarget;
 
     internal DocumentTabViewModel(string displayName)
     {
@@ -24,6 +29,8 @@ public sealed class DocumentTabViewModel : ViewModelBase
     }
 
     public string? DocumentPath => _documentPath;
+
+    internal string DragId => _dragId;
 
     public string DisplayName => _displayName;
 
@@ -35,9 +42,25 @@ public sealed class DocumentTabViewModel : ViewModelBase
 
     public bool CanClose => _canClose;
 
-    public IBrush TabBackground => _isActive ? ActiveTabBackground : InactiveTabBackground;
+    internal void SetDropTarget(bool isDropTarget)
+    {
+        if (_isDropTarget == isDropTarget)
+        {
+            return;
+        }
 
-    public IBrush TabBorderBrush => _isActive ? ActiveTabBorderBrush : InactiveTabBorderBrush;
+        _isDropTarget = isDropTarget;
+        OnPropertyChanged(nameof(TabBackground));
+        OnPropertyChanged(nameof(TabBorderBrush));
+    }
+
+    public IBrush TabBackground => _isDropTarget
+        ? DropTargetTabBackground
+        : _isActive ? ActiveTabBackground : InactiveTabBackground;
+
+    public IBrush TabBorderBrush => _isDropTarget
+        ? DropTargetTabBorderBrush
+        : _isActive ? ActiveTabBorderBrush : InactiveTabBorderBrush;
 
     public IBrush TabForeground => _isActive ? ActiveTabForeground : InactiveTabForeground;
 

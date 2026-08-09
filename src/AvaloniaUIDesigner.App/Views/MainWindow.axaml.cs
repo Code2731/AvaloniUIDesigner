@@ -128,6 +128,8 @@ public partial class MainWindow : Window
         DataFormat.CreateStringApplicationFormat("AvaloniaUIDesigner.ToolboxItem");
     private static readonly DataFormat<string> ObjectTreeDragDataFormat =
         DataFormat.CreateStringApplicationFormat("AvaloniaUIDesigner.ObjectTreeElement");
+    private static readonly DataFormat<string> DocumentTabDragDataFormat =
+        DataFormat.CreateStringApplicationFormat("AvaloniaUIDesigner.DocumentTab");
 
     private enum GuideOrientation { Horizontal, Vertical }
     private DragMode _dragMode = DragMode.None;
@@ -156,6 +158,9 @@ public partial class MainWindow : Window
     private Point _toolboxDragStart;
     private DesignElement? _pendingObjectTreeDragElement;
     private Point _objectTreeDragStart;
+    private DocumentTabViewModel? _pendingDocumentTabDrag;
+    private Point _documentTabDragStart;
+    private DocumentTabViewModel? _documentTabDropTarget;
 
     private CanvasViewModel? _boundCanvas;
     private DesignElement? _boundElement;
@@ -202,6 +207,123 @@ public partial class MainWindow : Window
             Vm.ActivateDocumentTab(tab);
             ClearDesignGuides();
         }
+    }
+
+    private void OnDocumentTabPointerPressed(object? sender, PointerPressedEventArgs e)
+    {
+        if (sender is not Button { Tag: DocumentTabViewModel tab } tabButton
+            || !e.GetCurrentPoint(tabButton).Properties.IsLeftButtonPressed)
+        {
+            return;
+        }
+
+        _pendingDocumentTabDrag = tab;
+        _documentTabDragStart = e.GetPosition(this);
+        e.Pointer.Capture(tabButton);
+    }
+
+    private async void OnDocumentTabPointerMoved(object? sender, PointerEventArgs e)
+    {
+        if (_pendingDocumentTabDrag is not { } tab)
+        {
+            return;
+        }
+
+        var point = e.GetPosition(this);
+        if (Math.Abs(point.X - _documentTabDragStart.X) < MarqueeThreshold
+            && Math.Abs(point.Y - _documentTabDragStart.Y) < MarqueeThreshold)
+        {
+            return;
+        }
+
+        _pendingDocumentTabDrag = null;
+        e.Pointer.Capture(null);
+        var data = new DataTransfer();
+        data.Add(DataTransferItem.Create(DocumentTabDragDataFormat, tab.DragId));
+        await DragDrop.DoDragDropAsync(e, data, DragDropEffects.Move);
+        ClearDocumentTabDropFeedback();
+        e.Handled = true;
+    }
+
+    private void OnDocumentTabPointerReleased(object? sender, PointerReleasedEventArgs e)
+    {
+        _pendingDocumentTabDrag = null;
+        e.Pointer.Capture(null);
+        ClearDocumentTabDropFeedback();
+    }
+
+    private void OnDocumentTabDragOver(object? sender, DragEventArgs e)
+    {
+        if (Vm is null
+            || sender is not Border { DataContext: DocumentTabViewModel target } targetBorder
+            || e.DataTransfer.TryGetValue(DocumentTabDragDataFormat) is not string dragId
+            || Vm.DocumentTabs.FirstOrDefault(tab => tab.DragId == dragId) is not { } source
+            || ReferenceEquals(source, target))
+        {
+            ClearDocumentTabDropFeedback();
+            e.DragEffects = DragDropEffects.None;
+            e.Handled = true;
+            return;
+        }
+
+        SetDocumentTabDropTarget(target);
+        e.DragEffects = DragDropEffects.Move;
+        e.Handled = true;
+    }
+
+    private void OnDocumentTabDragLeave(object? sender, DragEventArgs e)
+    {
+        ClearDocumentTabDropFeedback();
+    }
+
+    private void OnDocumentTabDrop(object? sender, DragEventArgs e)
+    {
+        if (Vm is null
+            || sender is not Border { DataContext: DocumentTabViewModel target } targetBorder
+            || e.DataTransfer.TryGetValue(DocumentTabDragDataFormat) is not string dragId
+            || Vm.DocumentTabs.FirstOrDefault(tab => tab.DragId == dragId) is not { } source
+            || ReferenceEquals(source, target))
+        {
+            e.DragEffects = DragDropEffects.None;
+            ClearDocumentTabDropFeedback();
+            e.Handled = true;
+            return;
+        }
+
+        var targetIndex = Vm.DocumentTabs.IndexOf(target);
+        if (e.GetPosition(targetBorder).X >= targetBorder.Bounds.Width / 2)
+        {
+            targetIndex++;
+        }
+
+        var sourceIndex = Vm.DocumentTabs.IndexOf(source);
+        if (sourceIndex < targetIndex)
+        {
+            targetIndex--;
+        }
+
+        var changed = Vm.MoveDocumentTab(source, targetIndex);
+        e.DragEffects = changed ? DragDropEffects.Move : DragDropEffects.None;
+        ClearDocumentTabDropFeedback();
+        e.Handled = true;
+    }
+
+    private void SetDocumentTabDropTarget(DocumentTabViewModel target)
+    {
+        if (ReferenceEquals(_documentTabDropTarget, target))
+        {
+            return;
+        }
+
+        ClearDocumentTabDropFeedback();
+        _documentTabDropTarget = target;
+        target.SetDropTarget(true);
+    }
+
+    private void ClearDocumentTabDropFeedback()
+    {
+        _documentTabDropTarget?.SetDropTarget(false);
+        _documentTabDropTarget = null;
     }
 
     private async void OnDocumentTabCloseClicked(

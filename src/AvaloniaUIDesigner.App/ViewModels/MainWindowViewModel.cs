@@ -9187,6 +9187,30 @@ public partial class MainWindowViewModel : ViewModelBase
         return ActivateDocumentTab(DocumentTabs[nextIndex]);
     }
 
+    public bool MoveDocumentTab(DocumentTabViewModel tab, int targetIndex)
+    {
+        if (!_documentTabStates.ContainsKey(tab))
+        {
+            return false;
+        }
+
+        var currentIndex = DocumentTabs.IndexOf(tab);
+        if (currentIndex < 0)
+        {
+            return false;
+        }
+
+        var normalizedIndex = Math.Clamp(targetIndex, 0, DocumentTabs.Count - 1);
+        if (currentIndex == normalizedIndex)
+        {
+            return false;
+        }
+
+        DocumentTabs.Move(currentIndex, normalizedIndex);
+        StatusText = $"Moved {tab.DisplayName} tab.";
+        return true;
+    }
+
     public bool IsDocumentTabDirty(DocumentTabViewModel tab)
         => _documentTabStates.TryGetValue(tab, out var state)
             && !AreSameDocument(state.LastSavedSnapshot, state.Document);

@@ -94,3 +94,6 @@ Users should be able to place controls visually, inspect properties, and validat
 
 17. v1.11
 - Qt Designer-style workspace panel visibility, size restore, and layout reset
+
+18. v1.12
+- Document tab drag reordering with active-order session restore

@@ -325,11 +325,18 @@
                                     BorderThickness="1"
                                     CornerRadius="4"
                                     Padding="2"
-                                    ToolTip.Tip="{Binding DocumentPath}">
+                                    ToolTip.Tip="{Binding DocumentPath}"
+                                    DragDrop.AllowDrop="True"
+                                    DragDrop.DragOver="OnDocumentTabDragOver"
+                                    DragDrop.DragLeave="OnDocumentTabDragLeave"
+                                    DragDrop.Drop="OnDocumentTabDrop">
                                 <StackPanel Orientation="Horizontal" Spacing="2">
                                     <Button Content="{Binding Header}"
                                             Tag="{Binding}"
                                             Click="OnDocumentTabClicked"
+                                            PointerPressed="OnDocumentTabPointerPressed"
+                                            PointerMoved="OnDocumentTabPointerMoved"
+                                            PointerReleased="OnDocumentTabPointerReleased"
                                             Background="Transparent"
                                             BorderThickness="0"
                                             Foreground="{Binding TabForeground}"
