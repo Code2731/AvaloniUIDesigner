@@ -43,11 +43,14 @@ public partial class MainWindow : Window
         Ctrl+Shift+PageUp   Move active tab left
         Ctrl+Shift+PageDown Move active tab right
         Middle-click tab    Close document tab
+        Ctrl+= / Ctrl+Plus  Zoom in
+        Ctrl+- / Ctrl+Minus Zoom out
         Ctrl+F              Focus Object Tree search
         Ctrl+Alt+I          Focus Property Inspector filter
         Ctrl+Alt+T          Focus Toolbox search
         Ctrl+Alt+P          Toggle Toolbox placement mode
         Ctrl+0              Actual size (100%)
+        F                   Fit canvas to view
         Ctrl+R              Open runtime Preview
         Ctrl+Z              Undo
         Ctrl+Y              Redo
@@ -3992,6 +3995,30 @@ public partial class MainWindow : Window
         if (ctrl && !shift && !alt && e.Key == Key.K)
         {
             await QuickSwitchDocumentTabAsync();
+            e.Handled = true;
+            return;
+        }
+
+        if (ctrl && !alt && (e.Key is Key.OemPlus or Key.Add))
+        {
+            Vm.Canvas.ZoomIn();
+            UpdateZoomStatus();
+            e.Handled = true;
+            return;
+        }
+
+        if (ctrl && !alt && (e.Key is Key.OemMinus or Key.Subtract))
+        {
+            Vm.Canvas.ZoomOut();
+            UpdateZoomStatus();
+            e.Handled = true;
+            return;
+        }
+
+        if (!ctrl && !shift && !alt && e.Key == Key.F)
+        {
+            Vm.Canvas.FitToViewport(DesignViewport.Bounds.Width, DesignViewport.Bounds.Height);
+            UpdateZoomStatus();
             e.Handled = true;
             return;
         }

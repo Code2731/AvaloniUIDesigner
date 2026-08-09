@@ -130,3 +130,6 @@ Users should be able to place controls visually, inspect properties, and validat
 
 29. v1.23
 - Search open document tabs by alias or saved file path and activate the selected result from a quick switch dialog
+
+30. v1.24
+- Provide keyboard navigation for canvas zoom and viewport fitting while preserving per-document zoom state

@@ -32,7 +32,7 @@ dotnet run --project src/AvaloniaUIDesigner.App/AvaloniaUIDesigner.App.csproj
 - **Custom Control Metadata**: `DesignOnly: true` 컴포넌트 팩으로 외부 Avalonia 타입을 디자인 타임 플레이스홀더로 등록하고, 커스텀 기본 속성·Preview 문구·AXAML 타입명을 보존
 - **선택 영역 Toolbox 프리셋**: 여러 root 컨트롤을 상대 좌표·현재 속성과 함께 Toolbox에 등록하고 JSON 팩으로 저장·불러오기
 - **배치**: 클릭-투-플레이스와 드래그 앤 드롭으로 실제 Avalonia 컨트롤 생성
-- **캔버스 뷰포트**: 큰 아트보드와 확대 상태를 양축 자동 스크롤로 탐색하고, Desktop·Tablet·Mobile·사용자 지정 아트보드 크기와 회전, Zoom In/Out·Actual Size·Fit to View와 스크롤 콘텐츠 크기를 동기화하며 중간 마우스 드래그로 뷰포트를 팬하고 Ctrl+휠로 포인터 중심 줌
+- **캔버스 뷰포트**: 큰 아트보드와 확대 상태를 양축 자동 스크롤로 탐색하고, Desktop·Tablet·Mobile·사용자 지정 아트보드 크기와 회전, Zoom In/Out·Actual Size·Fit to View와 스크롤 콘텐츠 크기를 동기화하며 `Ctrl+=`/`Ctrl+-`/`Ctrl+0`/`F` 단축키, 중간 마우스 드래그 팬, Ctrl+휠 포인터 중심 줌을 지원
 - **아트보드 배경**: White·Soft Gray·Ink 프리셋과 사용자 지정 `#RRGGBB`/`#AARRGGBB` 색상을 편집하고 Undo·Preview·AXAML 왕복에 보존
 - **디자인 룰러**: 가로·세로 눈금을 ScrollViewer 오프셋과 렌더 줌에 동기화하고 포인터 기준선을 표시해 현재 화면의 아트보드 좌표를 확인
 - **디자인 가이드**: 가로·세로 룰러에서 드래그해 가이드라인을 만들고 캔버스 이동·리사이즈 Smart Snap 후보로 사용하며, 캔버스 밖으로 드래그하면 제거합니다. View 메뉴에서 표시·가이드 스냅을 각각 끄거나 전체 가이드를 지울 수 있습니다.
@@ -215,6 +215,7 @@ dotnet run --project src/AvaloniaUIDesigner.App/AvaloniaUIDesigner.App.csproj
 75k. 문서 탭 헤더를 중간 클릭하면 `Close Tab`과 동일한 dirty 확인을 거쳐 해당 탭을 닫습니다. 마지막 탭은 닫히지 않으며, 취소 시 원래 활성 탭으로 복원됩니다.
 75l. `Ctrl+1`~`Ctrl+9`는 현재 탭 순서의 1-9번째 문서 탭을 즉시 선택합니다. 존재하지 않는 번호도 입력을 소비해 캔버스나 텍스트 편집기에 잘못 전달되지 않습니다.
 75m. `View > Quick Switch Document Tab...` 또는 `Ctrl+K`는 열린 문서 탭의 별칭과 저장 경로를 검색합니다. 검색창에서 `Enter`는 선택 탭으로 전환하고, `Escape`는 취소하며, 위/아래 방향키는 결과를 이동합니다.
+75n. 캔버스가 포커스를 가진 상태에서 `Ctrl+=`/`Ctrl+Plus`는 10% 확대, `Ctrl+-`/`Ctrl+Minus`는 10% 축소, `Ctrl+0`은 100% 실제 크기, `F`는 현재 뷰포트에 맞춤을 실행합니다. 확대·축소는 활성 문서 탭별 Zoom 상태에 보존되며 텍스트 입력 중인 TextBox에는 전달되지 않습니다.
 76. `File > Load Component Pack...` 또는 `File > Load Toolbox Preset Pack...`으로 외부 Toolbox 팩을 추가하면 파일 경로가 세션에 등록되어 다음 실행 때 자동으로 다시 로드됩니다. 파일이 없어도 문서 탭 복원은 계속되며 상태바에 경고가 표시됩니다.
 77. 외부 프로젝트의 컨트롤은 Component Pack 항목에 `designOnly: true`, `avaloniaTypeName`, `previewText`, `defaultProperties`를 지정해 등록합니다. 디자이너에서는 타입명 플레이스홀더로 편집하고, 생성 AXAML에는 원래 커스텀 타입과 속성을 출력합니다. 예시는 [custom-component-pack.example.json](docs/custom-component-pack.example.json)을 참고하세요.
 78. `File > Load Component Pack Plugin...`에서 `IComponentPackPlugin`을 구현한 신뢰할 수 있는 DLL을 선택하면 플러그인이 제공한 Component Pack을 Toolbox에 등록합니다. DLL 경로는 세션 JSON의 `ComponentPluginPaths`에 저장되고, 앱 재시작 시 플러그인·JSON 팩·프리셋 팩 순서로 복원됩니다.
@@ -358,6 +359,7 @@ AXAML 소스 편집기의 `Validate`와 `Preview`는 현재 디자인과 Undo �
 - v1.21: 문서 탭 중간 클릭 닫기와 dirty 확인 재사용
 - v1.22: 문서 탭 1-9번 직접 선택 단축키
 - v1.23: 문서 탭 별칭·경로 검색 기반 빠른 전환기
+- v1.24: 캔버스 Zoom/Viewport 키보드 네비게이션
 
 ## 컴포넌트 팩
 

@@ -250,10 +250,10 @@
                           Click="OnQuickSwitchDocumentTabMenuClicked"
                           IsEnabled="{Binding HasMultipleDocumentTabs}"/>
                 <Separator/>
-                <MenuItem Header="Zoom In" Click="OnZoomInMenuClicked"/>
-                <MenuItem Header="Zoom Out" Click="OnZoomOutMenuClicked"/>
-                <MenuItem Header="Actual Size (100%)" Click="OnResetZoomMenuClicked"/>
-                <MenuItem Header="Fit to View" Click="OnFitToViewMenuClicked"/>
+                <MenuItem Header="Zoom In (Ctrl+=)" Click="OnZoomInMenuClicked"/>
+                <MenuItem Header="Zoom Out (Ctrl+-)" Click="OnZoomOutMenuClicked"/>
+                <MenuItem Header="Actual Size (100%, Ctrl+0)" Click="OnResetZoomMenuClicked"/>
+                <MenuItem Header="Fit to View (F)" Click="OnFitToViewMenuClicked"/>
                 <Separator/>
                 <MenuItem Header="Artboard Size">
                     <MenuItem Header="Desktop (1280 x 800)" Click="OnDesktopArtboardMenuClicked"/>
