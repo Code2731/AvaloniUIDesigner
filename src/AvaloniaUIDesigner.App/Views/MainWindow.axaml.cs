@@ -83,7 +83,7 @@ public partial class MainWindow : Window
         Ctrl+Z              Undo
         Ctrl+Y              Redo
         Edit > History      Inspect and jump through Undo/Redo history
-        Ctrl+A              Select all controls
+        Ctrl+A              Select all visible unlocked controls
         Ctrl+D              Duplicate selection
         Ctrl+C              Copy selection
         Ctrl+X              Cut selection
@@ -1622,10 +1622,7 @@ public partial class MainWindow : Window
 
     private void OnSelectAllMenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
-        if (Vm is not null)
-        {
-            Vm.SelectElements(Vm.Canvas.Elements);
-        }
+        Vm?.SelectAllVisibleUnlockedElements();
     }
 
     private void OnToggleLockMenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
@@ -4612,7 +4609,7 @@ public partial class MainWindow : Window
 
         if (ctrl && e.Key == Key.A)
         {
-            Vm.SelectElements(Vm.Canvas.Elements);
+            Vm.SelectAllVisibleUnlockedElements();
             e.Handled = true;
             return;
         }

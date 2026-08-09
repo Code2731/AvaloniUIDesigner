@@ -181,3 +181,6 @@ Users should be able to place controls visually, inspect properties, and validat
 
 46. v1.40
 - Select visible Object Tree row ranges with Shift-click and append ranges with Ctrl+Shift-click using expanded hierarchy and search order
+
+47. v1.41
+- Make Select All choose only visible unlocked controls while preserving direct inspection of locked and hidden controls

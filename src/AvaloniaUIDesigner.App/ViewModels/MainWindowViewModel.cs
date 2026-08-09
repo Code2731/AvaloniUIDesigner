@@ -1512,6 +1512,22 @@ public partial class MainWindowViewModel : ViewModelBase
         StatusText = selection.Count == 0 ? "Ready" : $"Selected {selection.Count} control(s)";
     }
 
+    public bool SelectAllVisibleUnlockedElements()
+    {
+        var selection = Canvas.Elements
+            .Where(element => !element.IsLocked && element.IsVisibleOnArtboard)
+            .ToList();
+        SelectElements(selection);
+        if (selection.Count == 0)
+        {
+            StatusText = "No visible unlocked controls to select.";
+            return false;
+        }
+
+        StatusText = $"Selected all {selection.Count} visible unlocked control(s).";
+        return true;
+    }
+
     public bool TrySelectObjectTreeRange(
         DesignElement anchor,
         DesignElement target,
