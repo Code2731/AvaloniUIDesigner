@@ -103,3 +103,6 @@ Users should be able to place controls visually, inspect properties, and validat
 
 20. v1.14
 - Bulk document tab closing with preflight dirty confirmation
+
+21. v1.15
+- Save all dirty document tabs while preserving the active tab

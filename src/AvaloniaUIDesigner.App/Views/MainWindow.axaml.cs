@@ -29,6 +29,7 @@ public partial class MainWindow : Window
         Ctrl+N              New document
         Ctrl+O              Open AXAML document
         Ctrl+S              Save document
+        Ctrl+Alt+S          Save all dirty document tabs
         Ctrl+Shift+S        Save document as...
         Ctrl+W              Close active document tab
         Ctrl+Tab            Next document tab
@@ -799,6 +800,13 @@ public partial class MainWindow : Window
     private async void OnSaveAsMenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
         _ = await SaveDocumentAsync(forceSaveAs: true);
+    }
+
+    private async void OnSaveAllMenuClicked(
+        object? sender,
+        Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        _ = await SaveAllDocumentsAsync();
     }
 
     private async void OnRecoverBackupMenuClicked(
@@ -3587,6 +3595,13 @@ public partial class MainWindow : Window
             return;
         }
 
+        if (ctrl && alt && e.Key == Key.S)
+        {
+            _ = await SaveAllDocumentsAsync();
+            e.Handled = true;
+            return;
+        }
+
         if (ctrl && e.Key == Key.S)
         {
             _ = await SaveDocumentAsync(forceSaveAs: shift);
@@ -5916,6 +5931,52 @@ public partial class MainWindow : Window
             Vm.StatusText = $"Could not save {System.IO.Path.GetFileName(targetPath)}: {exception.Message}";
             return false;
         }
+    }
+
+    private async Task<bool> SaveAllDocumentsAsync()
+    {
+        if (Vm is null)
+        {
+            return false;
+        }
+
+        FlushPendingPropertyHistory();
+        var originalTab = Vm.SelectedDocumentTab;
+        var dirtyTabs = Vm.DocumentTabs
+            .Where(Vm.IsDocumentTabDirty)
+            .ToList();
+        if (dirtyTabs.Count == 0)
+        {
+            Vm.StatusText = "All document tabs are already saved.";
+            return true;
+        }
+
+        foreach (var tab in dirtyTabs)
+        {
+            if (!ReferenceEquals(Vm.SelectedDocumentTab, tab))
+            {
+                Vm.ActivateDocumentTab(tab);
+            }
+
+            FlushPendingPropertyHistory();
+            if (!await SaveDocumentAsync(forceSaveAs: false))
+            {
+                if (originalTab is not null)
+                {
+                    RestoreDocumentTabIfPresent(originalTab);
+                }
+
+                return false;
+            }
+        }
+
+        if (originalTab is not null)
+        {
+            RestoreDocumentTabIfPresent(originalTab);
+        }
+
+        Vm.StatusText = $"Saved {dirtyTabs.Count} document tab(s).";
+        return true;
     }
 
     private async Task<bool> EnsureCanContinueWithUnsavedChangesAsync()

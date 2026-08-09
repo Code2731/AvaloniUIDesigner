@@ -34,21 +34,20 @@ public static class AtomicFileWriter
 
         try
         {
-            await using (var stream = new FileStream(
+            using (var stream = new FileStream(
                 temporaryPath,
                 FileMode.CreateNew,
                 FileAccess.Write,
                 FileShare.None,
                 bufferSize: 4096,
-                options: FileOptions.Asynchronous | FileOptions.WriteThrough))
+                options: FileOptions.Asynchronous))
             {
-                await using (var writer = new StreamWriter(stream, new UTF8Encoding(encoderShouldEmitUTF8Identifier: false), leaveOpen: true))
+                using (var writer = new StreamWriter(stream, new UTF8Encoding(encoderShouldEmitUTF8Identifier: false), leaveOpen: true))
                 {
                     await writer.WriteAsync(content);
-                    await writer.FlushAsync();
+                    writer.Flush();
                 }
 
-                await stream.FlushAsync();
                 stream.Flush(flushToDisk: true);
             }
 

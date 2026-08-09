@@ -43,6 +43,9 @@
                 <Separator/>
                 <MenuItem Header="Save" Click="OnSaveMenuClicked"/>
                 <MenuItem Header="Save As..." Click="OnSaveAsMenuClicked"/>
+                <MenuItem Header="Save All"
+                          Click="OnSaveAllMenuClicked"
+                          IsEnabled="{Binding HasDirtyDocumentTabs}"/>
                 <MenuItem Header="Recover Backup..."
                           x:Name="RecoverBackupMenu"
                           Click="OnRecoverBackupMenuClicked"

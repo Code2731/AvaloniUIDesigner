@@ -707,6 +707,7 @@ public partial class MainWindowViewModel : ViewModelBase
 
     public bool HasMultipleDocumentTabs => DocumentTabs.Count > 1;
     public bool CanCloseCurrentDocumentTab => HasMultipleDocumentTabs;
+    public bool HasDirtyDocumentTabs => DocumentTabs.Any(IsDocumentTabDirty);
     public bool HasStylePreviewOptions => StylePreviewOptions.Count > 1;
     public bool HasSampleData => _sampleDataRoot is not null;
     public string SampleDataJson => _sampleDataJson ?? string.Empty;
@@ -13429,6 +13430,8 @@ public partial class MainWindowViewModel : ViewModelBase
                 ReferenceEquals(state.Tab, _selectedDocumentTab),
                 DocumentTabs.Count > 1);
         }
+
+        OnPropertyChanged(nameof(HasDirtyDocumentTabs));
     }
 
     private string CreateUntitledDocumentName()
