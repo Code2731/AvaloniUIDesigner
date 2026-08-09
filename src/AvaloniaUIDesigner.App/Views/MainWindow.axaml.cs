@@ -4109,6 +4109,10 @@ public partial class MainWindow : Window
 
         if (ctrl && alt && e.Key == Key.T)
         {
+            if (!ToolboxPane.IsVisible)
+            {
+                SetToolboxPaneVisible(true);
+            }
             ToolboxSearch.Focus();
             ToolboxSearch.SelectAll();
             Vm.StatusText = "Toolbox focused. Search or press Enter to quick-place.";
@@ -4118,6 +4122,11 @@ public partial class MainWindow : Window
 
         if (ctrl && alt && e.Key == Key.P)
         {
+            if (!ToolboxPane.IsVisible)
+            {
+                SetToolboxPaneVisible(true);
+            }
+
             var isActive = Vm.Toolbox.TogglePlacementMode();
             Vm.StatusText = isActive
                 ? $"Toolbox placement mode: {Vm.Toolbox.SelectedItem?.DisplayName}."
@@ -4128,6 +4137,11 @@ public partial class MainWindow : Window
 
         if (ctrl && alt && e.Key == Key.I)
         {
+            if (!PropertyInspectorPane.IsVisible)
+            {
+                SetPropertyInspectorPaneVisible(true);
+            }
+
             PropertyInspectorFilter.Focus();
             PropertyInspectorFilter.SelectAll();
             Vm.StatusText = "Property Inspector filter focused.";
@@ -4427,6 +4441,11 @@ public partial class MainWindow : Window
 
         if (ctrl && e.Key == Key.F)
         {
+            if (!ObjectTreePane.IsVisible)
+            {
+                SetObjectTreePaneVisible(true);
+            }
+
             ObjectTreeSearch.Focus();
             ObjectTreeSearch.SelectAll();
             e.Handled = true;

@@ -160,3 +160,6 @@ Users should be able to place controls visually, inspect properties, and validat
 
 39. v1.33
 - Provide keyboard shortcuts for toggling workspace panels and resetting the panel layout
+
+40. v1.34
+- Reveal hidden workspace panels before applying their search or placement focus shortcuts
