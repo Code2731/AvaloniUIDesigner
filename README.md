@@ -112,7 +112,7 @@ dotnet run --project src/AvaloniaUIDesigner.App/AvaloniaUIDesigner.App.csproj
 - **안전한 Select All**: Edit/Canvas context menu와 `Ctrl+A`는 현재 아트보드에 표시되는 잠금 해제 컨트롤만 선택하고, 잠긴·숨겨진 요소의 직접 검사는 유지
 - **잠금 인식 Copy/Duplicate**: 잠긴 컨트롤은 직접 검사할 수 있지만 `Copy`·`Duplicate`는 잠금 해제 선택만 처리하고, 혼합 선택에서는 잠금 해제 계층만 복사·복제하며 거부된 명령은 기존 클립보드를 보존
 - **겹친 요소 순환 선택**: `Alt+클릭`으로 포인터 아래의 visible 컨트롤을 앞쪽부터 순환 선택하고, `Alt+Shift+클릭`으로 반대 방향으로 이동하며 잠긴 요소도 속성 검사를 위해 순환
-- **키보드 선택 순환**: 캔버스에 포커스가 있을 때 `Tab`/`Shift+Tab`으로 보이는 컨트롤을 순환 선택하며, 명시 `TabIndex`를 낮은 값부터 적용하고 `auto/-1` 요소는 기존 Canvas 순서를 유지
+- **키보드 선택 순환**: 캔버스에 포커스가 있을 때 `Tab`/`Shift+Tab`으로 보이는 `IsTabStop=true` 컨트롤을 순환 선택하며, 명시 `TabIndex`를 낮은 값부터 적용하고 `auto/-1` 요소는 기존 Canvas 순서를 유지
 - **Object Tree 자동 동기화**: 배치된 요소가 루트(Window) 아래에 추가
 - **Object Tree 다중 선택 표시**: 다중 선택 항목에는 `SEL`, 잠긴 항목에는 `LOCK` 마커를 표시하고 헤더에 선택 개수를 표시
 - **Object Tree 다중 선택 입력**: 트리에서 일반 클릭은 단일 선택, `Ctrl+클릭`은 선택 항목 추가/해제로 동작
@@ -199,7 +199,7 @@ dotnet run --project src/AvaloniaUIDesigner.App/AvaloniaUIDesigner.App.csproj
 50. 캔버스에서 텍스트·버튼·토글·라벨·fallback 컨트롤을 더블클릭하면 해당 요소의 visible `Text`/`Content`를 빠르게 편집하고, 적용 시 Undo·AXAML·Preview에 함께 반영
 51. View > `Live Preview`를 열어두면 배치·속성·Undo/Redo·AXAML 적용·문서 로드가 같은 Preview 창에 자동 반영되며, 창을 다시 열면 현재 문서로 즉시 갱신
 52. Object Tree 검색에서 `Enter`를 누르면 다음 일치 컨트롤, `Shift+Enter`를 누르면 이전 일치 컨트롤을 선택하고 결과 위치를 확인
-53. 캔버스를 클릭한 뒤 `Tab`/`Shift+Tab`을 누르면 명시 `TabIndex`가 있는 보이는 컨트롤을 낮은 값부터 선택하고, `auto/-1` 요소는 기존 Canvas 순서로 순환하며 숨겨진 TabControl 페이지는 자동으로 건너뜁니다.
+53. 캔버스를 클릭한 뒤 `Tab`/`Shift+Tab`을 누르면 `IsTabStop=true`인 보이는 컨트롤만 대상으로 명시 `TabIndex`를 낮은 값부터 선택하고, `auto/-1` 요소는 기존 Canvas 순서로 순환하며 숨겨진 TabControl 페이지와 탭 제외 컨트롤은 자동으로 건너뜁니다.
 54. 여러 컨트롤을 선택하면 Object Tree의 각 항목에 `SEL` 마커와 헤더의 선택 개수가 표시되고, 잠긴 컨트롤에는 `LOCK` 마커가 표시됨
 55. Object Tree에서 일반 클릭은 하나만 선택하고, `Ctrl+클릭`은 여러 컨트롤을 추가 선택하거나 선택 해제함
 56. Object Tree 행을 우클릭하면 해당 컨트롤을 먼저 선택한 뒤 Rename·Lock/Unlock·Copy·Cut·Duplicate·Delete 명령을 실행할 수 있음
@@ -259,6 +259,7 @@ dotnet run --project src/AvaloniaUIDesigner.App/AvaloniaUIDesigner.App.csproj
 75ai. 캔버스에 포커스가 있고 단일 컨테이너를 선택한 상태에서 `Enter`는 첫 직접 자식, `Shift+Enter`는 마지막 직접 자식으로 선택을 내립니다. 자식이 없는 컨트롤·다중 선택·Toolbox 배치 모드에서는 Window가 키를 소비하지 않으며, Object Tree와 Property Inspector 선택은 기존 동기화 경로를 사용합니다.
 75aj. 캔버스에 포커스가 있고 단일 요소를 선택한 상태에서 `Alt+Up`/`Alt+Down`은 같은 부모의 이전/다음 형제로 선택을 이동합니다. root 요소도 Window 형제로 취급하며, `Alt+Shift+Arrow`는 기존 10px nudge를 유지하고 형제 목록의 양 끝에서는 입력을 소비하지 않아 기존 이동 경로를 보존합니다.
 75ak. 캔버스 `Tab`/`Shift+Tab` 선택 순환은 `Edit Tab Order...` 또는 `Edit Tab Order Map...`으로 지정한 `TabIndex`를 낮은 값부터 반영합니다. `auto/-1` 컨트롤은 명시 순서 뒤에 원래 Canvas 순서로 배치되고, 숨겨진 컨트롤은 계속 제외되며 선택이 끝나면 처음/마지막으로 wrap합니다.
+75al. Canvas `Tab`/`Shift+Tab`은 `IsTabStop=false`로 제외된 컨트롤을 건너뜁니다. `Edit > Include / Exclude from Tab Navigation`의 상태가 즉시 순환 후보에 반영되며, 모든 후보가 제외되면 기존처럼 선택 실패 상태를 표시합니다.
 76. `File > Load Component Pack...` 또는 `File > Load Toolbox Preset Pack...`으로 외부 Toolbox 팩을 추가하면 파일 경로가 세션에 등록되어 다음 실행 때 자동으로 다시 로드됩니다. 파일이 없어도 문서 탭 복원은 계속되며 상태바에 경고가 표시됩니다.
 77. 외부 프로젝트의 컨트롤은 Component Pack 항목에 `designOnly: true`, `avaloniaTypeName`, `previewText`, `defaultProperties`를 지정해 등록합니다. 디자이너에서는 타입명 플레이스홀더로 편집하고, 생성 AXAML에는 원래 커스텀 타입과 속성을 출력합니다. 예시는 [custom-component-pack.example.json](docs/custom-component-pack.example.json)을 참고하세요.
 78. `File > Load Component Pack Plugin...`에서 `IComponentPackPlugin`을 구현한 신뢰할 수 있는 DLL을 선택하면 플러그인이 제공한 Component Pack을 Toolbox에 등록합니다. DLL 경로는 세션 JSON의 `ComponentPluginPaths`에 저장되고, 앱 재시작 시 플러그인·JSON 팩·프리셋 팩 순서로 복원됩니다.
@@ -429,6 +430,7 @@ AXAML 소스 편집기의 `Validate`와 `Preview`는 현재 디자인과 Undo �
 - v1.48: Canvas Enter 자식 컨테이너 진입
 - v1.49: Canvas Alt+Arrow 형제 선택
 - v1.50: Tab Order 기반 Canvas 키보드 순환
+- v1.51: Canvas Tab Navigation IsTabStop 필터
 
 ## 컴포넌트 팩
 
