@@ -109,3 +109,6 @@ Users should be able to place controls visually, inspect properties, and validat
 
 22. v1.16
 - Close all document tabs with preflight confirmation and a fresh blank document
+
+23. v1.17
+- Reopen recently closed document tabs with their editing state intact

@@ -29,6 +29,9 @@
                 <MenuItem Header="Close All Tabs"
                           Click="OnCloseAllTabsMenuClicked"
                           IsEnabled="{Binding HasMultipleDocumentTabs}"/>
+                <MenuItem Header="Reopen Closed Tab"
+                          Click="OnReopenClosedTabMenuClicked"
+                          IsEnabled="{Binding CanReopenClosedDocumentTab}"/>
                 <MenuItem Header="New from Template">
                     <MenuItem Header="Login Form" Tag="Login" Click="OnTemplateMenuClicked"/>
                     <MenuItem Header="Settings" Tag="Settings" Click="OnTemplateMenuClicked"/>

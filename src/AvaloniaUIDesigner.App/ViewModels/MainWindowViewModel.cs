@@ -586,6 +586,7 @@ public partial class MainWindowViewModel : ViewModelBase
     private readonly List<string> _toolboxPresetPackPaths = new();
     private readonly Stack<HistoryEntry> _undoStack = new();
     private readonly Stack<HistoryEntry> _redoStack = new();
+    private readonly Stack<DocumentTabState> _closedDocumentTabs = new();
     private readonly Dictionary<string, string> _colorResources = new(StringComparer.Ordinal);
     private readonly List<DesignerStyleDefinition> _documentStyles = new();
     private readonly Dictionary<DocumentTabViewModel, DocumentTabState> _documentTabStates = new();
@@ -604,6 +605,8 @@ public partial class MainWindowViewModel : ViewModelBase
     private DesignElement? _standaloneAxamlElement;
     private DocumentTabViewModel? _selectedDocumentTab;
     private WorkspacePanelState _workspacePanelState = WorkspacePanelState.Default;
+
+    private const int MaxClosedDocumentTabs = 20;
 
     public MainWindowViewModel()
         : this(new BuiltInComponentCatalog(), new DefaultControlRenderer(), new AxamlDocumentSerializer())
@@ -707,6 +710,7 @@ public partial class MainWindowViewModel : ViewModelBase
 
     public bool HasMultipleDocumentTabs => DocumentTabs.Count > 1;
     public bool CanCloseCurrentDocumentTab => HasMultipleDocumentTabs;
+    public bool CanReopenClosedDocumentTab => _closedDocumentTabs.Count > 0;
     public bool HasDirtyDocumentTabs => DocumentTabs.Any(IsDocumentTabDirty);
     public bool HasStylePreviewOptions => StylePreviewOptions.Count > 1;
     public bool HasSampleData => _sampleDataRoot is not null;
@@ -9218,7 +9222,8 @@ public partial class MainWindowViewModel : ViewModelBase
 
     public bool CloseDocumentTab(DocumentTabViewModel tab)
     {
-        if (DocumentTabs.Count <= 1 || !_documentTabStates.TryGetValue(tab, out _))
+        if (DocumentTabs.Count <= 1
+            || !_documentTabStates.TryGetValue(tab, out var state))
         {
             return false;
         }
@@ -9229,6 +9234,7 @@ public partial class MainWindowViewModel : ViewModelBase
             SyncActiveDocumentTabState();
         }
 
+        RememberClosedDocumentTab(state);
         var tabIndex = DocumentTabs.IndexOf(tab);
         _documentTabStates.Remove(tab);
         DocumentTabs.Remove(tab);
@@ -9247,6 +9253,24 @@ public partial class MainWindowViewModel : ViewModelBase
         }
 
         StatusText = $"Closed {tab.DisplayName}.";
+        return true;
+    }
+
+    public bool ReopenClosedDocumentTab()
+    {
+        if (!_closedDocumentTabs.TryPop(out var state))
+        {
+            return false;
+        }
+
+        _documentTabStates[state.Tab] = state;
+        DocumentTabs.Add(state.Tab);
+        OnPropertyChanged(nameof(HasMultipleDocumentTabs));
+        OnPropertyChanged(nameof(CanCloseCurrentDocumentTab));
+        OnPropertyChanged(nameof(CanReopenClosedDocumentTab));
+        UpdateDocumentTabPresentations();
+        ActivateDocumentTab(state.Tab);
+        StatusText = $"Reopened {state.Tab.DisplayName} tab.";
         return true;
     }
 
@@ -13114,6 +13138,7 @@ public partial class MainWindowViewModel : ViewModelBase
 
     private void ClearDocumentTabsForSessionRestore()
     {
+        _closedDocumentTabs.Clear();
         _documentTabStates.Clear();
         DocumentTabs.Clear();
         _selectedDocumentTab = null;
@@ -13125,9 +13150,26 @@ public partial class MainWindowViewModel : ViewModelBase
         RaiseHistoryChanged();
         OnPropertyChanged(nameof(HasMultipleDocumentTabs));
         OnPropertyChanged(nameof(CanCloseCurrentDocumentTab));
+        OnPropertyChanged(nameof(CanReopenClosedDocumentTab));
         OnPropertyChanged(nameof(SelectedDocumentTab));
         OnPropertyChanged(nameof(CurrentDocumentPath));
         OnPropertyChanged(nameof(WindowTitle));
+    }
+
+    private void RememberClosedDocumentTab(DocumentTabState state)
+    {
+        _closedDocumentTabs.Push(state);
+        if (_closedDocumentTabs.Count > MaxClosedDocumentTabs)
+        {
+            var retained = _closedDocumentTabs.Take(MaxClosedDocumentTabs).ToArray();
+            _closedDocumentTabs.Clear();
+            for (var index = retained.Length - 1; index >= 0; index--)
+            {
+                _closedDocumentTabs.Push(retained[index]);
+            }
+        }
+
+        OnPropertyChanged(nameof(CanReopenClosedDocumentTab));
     }
 
     private void RestoreComponentPluginFiles(

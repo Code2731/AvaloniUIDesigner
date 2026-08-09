@@ -33,6 +33,7 @@ public partial class MainWindow : Window
         Ctrl+Shift+S        Save document as...
         Ctrl+W              Close active document tab
         Ctrl+Shift+W        Close all document tabs
+        Ctrl+Shift+T        Reopen last closed document tab
         Ctrl+Tab            Next document tab
         Ctrl+Shift+Tab      Previous document tab
         Ctrl+Shift+PageUp   Move active tab left
@@ -479,6 +480,14 @@ public partial class MainWindow : Window
         Avalonia.Interactivity.RoutedEventArgs e)
     {
         _ = await CloseAllDocumentTabsAsync();
+    }
+
+    private void OnReopenClosedTabMenuClicked(
+        object? sender,
+        Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        FlushPendingPropertyHistory();
+        Vm?.ReopenClosedDocumentTab();
     }
 
     private async Task CloseDocumentTabAsync(DocumentTabViewModel tab)
@@ -3665,6 +3674,14 @@ public partial class MainWindow : Window
         if (ctrl && shift && e.Key == Key.W)
         {
             _ = await CloseAllDocumentTabsAsync();
+            e.Handled = true;
+            return;
+        }
+
+        if (ctrl && shift && e.Key == Key.T)
+        {
+            FlushPendingPropertyHistory();
+            Vm.ReopenClosedDocumentTab();
             e.Handled = true;
             return;
         }
