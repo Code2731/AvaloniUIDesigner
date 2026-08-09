@@ -1965,6 +1965,12 @@ public partial class CanvasViewModel : ViewModelBase
             return false;
         }
 
+        if (groupChildren.Any(child => child.IsLocked))
+        {
+            error = "Cannot ungroup a Canvas group that contains locked controls.";
+            return false;
+        }
+
         var parent = FindParent(requested);
         if (parent is not null && parent.Visual is not Canvas)
         {
@@ -2069,6 +2075,12 @@ public partial class CanvasViewModel : ViewModelBase
         if (layoutChildren.Count == 0)
         {
             error = "The selected layout has no direct children to break.";
+            return false;
+        }
+
+        if (layoutChildren.Any(child => child.IsLocked))
+        {
+            error = "Cannot break a layout that contains locked controls.";
             return false;
         }
 
