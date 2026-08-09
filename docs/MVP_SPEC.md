@@ -139,3 +139,6 @@ Users should be able to place controls visually, inspect properties, and validat
 
 32. v1.26
 - Provide edge-alignment keyboard shortcuts for multi-selected controls without overriding Object Tree arrow navigation
+
+33. v1.27
+- Provide horizontal and vertical center-alignment keyboard shortcuts for multi-selected controls

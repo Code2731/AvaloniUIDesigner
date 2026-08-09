@@ -44,6 +44,7 @@ public partial class MainWindow : Window
         Ctrl+Shift+PageDown Move active tab right
         Middle-click tab    Close document tab
         Ctrl+Shift+Arrow    Align selected controls to an edge
+        Ctrl+Shift+E/M      Align selected controls center/middle
         Ctrl+= / Ctrl+Plus  Zoom in
         Ctrl+- / Ctrl+Minus Zoom out
         Ctrl+F              Focus Object Tree search
@@ -4164,6 +4165,8 @@ public partial class MainWindow : Window
         var keyboardArrangeAction = e.Key switch
         {
             Key.Left => MainWindowViewModel.SelectionLayoutAction.AlignLeft,
+            Key.E => MainWindowViewModel.SelectionLayoutAction.AlignCenter,
+            Key.M => MainWindowViewModel.SelectionLayoutAction.AlignMiddle,
             Key.Right => MainWindowViewModel.SelectionLayoutAction.AlignRight,
             Key.Up => MainWindowViewModel.SelectionLayoutAction.AlignTop,
             Key.Down => MainWindowViewModel.SelectionLayoutAction.AlignBottom,

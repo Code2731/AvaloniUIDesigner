@@ -207,11 +207,11 @@
                 </MenuItem>
                 <MenuItem Header="Arrange" IsEnabled="{Binding Canvas.HasMultipleSelection}">
                     <MenuItem Header="Align Left (Ctrl+Shift+Left)" Click="OnAlignLeftMenuClicked"/>
-                    <MenuItem Header="Align Center" Click="OnAlignCenterMenuClicked"/>
+                    <MenuItem Header="Align Center (Ctrl+Shift+E)" Click="OnAlignCenterMenuClicked"/>
                     <MenuItem Header="Align Right (Ctrl+Shift+Right)" Click="OnAlignRightMenuClicked"/>
                     <Separator/>
                     <MenuItem Header="Align Top (Ctrl+Shift+Up)" Click="OnAlignTopMenuClicked"/>
-                    <MenuItem Header="Align Middle" Click="OnAlignMiddleMenuClicked"/>
+                    <MenuItem Header="Align Middle (Ctrl+Shift+M)" Click="OnAlignMiddleMenuClicked"/>
                     <MenuItem Header="Align Bottom (Ctrl+Shift+Down)" Click="OnAlignBottomMenuClicked"/>
                     <Separator/>
                     <MenuItem Header="Distribute Horizontally" Click="OnDistributeHorizontallyMenuClicked"/>
