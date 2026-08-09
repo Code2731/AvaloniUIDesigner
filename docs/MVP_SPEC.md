@@ -118,3 +118,6 @@ Users should be able to place controls visually, inspect properties, and validat
 
 25. v1.19
 - Duplicate a document tab into an independent dirty document with its editing state intact
+
+26. v1.20
+- Rename document tabs with persistent aliases independent of their saved file paths

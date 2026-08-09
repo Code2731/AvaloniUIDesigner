@@ -31,6 +31,7 @@ public partial class MainWindow : Window
         Ctrl+S              Save document
         Ctrl+Alt+S          Save all dirty document tabs
         Ctrl+Alt+D          Duplicate active document tab
+        Ctrl+Alt+R          Rename document tab
         Ctrl+Shift+S        Save document as...
         Ctrl+W              Close active document tab
         Ctrl+Shift+W        Close all document tabs
@@ -357,6 +358,120 @@ public partial class MainWindow : Window
             : null;
         Vm.DuplicateDocumentTab(sourceTab);
         ClearDesignGuides();
+    }
+
+    private async void OnRenameDocumentTabMenuClicked(
+        object? sender,
+        Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        if (Vm is null)
+        {
+            return;
+        }
+
+        var tab = sender is MenuItem { Tag: DocumentTabViewModel taggedTab }
+            ? taggedTab
+            : Vm.SelectedDocumentTab;
+        await RenameDocumentTabAsync(tab);
+    }
+
+    private async Task RenameDocumentTabAsync(DocumentTabViewModel? tab)
+    {
+        if (Vm is null || tab is null)
+        {
+            return;
+        }
+
+        FlushPendingPropertyHistory();
+        var displayName = await ShowDocumentTabRenameDialogAsync(tab);
+        if (displayName is not null)
+        {
+            Vm.RenameDocumentTab(tab, displayName);
+        }
+    }
+
+    private async Task<string?> ShowDocumentTabRenameDialogAsync(DocumentTabViewModel tab)
+    {
+        var dialog = new Window
+        {
+            Title = "Rename Document Tab",
+            Width = 440,
+            Height = 210,
+            MinWidth = 360,
+            MinHeight = 190,
+            CanResize = false,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner,
+        };
+        var editor = new TextBox
+        {
+            Text = tab.DisplayName,
+            Watermark = "Document tab name",
+            MinWidth = 320,
+        };
+        var errorText = new TextBlock
+        {
+            Foreground = Brush.Parse("#B91C1C"),
+            TextWrapping = TextWrapping.Wrap,
+        };
+        var applyButton = new Button { Content = "Rename", MinWidth = 86 };
+        var cancelButton = new Button { Content = "Cancel", MinWidth = 86 };
+
+        void ApplyRename()
+        {
+            var normalizedName = editor.Text?.Trim() ?? string.Empty;
+            if (normalizedName.Length == 0
+                || normalizedName.Length > 80
+                || normalizedName.Any(char.IsControl))
+            {
+                errorText.Text = "Use 1-80 visible characters without line breaks.";
+                return;
+            }
+
+            dialog.Close(normalizedName);
+        }
+
+        applyButton.Click += (_, _) => ApplyRename();
+        cancelButton.Click += (_, _) => dialog.Close(null);
+        editor.KeyDown += (_, e) =>
+        {
+            if (e.Key == Key.Enter)
+            {
+                ApplyRename();
+                e.Handled = true;
+            }
+            else if (e.Key == Key.Escape)
+            {
+                dialog.Close(null);
+                e.Handled = true;
+            }
+        };
+        dialog.Opened += (_, _) =>
+        {
+            editor.Focus();
+            editor.SelectAll();
+        };
+
+        var buttons = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            HorizontalAlignment = HorizontalAlignment.Right,
+            Spacing = 8,
+            Children = { cancelButton, applyButton },
+        };
+        dialog.Content = new StackPanel
+        {
+            Margin = new Thickness(16),
+            Spacing = 10,
+            Children =
+            {
+                new TextBlock { Text = $"Choose a label for {tab.DisplayName}." },
+                editor,
+                errorText,
+                buttons,
+            },
+        };
+
+        return await dialog.ShowDialog<string?>(this);
     }
 
     private async void OnCloseDocumentTabMenuClicked(
@@ -3687,6 +3802,13 @@ public partial class MainWindow : Window
             FlushPendingPropertyHistory();
             Vm.DuplicateDocumentTab();
             ClearDesignGuides();
+            e.Handled = true;
+            return;
+        }
+
+        if (ctrl && alt && e.Key == Key.R)
+        {
+            await RenameDocumentTabAsync(Vm.SelectedDocumentTab);
             e.Handled = true;
             return;
         }

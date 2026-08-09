@@ -711,6 +711,7 @@ public partial class MainWindowViewModel : ViewModelBase
     public bool HasMultipleDocumentTabs => DocumentTabs.Count > 1;
     public bool CanCloseCurrentDocumentTab => HasMultipleDocumentTabs;
     public bool CanDuplicateCurrentDocumentTab => _selectedDocumentTab is not null;
+    public bool CanRenameCurrentDocumentTab => _selectedDocumentTab is not null;
     public bool CanReopenClosedDocumentTab => _closedDocumentTabs.Count > 0;
     public bool HasDirtyDocumentTabs => DocumentTabs.Any(IsDocumentTabDirty);
     public bool HasStylePreviewOptions => StylePreviewOptions.Count > 1;
@@ -8880,6 +8881,28 @@ public partial class MainWindowViewModel : ViewModelBase
         return duplicateTab;
     }
 
+    public bool RenameDocumentTab(DocumentTabViewModel? tab, string? displayName)
+    {
+        if (tab is null
+            || !_documentTabStates.TryGetValue(tab, out var state))
+        {
+            return false;
+        }
+
+        var normalizedName = NormalizeDocumentTabTitle(displayName);
+        if (normalizedName is null)
+        {
+            StatusText = "Document tab name must contain 1-80 visible characters.";
+            return false;
+        }
+
+        state.CustomDisplayName = normalizedName;
+        UpdateDocumentTabPresentations();
+        OnPropertyChanged(nameof(WindowTitle));
+        StatusText = $"Renamed document tab to {normalizedName}.";
+        return true;
+    }
+
     public DocumentTabViewModel CreateDocumentTabFromTemplate(string templateName)
     {
         var document = CreateTemplateDocument(templateName);
@@ -8970,7 +8993,8 @@ public partial class MainWindowViewModel : ViewModelBase
             state.SelectedElementNames.ToList(),
             state.PropertyInspectorFilterText,
             state.PropertyInspectorCategoriesVisible,
-            state.PropertyInspectorAllCategoriesExpanded);
+            state.PropertyInspectorAllCategoriesExpanded,
+            state.CustomDisplayName);
 
     public bool TryRestoreSessionJson(string json, out string error)
     {
@@ -9051,6 +9075,7 @@ public partial class MainWindowViewModel : ViewModelBase
             state.PropertyInspectorFilterText = restoredDocument.PropertyInspectorFilterText;
             state.PropertyInspectorCategoriesVisible = restoredDocument.PropertyInspectorCategoriesVisible;
             state.PropertyInspectorAllCategoriesExpanded = restoredDocument.PropertyInspectorAllCategoriesExpanded;
+            state.CustomDisplayName = restoredDocument.CustomDisplayName;
             tab.Update(
                 restoredDocument.DocumentPath,
                 restoredDocument.DisplayName,
@@ -9089,11 +9114,13 @@ public partial class MainWindowViewModel : ViewModelBase
         var savedDocument = string.IsNullOrWhiteSpace(persistedTab.SavedAxaml)
             ? currentDocument
             : ParseDraftDocument(persistedTab.SavedAxaml, new List<string>());
-        var displayName = string.IsNullOrWhiteSpace(persistedTab.DisplayName)
-            ? string.IsNullOrWhiteSpace(persistedTab.DocumentPath)
-                ? "Untitled"
-                : Path.GetFileName(persistedTab.DocumentPath!)
-            : persistedTab.DisplayName;
+        var customDisplayName = NormalizeDocumentTabTitle(persistedTab.TabTitle);
+        var displayName = customDisplayName
+            ?? (string.IsNullOrWhiteSpace(persistedTab.DisplayName)
+                ? string.IsNullOrWhiteSpace(persistedTab.DocumentPath)
+                    ? "Untitled"
+                    : Path.GetFileName(persistedTab.DocumentPath!)
+                : persistedTab.DisplayName);
         var undoHistory = ParsePersistedHistory(persistedTab.UndoHistory);
         var redoHistory = ParsePersistedHistory(persistedTab.RedoHistory);
         var zoomScale = double.IsFinite(persistedTab.ZoomScale)
@@ -9109,6 +9136,7 @@ public partial class MainWindowViewModel : ViewModelBase
         return new RestoredDocumentTab(
             persistedTab.DocumentPath,
             displayName,
+            customDisplayName,
             currentDocument,
             savedDocument,
             undoHistory,
@@ -9136,6 +9164,7 @@ public partial class MainWindowViewModel : ViewModelBase
         state.PropertyInspectorFilterText = restoredDocument.PropertyInspectorFilterText;
         state.PropertyInspectorCategoriesVisible = restoredDocument.PropertyInspectorCategoriesVisible;
         state.PropertyInspectorAllCategoriesExpanded = restoredDocument.PropertyInspectorAllCategoriesExpanded;
+        state.CustomDisplayName = restoredDocument.CustomDisplayName;
         return state;
     }
 
@@ -9249,6 +9278,7 @@ public partial class MainWindowViewModel : ViewModelBase
         OnPropertyChanged(nameof(CurrentDocumentPath));
         OnPropertyChanged(nameof(SelectedDocumentTab));
         OnPropertyChanged(nameof(CanDuplicateCurrentDocumentTab));
+        OnPropertyChanged(nameof(CanRenameCurrentDocumentTab));
         OnPropertyChanged(nameof(CanCloseCurrentDocumentTab));
         UpdateDocumentTabPresentations();
         StatusText = $"Switched to {state.Tab.DisplayName}.";
@@ -13237,6 +13267,7 @@ public partial class MainWindowViewModel : ViewModelBase
         OnPropertyChanged(nameof(CanReopenClosedDocumentTab));
         OnPropertyChanged(nameof(SelectedDocumentTab));
         OnPropertyChanged(nameof(CanDuplicateCurrentDocumentTab));
+        OnPropertyChanged(nameof(CanRenameCurrentDocumentTab));
         OnPropertyChanged(nameof(CurrentDocumentPath));
         OnPropertyChanged(nameof(WindowTitle));
     }
@@ -13548,11 +13579,12 @@ public partial class MainWindowViewModel : ViewModelBase
             var isDirty = !AreSameDocument(state.LastSavedSnapshot, state.Document);
             state.Tab.Update(
                 state.DocumentPath,
-                string.IsNullOrWhiteSpace(state.DocumentPath)
-                    ? state.Tab.DisplayName.Contains("Untitled", StringComparison.Ordinal)
-                        ? state.Tab.DisplayName
-                        : "Untitled"
-                    : Path.GetFileName(state.DocumentPath),
+                state.CustomDisplayName
+                    ?? (string.IsNullOrWhiteSpace(state.DocumentPath)
+                        ? state.Tab.DisplayName.Contains("Untitled", StringComparison.Ordinal)
+                            ? state.Tab.DisplayName
+                            : "Untitled"
+                        : Path.GetFileName(state.DocumentPath)),
                 isDirty,
                 ReferenceEquals(state.Tab, _selectedDocumentTab),
                 DocumentTabs.Count > 1);
@@ -13565,6 +13597,16 @@ public partial class MainWindowViewModel : ViewModelBase
     {
         var number = _nextUntitledDocumentNumber++;
         return number == 1 ? "Untitled" : $"Untitled {number}";
+    }
+
+    private static string? NormalizeDocumentTabTitle(string? displayName)
+    {
+        var normalizedName = displayName?.Trim();
+        return string.IsNullOrWhiteSpace(normalizedName)
+            || normalizedName.Length > 80
+            || normalizedName.Any(char.IsControl)
+            ? null
+            : normalizedName;
     }
 
     private static void CopyHistoryStack(
@@ -14504,6 +14546,13 @@ public partial class MainWindowViewModel : ViewModelBase
 
     private string GetDisplayDocumentName()
     {
+        if (_selectedDocumentTab is not null
+            && _documentTabStates.TryGetValue(_selectedDocumentTab, out var state)
+            && state.CustomDisplayName is not null)
+        {
+            return state.CustomDisplayName;
+        }
+
         if (string.IsNullOrWhiteSpace(_currentDocumentPath))
         {
             return "Untitled";
@@ -16521,6 +16570,7 @@ public partial class MainWindowViewModel : ViewModelBase
         public PendingMutation? PendingMutation { get; set; } = pendingMutation;
         public double ZoomScale { get; set; } = zoomScale;
         public List<string> SelectedElementNames { get; } = selectedElementNames;
+        public string? CustomDisplayName { get; set; }
         public string PropertyInspectorFilterText { get; set; } = string.Empty;
         public bool PropertyInspectorCategoriesVisible { get; set; } = true;
         public bool PropertyInspectorAllCategoriesExpanded { get; set; } = true;
@@ -16557,7 +16607,8 @@ public partial class MainWindowViewModel : ViewModelBase
         List<string>? SelectedElementNames = null,
         string? PropertyInspectorFilterText = null,
         bool PropertyInspectorCategoriesVisible = true,
-        bool PropertyInspectorAllCategoriesExpanded = true);
+        bool PropertyInspectorAllCategoriesExpanded = true,
+        string? TabTitle = null);
 
     private sealed record PersistedHistoryEntry(
         string BeforeAxaml,
@@ -16572,6 +16623,7 @@ public partial class MainWindowViewModel : ViewModelBase
     private sealed record RestoredDocumentTab(
         string? DocumentPath,
         string DisplayName,
+        string? CustomDisplayName,
         DesignerCanvasDocument CurrentDocument,
         DesignerCanvasDocument SavedDocument,
         List<HistoryEntry> UndoHistory,

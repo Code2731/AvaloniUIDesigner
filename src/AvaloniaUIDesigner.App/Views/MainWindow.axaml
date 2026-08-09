@@ -28,6 +28,9 @@
                 <MenuItem Header="Duplicate Tab"
                           Click="OnDuplicateDocumentTabMenuClicked"
                           IsEnabled="{Binding CanDuplicateCurrentDocumentTab}"/>
+                <MenuItem Header="Rename Tab..."
+                          Click="OnRenameDocumentTabMenuClicked"
+                          IsEnabled="{Binding CanRenameCurrentDocumentTab}"/>
                 <MenuItem Header="Close Tab" Click="OnCloseCurrentTabMenuClicked" IsEnabled="{Binding CanCloseCurrentDocumentTab}"/>
                 <MenuItem Header="Close All Tabs"
                           Click="OnCloseAllTabsMenuClicked"
@@ -353,6 +356,9 @@
                                         <MenuItem Header="Duplicate Tab"
                                                   Tag="{Binding}"
                                                   Click="OnDuplicateDocumentTabMenuClicked"/>
+                                        <MenuItem Header="Rename Tab..."
+                                                  Tag="{Binding}"
+                                                  Click="OnRenameDocumentTabMenuClicked"/>
                                         <Separator/>
                                         <MenuItem Header="Close Tab"
                                                   Tag="{Binding}"
