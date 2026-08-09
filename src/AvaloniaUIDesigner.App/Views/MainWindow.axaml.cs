@@ -40,6 +40,7 @@ public partial class MainWindow : Window
         Ctrl+Shift+Tab      Previous document tab
         Ctrl+Shift+PageUp   Move active tab left
         Ctrl+Shift+PageDown Move active tab right
+        Middle-click tab    Close document tab
         Ctrl+F              Focus Object Tree search
         Ctrl+Alt+I          Focus Property Inspector filter
         Ctrl+Alt+T          Focus Toolbox search
@@ -216,10 +217,21 @@ public partial class MainWindow : Window
         }
     }
 
-    private void OnDocumentTabPointerPressed(object? sender, PointerPressedEventArgs e)
+    private async void OnDocumentTabPointerPressed(object? sender, PointerPressedEventArgs e)
     {
-        if (sender is not Button { Tag: DocumentTabViewModel tab } tabButton
-            || !e.GetCurrentPoint(tabButton).Properties.IsLeftButtonPressed)
+        if (sender is not Button { Tag: DocumentTabViewModel tab } tabButton)
+        {
+            return;
+        }
+
+        var point = e.GetCurrentPoint(tabButton);
+        if (await TryCloseDocumentTabFromPointerAsync(tab, point.Properties.PointerUpdateKind))
+        {
+            e.Handled = true;
+            return;
+        }
+
+        if (!point.Properties.IsLeftButtonPressed)
         {
             return;
         }
@@ -227,6 +239,19 @@ public partial class MainWindow : Window
         _pendingDocumentTabDrag = tab;
         _documentTabDragStart = e.GetPosition(this);
         e.Pointer.Capture(tabButton);
+    }
+
+    private async Task<bool> TryCloseDocumentTabFromPointerAsync(
+        DocumentTabViewModel tab,
+        PointerUpdateKind updateKind)
+    {
+        if (updateKind != PointerUpdateKind.MiddleButtonPressed)
+        {
+            return false;
+        }
+
+        await CloseDocumentTabAsync(tab);
+        return true;
     }
 
     private async void OnDocumentTabPointerMoved(object? sender, PointerEventArgs e)

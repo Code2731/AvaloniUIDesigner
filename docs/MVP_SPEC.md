@@ -121,3 +121,6 @@ Users should be able to place controls visually, inspect properties, and validat
 
 26. v1.20
 - Rename document tabs with persistent aliases independent of their saved file paths
+
+27. v1.21
+- Close document tabs through middle-click while preserving the existing dirty-document safeguards
