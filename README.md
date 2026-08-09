@@ -39,7 +39,7 @@ dotnet run --project src/AvaloniaUIDesigner.App/AvaloniaUIDesigner.App.csproj
 - **리사이즈 Smart Snap**: 8방향 핸들로 크기를 조정할 때 아트보드 경계·중앙선, 디자인 가이드, 다른 컨트롤의 모서리·중앙선에 맞추고 스냅 기준선을 표시하며 최소 10px 크기를 보호합니다. 크기 변경은 이동과 같은 Undo·AXAML 왕복 흐름을 사용합니다.
 - **다중 선택 리사이즈**: 같은 root 또는 같은 Canvas의 여러 컨트롤을 선택하면 bounding box 핸들로 위치·크기를 비율 조정하고 Canvas 자식의 로컬 좌표도 동기화합니다. Grid·StackPanel·Content 자식이나 서로 다른 부모를 섞은 선택은 좌표 손실을 막기 위해 리사이즈를 차단합니다.
 - **다중 선택 공통 속성**: `Edit > Edit Common Properties...`에서 선택된 여러 컨트롤의 공통 Margin·정렬·Opacity·입력/표시 상태를 한 번에 적용하고, 서로 다른 값은 비워 둔 채 개별 값을 유지하며 하나의 Undo 작업으로 기록
-- **Arrange 키보드 단축키**: 캔버스에서 다중 선택 후 `Ctrl+Shift+Left/Right/Up/Down`으로 선택 컨트롤을 좌·우·상·하 경계에 정렬하고 `Ctrl+Shift+E/M`으로 가로 중앙·세로 중앙에 정렬하며 기존 Arrange Undo/AXAML 흐름을 그대로 사용
+- **Arrange 키보드 단축키**: 캔버스에서 다중 선택 후 `Ctrl+Shift+Left/Right/Up/Down`으로 선택 컨트롤을 좌·우·상·하 경계에 정렬하고 `Ctrl+Shift+E/M`으로 가로 중앙·세로 중앙에 정렬하며 `Ctrl+Alt+H/V`로 가로·세로 균등 분배하고 기존 Arrange Undo/AXAML 흐름을 그대로 사용
 - **리사이즈 비율 잠금**: 코너 핸들을 `Shift`와 함께 드래그하면 단일 컨트롤과 다중 선택 bounding box의 원래 가로·세로 비율을 유지하며, 잠금 중에는 Smart Snap보다 비율을 우선합니다.
 - **디자인 그리드**: 그리드 표시·Snap to Grid를 전환하고 4·8·16px 프리셋 또는 4~32px 사용자 지정 간격을 편집하며 문서 설정·Undo/Redo·Preview·AXAML 메타데이터에 보존
 - **계층 클립보드**: 컨테이너를 선택해 복사·잘라내기·붙여넣기·복제하면 내부 자식 계층과 부모별 배치 메타데이터를 함께 보존하고, 붙여넣은 부모 이름을 새 이름으로 재매핑
@@ -218,7 +218,7 @@ dotnet run --project src/AvaloniaUIDesigner.App/AvaloniaUIDesigner.App.csproj
 75m. `View > Quick Switch Document Tab...` 또는 `Ctrl+K`는 열린 문서 탭의 별칭과 저장 경로를 검색합니다. 검색창에서 `Enter`는 선택 탭으로 전환하고, `Escape`는 취소하며, 위/아래 방향키는 결과를 이동합니다.
 75n. 캔버스가 포커스를 가진 상태에서 `Ctrl+=`/`Ctrl+Plus`는 10% 확대, `Ctrl+-`/`Ctrl+Minus`는 10% 축소, `Ctrl+0`은 100% 실제 크기, `F`는 현재 뷰포트에 맞춤을 실행합니다. 확대·축소는 활성 문서 탭별 Zoom 상태에 보존되며 텍스트 입력 중인 TextBox에는 전달되지 않습니다.
 75o. `View > Zoom Presets`에서 25%·50%·75%·100%·125%·150%·200%를 즉시 선택하거나 `Custom...`에서 25~200%의 소수점 배율을 입력할 수 있습니다. 잘못된 값은 적용하지 않고 현재 배율을 유지합니다.
-75p. 캔버스에서 두 개 이상의 컨트롤을 선택한 뒤 `Ctrl+Shift+Left/Right/Up/Down`을 누르면 각각 선택 영역의 좌·우·상·하 경계에 맞춰 정렬하고, `Ctrl+Shift+E/M`은 가로 중앙·세로 중앙에 맞춥니다. Object Tree에 포커스가 있으면 방향키 탐색을 우선하며, 정렬 결과는 하나의 Undo 작업과 AXAML에 반영됩니다.
+75p. 캔버스에서 두 개 이상의 컨트롤을 선택한 뒤 `Ctrl+Shift+Left/Right/Up/Down`을 누르면 각각 선택 영역의 좌·우·상·하 경계에 맞춰 정렬하고, `Ctrl+Shift+E/M`은 가로 중앙·세로 중앙에 맞춥니다. 세 개 이상 선택하면 `Ctrl+Alt+H/V`로 가로·세로 간격을 균등 분배할 수 있습니다. Object Tree에 포커스가 있으면 방향키 탐색을 우선하며, 작업 결과는 하나의 Undo 작업과 AXAML에 반영됩니다.
 76. `File > Load Component Pack...` 또는 `File > Load Toolbox Preset Pack...`으로 외부 Toolbox 팩을 추가하면 파일 경로가 세션에 등록되어 다음 실행 때 자동으로 다시 로드됩니다. 파일이 없어도 문서 탭 복원은 계속되며 상태바에 경고가 표시됩니다.
 77. 외부 프로젝트의 컨트롤은 Component Pack 항목에 `designOnly: true`, `avaloniaTypeName`, `previewText`, `defaultProperties`를 지정해 등록합니다. 디자이너에서는 타입명 플레이스홀더로 편집하고, 생성 AXAML에는 원래 커스텀 타입과 속성을 출력합니다. 예시는 [custom-component-pack.example.json](docs/custom-component-pack.example.json)을 참고하세요.
 78. `File > Load Component Pack Plugin...`에서 `IComponentPackPlugin`을 구현한 신뢰할 수 있는 DLL을 선택하면 플러그인이 제공한 Component Pack을 Toolbox에 등록합니다. DLL 경로는 세션 JSON의 `ComponentPluginPaths`에 저장되고, 앱 재시작 시 플러그인·JSON 팩·프리셋 팩 순서로 복원됩니다.
@@ -366,6 +366,7 @@ AXAML 소스 편집기의 `Validate`와 `Preview`는 현재 디자인과 Undo �
 - v1.25: Zoom Preset 메뉴와 사용자 지정 배율 입력
 - v1.26: 다중 선택 Arrange 키보드 단축키
 - v1.27: 다중 선택 중앙 정렬 키보드 단축키
+- v1.28: 다중 선택 컨트롤 균등 분배 키보드 단축키
 
 ## 컴포넌트 팩
 

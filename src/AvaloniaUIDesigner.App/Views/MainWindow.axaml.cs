@@ -45,6 +45,7 @@ public partial class MainWindow : Window
         Middle-click tab    Close document tab
         Ctrl+Shift+Arrow    Align selected controls to an edge
         Ctrl+Shift+E/M      Align selected controls center/middle
+        Ctrl+Alt+H/V        Distribute selected controls horizontally/vertically
         Ctrl+= / Ctrl+Plus  Zoom in
         Ctrl+- / Ctrl+Minus Zoom out
         Ctrl+F              Focus Object Tree search
@@ -4175,6 +4176,19 @@ public partial class MainWindow : Window
         if (ctrl && shift && !alt && keyboardArrangeAction is { } arrangeAction)
         {
             ArrangeSelectedElements(arrangeAction);
+            e.Handled = true;
+            return;
+        }
+
+        var keyboardDistributeAction = e.Key switch
+        {
+            Key.H => MainWindowViewModel.SelectionLayoutAction.DistributeHorizontally,
+            Key.V => MainWindowViewModel.SelectionLayoutAction.DistributeVertically,
+            _ => (MainWindowViewModel.SelectionLayoutAction?)null,
+        };
+        if (ctrl && alt && keyboardDistributeAction is { } distributeAction)
+        {
+            ArrangeSelectedElements(distributeAction);
             e.Handled = true;
             return;
         }

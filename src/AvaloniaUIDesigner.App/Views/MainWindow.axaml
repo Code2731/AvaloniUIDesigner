@@ -214,8 +214,8 @@
                     <MenuItem Header="Align Middle (Ctrl+Shift+M)" Click="OnAlignMiddleMenuClicked"/>
                     <MenuItem Header="Align Bottom (Ctrl+Shift+Down)" Click="OnAlignBottomMenuClicked"/>
                     <Separator/>
-                    <MenuItem Header="Distribute Horizontally" Click="OnDistributeHorizontallyMenuClicked"/>
-                    <MenuItem Header="Distribute Vertically" Click="OnDistributeVerticallyMenuClicked"/>
+                    <MenuItem Header="Distribute Horizontally (Ctrl+Alt+H)" Click="OnDistributeHorizontallyMenuClicked"/>
+                    <MenuItem Header="Distribute Vertically (Ctrl+Alt+V)" Click="OnDistributeVerticallyMenuClicked"/>
                     <Separator/>
                     <MenuItem Header="Make Same Width" Click="OnMakeSameWidthMenuClicked"/>
                     <MenuItem Header="Make Same Height" Click="OnMakeSameHeightMenuClicked"/>

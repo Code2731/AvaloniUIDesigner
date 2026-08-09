@@ -142,3 +142,6 @@ Users should be able to place controls visually, inspect properties, and validat
 
 33. v1.27
 - Provide horizontal and vertical center-alignment keyboard shortcuts for multi-selected controls
+
+34. v1.28
+- Provide horizontal and vertical distribution keyboard shortcuts for selections of three or more controls
