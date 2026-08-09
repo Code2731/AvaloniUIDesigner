@@ -42,6 +42,7 @@ dotnet run --project src/AvaloniaUIDesigner.App/AvaloniaUIDesigner.App.csproj
 - **Arrange 키보드 단축키**: 캔버스에서 다중 선택 후 `Ctrl+Shift+Left/Right/Up/Down`으로 선택 컨트롤을 좌·우·상·하 경계에 정렬하고 `Ctrl+Shift+E/M`으로 가로 중앙·세로 중앙에 정렬하며 `Ctrl+Alt+H/V`로 가로·세로 균등 분배하고 기존 Arrange Undo/AXAML 흐름을 그대로 사용
 - **레이어 순서 키보드 단축키**: 선택 컨트롤을 `Ctrl+]`/`Ctrl+[`로 한 단계 앞·뒤로 이동하고 `Ctrl+Shift+]`/`Ctrl+Shift+[`로 맨 앞·뒤로 보내며 기존 Order Undo/AXAML 흐름과 선택 상태를 유지
 - **아트보드 중앙 정렬 단축키**: root 선택을 `Ctrl+Alt+Shift+X/Y`로 가로·세로 중앙에 배치하고 `Ctrl+Alt+Shift+C`로 양축 중앙에 배치하며 기존 Center on Artboard Undo/AXAML 흐름을 사용
+- **그룹 편집 키보드 단축키**: 다중 선택을 `Ctrl+G`로 Canvas 그룹으로 묶고 선택된 Canvas를 `Ctrl+Shift+U`로 해제하며 기존 계층·Undo·Preview·AXAML 흐름을 유지
 - **그리드/스냅 키보드 단축키**: `Ctrl+Alt+G`로 디자인 그리드를 표시·숨기고 `Ctrl+Alt+Shift+G`로 Grid snap을 토글하며 기존 문서 설정·Undo/AXAML 메타데이터를 유지
 - **Workspace 패널 키보드 단축키**: `Ctrl+Alt+1/2/3`으로 Toolbox·Object Tree·Property Inspector를 토글하고 `Ctrl+Alt+0`으로 기본 패널 레이아웃을 복원하며 기존 세션 저장 상태와 메뉴 체크를 동기화
 - **패널 포커스 복구**: 숨겨진 패널에서도 `Ctrl+Alt+T/P/I` 또는 `Ctrl+F`를 누르면 필요한 Toolbox·Object Tree·Property Inspector를 자동으로 다시 표시한 뒤 검색·배치 작업으로 진입
@@ -229,6 +230,7 @@ dotnet run --project src/AvaloniaUIDesigner.App/AvaloniaUIDesigner.App.csproj
 75s. `Ctrl+Alt+G`로 디자인 그리드를 표시하거나 숨기고, `Ctrl+Alt+Shift+G`로 컨트롤 배치·이동·리사이즈의 Grid snap을 켜거나 끕니다. `Ctrl+Shift+G`는 기존처럼 디자인 가이드만 지우며, 세 명령은 서로 다른 작업으로 Undo할 수 있습니다.
 75t. `Ctrl+Alt+1`/`2`/`3`으로 Toolbox·Object Tree·Property Inspector 패널을 각각 표시하거나 숨기고, `Ctrl+Alt+0`으로 기본 패널 크기와 가시성을 복원합니다. 숫자 키패드의 0~3도 지원하며, `View > Panels` 메뉴와 세션 저장 상태가 같은 패널 상태를 공유합니다.
 75u. Toolbox·Object Tree·Property Inspector 패널을 숨긴 상태에서도 각각 `Ctrl+Alt+T/P`, `Ctrl+F`, `Ctrl+Alt+I`를 누르면 대상 패널이 자동으로 표시되고 검색 포커스 또는 Toolbox 배치 모드가 이어집니다.
+75v. 두 개 이상의 같은 root 또는 같은 Canvas 형제 컨트롤을 선택한 뒤 `Ctrl+G`를 누르면 `Group Selected into Canvas`와 동일하게 묶이고, 그룹 Canvas를 선택한 뒤 `Ctrl+Shift+U`를 누르면 원래 부모·좌표를 보존하며 해제됩니다. 두 작업은 각각 하나의 Undo 단계로 기록됩니다.
 76. `File > Load Component Pack...` 또는 `File > Load Toolbox Preset Pack...`으로 외부 Toolbox 팩을 추가하면 파일 경로가 세션에 등록되어 다음 실행 때 자동으로 다시 로드됩니다. 파일이 없어도 문서 탭 복원은 계속되며 상태바에 경고가 표시됩니다.
 77. 외부 프로젝트의 컨트롤은 Component Pack 항목에 `designOnly: true`, `avaloniaTypeName`, `previewText`, `defaultProperties`를 지정해 등록합니다. 디자이너에서는 타입명 플레이스홀더로 편집하고, 생성 AXAML에는 원래 커스텀 타입과 속성을 출력합니다. 예시는 [custom-component-pack.example.json](docs/custom-component-pack.example.json)을 참고하세요.
 78. `File > Load Component Pack Plugin...`에서 `IComponentPackPlugin`을 구현한 신뢰할 수 있는 DLL을 선택하면 플러그인이 제공한 Component Pack을 Toolbox에 등록합니다. DLL 경로는 세션 JSON의 `ComponentPluginPaths`에 저장되고, 앱 재시작 시 플러그인·JSON 팩·프리셋 팩 순서로 복원됩니다.
@@ -383,6 +385,7 @@ AXAML 소스 편집기의 `Validate`와 `Preview`는 현재 디자인과 Undo �
 - v1.32: 디자인 그리드/스냅 키보드 단축키
 - v1.33: Workspace 패널 키보드 단축키
 - v1.34: 숨겨진 Workspace 패널의 포커스 단축키 자동 복구
+- v1.35: Canvas 그룹/그룹 해제 키보드 단축키
 
 ## 컴포넌트 팩
 

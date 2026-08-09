@@ -45,6 +45,8 @@ public partial class MainWindow : Window
         Middle-click tab    Close document tab
         Ctrl+Shift+Arrow    Align selected controls to an edge
         Ctrl+Shift+E/M      Align selected controls center/middle
+        Ctrl+G              Group selected controls into a Canvas
+        Ctrl+Shift+U        Ungroup selected Canvas
         Ctrl+Alt+H/V        Distribute selected controls horizontally/vertically
         Ctrl+Alt+Shift+W/H/S Match selected control widths/heights/sizes
         Ctrl+Alt+Shift+X/Y Center selection on artboard horizontally/vertically
@@ -4298,6 +4300,22 @@ public partial class MainWindow : Window
         if (!ctrl && e.Key == Key.Tab && ReferenceEquals(e.Source, DesignHost))
         {
             Vm.SelectNextVisibleElement(shift);
+            e.Handled = true;
+            return;
+        }
+
+        if (ctrl && !shift && !alt && e.Key == Key.G)
+        {
+            FlushPendingPropertyHistory();
+            Vm.GroupSelectedElements();
+            e.Handled = true;
+            return;
+        }
+
+        if (ctrl && shift && !alt && e.Key == Key.U)
+        {
+            FlushPendingPropertyHistory();
+            Vm.UngroupSelectedCanvas();
             e.Handled = true;
             return;
         }

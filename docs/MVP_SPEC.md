@@ -163,3 +163,6 @@ Users should be able to place controls visually, inspect properties, and validat
 
 40. v1.34
 - Reveal hidden workspace panels before applying their search or placement focus shortcuts
+
+41. v1.35
+- Provide keyboard shortcuts for grouping selections into a Canvas and ungrouping the selected Canvas

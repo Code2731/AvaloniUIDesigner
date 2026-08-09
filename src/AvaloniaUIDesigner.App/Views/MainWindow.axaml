@@ -240,9 +240,9 @@
                               Click="OnLayoutSelectedWrapPanelVerticallyMenuClicked"/>
                 </MenuItem>
                 <Separator/>
-                <MenuItem Header="Group Selected into Canvas" Click="OnGroupSelectedMenuClicked" IsEnabled="{Binding Canvas.HasMultipleSelection}"/>
+                <MenuItem Header="Group Selected into Canvas (Ctrl+G)" Click="OnGroupSelectedMenuClicked" IsEnabled="{Binding Canvas.HasMultipleSelection}"/>
                 <MenuItem Header="Break Selected Layout" Click="OnBreakSelectedLayoutMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
-                <MenuItem Header="Ungroup Selected Canvas" Click="OnUngroupSelectedMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
+                <MenuItem Header="Ungroup Selected Canvas (Ctrl+Shift+U)" Click="OnUngroupSelectedMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
             </MenuItem>
             <MenuItem Header="View">
                 <MenuItem Header="Live Preview" Click="OnPreviewMenuClicked"/>
@@ -807,9 +807,9 @@
                                                                   Click="OnLayoutSelectedWrapPanelVerticallyMenuClicked"/>
                                                     </MenuItem>
                                                     <Separator/>
-                                                    <MenuItem Header="Group Selected into Canvas" Click="OnGroupSelectedMenuClicked"/>
+                                                    <MenuItem Header="Group Selected into Canvas (Ctrl+G)" Click="OnGroupSelectedMenuClicked"/>
                                                     <MenuItem Header="Break Selected Layout" Click="OnBreakSelectedLayoutMenuClicked"/>
-                                                    <MenuItem Header="Ungroup Selected Canvas" Click="OnUngroupSelectedMenuClicked"/>
+                                                    <MenuItem Header="Ungroup Selected Canvas (Ctrl+Shift+U)" Click="OnUngroupSelectedMenuClicked"/>
                                                 </ContextMenu>
                                             </Border.ContextMenu>
                                             <Grid>
