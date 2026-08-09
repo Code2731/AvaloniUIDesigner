@@ -145,3 +145,6 @@ Users should be able to place controls visually, inspect properties, and validat
 
 34. v1.28
 - Provide horizontal and vertical distribution keyboard shortcuts for selections of three or more controls
+
+35. v1.29
+- Provide keyboard shortcuts for matching the width, height, or full size of multi-selected controls

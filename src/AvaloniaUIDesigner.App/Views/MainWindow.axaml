@@ -217,9 +217,9 @@
                     <MenuItem Header="Distribute Horizontally (Ctrl+Alt+H)" Click="OnDistributeHorizontallyMenuClicked"/>
                     <MenuItem Header="Distribute Vertically (Ctrl+Alt+V)" Click="OnDistributeVerticallyMenuClicked"/>
                     <Separator/>
-                    <MenuItem Header="Make Same Width" Click="OnMakeSameWidthMenuClicked"/>
-                    <MenuItem Header="Make Same Height" Click="OnMakeSameHeightMenuClicked"/>
-                    <MenuItem Header="Make Same Size" Click="OnMakeSameSizeMenuClicked"/>
+                    <MenuItem Header="Make Same Width (Ctrl+Alt+Shift+W)" Click="OnMakeSameWidthMenuClicked"/>
+                    <MenuItem Header="Make Same Height (Ctrl+Alt+Shift+H)" Click="OnMakeSameHeightMenuClicked"/>
+                    <MenuItem Header="Make Same Size (Ctrl+Alt+Shift+S)" Click="OnMakeSameSizeMenuClicked"/>
                 </MenuItem>
                 <MenuItem Header="Lay Out Selected" IsEnabled="{Binding Canvas.HasMultipleSelection}">
                     <MenuItem Header="Horizontally (StackPanel)"
