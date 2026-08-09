@@ -47,6 +47,10 @@ public partial class MainWindow : Window
         Ctrl+Shift+E/M      Align selected controls center/middle
         Ctrl+Alt+H/V        Distribute selected controls horizontally/vertically
         Ctrl+Alt+Shift+W/H/S Match selected control widths/heights/sizes
+        Ctrl+]              Bring selected controls forward
+        Ctrl+[              Send selected controls backward
+        Ctrl+Shift+]        Bring selected controls to front
+        Ctrl+Shift+[        Send selected controls to back
         Ctrl+= / Ctrl+Plus  Zoom in
         Ctrl+- / Ctrl+Minus Zoom out
         Ctrl+F              Focus Object Tree search
@@ -4204,6 +4208,23 @@ public partial class MainWindow : Window
         if (ctrl && alt && shift && keyboardSizeAction is { } sizeAction)
         {
             ArrangeSelectedElements(sizeAction);
+            e.Handled = true;
+            return;
+        }
+
+        var keyboardLayerAction = e.Key switch
+        {
+            Key.OemOpenBrackets => shift
+                ? MainWindowViewModel.LayerOrderAction.SendToBack
+                : MainWindowViewModel.LayerOrderAction.SendBackward,
+            Key.OemCloseBrackets => shift
+                ? MainWindowViewModel.LayerOrderAction.BringToFront
+                : MainWindowViewModel.LayerOrderAction.BringForward,
+            _ => (MainWindowViewModel.LayerOrderAction?)null,
+        };
+        if (ctrl && !alt && keyboardLayerAction is { } layerAction)
+        {
+            MoveSelectedElementsInLayerOrder(layerAction);
             e.Handled = true;
             return;
         }

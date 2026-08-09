@@ -148,3 +148,6 @@ Users should be able to place controls visually, inspect properties, and validat
 
 35. v1.29
 - Provide keyboard shortcuts for matching the width, height, or full size of multi-selected controls
+
+36. v1.30
+- Provide keyboard shortcuts for moving selected controls forward, backward, to front, or to back in z-order
