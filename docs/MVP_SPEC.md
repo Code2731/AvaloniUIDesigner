@@ -100,3 +100,6 @@ Users should be able to place controls visually, inspect properties, and validat
 
 19. v1.13
 - Document tab keyboard movement and context-menu operations
+
+20. v1.14
+- Bulk document tab closing with preflight dirty confirmation

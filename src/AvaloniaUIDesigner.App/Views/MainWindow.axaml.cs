@@ -348,6 +348,91 @@ public partial class MainWindow : Window
         }
     }
 
+    private async void OnCloseDocumentTabsToRightMenuClicked(
+        object? sender,
+        Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        if (sender is MenuItem { Tag: DocumentTabViewModel tab })
+        {
+            var tabIndex = Vm?.DocumentTabs.IndexOf(tab) ?? -1;
+            if (tabIndex >= 0 && Vm is not null)
+            {
+                await CloseDocumentTabSetAsync(
+                    tab,
+                    Vm.DocumentTabs.Skip(tabIndex + 1).ToList());
+            }
+        }
+    }
+
+    private async void OnCloseOtherDocumentTabsMenuClicked(
+        object? sender,
+        Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        if (Vm is not null && sender is MenuItem { Tag: DocumentTabViewModel tab })
+        {
+            await CloseDocumentTabSetAsync(
+                tab,
+                Vm.DocumentTabs.Where(candidate => !ReferenceEquals(candidate, tab)).ToList());
+        }
+    }
+
+    private async Task<bool> CloseDocumentTabSetAsync(
+        DocumentTabViewModel preferredTab,
+        IReadOnlyList<DocumentTabViewModel> tabsToClose)
+    {
+        if (Vm is null)
+        {
+            return false;
+        }
+
+        var targets = tabsToClose
+            .Where(tab => Vm.DocumentTabs.Contains(tab))
+            .ToList();
+        if (targets.Count == 0)
+        {
+            return true;
+        }
+
+        var originalTab = Vm.SelectedDocumentTab;
+        foreach (var tab in targets)
+        {
+            FlushPendingPropertyHistory();
+            if (!ReferenceEquals(Vm.SelectedDocumentTab, tab))
+            {
+                Vm.ActivateDocumentTab(tab);
+            }
+
+            if (!await EnsureCanContinueWithUnsavedChangesAsync())
+            {
+                RestoreDocumentTabIfPresent(originalTab ?? preferredTab);
+                return false;
+            }
+        }
+
+        RestoreDocumentTabIfPresent(preferredTab);
+        foreach (var tab in targets)
+        {
+            if (Vm.DocumentTabs.Contains(tab))
+            {
+                Vm.CloseDocumentTab(tab);
+            }
+        }
+
+        RestoreDocumentTabIfPresent(preferredTab);
+        ClearDesignGuides();
+        return true;
+    }
+
+    private void RestoreDocumentTabIfPresent(DocumentTabViewModel tab)
+    {
+        if (Vm is not null
+            && Vm.DocumentTabs.Contains(tab)
+            && !ReferenceEquals(Vm.SelectedDocumentTab, tab))
+        {
+            Vm.ActivateDocumentTab(tab);
+        }
+    }
+
     private void MoveDocumentTabFromMenu(object? sender, int offset)
     {
         if (Vm is null

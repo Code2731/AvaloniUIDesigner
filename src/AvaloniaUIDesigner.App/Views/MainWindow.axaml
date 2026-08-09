@@ -342,6 +342,12 @@
                                         <MenuItem Header="Close Tab"
                                                   Tag="{Binding}"
                                                   Click="OnCloseDocumentTabMenuClicked"/>
+                                        <MenuItem Header="Close Tabs to Right"
+                                                  Tag="{Binding}"
+                                                  Click="OnCloseDocumentTabsToRightMenuClicked"/>
+                                        <MenuItem Header="Close Other Tabs"
+                                                  Tag="{Binding}"
+                                                  Click="OnCloseOtherDocumentTabsMenuClicked"/>
                                     </ContextMenu>
                                 </Border.ContextMenu>
                                 <StackPanel Orientation="Horizontal" Spacing="2">
