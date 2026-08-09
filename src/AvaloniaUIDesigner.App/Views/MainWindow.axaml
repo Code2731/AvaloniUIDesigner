@@ -246,6 +246,9 @@
             </MenuItem>
             <MenuItem Header="View">
                 <MenuItem Header="Live Preview" Click="OnPreviewMenuClicked"/>
+                <MenuItem Header="Quick Switch Document Tab..."
+                          Click="OnQuickSwitchDocumentTabMenuClicked"
+                          IsEnabled="{Binding HasMultipleDocumentTabs}"/>
                 <Separator/>
                 <MenuItem Header="Zoom In" Click="OnZoomInMenuClicked"/>
                 <MenuItem Header="Zoom Out" Click="OnZoomOutMenuClicked"/>

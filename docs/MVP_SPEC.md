@@ -127,3 +127,6 @@ Users should be able to place controls visually, inspect properties, and validat
 
 28. v1.22
 - Activate the first nine document tabs directly with keyboard shortcuts
+
+29. v1.23
+- Search open document tabs by alias or saved file path and activate the selected result from a quick switch dialog

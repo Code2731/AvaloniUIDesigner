@@ -39,6 +39,7 @@ public partial class MainWindow : Window
         Ctrl+Tab            Next document tab
         Ctrl+Shift+Tab      Previous document tab
         Ctrl+1..9           Activate document tab 1-9
+        Ctrl+K              Quick switch document tab
         Ctrl+Shift+PageUp   Move active tab left
         Ctrl+Shift+PageDown Move active tab right
         Middle-click tab    Close document tab
@@ -127,6 +128,10 @@ public partial class MainWindow : Window
             => string.IsNullOrWhiteSpace(ChildName) ? Slot.ToString() : $"{Slot} ({ChildName})";
     }
     private sealed record ContentAssignmentOptions(string ParentName);
+    private sealed record DocumentTabSwitcherItem(DocumentTabViewModel Tab, string Path)
+    {
+        public override string ToString() => $"{Tab.Header} - {Path}";
+    }
 
     private const double HandleHalf = 5;
     private const double MinSize = 10;
@@ -206,6 +211,208 @@ public partial class MainWindow : Window
     private async void OnOpenMenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
         await HandleOpenCommandAsync();
+    }
+
+    private async void OnQuickSwitchDocumentTabMenuClicked(
+        object? sender,
+        Avalonia.Interactivity.RoutedEventArgs e)
+        => await QuickSwitchDocumentTabAsync();
+
+    private async Task QuickSwitchDocumentTabAsync()
+    {
+        if (Vm is null)
+        {
+            return;
+        }
+
+        if (Vm.DocumentTabs.Count < 2)
+        {
+            Vm.StatusText = "At least two document tabs are required for quick switching.";
+            return;
+        }
+
+        FlushPendingPropertyHistory();
+        var selectedTab = await ShowDocumentTabSwitcherAsync();
+        if (selectedTab is not null && Vm.ActivateDocumentTab(selectedTab))
+        {
+            ClearDesignGuides();
+        }
+    }
+
+    private static List<DocumentTabSwitcherItem> FilterDocumentTabSwitcherItems(
+        IReadOnlyList<DocumentTabViewModel> tabs,
+        string? query)
+    {
+        var normalizedQuery = query?.Trim() ?? string.Empty;
+        return tabs
+            .Where(tab => string.IsNullOrWhiteSpace(normalizedQuery)
+                || tab.DisplayName.Contains(normalizedQuery, StringComparison.OrdinalIgnoreCase)
+                || (!string.IsNullOrWhiteSpace(tab.DocumentPath)
+                    && tab.DocumentPath.Contains(normalizedQuery, StringComparison.OrdinalIgnoreCase)))
+            .Select(tab => new DocumentTabSwitcherItem(
+                tab,
+                string.IsNullOrWhiteSpace(tab.DocumentPath)
+                    ? "Unsaved document"
+                    : tab.DocumentPath!))
+            .ToList();
+    }
+
+    private async Task<DocumentTabViewModel?> ShowDocumentTabSwitcherAsync()
+    {
+        if (Vm is null)
+        {
+            return null;
+        }
+
+        var tabs = Vm.DocumentTabs.ToList();
+        var dialog = new Window
+        {
+            Title = "Quick Switch Document Tab",
+            Width = 580,
+            Height = 430,
+            MinWidth = 440,
+            MinHeight = 340,
+            CanResize = false,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner,
+        };
+        var search = new TextBox
+        {
+            Watermark = "Search tab name or file path",
+            MinWidth = 380,
+        };
+        var matchSummary = new TextBlock
+        {
+            Foreground = Brush.Parse("#64748B"),
+        };
+        var list = new ListBox
+        {
+            MinHeight = 250,
+            MaxHeight = 290,
+            SelectionMode = SelectionMode.Single,
+        };
+        var filteredItems = new List<DocumentTabSwitcherItem>();
+
+        void RefreshResults()
+        {
+            filteredItems = FilterDocumentTabSwitcherItems(tabs, search.Text);
+            list.ItemsSource = filteredItems;
+
+            var activeIndex = filteredItems.FindIndex(
+                item => ReferenceEquals(item.Tab, Vm.SelectedDocumentTab));
+            list.SelectedIndex = activeIndex >= 0
+                ? activeIndex
+                : filteredItems.Count > 0 ? 0 : -1;
+            matchSummary.Text = filteredItems.Count == 0
+                ? "No matching document tabs."
+                : $"{filteredItems.Count} document tab(s)";
+        }
+
+        void MoveSelection(int offset)
+        {
+            if (filteredItems.Count == 0)
+            {
+                return;
+            }
+
+            var currentIndex = list.SelectedIndex;
+            if (currentIndex < 0)
+            {
+                currentIndex = offset > 0 ? 0 : filteredItems.Count - 1;
+            }
+            else
+            {
+                currentIndex = Math.Clamp(
+                    currentIndex + offset,
+                    0,
+                    filteredItems.Count - 1);
+            }
+
+            list.SelectedIndex = currentIndex;
+        }
+
+        void SelectCurrent()
+        {
+            if (list.SelectedItem is DocumentTabSwitcherItem item)
+            {
+                dialog.Close(item.Tab);
+            }
+        }
+
+        var cancelButton = new Button { Content = "Cancel", MinWidth = 86 };
+        var switchButton = new Button { Content = "Switch", MinWidth = 86 };
+        cancelButton.Click += (_, _) => dialog.Close(null);
+        switchButton.Click += (_, _) => SelectCurrent();
+        search.TextChanged += (_, _) => RefreshResults();
+        search.KeyDown += (_, e) =>
+        {
+            if (e.Key == Key.Enter)
+            {
+                SelectCurrent();
+                e.Handled = true;
+            }
+            else if (e.Key == Key.Escape)
+            {
+                dialog.Close(null);
+                e.Handled = true;
+            }
+            else if (e.Key == Key.Down)
+            {
+                MoveSelection(1);
+                list.Focus();
+                e.Handled = true;
+            }
+            else if (e.Key == Key.Up)
+            {
+                MoveSelection(-1);
+                list.Focus();
+                e.Handled = true;
+            }
+        };
+        list.KeyDown += (_, e) =>
+        {
+            if (e.Key == Key.Enter)
+            {
+                SelectCurrent();
+                e.Handled = true;
+            }
+            else if (e.Key == Key.Escape)
+            {
+                dialog.Close(null);
+                e.Handled = true;
+            }
+        };
+        dialog.Opened += (_, _) =>
+        {
+            search.Focus();
+            search.SelectAll();
+        };
+
+        dialog.Content = new StackPanel
+        {
+            Margin = new Thickness(16),
+            Spacing = 10,
+            Children =
+            {
+                new TextBlock
+                {
+                    Text = "Search open document tabs by alias or file path.",
+                    TextWrapping = TextWrapping.Wrap,
+                },
+                search,
+                matchSummary,
+                list,
+                new StackPanel
+                {
+                    Orientation = Orientation.Horizontal,
+                    HorizontalAlignment = HorizontalAlignment.Right,
+                    Spacing = 8,
+                    Children = { cancelButton, switchButton },
+                },
+            },
+        };
+
+        RefreshResults();
+        return await dialog.ShowDialog<DocumentTabViewModel?>(this);
     }
 
     private void OnDocumentTabClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
@@ -3779,6 +3986,13 @@ public partial class MainWindow : Window
         // Keep text editing inside the PropertyGrid native to the focused editor.
         if (e.Source is TextBox)
         {
+            return;
+        }
+
+        if (ctrl && !shift && !alt && e.Key == Key.K)
+        {
+            await QuickSwitchDocumentTabAsync();
+            e.Handled = true;
             return;
         }
 
