@@ -93,8 +93,8 @@ public partial class MainWindow : Window
         Ctrl+Shift+C        Copy visual style
         Ctrl+Shift+V        Paste visual style
         Ctrl+Shift+G        Clear design guides
-        Tab                 Select next visible tab-stop control in Tab Order
-        Shift+Tab           Select previous visible tab-stop control in Tab Order
+        Tab                 Select next enabled focusable tab-stop control in Tab Order
+        Shift+Tab           Select previous enabled focusable tab-stop control in Tab Order
         Escape              Select the parent container on the canvas, or clear selection at the root
         Enter               Select the first child of the selected container
         Shift+Enter         Select the last child of the selected container

@@ -1634,7 +1634,10 @@ public partial class MainWindowViewModel : ViewModelBase
     public bool SelectNextVisibleElement(bool reverse = false)
     {
         var candidates = Canvas.Elements
-            .Where(element => element.IsVisibleOnArtboard && element.Visual.IsTabStop)
+            .Where(element => element.IsVisibleOnArtboard
+                && element.Visual.IsEnabled
+                && element.Visual.Focusable
+                && element.Visual.IsTabStop)
             .OrderBy(element => element.HasTabOrder ? 0 : 1)
             .ThenBy(element => element.HasTabOrder ? element.Visual.TabIndex : int.MaxValue)
             .ThenBy(Canvas.Elements.IndexOf)
