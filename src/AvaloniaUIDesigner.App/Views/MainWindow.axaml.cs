@@ -95,7 +95,7 @@ public partial class MainWindow : Window
         Ctrl+Shift+G        Clear design guides
         Tab                 Select next visible control on the canvas
         Shift+Tab           Select previous visible control on the canvas
-        Escape              Return to the selection tool
+        Escape              Select the parent container on the canvas, or clear selection at the root
         Arrow keys           Nudge selection by 1 px
         Shift+Arrow keys     Nudge selection by 10 px
         Shift+corner handle  Lock aspect ratio while resizing
@@ -4454,10 +4454,22 @@ public partial class MainWindow : Window
 
         if (e.Key == Key.Escape)
         {
+            var wasMarqueeSelecting = _isMarqueeSelecting;
+            var wasToolboxPlacement = Vm.Toolbox.SelectedItem is not null;
             _isMarqueeSelecting = false;
             MarqueeRectangle.IsVisible = false;
             Vm.Toolbox.SelectedItem = null;
             HideToolboxPlacementPreview();
+
+            if (!wasMarqueeSelecting
+                && !wasToolboxPlacement
+                && ReferenceEquals(e.Source, DesignHost)
+                && Vm.SelectParentOfSelectedElement())
+            {
+                e.Handled = true;
+                return;
+            }
+
             Vm.SelectElements(Array.Empty<DesignElement>());
             Vm.StatusText = "Selection tool active.";
             e.Handled = true;

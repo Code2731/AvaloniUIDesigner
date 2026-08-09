@@ -1503,6 +1503,27 @@ public partial class MainWindowViewModel : ViewModelBase
         StatusText = $"Added {element.DisplayName} to selection ({Canvas.SelectedElements.Count} control(s)).";
     }
 
+    public bool SelectParentOfSelectedElement()
+    {
+        if (Canvas.SelectedElements.Count != 1
+            || Canvas.SelectedElement is not { } child
+            || string.IsNullOrWhiteSpace(child.ParentName))
+        {
+            return false;
+        }
+
+        var parent = Canvas.Elements.FirstOrDefault(element =>
+            string.Equals(element.DisplayName, child.ParentName, StringComparison.OrdinalIgnoreCase));
+        if (parent is null)
+        {
+            return false;
+        }
+
+        SelectElement(parent);
+        StatusText = $"Selected parent {parent.DisplayName}.";
+        return true;
+    }
+
     public void SelectElements(IEnumerable<DesignElement> elements, bool append = false)
     {
         var selection = append
