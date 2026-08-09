@@ -25,6 +25,9 @@
         <Menu DockPanel.Dock="Top">
             <MenuItem Header="File">
                 <MenuItem Header="New" Click="OnNewMenuClicked"/>
+                <MenuItem Header="Duplicate Tab"
+                          Click="OnDuplicateDocumentTabMenuClicked"
+                          IsEnabled="{Binding CanDuplicateCurrentDocumentTab}"/>
                 <MenuItem Header="Close Tab" Click="OnCloseCurrentTabMenuClicked" IsEnabled="{Binding CanCloseCurrentDocumentTab}"/>
                 <MenuItem Header="Close All Tabs"
                           Click="OnCloseAllTabsMenuClicked"
@@ -347,6 +350,9 @@
                                         <MenuItem Header="Move Tab Right"
                                                   Tag="{Binding}"
                                                   Click="OnMoveDocumentTabRightMenuClicked"/>
+                                        <MenuItem Header="Duplicate Tab"
+                                                  Tag="{Binding}"
+                                                  Click="OnDuplicateDocumentTabMenuClicked"/>
                                         <Separator/>
                                         <MenuItem Header="Close Tab"
                                                   Tag="{Binding}"

@@ -115,3 +115,6 @@ Users should be able to place controls visually, inspect properties, and validat
 
 24. v1.18
 - Persist and restore the recently closed document tab history
+
+25. v1.19
+- Duplicate a document tab into an independent dirty document with its editing state intact

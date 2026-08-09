@@ -710,6 +710,7 @@ public partial class MainWindowViewModel : ViewModelBase
 
     public bool HasMultipleDocumentTabs => DocumentTabs.Count > 1;
     public bool CanCloseCurrentDocumentTab => HasMultipleDocumentTabs;
+    public bool CanDuplicateCurrentDocumentTab => _selectedDocumentTab is not null;
     public bool CanReopenClosedDocumentTab => _closedDocumentTabs.Count > 0;
     public bool HasDirtyDocumentTabs => DocumentTabs.Any(IsDocumentTabDirty);
     public bool HasStylePreviewOptions => StylePreviewOptions.Count > 1;
@@ -8838,6 +8839,47 @@ public partial class MainWindowViewModel : ViewModelBase
         return tab;
     }
 
+    public DocumentTabViewModel? DuplicateDocumentTab(DocumentTabViewModel? sourceTab = null)
+    {
+        sourceTab ??= _selectedDocumentTab;
+        if (sourceTab is null
+            || !_documentTabStates.TryGetValue(sourceTab, out var sourceState))
+        {
+            return null;
+        }
+
+        if (ReferenceEquals(sourceTab, _selectedDocumentTab))
+        {
+            SyncActiveDocumentTabState();
+            sourceState = _documentTabStates[sourceTab];
+        }
+
+        var duplicateTab = new DocumentTabViewModel(CreateUntitledDocumentName());
+        var duplicateState = new DocumentTabState(
+            duplicateTab,
+            CloneDocument(sourceState.Document),
+            new DesignerCanvasDocument(Array.Empty<DesignerElementSnapshot>()),
+            documentPath: null,
+            CloneHistoryStack(sourceState.UndoStack),
+            CloneHistoryStack(sourceState.RedoStack),
+            pendingMutation: null,
+            sourceState.ZoomScale,
+            sourceState.SelectedElementNames.ToList());
+        duplicateState.PropertyInspectorFilterText = sourceState.PropertyInspectorFilterText;
+        duplicateState.PropertyInspectorCategoriesVisible = sourceState.PropertyInspectorCategoriesVisible;
+        duplicateState.PropertyInspectorAllCategoriesExpanded = sourceState.PropertyInspectorAllCategoriesExpanded;
+
+        _documentTabStates[duplicateTab] = duplicateState;
+        DocumentTabs.Add(duplicateTab);
+        OnPropertyChanged(nameof(HasMultipleDocumentTabs));
+        OnPropertyChanged(nameof(CanCloseCurrentDocumentTab));
+        OnPropertyChanged(nameof(CanDuplicateCurrentDocumentTab));
+        UpdateDocumentTabPresentations();
+        ActivateDocumentTab(duplicateTab);
+        StatusText = $"Duplicated {sourceTab.DisplayName} into a new document tab.";
+        return duplicateTab;
+    }
+
     public DocumentTabViewModel CreateDocumentTabFromTemplate(string templateName)
     {
         var document = CreateTemplateDocument(templateName);
@@ -9206,6 +9248,7 @@ public partial class MainWindowViewModel : ViewModelBase
         RaiseHistoryChanged();
         OnPropertyChanged(nameof(CurrentDocumentPath));
         OnPropertyChanged(nameof(SelectedDocumentTab));
+        OnPropertyChanged(nameof(CanDuplicateCurrentDocumentTab));
         OnPropertyChanged(nameof(CanCloseCurrentDocumentTab));
         UpdateDocumentTabPresentations();
         StatusText = $"Switched to {state.Tab.DisplayName}.";
@@ -13193,6 +13236,7 @@ public partial class MainWindowViewModel : ViewModelBase
         OnPropertyChanged(nameof(CanCloseCurrentDocumentTab));
         OnPropertyChanged(nameof(CanReopenClosedDocumentTab));
         OnPropertyChanged(nameof(SelectedDocumentTab));
+        OnPropertyChanged(nameof(CanDuplicateCurrentDocumentTab));
         OnPropertyChanged(nameof(CurrentDocumentPath));
         OnPropertyChanged(nameof(WindowTitle));
     }
@@ -13533,6 +13577,36 @@ public partial class MainWindowViewModel : ViewModelBase
             target.Push(entry);
         }
     }
+
+    private static Stack<HistoryEntry> CloneHistoryStack(Stack<HistoryEntry> source)
+    {
+        var target = new Stack<HistoryEntry>();
+        foreach (var entry in source.Reverse())
+        {
+            target.Push(new HistoryEntry(
+                CloneDocument(entry.Before),
+                CloneDocument(entry.After),
+                entry.ActionType,
+                entry.Message));
+        }
+
+        return target;
+    }
+
+    private static DesignerCanvasDocument CloneDocument(DesignerCanvasDocument document)
+        => document with
+        {
+            Elements = document.Elements
+                .Select(snapshot => snapshot with
+                {
+                    VisualProperties = CloneProperties(snapshot.VisualProperties),
+                })
+                .ToList(),
+            ColorResources = document.ColorResources is null
+                ? null
+                : new Dictionary<string, string>(document.ColorResources, StringComparer.Ordinal),
+            Styles = document.Styles is null ? null : CloneStyles(document.Styles),
+        };
 
     private static Stack<HistoryEntry> CreateHistoryStack(
         IReadOnlyList<HistoryEntry> entries)

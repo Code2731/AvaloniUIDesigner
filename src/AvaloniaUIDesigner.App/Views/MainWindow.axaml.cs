@@ -30,6 +30,7 @@ public partial class MainWindow : Window
         Ctrl+O              Open AXAML document
         Ctrl+S              Save document
         Ctrl+Alt+S          Save all dirty document tabs
+        Ctrl+Alt+D          Duplicate active document tab
         Ctrl+Shift+S        Save document as...
         Ctrl+W              Close active document tab
         Ctrl+Shift+W        Close all document tabs
@@ -340,6 +341,23 @@ public partial class MainWindow : Window
         object? sender,
         Avalonia.Interactivity.RoutedEventArgs e)
         => MoveDocumentTabFromMenu(sender, 1);
+
+    private void OnDuplicateDocumentTabMenuClicked(
+        object? sender,
+        Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        if (Vm is null)
+        {
+            return;
+        }
+
+        FlushPendingPropertyHistory();
+        var sourceTab = sender is MenuItem { Tag: DocumentTabViewModel tab }
+            ? tab
+            : null;
+        Vm.DuplicateDocumentTab(sourceTab);
+        ClearDesignGuides();
+    }
 
     private async void OnCloseDocumentTabMenuClicked(
         object? sender,
@@ -3660,6 +3678,15 @@ public partial class MainWindow : Window
         if (ctrl && alt && e.Key == Key.S)
         {
             _ = await SaveAllDocumentsAsync();
+            e.Handled = true;
+            return;
+        }
+
+        if (ctrl && alt && e.Key == Key.D)
+        {
+            FlushPendingPropertyHistory();
+            Vm.DuplicateDocumentTab();
+            ClearDesignGuides();
             e.Handled = true;
             return;
         }
