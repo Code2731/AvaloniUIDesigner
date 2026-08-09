@@ -96,6 +96,8 @@ public partial class MainWindow : Window
         Tab                 Select next visible control on the canvas
         Shift+Tab           Select previous visible control on the canvas
         Escape              Select the parent container on the canvas, or clear selection at the root
+        Enter               Select the first child of the selected container
+        Shift+Enter         Select the last child of the selected container
         Arrow keys           Nudge selection by 1 px
         Shift+Arrow keys     Nudge selection by 10 px
         Shift+corner handle  Lock aspect ratio while resizing
@@ -4396,6 +4398,17 @@ public partial class MainWindow : Window
         if (!ctrl && e.Key == Key.Tab && ReferenceEquals(e.Source, DesignHost))
         {
             Vm.SelectNextVisibleElement(shift);
+            e.Handled = true;
+            return;
+        }
+
+        if (!ctrl
+            && !alt
+            && e.Key == Key.Enter
+            && Vm.Toolbox.SelectedItem is null
+            && ReferenceEquals(e.Source, DesignHost)
+            && Vm.SelectChildOfSelectedElement(shift))
+        {
             e.Handled = true;
             return;
         }

@@ -1524,6 +1524,31 @@ public partial class MainWindowViewModel : ViewModelBase
         return true;
     }
 
+    public bool SelectChildOfSelectedElement(bool reverse = false)
+    {
+        if (Canvas.SelectedElements.Count != 1
+            || Canvas.SelectedElement is not { } parent)
+        {
+            return false;
+        }
+
+        var children = Canvas.Elements
+            .Where(element => string.Equals(
+                element.ParentName,
+                parent.DisplayName,
+                StringComparison.OrdinalIgnoreCase))
+            .ToList();
+        if (children.Count == 0)
+        {
+            return false;
+        }
+
+        var child = reverse ? children[^1] : children[0];
+        SelectElement(child);
+        StatusText = $"Selected child {child.DisplayName} of {parent.DisplayName}.";
+        return true;
+    }
+
     public void SelectElements(IEnumerable<DesignElement> elements, bool append = false)
     {
         var selection = append
