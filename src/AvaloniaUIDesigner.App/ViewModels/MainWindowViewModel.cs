@@ -9306,6 +9306,16 @@ public partial class MainWindowViewModel : ViewModelBase
         return ActivateDocumentTab(DocumentTabs[nextIndex]);
     }
 
+    public bool ActivateDocumentTabAt(int index)
+    {
+        if (index < 0 || index >= DocumentTabs.Count)
+        {
+            return false;
+        }
+
+        return ActivateDocumentTab(DocumentTabs[index]);
+    }
+
     public bool MoveDocumentTab(DocumentTabViewModel tab, int targetIndex)
     {
         if (!_documentTabStates.ContainsKey(tab))

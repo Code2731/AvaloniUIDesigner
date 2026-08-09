@@ -38,6 +38,7 @@ public partial class MainWindow : Window
         Ctrl+Shift+T        Reopen last closed document tab
         Ctrl+Tab            Next document tab
         Ctrl+Shift+Tab      Previous document tab
+        Ctrl+1..9           Activate document tab 1-9
         Ctrl+Shift+PageUp   Move active tab left
         Ctrl+Shift+PageDown Move active tab right
         Middle-click tab    Close document tab
@@ -3874,6 +3875,26 @@ public partial class MainWindow : Window
         if (ctrl && e.Key == Key.Tab)
         {
             Vm.ActivateNextDocumentTab(reverse: shift);
+            e.Handled = true;
+            return;
+        }
+
+        var directTabIndex = e.Key switch
+        {
+            Key.D1 => 0,
+            Key.D2 => 1,
+            Key.D3 => 2,
+            Key.D4 => 3,
+            Key.D5 => 4,
+            Key.D6 => 5,
+            Key.D7 => 6,
+            Key.D8 => 7,
+            Key.D9 => 8,
+            _ => -1,
+        };
+        if (ctrl && !shift && !alt && directTabIndex >= 0)
+        {
+            Vm.ActivateDocumentTabAt(directTabIndex);
             e.Handled = true;
             return;
         }

@@ -88,6 +88,7 @@ dotnet run --project src/AvaloniaUIDesigner.App/AvaloniaUIDesigner.App.csproj
 - **Document Tab Duplication**: `File > Duplicate Tab`, 탭 컨텍스트 메뉴 또는 `Ctrl+Alt+D`로 현재 문서를 독립된 새 dirty 탭으로 복제합니다. 문서 내용·Undo/Redo·줌·선택·Property Inspector 탐색 상태를 함께 복사하고 저장 경로는 비워 새 파일로 저장하게 합니다.
 - **Document Tab Naming**: `File > Rename Tab...`, 탭 컨텍스트 메뉴 또는 `Ctrl+Alt+R`로 열린 문서 탭에 1-80자 별칭을 지정합니다. 저장 파일명과 별칭을 분리하고, 별칭은 열린 탭·닫힌 탭 기록·세션 복원·창 제목에 유지합니다.
 - **Document Tab Middle-Click Close**: 탭 헤더를 중간 클릭하면 기존 dirty 확인을 거쳐 해당 문서 탭을 닫습니다. 취소하거나 저장에 실패하면 원래 활성 탭과 편집 상태를 유지합니다.
+- **Document Tab Direct Shortcuts**: `Ctrl+1`~`Ctrl+9`로 1-9번째 문서 탭을 즉시 활성화하고, `Ctrl+Tab` 순환이나 탭 드래그/이동과 함께 사용할 수 있습니다.
 - **Tab View Navigation**: `Ctrl+Tab`/`Ctrl+Shift+Tab`으로 문서 탭을 순환하고, `Ctrl+Shift+PageUp/PageDown` 또는 탭 컨텍스트 메뉴로 활성 탭을 좌우 이동하며, 탭별 캔버스 줌과 Object Tree 선택을 전환·세션 복원 때 보존합니다.
 - **Workspace Panels**: `View > Panels`에서 Toolbox·Object Tree·Property Inspector를 독립적으로 숨기거나 다시 표시하고, 패널 크기와 가시성·Object Tree 분할 위치를 세션에 저장합니다. `Reset Panel Layout`으로 기본 작업 공간을 복원합니다.
 - **Workspace Session Restore**: 앱을 정상적으로 닫으면 열린 탭 목록·활성 탭·현재 AXAML·저장 기준 스냅샷·줌·Object Tree 선택·Property Inspector 탐색 상태를 로컬 세션에 저장하고, 다음 실행 시 dirty 문서를 포함해 복원합니다. 세션 JSON이 손상되면 현재 새 문서 상태를 유지하고 안전하게 시작합니다.
@@ -211,6 +212,7 @@ dotnet run --project src/AvaloniaUIDesigner.App/AvaloniaUIDesigner.App.csproj
 75i. `File > Duplicate Tab`, 탭 컨텍스트 메뉴 또는 `Ctrl+Alt+D`는 현재 문서를 새 `Untitled` dirty 탭으로 복제합니다. 원본과 독립된 문서·Undo/Redo·줌·선택·Property Inspector 상태를 유지하며, 새 경로를 지정해 저장할 수 있습니다.
 75j. `File > Rename Tab...`, 탭 컨텍스트 메뉴 또는 `Ctrl+Alt+R`로 문서 탭 별칭을 지정할 수 있습니다. 별칭은 1-80자의 한 줄 이름으로 검증되며 파일 경로와 독립적으로 열린 탭·닫힌 탭 복원·세션 JSON·창 제목에 반영됩니다.
 75k. 문서 탭 헤더를 중간 클릭하면 `Close Tab`과 동일한 dirty 확인을 거쳐 해당 탭을 닫습니다. 마지막 탭은 닫히지 않으며, 취소 시 원래 활성 탭으로 복원됩니다.
+75l. `Ctrl+1`~`Ctrl+9`는 현재 탭 순서의 1-9번째 문서 탭을 즉시 선택합니다. 존재하지 않는 번호도 입력을 소비해 캔버스나 텍스트 편집기에 잘못 전달되지 않습니다.
 76. `File > Load Component Pack...` 또는 `File > Load Toolbox Preset Pack...`으로 외부 Toolbox 팩을 추가하면 파일 경로가 세션에 등록되어 다음 실행 때 자동으로 다시 로드됩니다. 파일이 없어도 문서 탭 복원은 계속되며 상태바에 경고가 표시됩니다.
 77. 외부 프로젝트의 컨트롤은 Component Pack 항목에 `designOnly: true`, `avaloniaTypeName`, `previewText`, `defaultProperties`를 지정해 등록합니다. 디자이너에서는 타입명 플레이스홀더로 편집하고, 생성 AXAML에는 원래 커스텀 타입과 속성을 출력합니다. 예시는 [custom-component-pack.example.json](docs/custom-component-pack.example.json)을 참고하세요.
 78. `File > Load Component Pack Plugin...`에서 `IComponentPackPlugin`을 구현한 신뢰할 수 있는 DLL을 선택하면 플러그인이 제공한 Component Pack을 Toolbox에 등록합니다. DLL 경로는 세션 JSON의 `ComponentPluginPaths`에 저장되고, 앱 재시작 시 플러그인·JSON 팩·프리셋 팩 순서로 복원됩니다.
@@ -352,6 +354,7 @@ AXAML 소스 편집기의 `Validate`와 `Preview`는 현재 디자인과 Undo �
 - v1.19: 문서 탭 복제와 독립 편집 상태 유지
 - v1.20: 문서 탭 별칭과 세션·창 제목 동기화
 - v1.21: 문서 탭 중간 클릭 닫기와 dirty 확인 재사용
+- v1.22: 문서 탭 1-9번 직접 선택 단축키
 
 ## 컴포넌트 팩
 

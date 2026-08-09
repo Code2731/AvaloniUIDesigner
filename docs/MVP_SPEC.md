@@ -124,3 +124,6 @@ Users should be able to place controls visually, inspect properties, and validat
 
 27. v1.21
 - Close document tabs through middle-click while preserving the existing dirty-document safeguards
+
+28. v1.22
+- Activate the first nine document tabs directly with keyboard shortcuts
