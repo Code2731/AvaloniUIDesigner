@@ -310,22 +310,22 @@
                 <Separator/>
                 <MenuItem Header="Panels">
                     <MenuItem Name="ShowToolboxMenu"
-                              Header="Toolbox"
+                              Header="Toolbox (Ctrl+Alt+1)"
                               ToggleType="CheckBox"
                               IsChecked="True"
                               Click="OnShowToolboxMenuClicked"/>
                     <MenuItem Name="ShowObjectTreeMenu"
-                              Header="Object Tree"
+                              Header="Object Tree (Ctrl+Alt+2)"
                               ToggleType="CheckBox"
                               IsChecked="True"
                               Click="OnShowObjectTreeMenuClicked"/>
                     <MenuItem Name="ShowPropertyInspectorMenu"
-                              Header="Property Inspector"
+                              Header="Property Inspector (Ctrl+Alt+3)"
                               ToggleType="CheckBox"
                               IsChecked="True"
                               Click="OnShowPropertyInspectorMenuClicked"/>
                     <Separator/>
-                    <MenuItem Header="Reset Panel Layout" Click="OnResetPanelLayoutMenuClicked"/>
+                    <MenuItem Header="Reset Panel Layout (Ctrl+Alt+0)" Click="OnResetPanelLayoutMenuClicked"/>
                 </MenuItem>
             </MenuItem>
             <MenuItem Header="Help">

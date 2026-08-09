@@ -157,3 +157,6 @@ Users should be able to place controls visually, inspect properties, and validat
 
 38. v1.32
 - Provide separate keyboard shortcuts for toggling the design grid and grid snapping without changing the design-guide clear shortcut
+
+39. v1.33
+- Provide keyboard shortcuts for toggling workspace panels and resetting the panel layout

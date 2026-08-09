@@ -51,6 +51,10 @@ public partial class MainWindow : Window
         Ctrl+Alt+Shift+C   Center selection on artboard on both axes
         Ctrl+Alt+G          Toggle design grid
         Ctrl+Alt+Shift+G    Toggle snap to grid
+        Ctrl+Alt+1          Toggle Toolbox panel
+        Ctrl+Alt+2          Toggle Object Tree panel
+        Ctrl+Alt+3          Toggle Property Inspector panel
+        Ctrl+Alt+0          Reset panel layout
         Ctrl+]              Bring selected controls forward
         Ctrl+[              Send selected controls backward
         Ctrl+Shift+]        Bring selected controls to front
@@ -1731,6 +1735,9 @@ public partial class MainWindow : Window
     private void OnResetPanelLayoutMenuClicked(
         object? sender,
         Avalonia.Interactivity.RoutedEventArgs e)
+        => ResetWorkspacePanelLayout();
+
+    private void ResetWorkspacePanelLayout()
     {
         Vm?.SetWorkspacePanelState(WorkspacePanelState.Default);
         ApplyWorkspacePanelState();
@@ -4126,6 +4133,33 @@ public partial class MainWindow : Window
             Vm.StatusText = "Property Inspector filter focused.";
             e.Handled = true;
             return;
+        }
+
+        if (ctrl && alt && !shift)
+        {
+            switch (e.Key)
+            {
+                case Key.D1:
+                case Key.NumPad1:
+                    SetToolboxPaneVisible(!ToolboxPane.IsVisible);
+                    e.Handled = true;
+                    return;
+                case Key.D2:
+                case Key.NumPad2:
+                    SetObjectTreePaneVisible(!ObjectTreePane.IsVisible);
+                    e.Handled = true;
+                    return;
+                case Key.D3:
+                case Key.NumPad3:
+                    SetPropertyInspectorPaneVisible(!PropertyInspectorPane.IsVisible);
+                    e.Handled = true;
+                    return;
+                case Key.D0:
+                case Key.NumPad0:
+                    ResetWorkspacePanelLayout();
+                    e.Handled = true;
+                    return;
+            }
         }
 
         // Keep text editing inside the PropertyGrid native to the focused editor.
