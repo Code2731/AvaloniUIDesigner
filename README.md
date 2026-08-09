@@ -120,6 +120,7 @@ dotnet run --project src/AvaloniaUIDesigner.App/AvaloniaUIDesigner.App.csproj
 - **계층 부모 선택**: 캔버스에서 단일 컨테이너 자식을 선택한 뒤 `Escape`를 누르면 부모 컨테이너를 선택하고, root·다중 선택에서는 기존처럼 선택을 해제하며 Toolbox 배치·marquee 취소를 우선
 - **계층 자식 진입**: 캔버스에서 단일 컨테이너를 선택한 뒤 `Enter`로 첫 직접 자식, `Shift+Enter`로 마지막 직접 자식을 선택하며, 자식이 없거나 다중 선택이면 기존 입력을 유지
 - **계층 형제 탐색**: 캔버스에서 `Alt+Up/Down`으로 같은 부모의 이전·다음 형제를 선택하고, `Alt+Shift+Arrow`의 기존 10px nudge와 형제가 없는 경계에서의 기존 이동을 보존
+- **Canvas 방향 선택**: `Ctrl+Arrow`로 현재 선택 중심에서 해당 방향의 가장 가까운 보이는 컨트롤을 선택하며, 같은 축으로 겹치는 후보·축 거리·보조 거리·Canvas 순서를 결정 규칙으로 사용하고 대상이 없으면 기존 nudge 동작을 유지
 - **Object Tree 범위 선택**: 트리의 현재 표시 순서에서 일반 클릭을 anchor로 삼아 `Shift+클릭`으로 행 범위를 선택하고, `Ctrl+Shift+클릭`으로 기존 선택에 범위를 추가하며 접힌 자식과 검색 결과 순서를 안전하게 반영
 - **Object Tree 컨텍스트 편집**: 트리 행을 우클릭해 Rename·Lock/Unlock·Copy·Cut·Duplicate·Delete 실행
 - **Object Tree 계층 편집**: 트리 행의 컨텍스트 메뉴에서 지원 컨테이너 할당과 부모 컨테이너 해제를 바로 실행
@@ -261,6 +262,7 @@ dotnet run --project src/AvaloniaUIDesigner.App/AvaloniaUIDesigner.App.csproj
 75ak. 캔버스 `Tab`/`Shift+Tab` 선택 순환은 `Edit Tab Order...` 또는 `Edit Tab Order Map...`으로 지정한 `TabIndex`를 낮은 값부터 반영합니다. `auto/-1` 컨트롤은 명시 순서 뒤에 원래 Canvas 순서로 배치되고, 숨겨진 컨트롤은 계속 제외되며 선택이 끝나면 처음/마지막으로 wrap합니다.
 75al. Canvas `Tab`/`Shift+Tab`은 `IsTabStop=false`로 제외된 컨트롤을 건너뜁니다. `Edit > Include / Exclude from Tab Navigation`의 상태가 즉시 순환 후보에 반영되며, 모든 후보가 제외되면 기존처럼 선택 실패 상태를 표시합니다.
 75am. Canvas `Tab`/`Shift+Tab`은 `IsEnabled=false` 또는 `Focusable=false`인 컨트롤도 건너뛰어 Avalonia 키보드 포커스 조건과 맞춥니다. 활성화·포커스 가능·탭 정지 조건이 모두 맞는 후보만 기존 `TabIndex`와 Canvas 순서로 순환합니다.
+75an. 캔버스에서 단일 요소를 선택한 뒤 `Ctrl+Left/Right/Up/Down`은 해당 방향에 있는 보이는 후보 중 같은 축으로 겹치는 요소를 우선하고 축 거리·보조 거리·Canvas 순서로 가장 가까운 요소를 선택합니다. 후보가 없거나 다중 선택이면 입력을 소비하지 않아 기존 화살표 nudge 경로를 보존합니다.
 76. `File > Load Component Pack...` 또는 `File > Load Toolbox Preset Pack...`으로 외부 Toolbox 팩을 추가하면 파일 경로가 세션에 등록되어 다음 실행 때 자동으로 다시 로드됩니다. 파일이 없어도 문서 탭 복원은 계속되며 상태바에 경고가 표시됩니다.
 77. 외부 프로젝트의 컨트롤은 Component Pack 항목에 `designOnly: true`, `avaloniaTypeName`, `previewText`, `defaultProperties`를 지정해 등록합니다. 디자이너에서는 타입명 플레이스홀더로 편집하고, 생성 AXAML에는 원래 커스텀 타입과 속성을 출력합니다. 예시는 [custom-component-pack.example.json](docs/custom-component-pack.example.json)을 참고하세요.
 78. `File > Load Component Pack Plugin...`에서 `IComponentPackPlugin`을 구현한 신뢰할 수 있는 DLL을 선택하면 플러그인이 제공한 Component Pack을 Toolbox에 등록합니다. DLL 경로는 세션 JSON의 `ComponentPluginPaths`에 저장되고, 앱 재시작 시 플러그인·JSON 팩·프리셋 팩 순서로 복원됩니다.
@@ -433,6 +435,7 @@ AXAML 소스 편집기의 `Validate`와 `Preview`는 현재 디자인과 Undo �
 - v1.50: Tab Order 기반 Canvas 키보드 순환
 - v1.51: Canvas Tab Navigation IsTabStop 필터
 - v1.52: Canvas Tab Navigation 포커스 가능·활성화 필터
+- v1.53: Canvas Ctrl+Arrow 방향 선택
 
 ## 컴포넌트 팩
 

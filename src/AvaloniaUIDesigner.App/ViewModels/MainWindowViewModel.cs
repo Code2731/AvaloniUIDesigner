@@ -1577,6 +1577,71 @@ public partial class MainWindowViewModel : ViewModelBase
         return true;
     }
 
+    public bool SelectNearestElementInDirection(CanvasSelectionDirection direction)
+    {
+        if (Canvas.SelectedElements.Count != 1
+            || Canvas.SelectedElement is not { } selected)
+        {
+            return false;
+        }
+
+        var selectedCenterX = selected.X + selected.Width / 2;
+        var selectedCenterY = selected.Y + selected.Height / 2;
+        var selectedRight = selected.X + selected.Width;
+        var selectedBottom = selected.Y + selected.Height;
+
+        var candidates = Canvas.Elements
+            .Where(element => !ReferenceEquals(element, selected)
+                && element.IsVisibleOnArtboard)
+            .Select(element =>
+            {
+                var centerX = element.X + element.Width / 2;
+                var centerY = element.Y + element.Height / 2;
+                var right = element.X + element.Width;
+                var bottom = element.Y + element.Height;
+                var isInDirection = direction switch
+                {
+                    CanvasSelectionDirection.Left => centerX < selectedCenterX,
+                    CanvasSelectionDirection.Right => centerX > selectedCenterX,
+                    CanvasSelectionDirection.Up => centerY < selectedCenterY,
+                    CanvasSelectionDirection.Down => centerY > selectedCenterY,
+                    _ => false,
+                };
+                var primaryDistance = direction is (CanvasSelectionDirection.Left or CanvasSelectionDirection.Right)
+                    ? Math.Abs(centerX - selectedCenterX)
+                    : Math.Abs(centerY - selectedCenterY);
+                var secondaryDistance = direction is (CanvasSelectionDirection.Left or CanvasSelectionDirection.Right)
+                    ? Math.Abs(centerY - selectedCenterY)
+                    : Math.Abs(centerX - selectedCenterX);
+                var isAligned = direction is (CanvasSelectionDirection.Left or CanvasSelectionDirection.Right)
+                    ? element.Y < selectedBottom && bottom > selected.Y
+                    : element.X < selectedRight && right > selected.X;
+
+                return (
+                    Element: element,
+                    IsInDirection: isInDirection,
+                    IsAligned: isAligned,
+                    PrimaryDistance: primaryDistance,
+                    SecondaryDistance: secondaryDistance);
+            })
+            .Where(candidate => candidate.IsInDirection)
+            .OrderByDescending(candidate => candidate.IsAligned)
+            .ThenBy(candidate => candidate.PrimaryDistance)
+            .ThenBy(candidate => candidate.SecondaryDistance)
+            .ThenBy(candidate => Canvas.Elements.IndexOf(candidate.Element))
+            .ToList();
+
+        if (candidates.Count == 0)
+        {
+            return false;
+        }
+
+        var next = candidates[0].Element;
+        SelectElement(next);
+        StatusText = $"Selected {next.DisplayName} {direction.ToString().ToLowerInvariant()}.";
+        return true;
+    }
+
     public void SelectElements(IEnumerable<DesignElement> elements, bool append = false)
     {
         var selection = append
@@ -16687,6 +16752,14 @@ public partial class MainWindowViewModel : ViewModelBase
         SendToBack,
         BringForward,
         SendBackward,
+    }
+
+    public enum CanvasSelectionDirection
+    {
+        Left,
+        Right,
+        Up,
+        Down,
     }
 
     private sealed class DocumentTabState(

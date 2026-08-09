@@ -95,6 +95,7 @@ public partial class MainWindow : Window
         Ctrl+Shift+G        Clear design guides
         Tab                 Select next enabled focusable tab-stop control in Tab Order
         Shift+Tab           Select previous enabled focusable tab-stop control in Tab Order
+        Ctrl+Arrow          Select nearest visible control in that direction
         Escape              Select the parent container on the canvas, or clear selection at the root
         Enter               Select the first child of the selected container
         Shift+Enter         Select the last child of the selected container
@@ -4706,6 +4707,25 @@ public partial class MainWindow : Window
         if (ctrl && e.Key == Key.R)
         {
             OnPreviewMenuClicked(this, e);
+            e.Handled = true;
+            return;
+        }
+
+        var canvasSelectionDirection = e.Key switch
+        {
+            Key.Left => MainWindowViewModel.CanvasSelectionDirection.Left,
+            Key.Right => MainWindowViewModel.CanvasSelectionDirection.Right,
+            Key.Up => MainWindowViewModel.CanvasSelectionDirection.Up,
+            Key.Down => MainWindowViewModel.CanvasSelectionDirection.Down,
+            _ => (MainWindowViewModel.CanvasSelectionDirection?)null,
+        };
+        if (ctrl
+            && !shift
+            && !alt
+            && ReferenceEquals(e.Source, DesignHost)
+            && canvasSelectionDirection is { } direction
+            && Vm.SelectNearestElementInDirection(direction))
+        {
             e.Handled = true;
             return;
         }
