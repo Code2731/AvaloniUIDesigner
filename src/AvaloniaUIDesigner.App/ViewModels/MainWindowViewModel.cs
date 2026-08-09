@@ -1549,6 +1549,34 @@ public partial class MainWindowViewModel : ViewModelBase
         return true;
     }
 
+    public bool SelectSiblingOfSelectedElement(int offset)
+    {
+        if (offset is not (-1 or 1)
+            || Canvas.SelectedElements.Count != 1
+            || Canvas.SelectedElement is not { } selected)
+        {
+            return false;
+        }
+
+        var siblings = Canvas.Elements
+            .Where(element => string.Equals(
+                element.ParentName,
+                selected.ParentName,
+                StringComparison.OrdinalIgnoreCase))
+            .ToList();
+        var currentIndex = siblings.IndexOf(selected);
+        var nextIndex = currentIndex + offset;
+        if (currentIndex < 0 || nextIndex < 0 || nextIndex >= siblings.Count)
+        {
+            return false;
+        }
+
+        var sibling = siblings[nextIndex];
+        SelectElement(sibling);
+        StatusText = $"Selected sibling {sibling.DisplayName}.";
+        return true;
+    }
+
     public void SelectElements(IEnumerable<DesignElement> elements, bool append = false)
     {
         var selection = append
