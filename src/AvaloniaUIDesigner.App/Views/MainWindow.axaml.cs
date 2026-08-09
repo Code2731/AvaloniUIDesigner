@@ -6622,8 +6622,16 @@ public partial class MainWindow : Window
             return;
         }
 
+        // Match common design-tool marquee behavior: left-to-right contains, right-to-left crosses.
+        var requiresContainment = current.X >= _marqueeStart.X;
         var selected = Vm.Canvas.Elements
-            .Where(element => area.Intersects(new Rect(element.X, element.Y, element.Width, element.Height)))
+            .Where(element =>
+            {
+                var bounds = new Rect(element.X, element.Y, element.Width, element.Height);
+                return requiresContainment
+                    ? area.Contains(bounds)
+                    : area.Intersects(bounds);
+            })
             .ToList();
         Vm.SelectElements(selected, _marqueeAdditive);
     }

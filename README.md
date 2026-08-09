@@ -104,6 +104,7 @@ dotnet run --project src/AvaloniaUIDesigner.App/AvaloniaUIDesigner.App.csproj
 - **문서 루트 속성**: Window/UserControl 루트 종류와 Window 제목·리사이즈·시작 위치, 루트 Min/Max 크기를 편집하고 Undo/Redo, Preview, Draft·Full AXAML 왕복에 보존
 - **벡터 Shape 편집**: Rectangle, Ellipse, Line, Path의 Fill·Stroke·대시·끝점·결합 스타일과 반지름·점 좌표를 편집하고, 검증된 Path geometry를 리소스·Undo/Redo·복제·미리보기·AXAML 왕복에 보존
 - **요소 선택**: 배치된 요소 클릭 시 파란 외곽선
+- **방향 인식 Marquee 선택**: 캔버스에서 왼쪽→오른쪽으로 드래그하면 사각형 안에 완전히 포함된 컨트롤만 선택하고, 오른쪽→왼쪽으로 드래그하면 사각형과 교차한 컨트롤을 선택하며 Ctrl로 기존 선택에 추가
 - **키보드 선택 순환**: 캔버스에 포커스가 있을 때 `Tab`/`Shift+Tab`으로 보이는 컨트롤을 순환 선택
 - **Object Tree 자동 동기화**: 배치된 요소가 루트(Window) 아래에 추가
 - **Object Tree 다중 선택 표시**: 다중 선택 항목에는 `SEL`, 잠긴 항목에는 `LOCK` 마커를 표시하고 헤더에 선택 개수를 표시
@@ -231,6 +232,7 @@ dotnet run --project src/AvaloniaUIDesigner.App/AvaloniaUIDesigner.App.csproj
 75t. `Ctrl+Alt+1`/`2`/`3`으로 Toolbox·Object Tree·Property Inspector 패널을 각각 표시하거나 숨기고, `Ctrl+Alt+0`으로 기본 패널 크기와 가시성을 복원합니다. 숫자 키패드의 0~3도 지원하며, `View > Panels` 메뉴와 세션 저장 상태가 같은 패널 상태를 공유합니다.
 75u. Toolbox·Object Tree·Property Inspector 패널을 숨긴 상태에서도 각각 `Ctrl+Alt+T/P`, `Ctrl+F`, `Ctrl+Alt+I`를 누르면 대상 패널이 자동으로 표시되고 검색 포커스 또는 Toolbox 배치 모드가 이어집니다.
 75v. 두 개 이상의 같은 root 또는 같은 Canvas 형제 컨트롤을 선택한 뒤 `Ctrl+G`를 누르면 `Group Selected into Canvas`와 동일하게 묶이고, 그룹 Canvas를 선택한 뒤 `Ctrl+Shift+U`를 누르면 원래 부모·좌표를 보존하며 해제됩니다. 두 작업은 각각 하나의 Undo 단계로 기록됩니다.
+75w. 캔버스 빈 영역에서 왼쪽→오른쪽으로 marquee를 그리면 컨트롤 bounds가 선택 사각형 안에 완전히 들어온 요소만 선택하고, 오른쪽→왼쪽으로 그리면 일부가 걸친 요소도 선택합니다. `Ctrl`을 누른 채 드래그하면 기존 선택을 유지한 채 결과를 추가합니다.
 76. `File > Load Component Pack...` 또는 `File > Load Toolbox Preset Pack...`으로 외부 Toolbox 팩을 추가하면 파일 경로가 세션에 등록되어 다음 실행 때 자동으로 다시 로드됩니다. 파일이 없어도 문서 탭 복원은 계속되며 상태바에 경고가 표시됩니다.
 77. 외부 프로젝트의 컨트롤은 Component Pack 항목에 `designOnly: true`, `avaloniaTypeName`, `previewText`, `defaultProperties`를 지정해 등록합니다. 디자이너에서는 타입명 플레이스홀더로 편집하고, 생성 AXAML에는 원래 커스텀 타입과 속성을 출력합니다. 예시는 [custom-component-pack.example.json](docs/custom-component-pack.example.json)을 참고하세요.
 78. `File > Load Component Pack Plugin...`에서 `IComponentPackPlugin`을 구현한 신뢰할 수 있는 DLL을 선택하면 플러그인이 제공한 Component Pack을 Toolbox에 등록합니다. DLL 경로는 세션 JSON의 `ComponentPluginPaths`에 저장되고, 앱 재시작 시 플러그인·JSON 팩·프리셋 팩 순서로 복원됩니다.
@@ -386,6 +388,7 @@ AXAML 소스 편집기의 `Validate`와 `Preview`는 현재 디자인과 Undo �
 - v1.33: Workspace 패널 키보드 단축키
 - v1.34: 숨겨진 Workspace 패널의 포커스 단축키 자동 복구
 - v1.35: Canvas 그룹/그룹 해제 키보드 단축키
+- v1.36: 방향 인식 Marquee 다중 선택
 
 ## 컴포넌트 팩
 

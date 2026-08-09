@@ -166,3 +166,6 @@ Users should be able to place controls visually, inspect properties, and validat
 
 41. v1.35
 - Provide keyboard shortcuts for grouping selections into a Canvas and ungrouping the selected Canvas
+
+42. v1.36
+- Use direction-aware marquee selection with containment for left-to-right drags and intersection for right-to-left drags
