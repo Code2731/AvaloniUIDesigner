@@ -172,3 +172,6 @@ Users should be able to place controls visually, inspect properties, and validat
 
 43. v1.37
 - Provide keyboard shortcuts for applying supported selection layouts and breaking the selected layout
+
+44. v1.38
+- Exclude locked and hidden controls from marquee selection while preserving direct inspection of locked controls
