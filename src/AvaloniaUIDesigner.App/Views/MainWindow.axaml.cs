@@ -32,6 +32,7 @@ public partial class MainWindow : Window
         Ctrl+Alt+S          Save all dirty document tabs
         Ctrl+Shift+S        Save document as...
         Ctrl+W              Close active document tab
+        Ctrl+Shift+W        Close all document tabs
         Ctrl+Tab            Next document tab
         Ctrl+Shift+Tab      Previous document tab
         Ctrl+Shift+PageUp   Move active tab left
@@ -473,6 +474,13 @@ public partial class MainWindow : Window
         }
     }
 
+    private async void OnCloseAllTabsMenuClicked(
+        object? sender,
+        Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        _ = await CloseAllDocumentTabsAsync();
+    }
+
     private async Task CloseDocumentTabAsync(DocumentTabViewModel tab)
     {
         if (Vm is null || Vm.DocumentTabs.Count <= 1)
@@ -499,6 +507,51 @@ public partial class MainWindow : Window
 
         Vm.CloseDocumentTab(tab);
         ClearDesignGuides();
+    }
+
+    private async Task<bool> CloseAllDocumentTabsAsync()
+    {
+        if (Vm is null || Vm.DocumentTabs.Count <= 1)
+        {
+            return false;
+        }
+
+        FlushPendingPropertyHistory();
+        var originalTab = Vm.SelectedDocumentTab;
+        var tabs = Vm.DocumentTabs.ToList();
+        foreach (var tab in tabs)
+        {
+            if (!ReferenceEquals(Vm.SelectedDocumentTab, tab))
+            {
+                Vm.ActivateDocumentTab(tab);
+            }
+
+            FlushPendingPropertyHistory();
+            if (!await EnsureCanContinueWithUnsavedChangesAsync())
+            {
+                if (originalTab is not null)
+                {
+                    RestoreDocumentTabIfPresent(originalTab);
+                }
+
+                return false;
+            }
+        }
+
+        var keepTab = originalTab ?? tabs[0];
+        RestoreDocumentTabIfPresent(keepTab);
+        foreach (var tab in tabs)
+        {
+            if (!ReferenceEquals(tab, keepTab) && Vm.DocumentTabs.Contains(tab))
+            {
+                Vm.CloseDocumentTab(tab);
+            }
+        }
+
+        Vm.NewDocument();
+        ClearDesignGuides();
+        Vm.StatusText = "Closed all document tabs and created a new document.";
+        return true;
     }
 
     private async void OnLoadComponentPackMenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
@@ -3605,6 +3658,13 @@ public partial class MainWindow : Window
         if (ctrl && e.Key == Key.S)
         {
             _ = await SaveDocumentAsync(forceSaveAs: shift);
+            e.Handled = true;
+            return;
+        }
+
+        if (ctrl && shift && e.Key == Key.W)
+        {
+            _ = await CloseAllDocumentTabsAsync();
             e.Handled = true;
             return;
         }

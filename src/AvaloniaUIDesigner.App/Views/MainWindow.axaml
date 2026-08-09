@@ -26,6 +26,9 @@
             <MenuItem Header="File">
                 <MenuItem Header="New" Click="OnNewMenuClicked"/>
                 <MenuItem Header="Close Tab" Click="OnCloseCurrentTabMenuClicked" IsEnabled="{Binding CanCloseCurrentDocumentTab}"/>
+                <MenuItem Header="Close All Tabs"
+                          Click="OnCloseAllTabsMenuClicked"
+                          IsEnabled="{Binding HasMultipleDocumentTabs}"/>
                 <MenuItem Header="New from Template">
                     <MenuItem Header="Login Form" Tag="Login" Click="OnTemplateMenuClicked"/>
                     <MenuItem Header="Settings" Tag="Settings" Click="OnTemplateMenuClicked"/>

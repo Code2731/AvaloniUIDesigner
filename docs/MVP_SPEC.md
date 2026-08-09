@@ -106,3 +106,6 @@ Users should be able to place controls visually, inspect properties, and validat
 
 21. v1.15
 - Save all dirty document tabs while preserving the active tab
+
+22. v1.16
+- Close all document tabs with preflight confirmation and a fresh blank document
