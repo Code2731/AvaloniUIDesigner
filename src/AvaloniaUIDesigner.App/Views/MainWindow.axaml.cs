@@ -193,7 +193,7 @@ public partial class MainWindow : Window
         public override string ToString() => $"{Tab.Header} - {Path}";
     }
 
-    private const double HandleHalf = 5;
+    private const double HandlePixelSize = 10;
     private const double MinSize = 10;
     private const double MarqueeThreshold = 3;
     private const double SmartSnapThreshold = 6;
@@ -5330,6 +5330,11 @@ public partial class MainWindow : Window
             RebindSelection();
         }
 
+        if (e.PropertyName == nameof(CanvasViewModel.ZoomScale))
+        {
+            UpdateHandlePositions();
+        }
+
         UpdateViewportRulers();
     }
 
@@ -6017,10 +6022,14 @@ public partial class MainWindow : Window
         return true;
     }
 
-    private static void Place(Rectangle rectangle, double cx, double cy)
+    private void Place(Rectangle rectangle, double cx, double cy)
     {
-        Canvas.SetLeft(rectangle, cx - HandleHalf);
-        Canvas.SetTop(rectangle, cy - HandleHalf);
+        var zoom = Math.Clamp(Vm?.Canvas.ZoomScale ?? 1, 0.25, 2);
+        var size = HandlePixelSize / zoom;
+        rectangle.Width = size;
+        rectangle.Height = size;
+        Canvas.SetLeft(rectangle, cx - (size / 2));
+        Canvas.SetTop(rectangle, cy - (size / 2));
     }
 
     private void OnToolboxItemPointerPressed(object? sender, PointerPressedEventArgs e)
