@@ -117,6 +117,8 @@ public partial class MainWindow : Window
         Object Tree Ctrl+L   Lock / unlock selected control
         Object Tree Shift+Arrow Extend the visible row range
         Object Tree Ctrl+Shift+Arrow Add a visible row range
+        Object Tree Shift+Home/End Extend to a visible boundary
+        Object Tree Ctrl+Shift+Home/End Add a visible boundary range
         Object Tree Shift+click Select a visible row range
         Object Tree Ctrl+Shift+click Add a visible row range
         Object Tree arrows   Navigate the hierarchy without nudging the canvas
@@ -3978,6 +3980,33 @@ public partial class MainWindow : Window
             if (rangeSelected)
             {
                 _objectTreeSelectionAnchor = anchor;
+                e.Handled = true;
+                return;
+            }
+        }
+
+        if (shift
+            && !alt
+            && e.Key is (Key.Home or Key.End)
+            && (_objectTreeSelectionAnchor ?? Vm.Canvas.SelectedElement) is { } boundaryAnchor)
+        {
+            _isObjectTreeSelectionGesture = true;
+            bool rangeSelected;
+            try
+            {
+                rangeSelected = Vm.TrySelectObjectTreeBoundaryRange(
+                    boundaryAnchor,
+                    last: e.Key == Key.End,
+                    append: ctrl);
+            }
+            finally
+            {
+                _isObjectTreeSelectionGesture = false;
+            }
+
+            if (rangeSelected)
+            {
+                _objectTreeSelectionAnchor = boundaryAnchor;
                 e.Handled = true;
                 return;
             }

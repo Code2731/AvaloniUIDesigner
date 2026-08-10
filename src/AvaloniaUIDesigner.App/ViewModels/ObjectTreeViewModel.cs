@@ -145,6 +145,21 @@ public partial class ObjectTreeViewModel : ViewModelBase
         return true;
     }
 
+    public bool TryGetVisibleBoundaryElement(
+        bool last,
+        out DesignElement? boundary)
+    {
+        var visible = GetVisibleElements();
+        if (visible.Count == 0)
+        {
+            boundary = null;
+            return false;
+        }
+
+        boundary = visible[last ? visible.Count - 1 : 0];
+        return true;
+    }
+
     public void SetDropFeedback(ObjectNodeViewModel? target, bool accepted)
         => SetDropFeedback(target, accepted, insertBefore: false, insertAfter: false);
 

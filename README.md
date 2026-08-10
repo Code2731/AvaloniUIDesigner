@@ -124,7 +124,7 @@ dotnet run --project src/AvaloniaUIDesigner.App/AvaloniaUIDesigner.App.csproj
 - **계층 자식 진입**: 캔버스에서 단일 컨테이너를 선택한 뒤 `Enter`로 첫 visible 직접 자식, `Shift+Enter`로 마지막 visible 직접 자식을 선택하며, 자식이 없거나 다중 선택이면 기존 입력을 유지
 - **계층 형제 탐색**: 캔버스에서 `Alt+Left/Up`으로 같은 부모의 이전 visible 형제, `Alt+Right/Down`으로 다음 visible 형제를 선택하고, `Alt+Shift+Arrow`의 기존 10px nudge와 형제가 없는 경계에서의 기존 이동을 보존
 - **Canvas 방향 선택**: `Ctrl+Arrow`로 현재 선택 중심에서 해당 방향의 가장 가까운 보이는 컨트롤을 선택하며, 같은 축으로 겹치는 후보·축 거리·보조 거리·Canvas 순서를 결정 규칙으로 사용하고 대상이 없으면 기존 nudge 동작을 유지
-- **Object Tree 범위 선택**: 트리의 현재 표시 순서에서 일반 클릭을 anchor로 삼아 `Shift+클릭` 또는 `Shift+Up/Down`으로 행 범위를 선택하고, `Ctrl+Shift+클릭` 또는 `Ctrl+Shift+Up/Down`으로 기존 선택에 범위를 추가하며 접힌 자식과 검색 결과 순서를 안전하게 반영
+- **Object Tree 범위 선택**: 트리의 현재 표시 순서에서 일반 클릭을 anchor로 삼아 `Shift+클릭`, `Shift+Up/Down` 또는 `Shift+Home/End`로 행 범위를 선택하고, `Ctrl+Shift+클릭`, `Ctrl+Shift+Up/Down` 또는 `Ctrl+Shift+Home/End`로 기존 선택에 범위를 추가하며 접힌 자식과 검색 결과 순서를 안전하게 반영
 - **Object Tree 컨텍스트 편집**: 트리 행을 우클릭해 Rename·Lock/Unlock·Copy·Cut·Duplicate·Delete 실행
 - **Object Tree 계층 편집**: 트리 행의 컨텍스트 메뉴에서 지원 컨테이너 할당과 부모 컨테이너 해제를 바로 실행
 - **Object Tree 순서 편집**: StackPanel·DockPanel·WrapPanel·UniformGrid·Canvas 자식의 순서를 `Move Earlier/Later`로 바로 변경
@@ -271,6 +271,7 @@ dotnet run --project src/AvaloniaUIDesigner.App/AvaloniaUIDesigner.App.csproj
 75aq. 캔버스에 포커스가 있고 Toolbox 배치 모드가 아닐 때 `Home`은 Canvas 순서의 첫 visible 컨트롤, `End`는 마지막 visible 컨트롤을 선택하고, `Shift+Home/End`는 anchor부터 해당 경계까지 visible 범위를 기존 선택에 누적합니다. `Ctrl`·`Alt`가 붙은 입력이나 후보가 없는 캔버스에서는 기존 입력과 상태를 보존합니다.
 75ar. 캔버스에 포커스가 있고 Toolbox 배치 모드가 아닐 때 `PageUp`은 Canvas 순서의 이전 visible 컨트롤, `PageDown`은 다음 visible 컨트롤을 선택해 끝에서 반대쪽으로 wrap하고, `Shift+PageUp/PageDown`은 해당 요소를 기존 선택에 누적합니다. `Ctrl+Shift+PageUp/PageDown` 문서 탭 이동은 기존 동작을 유지합니다.
 75as. Object Tree에 포커스가 있을 때 `Shift+Up/Down`은 현재 펼쳐진 visible 행 순서에서 anchor부터 이전/다음 target까지 범위를 선택하고, `Ctrl+Shift+Up/Down`은 기존 선택에 범위를 추가합니다. 첫/마지막 visible 행에서는 범위를 wrap하지 않으며, 접힌 계층과 검색 결과 순서를 그대로 사용합니다.
+75at. Object Tree에 포커스가 있을 때 `Shift+Home/End`는 anchor부터 첫/마지막 visible 행까지 범위를 선택하고, `Ctrl+Shift+Home/End`는 기존 선택에 해당 경계 범위를 추가합니다. 검색 결과·펼침 상태를 반영하며 현재 경계에서 다시 누르면 선택과 active 행을 유지합니다.
 76. `File > Load Component Pack...` 또는 `File > Load Toolbox Preset Pack...`으로 외부 Toolbox 팩을 추가하면 파일 경로가 세션에 등록되어 다음 실행 때 자동으로 다시 로드됩니다. 파일이 없어도 문서 탭 복원은 계속되며 상태바에 경고가 표시됩니다.
 77. 외부 프로젝트의 컨트롤은 Component Pack 항목에 `designOnly: true`, `avaloniaTypeName`, `previewText`, `defaultProperties`를 지정해 등록합니다. 디자이너에서는 타입명 플레이스홀더로 편집하고, 생성 AXAML에는 원래 커스텀 타입과 속성을 출력합니다. 예시는 [custom-component-pack.example.json](docs/custom-component-pack.example.json)을 참고하세요.
 78. `File > Load Component Pack Plugin...`에서 `IComponentPackPlugin`을 구현한 신뢰할 수 있는 DLL을 선택하면 플러그인이 제공한 Component Pack을 Toolbox에 등록합니다. DLL 경로는 세션 JSON의 `ComponentPluginPaths`에 저장되고, 앱 재시작 시 플러그인·JSON 팩·프리셋 팩 순서로 복원됩니다.
@@ -458,6 +459,7 @@ AXAML 소스 편집기의 `Validate`와 `Preview`는 현재 디자인과 Undo �
 - v1.65: Shift+Tab Tab Order 연속 범위 누적 선택
 - v1.66: Object Tree Shift+Arrow 키보드 범위 선택
 - v1.67: Shift+Home/End Canvas 경계 연속 범위 누적 선택
+- v1.68: Object Tree Shift+Home/End 경계 범위 선택
 
 ## 컴포넌트 팩
 

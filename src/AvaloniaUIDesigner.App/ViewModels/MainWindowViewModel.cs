@@ -1751,6 +1751,43 @@ public partial class MainWindowViewModel : ViewModelBase
         return true;
     }
 
+    public bool TrySelectObjectTreeBoundaryRange(
+        DesignElement anchor,
+        bool last = false,
+        bool append = false)
+    {
+        if (!ObjectTree.TryGetVisibleBoundaryElement(last, out var boundary)
+            || boundary is null)
+        {
+            StatusText = "No visible Object Tree controls to select.";
+            return false;
+        }
+
+        var rangeAnchor = anchor;
+        if (!ObjectTree.TryGetVisibleElementRange(rangeAnchor, rangeAnchor, out _))
+        {
+            rangeAnchor = Canvas.SelectedElement ?? anchor;
+        }
+
+        if (!ObjectTree.TryGetVisibleElementRange(rangeAnchor, boundary, out var range))
+        {
+            StatusText = "Object Tree boundary range is unavailable.";
+            return false;
+        }
+
+        if (ReferenceEquals(rangeAnchor, boundary))
+        {
+            StatusText = "Object Tree boundary range is already at the active boundary.";
+            return true;
+        }
+
+        SelectElements(range, append, activeElement: boundary);
+        StatusText = append
+            ? $"Added Object Tree boundary range ({range.Count} control(s))."
+            : $"Selected Object Tree boundary range ({range.Count} control(s)).";
+        return true;
+    }
+
     public bool TrySelectCanvasRange(
         DesignElement anchor,
         DesignElement target,
