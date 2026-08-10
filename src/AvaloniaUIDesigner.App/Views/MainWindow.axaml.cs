@@ -5856,7 +5856,31 @@ public partial class MainWindow : Window
 
     private void OnToolboxSearchKeyDown(object? sender, KeyEventArgs e)
     {
-        if (Vm is null || e.Key != Key.Enter)
+        if (Vm is null)
+        {
+            return;
+        }
+
+        if (e.Key == Key.Escape)
+        {
+            if (Vm.Toolbox.IsPlacementModeActive)
+            {
+                Vm.Toolbox.CancelPlacementMode();
+                HideToolboxPlacementPreview();
+                Vm.StatusText = "Toolbox placement mode cancelled.";
+            }
+            else
+            {
+                ToolboxSearch.Text = string.Empty;
+                ToolboxSearch.Focus();
+                Vm.StatusText = "Toolbox search cleared.";
+            }
+
+            e.Handled = true;
+            return;
+        }
+
+        if (e.Key != Key.Enter)
         {
             return;
         }
