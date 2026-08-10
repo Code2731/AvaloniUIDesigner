@@ -299,6 +299,7 @@ dotnet run --project src/AvaloniaUIDesigner.App/AvaloniaUIDesigner.App.csproj
 75bk. 이름·스타일·색상 리소스·경로·툴팁·이벤트 맵 등 공통 텍스트 편집기에서도 `Escape`는 취소 결과를 반환하고 `Ctrl+Enter`는 Apply 결과를 반환합니다. multiline 편집의 일반 `Enter`는 줄바꿈을 유지합니다.
 75bl. Binding·Items/Columns·Sample Data 전문 편집기도 같은 키보드 계약을 사용합니다. `Ctrl+Enter`의 검증이 실패하면 오류를 편집기에 남기고, `Escape`는 변경·Undo 기록 없이 취소합니다.
 75bm. Grid Definitions·DataGrid Behavior·Typography·Transform 속성 편집기는 입력 컨트롤 종류와 관계없이 dialog 포커스에서 `Escape` 취소와 `Ctrl+Enter` 적용을 지원하며, 검증 실패 시 대화상자를 유지합니다.
+75bn. Accessibility·Interaction·Effects·Range·Text Input·SelectableTextBlock 속성 편집기도 기존 Apply Click 검증 경로를 키보드에서 재사용해 dialog 포커스에서 `Escape` 취소와 `Ctrl+Enter` 적용을 지원합니다.
 76. `File > Load Component Pack...` 또는 `File > Load Toolbox Preset Pack...`으로 외부 Toolbox 팩을 추가하면 파일 경로가 세션에 등록되어 다음 실행 때 자동으로 다시 로드됩니다. 파일이 없어도 문서 탭 복원은 계속되며 상태바에 경고가 표시됩니다.
 77. 외부 프로젝트의 컨트롤은 Component Pack 항목에 `designOnly: true`, `avaloniaTypeName`, `previewText`, `defaultProperties`를 지정해 등록합니다. 디자이너에서는 타입명 플레이스홀더로 편집하고, 생성 AXAML에는 원래 커스텀 타입과 속성을 출력합니다. 예시는 [custom-component-pack.example.json](docs/custom-component-pack.example.json)을 참고하세요.
 78. `File > Load Component Pack Plugin...`에서 `IComponentPackPlugin`을 구현한 신뢰할 수 있는 DLL을 선택하면 플러그인이 제공한 Component Pack을 Toolbox에 등록합니다. DLL 경로는 세션 JSON의 `ComponentPluginPaths`에 저장되고, 앱 재시작 시 플러그인·JSON 팩·프리셋 팩 순서로 복원됩니다.
@@ -506,6 +507,7 @@ AXAML 소스 편집기의 `Validate`와 `Preview`는 현재 디자인과 Undo �
 - v1.85: 공통 Text Editor Escape 취소·Ctrl+Enter 적용
 - v1.86: Binding·Items·Sample Data 편집기 키보드 취소·적용
 - v1.87: 주요 속성 편집기 dialog-level 키보드 취소·적용
+- v1.88: Accessibility·Interaction·Effects·Range·Text Input·SelectableTextBlock dialog-level 키보드 취소·적용
 
 ## 컴포넌트 팩
 

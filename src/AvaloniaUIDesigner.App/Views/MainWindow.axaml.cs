@@ -8345,6 +8345,7 @@ public partial class MainWindow : Window
 
             dialog.Close();
         };
+        WireEditorDialogShortcuts(dialog, applyButton);
         var cancelButton = new Button { Content = "Cancel", MinWidth = 84 };
         cancelButton.Click += (_, _) => dialog.Close();
         var buttons = new StackPanel
@@ -8504,6 +8505,7 @@ public partial class MainWindow : Window
 
             dialog.Close();
         };
+        WireEditorDialogShortcuts(dialog, applyButton);
         var cancelButton = new Button { Content = "Cancel", MinWidth = 84 };
         cancelButton.Click += (_, _) => dialog.Close();
         var buttons = new StackPanel
@@ -8633,6 +8635,7 @@ public partial class MainWindow : Window
 
             dialog.Close();
         };
+        WireEditorDialogShortcuts(dialog, applyButton);
         var cancelButton = new Button { Content = "Cancel", MinWidth = 84 };
         cancelButton.Click += (_, _) => dialog.Close();
         var buttons = new StackPanel
@@ -8899,6 +8902,7 @@ public partial class MainWindow : Window
 
             dialog.Close();
         };
+        WireEditorDialogShortcuts(dialog, applyButton);
         var cancelButton = new Button { Content = "Cancel", MinWidth = 84 };
         cancelButton.Click += (_, _) => dialog.Close();
         var buttons = new StackPanel
@@ -9153,6 +9157,7 @@ public partial class MainWindow : Window
 
             dialog.Close();
         };
+        WireEditorDialogShortcuts(dialog, applyButton);
         var cancelButton = new Button { Content = "Cancel", MinWidth = 84 };
         cancelButton.Click += (_, _) => dialog.Close();
         var buttons = new StackPanel
@@ -9271,6 +9276,7 @@ public partial class MainWindow : Window
 
             dialog.Close();
         };
+        WireEditorDialogShortcuts(dialog, applyButton);
         var cancelButton = new Button { Content = "Cancel", MinWidth = 84 };
         cancelButton.Click += (_, _) => dialog.Close();
         var buttons = new StackPanel
@@ -12107,6 +12113,15 @@ public partial class MainWindow : Window
         {
             HandleTextEditorShortcut(e, close, apply);
         };
+    }
+
+    private static void WireEditorDialogShortcuts(Window dialog, Button applyButton)
+    {
+        WireEditorDialogShortcuts(
+            dialog,
+            dialog.Close,
+            () => applyButton.RaiseEvent(
+                new Avalonia.Interactivity.RoutedEventArgs(Button.ClickEvent)));
     }
 
     private async Task ShowAxamlSourceEditorDialogAsync(string source)
