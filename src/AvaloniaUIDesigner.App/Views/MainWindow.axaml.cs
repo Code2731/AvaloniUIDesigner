@@ -3017,14 +3017,12 @@ public partial class MainWindow : Window
 
     private void OnZoomInMenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
-        Vm?.Canvas.ZoomIn();
-        UpdateZoomStatus();
+        ZoomViewportAtCenter(1);
     }
 
     private void OnZoomOutMenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
-        Vm?.Canvas.ZoomOut();
-        UpdateZoomStatus();
+        ZoomViewportAtCenter(-1);
     }
 
     private void OnResetZoomMenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
@@ -4436,16 +4434,14 @@ public partial class MainWindow : Window
 
         if (ctrl && !alt && (e.Key is Key.OemPlus or Key.Add))
         {
-            Vm.Canvas.ZoomIn();
-            UpdateZoomStatus();
+            ZoomViewportAtCenter(1);
             e.Handled = true;
             return;
         }
 
         if (ctrl && !alt && (e.Key is Key.OemMinus or Key.Subtract))
         {
-            Vm.Canvas.ZoomOut();
-            UpdateZoomStatus();
+            ZoomViewportAtCenter(-1);
             e.Handled = true;
             return;
         }
@@ -6594,6 +6590,15 @@ public partial class MainWindow : Window
 
         ZoomViewportAtPointer(delta, e.GetPosition(DesignScrollViewer));
         e.Handled = true;
+    }
+
+    private void ZoomViewportAtCenter(double wheelDelta)
+    {
+        var viewport = DesignScrollViewer.Viewport;
+        var width = viewport.Width > 0 ? viewport.Width : DesignViewport.Bounds.Width;
+        var height = viewport.Height > 0 ? viewport.Height : DesignViewport.Bounds.Height;
+        ZoomViewportAtPointer(wheelDelta, new Point(width / 2, height / 2));
+        UpdateZoomStatus();
     }
 
     private void ZoomViewportAtPointer(double wheelDelta, Point pointer)

@@ -36,7 +36,7 @@ dotnet run --project src/AvaloniaUIDesigner.App/AvaloniaUIDesigner.App.csproj
 - **Custom Control Metadata**: `DesignOnly: true` 컴포넌트 팩으로 외부 Avalonia 타입을 디자인 타임 플레이스홀더로 등록하고, 커스텀 기본 속성·Preview 문구·AXAML 타입명을 보존
 - **선택 영역 Toolbox 프리셋**: 여러 root 컨트롤을 상대 좌표·현재 속성과 함께 Toolbox에 등록하고 JSON 팩으로 저장·불러오기
 - **배치**: 클릭-투-플레이스와 드래그 앤 드롭으로 실제 Avalonia 컨트롤 생성
-- **캔버스 뷰포트**: 큰 아트보드와 확대 상태를 양축 자동 스크롤로 탐색하고, Desktop·Tablet·Mobile·사용자 지정 아트보드 크기와 회전, Zoom In/Out·Actual Size·Fit to View·Fit Selected to View·25~200% Zoom Presets와 스크롤 콘텐츠 크기를 동기화하며 `Ctrl+=`/`Ctrl+-`/`Ctrl+0`/`F`/`Ctrl+Shift+F` 단축키, `Ctrl+Alt+Arrow` 키보드 팬, 중간 마우스 드래그 팬, Ctrl+휠 포인터 중심 줌을 지원
+- **캔버스 뷰포트**: 큰 아트보드와 확대 상태를 양축 자동 스크롤로 탐색하고, Desktop·Tablet·Mobile·사용자 지정 아트보드 크기와 회전, Zoom In/Out·Actual Size·Fit to View·Fit Selected to View·25~200% Zoom Presets와 스크롤 콘텐츠 크기를 동기화하며 `Ctrl+=`/`Ctrl+-`/`Ctrl+0`/`F`/`Ctrl+Shift+F` 단축키, `Ctrl+Alt+Arrow` 키보드 팬, 중간 마우스 드래그 팬, Ctrl+휠 포인터 중심 줌, 키보드·View 메뉴 viewport 중심 줌을 지원
 - **임시 viewport 팬**: Canvas·요소 위에서 `Space`를 누른 채 왼쪽 드래그하면 선택·배치를 잠시 멈추고 viewport를 이동하며, 중간 마우스 드래그 팬과 함께 사용할 수 있고 Space 해제 시 포인터 캡처를 안전하게 종료
 - **선택 영역 viewport 맞춤**: `Ctrl+Shift+F` 또는 View/context menu의 `Fit Selected to View`로 하나 이상의 선택 컨트롤을 안전한 여백과 함께 확대해 viewport 중앙에 맞추고, 큰 아트보드의 선택 위치까지 offset을 동기화
 - **아트보드 배경**: White·Soft Gray·Ink 프리셋과 사용자 지정 `#RRGGBB`/`#AARRGGBB` 색상을 편집하고 Undo·Preview·AXAML 왕복에 보존
@@ -288,6 +288,7 @@ dotnet run --project src/AvaloniaUIDesigner.App/AvaloniaUIDesigner.App.csproj
 75ba. Canvas 또는 요소 위에서 `Space`를 누른 채 왼쪽 드래그하면 임시 viewport pan을 시작해 선택·marquee·Toolbox 배치 입력을 가로채지 않습니다. Space를 먼저 놓으면 다음 pointer move에서 캡처와 pan 상태를 정리하고, 중간 버튼 팬과 기존 배치·편집 드래그는 그대로 유지합니다.
 75bb. `Ctrl+Alt+Left/Right/Up/Down`은 큰 아트보드 viewport를 96px씩 이동하고 ScrollViewer의 양축 경계에서 offset을 clamp합니다. Object Tree에 포커스가 있으면 기존 계층 방향키 탐색을 우선하며, View 메뉴와 키보드 도움말에 팬 입력을 표시합니다.
 75bc. `Ctrl+Shift+F` 또는 Canvas context menu의 `Fit Selected to View`는 선택 bounds와 viewport 여백으로 25~200% 배율을 계산하고, zoom layout 이후 선택 중심을 다시 계산해 ScrollViewer offset을 맞춥니다. 선택이 없으면 문서·zoom·history를 변경하지 않고 안내 상태만 표시하며, 기존 `Ctrl+F` Object Tree 검색과 `F` 전체 canvas fit은 유지합니다.
+75bd. `Ctrl+=`/`Ctrl+Plus`/`Ctrl+-`/`Ctrl+Minus`와 `View > Zoom In`/`Zoom Out`은 viewport 중앙의 아트보드 좌표를 확대·축소 전후 동일하게 유지합니다. 기존 Ctrl+휠은 포인터 좌표를 기준으로 동작하며 모든 입력은 layout 갱신 후에도 ScrollViewer offset을 재적용합니다.
 76. `File > Load Component Pack...` 또는 `File > Load Toolbox Preset Pack...`으로 외부 Toolbox 팩을 추가하면 파일 경로가 세션에 등록되어 다음 실행 때 자동으로 다시 로드됩니다. 파일이 없어도 문서 탭 복원은 계속되며 상태바에 경고가 표시됩니다.
 77. 외부 프로젝트의 컨트롤은 Component Pack 항목에 `designOnly: true`, `avaloniaTypeName`, `previewText`, `defaultProperties`를 지정해 등록합니다. 디자이너에서는 타입명 플레이스홀더로 편집하고, 생성 AXAML에는 원래 커스텀 타입과 속성을 출력합니다. 예시는 [custom-component-pack.example.json](docs/custom-component-pack.example.json)을 참고하세요.
 78. `File > Load Component Pack Plugin...`에서 `IComponentPackPlugin`을 구현한 신뢰할 수 있는 DLL을 선택하면 플러그인이 제공한 Component Pack을 Toolbox에 등록합니다. DLL 경로는 세션 JSON의 `ComponentPluginPaths`에 저장되고, 앱 재시작 시 플러그인·JSON 팩·프리셋 팩 순서로 복원됩니다.
@@ -485,6 +486,7 @@ AXAML 소스 편집기의 `Validate`와 `Preview`는 현재 디자인과 Undo �
 - v1.75: Space+왼쪽 드래그 임시 viewport pan
 - v1.76: Ctrl+Alt+Arrow 키보드 viewport pan
 - v1.77: 선택 영역 Fit Selected to View
+- v1.78: 키보드·View 메뉴 Zoom viewport 중심 보존
 
 ## 컴포넌트 팩
 
