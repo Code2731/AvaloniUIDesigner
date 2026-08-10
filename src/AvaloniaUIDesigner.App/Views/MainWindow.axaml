@@ -255,6 +255,9 @@
                 <MenuItem Header="Zoom Out (Ctrl+-)" Click="OnZoomOutMenuClicked"/>
                 <MenuItem Header="Actual Size (100%, Ctrl+0)" Click="OnResetZoomMenuClicked"/>
                 <MenuItem Header="Fit to View (F)" Click="OnFitToViewMenuClicked"/>
+                <MenuItem Header="Fit Selected to View (Ctrl+Shift+F)"
+                          Click="OnFitSelectedToViewMenuClicked"
+                          IsEnabled="{Binding Canvas.IsSelectionActive}"/>
                 <MenuItem Header="Pan Canvas (Space + Left Drag / Middle Drag / Ctrl+Alt+Arrow)" IsEnabled="False"/>
                 <MenuItem Header="Zoom Presets">
                     <MenuItem Header="25%" Tag="0.25" Click="OnZoomPresetMenuClicked"/>
@@ -641,6 +644,9 @@
                                     <Separator/>
                                     <MenuItem Header="Live Preview" Click="OnPreviewMenuClicked"/>
                                     <MenuItem Header="Fit to View" Click="OnFitToViewMenuClicked"/>
+                                    <MenuItem Header="Fit Selected to View (Ctrl+Shift+F)"
+                                              Click="OnFitSelectedToViewMenuClicked"
+                                              IsEnabled="{Binding Canvas.IsSelectionActive}"/>
                                 </ContextMenu>
                             </Panel.ContextMenu>
                             <views:DesignerGridOverlay GridSize="{Binding Canvas.GridSize}"

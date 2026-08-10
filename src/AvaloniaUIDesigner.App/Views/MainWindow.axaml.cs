@@ -77,6 +77,7 @@ public partial class MainWindow : Window
         Ctrl+Alt+T          Focus Toolbox search
         Ctrl+Alt+P          Toggle Toolbox placement mode
         Ctrl+0              Actual size (100%)
+        Ctrl+Shift+F        Fit selected controls to view
         F                   Fit canvas to view
         Space + left-drag   Temporarily pan the design viewport
         Middle-drag         Pan the design viewport
@@ -3038,6 +3039,68 @@ public partial class MainWindow : Window
         UpdateZoomStatus();
     }
 
+    private void OnFitSelectedToViewMenuClicked(
+        object? sender,
+        Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        FitSelectedElementsToViewport();
+    }
+
+    private void FitSelectedElementsToViewport()
+    {
+        if (Vm is null || !TryGetSelectionBounds(out var bounds))
+        {
+            Vm?.StatusText = "Select at least one control to fit it to view.";
+            return;
+        }
+
+        var canvas = Vm.Canvas;
+        var viewport = DesignScrollViewer.Viewport;
+        var viewportWidth = viewport.Width > 0 ? viewport.Width : DesignViewport.Bounds.Width;
+        var viewportHeight = viewport.Height > 0 ? viewport.Height : DesignViewport.Bounds.Height;
+        if (viewportWidth <= 0 || viewportHeight <= 0)
+        {
+            return;
+        }
+
+        const double padding = 48;
+        var availableWidth = Math.Max(1, viewportWidth - (padding * 2));
+        var availableHeight = Math.Max(1, viewportHeight - (padding * 2));
+        var selectionWidth = Math.Max(MinSize, bounds.Width);
+        var selectionHeight = Math.Max(MinSize, bounds.Height);
+        var zoom = Math.Clamp(
+            Math.Min(availableWidth / selectionWidth, availableHeight / selectionHeight),
+            0.25,
+            2);
+        canvas.SetZoomScale(zoom);
+        UpdateZoomStatus();
+
+        void CenterSelection()
+        {
+            var currentViewport = DesignScrollViewer.Viewport;
+            var currentWidth = currentViewport.Width > 0 ? currentViewport.Width : viewportWidth;
+            var currentHeight = currentViewport.Height > 0 ? currentViewport.Height : viewportHeight;
+            var centerX = (bounds.X + (bounds.Width / 2)) * canvas.ZoomScale;
+            var centerY = (bounds.Y + (bounds.Height / 2)) * canvas.ZoomScale;
+            var maxX = Math.Max(0, DesignScrollViewer.Extent.Width - currentWidth);
+            var maxY = Math.Max(0, DesignScrollViewer.Extent.Height - currentHeight);
+            DesignScrollViewer.Offset = new Vector(
+                Math.Clamp(centerX - (currentWidth / 2), 0, maxX),
+                Math.Clamp(centerY - (currentHeight / 2), 0, maxY));
+        }
+
+        CenterSelection();
+        EventHandler? layoutUpdated = null;
+        layoutUpdated = (_, _) =>
+        {
+            DesignScrollViewer.LayoutUpdated -= layoutUpdated;
+            CenterSelection();
+        };
+        DesignScrollViewer.LayoutUpdated += layoutUpdated;
+        Dispatcher.UIThread.Post(CenterSelection, DispatcherPriority.Normal);
+        Vm.StatusText = $"Fitted selected controls to view at {zoom * 100:0}% zoom.";
+    }
+
     private void OnZoomPresetMenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
         if (Vm is null
@@ -4395,6 +4458,13 @@ public partial class MainWindow : Window
             return;
         }
 
+        if (ctrl && shift && !alt && e.Key == Key.F)
+        {
+            FitSelectedElementsToViewport();
+            e.Handled = true;
+            return;
+        }
+
         // TreeView owns hierarchy navigation; arrows must not nudge the canvas selection.
         if (IsObjectTreeSource(e.Source)
             && e.Key is (Key.Left or Key.Right or Key.Up or Key.Down))
@@ -4762,7 +4832,7 @@ public partial class MainWindow : Window
             return;
         }
 
-        if (ctrl && e.Key == Key.F)
+        if (ctrl && !shift && e.Key == Key.F)
         {
             if (!ObjectTreePane.IsVisible)
             {
