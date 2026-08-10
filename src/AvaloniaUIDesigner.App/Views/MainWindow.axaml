@@ -658,6 +658,27 @@
                                   IsChecked="{Binding Canvas.SnapToGrid, Mode=OneWay}"
                                   ToolTip.Tip="Toggle snap to grid"
                                   Padding="7,3"/>
+                    <TextBlock Text="Guides"
+                               VerticalAlignment="Center"
+                               FontSize="11"
+                               Foreground="#64748B"
+                               Margin="2,0,0,0"/>
+                    <ToggleButton Name="ShowDesignGuidesToolbar"
+                                  Content="Show"
+                                  Click="OnShowDesignGuidesMenuClicked"
+                                  IsChecked="True"
+                                  ToolTip.Tip="Show or hide design guides"
+                                  Padding="7,3"/>
+                    <ToggleButton Name="SnapToGuidesToolbar"
+                                  Content="Snap"
+                                  Click="OnSnapToGuidesMenuClicked"
+                                  IsChecked="True"
+                                  ToolTip.Tip="Toggle snapping to design guides"
+                                  Padding="7,3"/>
+                    <Button Content="Clear"
+                            Click="OnClearDesignGuidesMenuClicked"
+                            ToolTip.Tip="Clear all design guides from the current document tab"
+                            Padding="7,3"/>
                     <Border Width="1" Background="#CBD5E1" Margin="0,2"/>
                     <Button Content="Fit"
                             Click="OnFitToViewMenuClicked"

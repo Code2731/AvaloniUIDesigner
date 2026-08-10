@@ -53,7 +53,7 @@ dotnet run --project src/AvaloniaUIDesigner.App/AvaloniaUIDesigner.App.csproj
 - **잠금 인식 구조 해제**: `Ungroup Selected Canvas`와 `Break Selected Layout`은 잠긴 컨테이너 자식이 포함된 계층을 거부해 부분적인 부모·좌표 변경을 방지하고, 잠금 해제 후 기존 해제·Undo 흐름을 유지
 - **그리드/스냅 키보드 단축키**: `Ctrl+Alt+G`로 디자인 그리드를 표시·숨기고 `Ctrl+Alt+Shift+G`로 Grid snap을 토글하며 기존 문서 설정·Undo/AXAML 메타데이터를 유지
 - **Workspace 패널 키보드 단축키**: `Ctrl+Alt+1/2/3`으로 Toolbox·Object Tree·Property Inspector를 토글하고 `Ctrl+Alt+0`으로 기본 패널 레이아웃을 복원하며 기존 세션 저장 상태와 메뉴 체크를 동기화
-- **Design Toolbar**: 캔버스 상단의 Qt Designer식 도구 모음에서 Select/Pick 작업 모드, New·Save·Undo/Redo·Copy/Paste/Delete·Copy Style/Paste Style·Preview, Align/Distribute/Size, z-order·아트보드 가장자리/중앙 정렬, Group/Ungroup/Break, Stack/Grid/Uniform/Dock/Wrap Layout, Lock·Grid/Snap, Fit/Zoom 명령을 가로 스크롤 가능한 한 줄에서 실행하고 선택·배치 상태에 따라 사용할 수 없는 작업을 자동 비활성화
+- **Design Toolbar**: 캔버스 상단의 Qt Designer식 도구 모음에서 Select/Pick 작업 모드, New·Save·Undo/Redo·Copy/Paste/Delete·Copy Style/Paste Style·Preview, Align/Distribute/Size, z-order·아트보드 가장자리/중앙 정렬, Group/Ungroup/Break, Stack/Grid/Uniform/Dock/Wrap Layout, Lock·Grid/Snap·Guides, Fit/Zoom 명령을 가로 스크롤 가능한 한 줄에서 실행하고 선택·배치 상태에 따라 사용할 수 없는 작업을 자동 비활성화
 - **Selection Breadcrumb**: Design Surface 헤더에 현재 선택 컨트롤의 `Parent / Child` 계층 경로를 표시하고 각 경로 항목을 클릭해 해당 컨테이너를 바로 선택하며, `Up`·`Into` 버튼으로 기존 Escape 부모 선택·Enter 자식 진입도 직접 실행하고 재부모화·이름 변경을 즉시 반영
 - **패널 포커스 복구**: 숨겨진 패널에서도 `Ctrl+Alt+T/P/I` 또는 `Ctrl+F`를 누르면 필요한 Toolbox·Object Tree·Property Inspector를 자동으로 다시 표시한 뒤 검색·배치 작업으로 진입
 - **리사이즈 비율 잠금**: 코너 핸들을 `Shift`와 함께 드래그하면 단일 컨트롤과 다중 선택 bounding box의 원래 가로·세로 비율을 유지하며, 잠금 중에는 Smart Snap보다 비율을 우선합니다.
@@ -338,6 +338,7 @@ dotnet run --project src/AvaloniaUIDesigner.App/AvaloniaUIDesigner.App.csproj
 92. Design Toolbar에 `Copy`·`Paste`·`Delete`, `Front/Back/Forward/Backward`, 아트보드 `X/Y/XY` 중앙 정렬, `Dock H/V`·`Wrap H/V`, `Lock`, `Grid`·`Snap`을 추가해 반복적인 메뉴 탐색 없이 기본 Form Editor 작업을 수행합니다. 선택이 없거나 다중 선택이 필요한 조건에서는 동일한 기존 검증 규칙으로 버튼을 비활성화하며 Grid/Snap 토글은 View 메뉴 상태와 동기화됩니다.
 93. Design Toolbar의 `Select`는 현재 Toolbox 배치 모드와 배치 미리보기를 즉시 취소하고 Canvas 선택 도구로 돌아갑니다. `Pick`은 Toolbox의 첫 표시 항목을 기준으로 배치 모드를 토글하며 현재 `Place: ...` 상태와 `Ctrl+Alt+P` 경로를 같은 상태 바인딩으로 유지합니다. `Copy Style`·`Paste Style`은 기존 시각 스타일 클립보드를 Toolbar에서 바로 재사용합니다.
 94. `Edit > Align to Artboard` 또는 Design Toolbar의 `Form` 명령은 선택된 잠금 해제 root 컨트롤을 아트보드 Left/Right/Top/Bottom 가장자리에 직접 배치합니다. `Ctrl+Alt+Shift+Arrow` 단축키도 같은 명령을 사용하며 Canvas·Grid·StackPanel 등 부모 레이아웃이 위치를 관리하는 자식은 거부하고, 이동 결과는 하나의 Undo/Redo와 AXAML 변경으로 기록합니다.
+95. Design Toolbar의 `Guides > Show`·`Snap`·`Clear`는 View 메뉴의 Design Guides 상태와 같은 탭별 상태를 사용합니다. 다른 문서 탭으로 전환하거나 세션을 복원해도 현재 탭의 가이드 표시·Guide Snap 토글이 Toolbar와 메뉴에 함께 반영되며, `Clear`는 현재 탭의 수평·수직 가이드만 제거합니다.
 
 DataGrid가 포함된 생성 AXAML을 다른 프로젝트에서 사용할 때는 같은 Avalonia 버전의 `Avalonia.Controls.DataGrid` 패키지와 `avares://Avalonia.Controls.DataGrid/Themes/Fluent.xaml` 스타일 include가 필요합니다.
 
@@ -550,6 +551,7 @@ AXAML 소스 편집기의 `Validate`와 `Preview`는 현재 디자인과 Undo �
 - v2.04: Design Toolbar 편집·z-order·중앙 정렬·Grid/Snap·Dock/Wrap 명령 확장
 - v2.05: Design Toolbar Select/Pick 작업 모드·스타일 클립보드 명령 추가
 - v2.06: 아트보드 가장자리 정렬 명령과 Form Toolbar 그룹 추가
+- v2.07: Design Guides 표시·Guide Snap·Clear Toolbar 명령 추가
 
 ## 컴포넌트 팩
 

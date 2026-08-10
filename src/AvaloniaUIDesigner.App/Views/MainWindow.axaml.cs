@@ -3425,14 +3425,22 @@ public partial class MainWindow : Window
     private void OnShowDesignGuidesMenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
         _showDesignGuides = !_showDesignGuides;
-        ShowDesignGuidesMenu.IsChecked = _showDesignGuides;
+        SyncDesignGuideToggles();
         GuideOverlay.IsVisible = _showDesignGuides;
     }
 
     private void OnSnapToGuidesMenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
         _snapToGuides = !_snapToGuides;
+        SyncDesignGuideToggles();
+    }
+
+    private void SyncDesignGuideToggles()
+    {
+        ShowDesignGuidesMenu.IsChecked = _showDesignGuides;
         SnapToGuidesMenu.IsChecked = _snapToGuides;
+        ShowDesignGuidesToolbar.IsChecked = _showDesignGuides;
+        SnapToGuidesToolbar.IsChecked = _snapToGuides;
     }
 
     private void OnClearDesignGuidesMenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
@@ -5407,8 +5415,7 @@ public partial class MainWindow : Window
         _showDesignGuides = state.ShowDesignGuides;
         _snapToGuides = state.SnapToGuides;
 
-        ShowDesignGuidesMenu.IsChecked = _showDesignGuides;
-        SnapToGuidesMenu.IsChecked = _snapToGuides;
+        SyncDesignGuideToggles();
         GuideOverlay.IsVisible = _showDesignGuides;
         UpdateGuideOverlay();
     }
