@@ -1046,6 +1046,13 @@
                                 </ComboBox>
                             </StackPanel>
                             <TextBlock Text="Design Surface" FontWeight="SemiBold" Foreground="#CCCCCC"/>
+                            <TextBlock Text="{Binding Canvas.SelectionBoundsSummary}"
+                                       IsVisible="{Binding Canvas.IsSelectionActive}"
+                                       VerticalAlignment="Center"
+                                       Margin="10,0,0,0"
+                                       FontSize="11"
+                                       Foreground="#7DD3FC"
+                                       ToolTip.Tip="Selection bounds in artboard coordinates"/>
                         </DockPanel>
                     </Border>
                     <Grid Margin="24" RowDefinitions="24,*" ColumnDefinitions="24,*">

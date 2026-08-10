@@ -57,6 +57,7 @@ dotnet run --project src/AvaloniaUIDesigner.App/AvaloniaUIDesigner.App.csproj
 - **Canvas Pan Tool**: Design Toolbar의 `Pan` 또는 `View > Pan Canvas (H)`로 전용 패닝 모드를 켜고 좌클릭 드래그로 확대된 아트보드를 이동하며, `H`를 다시 누르거나 `Select`를 선택하면 기존 선택 도구로 돌아가고 Toolbox 배치 모드와 상호 배타적으로 동작
 - **Canvas Context Menu**: 빈 Design Surface를 우클릭하면 Copy/Cut/Paste·Style·AXAML, Duplicate/Delete, Lock, z-order, Arrange, 아트보드 정렬, Group/Ungroup/Break, Preview/Fit 명령을 현재 선택 상태에 맞는 조건으로 바로 실행
 - **Selection Breadcrumb**: Design Surface 헤더에 현재 선택 컨트롤의 `Parent / Child` 계층 경로를 표시하고 각 경로 항목을 클릭해 해당 컨테이너를 바로 선택하며, `Up`·`Into` 버튼으로 기존 Escape 부모 선택·Enter 자식 진입도 직접 실행하고 재부모화·이름 변경을 즉시 반영
+- **Selection Bounds HUD**: Design Surface 헤더에 선택 영역의 아트보드 기준 `X/Y/W/H` bounds를 실시간 표시해 단일·다중 선택의 위치와 크기를 메뉴를 열지 않고 확인
 - **패널 포커스 복구**: 숨겨진 패널에서도 `Ctrl+Alt+T/P/I` 또는 `Ctrl+F`를 누르면 필요한 Toolbox·Object Tree·Property Inspector를 자동으로 다시 표시한 뒤 검색·배치 작업으로 진입
 - **리사이즈 비율 잠금**: 코너 핸들을 `Shift`와 함께 드래그하면 단일 컨트롤과 다중 선택 bounding box의 원래 가로·세로 비율을 유지하며, 잠금 중에는 Smart Snap보다 비율을 우선합니다.
 - **줌 독립 리사이즈 핸들**: 선택 핸들의 화면상 클릭 영역을 약 10px로 유지해 25~200% 확대·축소에서도 핸들이 지나치게 작거나 커지지 않으며, 줌 변경 시 문서 좌표 크기를 자동으로 역산합니다.
@@ -346,6 +347,7 @@ dotnet run --project src/AvaloniaUIDesigner.App/AvaloniaUIDesigner.App.csproj
 97. Canvas 빈 영역의 Context Menu가 `Copy`·`Copy Style`·`Cut`·`Paste`·`Paste Style`·`Paste AXAML`·`Duplicate`·`Delete`와 `Order`·`Arrange`·`Center/Align to Artboard`·`Group/Ungroup/Break`를 노출합니다. 선택이 없거나 다중 선택이 필요한 명령은 기존 Toolbar/Edit 메뉴와 동일하게 비활성화되어 우클릭 작업에서도 편집 조건이 달라지지 않습니다.
 98. Design Toolbar의 `Pan`과 `View > Pan Canvas (H)`는 패닝 모드를 토글합니다. 모드가 활성화되면 빈 영역·컨트롤·선택 핸들 위에서 좌클릭 드래그가 선택이나 리사이즈 대신 ScrollViewer 오프셋을 이동하고, Toolbar/Menu 체크·Hand 커서·상태 표시를 함께 갱신합니다. `H`를 다시 누르거나 `Select`를 선택하면 복귀하며, Pick/Toolbox 배치 진입 시 Pan 모드는 자동으로 해제됩니다.
 99. 선택 Adorner의 8방향 리사이즈 핸들은 아트보드 확대 배율과 반비례하는 문서 좌표 크기를 사용해 화면상 약 10px로 고정됩니다. 따라서 25%에서는 충분한 hit target을 확보하고 200%에서도 핸들이 선택 영역을 과도하게 가리지 않으며, 단일·다중 선택과 기존 Smart Snap/Shift 비율 잠금 동작은 그대로 유지됩니다.
+100. Design Surface 헤더의 Selection Bounds HUD는 선택된 컨트롤들의 실제 아트보드 bounds를 `X: ... Y: ... W: ... H: ...` 형식으로 표시합니다. 단일·다중 선택 변경과 이동·리사이즈·속성 편집에 즉시 반응하며, 선택이 없을 때는 숨겨져 기존 헤더와 계층 breadcrumb 공간을 침범하지 않습니다.
 
 DataGrid가 포함된 생성 AXAML을 다른 프로젝트에서 사용할 때는 같은 Avalonia 버전의 `Avalonia.Controls.DataGrid` 패키지와 `avares://Avalonia.Controls.DataGrid/Themes/Fluent.xaml` 스타일 include가 필요합니다.
 
@@ -563,6 +565,7 @@ AXAML 소스 편집기의 `Validate`와 `Preview`는 현재 디자인과 Undo �
 - v2.09: Canvas Context Menu 편집·정렬·레이아웃 명령 확장
 - v2.10: 전용 Canvas Pan 작업 모드·H 단축키·패닝 상태 피드백 추가
 - v2.11: 줌 독립 선택 리사이즈 핸들 추가
+- v2.12: Selection Bounds HUD와 실시간 위치·크기 피드백 추가
 
 ## 컴포넌트 팩
 

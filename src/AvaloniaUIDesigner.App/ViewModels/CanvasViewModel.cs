@@ -129,6 +129,29 @@ public partial class CanvasViewModel : ViewModelBase
         }
     }
 
+    public string SelectionBoundsSummary
+    {
+        get
+        {
+            if (SelectedElements.Count == 0)
+            {
+                return string.Empty;
+            }
+
+            var left = SelectedElements.Min(element => element.X);
+            var top = SelectedElements.Min(element => element.Y);
+            var right = SelectedElements.Max(element => element.X + element.Width);
+            var bottom = SelectedElements.Max(element => element.Y + element.Height);
+            return string.Format(
+                CultureInfo.InvariantCulture,
+                "X: {0:0.###}  Y: {1:0.###}  W: {2:0.###}  H: {3:0.###}",
+                left,
+                top,
+                right - left,
+                bottom - top);
+        }
+    }
+
     public string? ActiveStylePreviewPseudoClass => _stylePreviewPseudoClass;
 
     public string ZoomPercentage => $"{ZoomScale * 100:0}%";
@@ -2560,6 +2583,7 @@ public partial class CanvasViewModel : ViewModelBase
         OnPropertyChanged(nameof(HasMultipleSelection));
         OnPropertyChanged(nameof(CanNavigateHierarchy));
         OnPropertyChanged(nameof(SelectionSummary));
+        OnPropertyChanged(nameof(SelectionBoundsSummary));
         RefreshSelectionPresentation();
     }
 
@@ -2568,6 +2592,16 @@ public partial class CanvasViewModel : ViewModelBase
         if (e.PropertyName is nameof(DesignElement.DisplayName) or nameof(DesignElement.ParentName))
         {
             RefreshSelectionPresentation();
+        }
+
+        if (sender is DesignElement element
+            && SelectedElements.Contains(element)
+            && e.PropertyName is nameof(DesignElement.X)
+                or nameof(DesignElement.Y)
+                or nameof(DesignElement.Width)
+                or nameof(DesignElement.Height))
+        {
+            OnPropertyChanged(nameof(SelectionBoundsSummary));
         }
     }
 
