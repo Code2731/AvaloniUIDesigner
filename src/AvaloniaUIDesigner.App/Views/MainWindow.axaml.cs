@@ -12053,7 +12053,7 @@ public partial class MainWindow : Window
         await dialog.ShowDialog(this);
     }
 
-    private static bool HandleAxamlSourceEditorShortcut(
+    private static bool HandleTextEditorShortcut(
         KeyEventArgs e,
         Action close,
         Action apply)
@@ -12160,7 +12160,7 @@ public partial class MainWindow : Window
         applyButton.Click += (_, _) => ApplySource();
         editor.KeyDown += (_, e) =>
         {
-            HandleAxamlSourceEditorShortcut(e, dialog.Close, ApplySource);
+            HandleTextEditorShortcut(e, dialog.Close, ApplySource);
         };
         var cancelButton = new Button { Content = "Cancel", MinWidth = 84 };
         cancelButton.Click += (_, _) => dialog.Close();
@@ -13661,6 +13661,13 @@ public partial class MainWindow : Window
 
         var applyButton = new Button { Content = "Apply", MinWidth = 84 };
         applyButton.Click += (_, _) => dialog.Close(editor.Text ?? string.Empty);
+        editor.KeyDown += (_, e) =>
+        {
+            HandleTextEditorShortcut(
+                e,
+                () => dialog.Close(null),
+                () => dialog.Close(editor.Text ?? string.Empty));
+        };
 
         var cancelButton = new Button { Content = "Cancel", MinWidth = 84 };
         cancelButton.Click += (_, _) => dialog.Close(null);
