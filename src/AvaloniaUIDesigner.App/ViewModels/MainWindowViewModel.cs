@@ -1759,6 +1759,29 @@ public partial class MainWindowViewModel : ViewModelBase
         return true;
     }
 
+    public bool SelectNextCanvasElement(bool reverse = false)
+    {
+        var candidates = Canvas.Elements
+            .Where(Canvas.IsElementVisibleOnCanvas)
+            .ToList();
+        if (candidates.Count == 0)
+        {
+            StatusText = "No visible controls to select.";
+            return false;
+        }
+
+        var currentIndex = Canvas.SelectedElement is { } selected
+            ? candidates.IndexOf(selected)
+            : -1;
+        var nextIndex = reverse
+            ? currentIndex <= 0 ? candidates.Count - 1 : currentIndex - 1
+            : currentIndex < 0 || currentIndex == candidates.Count - 1 ? 0 : currentIndex + 1;
+        var next = candidates[nextIndex];
+        SelectElement(next);
+        StatusText = $"Selected {next.DisplayName} in Canvas order ({nextIndex + 1}/{candidates.Count}).";
+        return true;
+    }
+
     public bool MoveSelectedElementInParentOrder(int offset)
     {
         if (offset is not (-1 or 1))
