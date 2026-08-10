@@ -96,7 +96,7 @@ public partial class MainWindow : Window
         Tab                 Select next enabled focusable tab-stop control in Tab Order
         Shift+Tab           Add the contiguous Tab Order range to the selection
         Home/End            Select the first/last visible control in Canvas order
-        Shift+Home/End      Add the first/last visible control to selection
+        Shift+Home/End      Add the contiguous Canvas boundary range to selection
         PageUp/PageDown     Select previous/next visible control in Canvas order
         Shift+PageUp/Down   Add the contiguous Canvas range to the selection
         Ctrl+Arrow          Select nearest visible control in that direction
@@ -4458,11 +4458,26 @@ public partial class MainWindow : Window
             && !alt
             && e.Key is (Key.Home or Key.End)
             && Vm.Toolbox.SelectedItem is null
-            && ReferenceEquals(e.Source, DesignHost)
-            && Vm.SelectBoundaryVisibleElement(e.Key == Key.End, append: shift))
+            && ReferenceEquals(e.Source, DesignHost))
         {
-            e.Handled = true;
-            return;
+            if (shift
+                && (_canvasSelectionAnchor ?? Vm.Canvas.SelectedElement) is { } anchor
+                && Vm.TrySelectCanvasBoundaryRange(
+                    anchor,
+                    last: e.Key == Key.End,
+                    append: true))
+            {
+                _canvasSelectionAnchor ??= anchor;
+                e.Handled = true;
+                return;
+            }
+
+            if (Vm.SelectBoundaryVisibleElement(e.Key == Key.End, append: shift))
+            {
+                _canvasSelectionAnchor = Vm.Canvas.SelectedElement;
+                e.Handled = true;
+                return;
+            }
         }
 
         if (!ctrl

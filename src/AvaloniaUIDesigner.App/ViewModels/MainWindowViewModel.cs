@@ -1892,6 +1892,40 @@ public partial class MainWindowViewModel : ViewModelBase
         return true;
     }
 
+    public bool TrySelectCanvasBoundaryRange(
+        DesignElement anchor,
+        bool last = false,
+        bool append = true)
+    {
+        var candidates = Canvas.Elements
+            .Where(Canvas.IsElementVisibleOnCanvas)
+            .ToList();
+        var anchorIndex = candidates.IndexOf(anchor);
+        if (anchorIndex < 0 || candidates.Count == 0)
+        {
+            return false;
+        }
+
+        var boundaryIndex = last ? candidates.Count - 1 : 0;
+        if (anchorIndex == boundaryIndex)
+        {
+            StatusText = "Canvas boundary range is already at the active boundary.";
+            return true;
+        }
+
+        var boundary = candidates[boundaryIndex];
+        var start = Math.Min(anchorIndex, boundaryIndex);
+        var range = candidates
+            .Skip(start)
+            .Take(Math.Abs(boundaryIndex - anchorIndex) + 1)
+            .ToList();
+        SelectElements(range, append, activeElement: boundary);
+        StatusText = append
+            ? $"Added Canvas boundary range ({range.Count} control(s))."
+            : $"Selected Canvas boundary range ({range.Count} control(s)).";
+        return true;
+    }
+
     public bool SelectNextCanvasElement(bool reverse = false, bool append = false)
     {
         var candidates = Canvas.Elements
