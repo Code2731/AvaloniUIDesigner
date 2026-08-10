@@ -1844,6 +1844,48 @@ public partial class MainWindowViewModel : ViewModelBase
         return true;
     }
 
+    public bool TrySelectNextCanvasRange(
+        DesignElement anchor,
+        bool reverse = false,
+        bool append = true)
+    {
+        var candidates = Canvas.Elements
+            .Where(Canvas.IsElementVisibleOnCanvas)
+            .ToList();
+        var anchorIndex = candidates.IndexOf(anchor);
+        if (anchorIndex < 0 || candidates.Count == 0)
+        {
+            return false;
+        }
+
+        var currentIndex = Canvas.SelectedElement is { } selected
+            ? candidates.IndexOf(selected)
+            : anchorIndex;
+        if (currentIndex < 0)
+        {
+            currentIndex = anchorIndex;
+        }
+
+        var targetIndex = currentIndex + (reverse ? -1 : 1);
+        if (targetIndex < 0 || targetIndex >= candidates.Count)
+        {
+            StatusText = "Canvas range is already at the visible boundary.";
+            return true;
+        }
+
+        var target = candidates[targetIndex];
+        var start = Math.Min(anchorIndex, targetIndex);
+        var range = candidates
+            .Skip(start)
+            .Take(Math.Abs(targetIndex - anchorIndex) + 1)
+            .ToList();
+        SelectElements(range, append, activeElement: target);
+        StatusText = append
+            ? $"Added Canvas keyboard range ({range.Count} control(s))."
+            : $"Selected Canvas keyboard range ({range.Count} control(s)).";
+        return true;
+    }
+
     public bool MoveSelectedElementInParentOrder(int offset)
     {
         if (offset is not (-1 or 1))

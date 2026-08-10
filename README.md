@@ -114,7 +114,7 @@ dotnet run --project src/AvaloniaUIDesigner.App/AvaloniaUIDesigner.App.csproj
 - **겹친 요소 순환 선택**: `Alt+클릭`으로 포인터 아래의 visible 컨트롤을 앞쪽부터 순환 선택하고, `Alt+Shift+클릭`으로 반대 방향으로 이동하며 잠긴 요소도 속성 검사를 위해 순환
 - **키보드 선택 순환**: 캔버스에 포커스가 있을 때 `Tab`/`Shift+Tab`으로 보이고 활성화된 `Focusable=true`, `IsTabStop=true` 컨트롤을 순환 선택하고 `Shift+Tab`은 이전 컨트롤을 기존 선택에 누적하며, 명시 `TabIndex`를 낮은 값부터 적용하고 `auto/-1` 요소는 기존 Canvas 순서를 유지
 - **Canvas 경계 선택**: 캔버스에 포커스가 있을 때 `Home`/`End`로 Canvas 순서의 첫/마지막 visible 컨트롤을 즉시 선택하고 `Shift+Home/End`로 해당 경계 요소를 기존 선택에 누적하며 Object Tree를 동기화하고, hidden 요소는 경계 후보에서 제외
-- **Canvas 순차 선택**: 캔버스에 포커스가 있을 때 `PageUp`/`PageDown`으로 Canvas 순서의 이전/다음 visible 컨트롤을 순환 선택하고, `Shift+PageUp/PageDown`으로 해당 요소를 기존 선택에 누적하며 hidden 요소를 건너뛰고 Object Tree를 동기화
+- **Canvas 순차 선택**: 캔버스에 포커스가 있을 때 `PageUp`/`PageDown`으로 Canvas 순서의 이전/다음 visible 컨트롤을 순환 선택하고, `Shift+PageUp/PageDown`으로 anchor부터 다음 target까지 visible 범위를 기존 선택에 누적하며 hidden 요소를 건너뛰고 Object Tree를 동기화
 - **Object Tree 자동 동기화**: 배치된 요소가 루트(Window) 아래에 추가
 - **Object Tree 다중 선택 표시**: 다중 선택 항목에는 `SEL`, 잠긴 항목에는 `LOCK` 마커를 표시하고 헤더에 선택 개수를 표시
 - **Object Tree 다중 선택 입력**: 트리에서 일반 클릭은 단일 선택, `Ctrl+클릭`은 선택 항목 추가/해제로 동작
@@ -453,6 +453,7 @@ AXAML 소스 편집기의 `Validate`와 `Preview`는 현재 디자인과 Undo �
 - v1.61: Shift+Home/End Canvas 경계 누적 선택
 - v1.62: Canvas Shift+클릭 범위 선택
 - v1.63: Canvas 범위 선택 reverse 활성 대상 동기화
+- v1.64: Shift+PageUp/PageDown Canvas 연속 범위 누적 선택
 
 ## 컴포넌트 팩
 

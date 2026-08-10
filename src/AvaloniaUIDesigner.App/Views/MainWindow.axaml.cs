@@ -98,7 +98,7 @@ public partial class MainWindow : Window
         Home/End            Select the first/last visible control in Canvas order
         Shift+Home/End      Add the first/last visible control to selection
         PageUp/PageDown     Select previous/next visible control in Canvas order
-        Shift+PageUp/Down   Add previous/next visible control to selection
+        Shift+PageUp/Down   Add the contiguous Canvas range to the selection
         Ctrl+Arrow          Select nearest visible control in that direction
         Escape              Select the parent container on the canvas, or clear selection at the root
         Enter               Select the first child of the selected container
@@ -4426,11 +4426,26 @@ public partial class MainWindow : Window
             && !alt
             && e.Key is (Key.PageUp or Key.PageDown)
             && Vm.Toolbox.SelectedItem is null
-            && ReferenceEquals(e.Source, DesignHost)
-            && Vm.SelectNextCanvasElement(e.Key == Key.PageUp, append: shift))
+            && ReferenceEquals(e.Source, DesignHost))
         {
-            e.Handled = true;
-            return;
+            if (shift
+                && (_canvasSelectionAnchor ?? Vm.Canvas.SelectedElement) is { } anchor
+                && Vm.TrySelectNextCanvasRange(
+                    anchor,
+                    e.Key == Key.PageUp,
+                    append: true))
+            {
+                _canvasSelectionAnchor ??= anchor;
+                e.Handled = true;
+                return;
+            }
+
+            if (Vm.SelectNextCanvasElement(e.Key == Key.PageUp))
+            {
+                _canvasSelectionAnchor = Vm.Canvas.SelectedElement;
+                e.Handled = true;
+                return;
+            }
         }
 
         if (!ctrl
