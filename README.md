@@ -124,7 +124,7 @@ dotnet run --project src/AvaloniaUIDesigner.App/AvaloniaUIDesigner.App.csproj
 - **계층 자식 진입**: 캔버스에서 단일 컨테이너를 선택한 뒤 `Enter`로 첫 visible 직접 자식, `Shift+Enter`로 마지막 visible 직접 자식을 선택하며, 자식이 없거나 다중 선택이면 기존 입력을 유지
 - **계층 형제 탐색**: 캔버스에서 `Alt+Left/Up`으로 같은 부모의 이전 visible 형제, `Alt+Right/Down`으로 다음 visible 형제를 선택하고, `Alt+Shift+Arrow`의 기존 10px nudge와 형제가 없는 경계에서의 기존 이동을 보존
 - **Canvas 방향 선택**: `Ctrl+Arrow`로 현재 선택 중심에서 해당 방향의 가장 가까운 보이는 컨트롤을 선택하며, 같은 축으로 겹치는 후보·축 거리·보조 거리·Canvas 순서를 결정 규칙으로 사용하고 대상이 없으면 기존 nudge 동작을 유지
-- **Object Tree 범위 선택**: 트리의 현재 표시 순서에서 일반 클릭을 anchor로 삼아 `Shift+클릭`으로 행 범위를 선택하고, `Ctrl+Shift+클릭`으로 기존 선택에 범위를 추가하며 접힌 자식과 검색 결과 순서를 안전하게 반영
+- **Object Tree 범위 선택**: 트리의 현재 표시 순서에서 일반 클릭을 anchor로 삼아 `Shift+클릭` 또는 `Shift+Up/Down`으로 행 범위를 선택하고, `Ctrl+Shift+클릭` 또는 `Ctrl+Shift+Up/Down`으로 기존 선택에 범위를 추가하며 접힌 자식과 검색 결과 순서를 안전하게 반영
 - **Object Tree 컨텍스트 편집**: 트리 행을 우클릭해 Rename·Lock/Unlock·Copy·Cut·Duplicate·Delete 실행
 - **Object Tree 계층 편집**: 트리 행의 컨텍스트 메뉴에서 지원 컨테이너 할당과 부모 컨테이너 해제를 바로 실행
 - **Object Tree 순서 편집**: StackPanel·DockPanel·WrapPanel·UniformGrid·Canvas 자식의 순서를 `Move Earlier/Later`로 바로 변경
@@ -203,7 +203,7 @@ dotnet run --project src/AvaloniaUIDesigner.App/AvaloniaUIDesigner.App.csproj
 50. 캔버스에서 텍스트·버튼·토글·라벨·fallback 컨트롤을 더블클릭하면 해당 요소의 visible `Text`/`Content`를 빠르게 편집하고, 적용 시 Undo·AXAML·Preview에 함께 반영
 51. View > `Live Preview`를 열어두면 배치·속성·Undo/Redo·AXAML 적용·문서 로드가 같은 Preview 창에 자동 반영되며, 창을 다시 열면 현재 문서로 즉시 갱신
 52. Object Tree 검색에서 `Enter`를 누르면 다음 일치 컨트롤, `Shift+Enter`를 누르면 이전 일치 컨트롤을 선택하고 결과 위치를 확인
-53. 캔버스를 클릭한 뒤 `Tab`/`Shift+Tab`을 누르면 보이고 활성화된 `Focusable=true`, `IsTabStop=true` 컨트롤만 대상으로 명시 `TabIndex`를 낮은 값부터 선택하고, `Shift+Tab`은 이전 후보를 기존 선택에 누적합니다. `auto/-1` 요소는 기존 Canvas 순서로 순환하며 숨겨진 TabControl 페이지와 비활성·비포커스·탭 제외 컨트롤은 자동으로 건너뜁니다.
+53. 캔버스를 클릭한 뒤 `Tab`/`Shift+Tab`을 누르면 보이고 활성화된 `Focusable=true`, `IsTabStop=true` 컨트롤만 대상으로 명시 `TabIndex`를 낮은 값부터 선택하고, `Shift+Tab`은 Tab Order anchor부터 이전 target까지 범위를 기존 선택에 누적합니다. `auto/-1` 요소는 기존 Canvas 순서로 순환하며 숨겨진 TabControl 페이지와 비활성·비포커스·탭 제외 컨트롤은 자동으로 건너뜁니다.
 54. 여러 컨트롤을 선택하면 Object Tree의 각 항목에 `SEL` 마커와 헤더의 선택 개수가 표시되고, 잠긴 컨트롤에는 `LOCK` 마커가 표시됨
 55. Object Tree에서 일반 클릭은 하나만 선택하고, `Ctrl+클릭`은 여러 컨트롤을 추가 선택하거나 선택 해제함
 56. Object Tree 행을 우클릭하면 해당 컨트롤을 먼저 선택한 뒤 Rename·Lock/Unlock·Copy·Cut·Duplicate·Delete 명령을 실행할 수 있음
@@ -252,7 +252,7 @@ dotnet run --project src/AvaloniaUIDesigner.App/AvaloniaUIDesigner.App.csproj
 75x. 두 개 이상의 컨트롤을 선택한 뒤 `Ctrl+Alt+Shift+1`/`2`로 가로·세로 StackPanel, `3`으로 Grid, `4`로 UniformGrid, `5`/`6`으로 가로·세로 DockPanel, `7`/`8`로 가로·세로 WrapPanel을 즉시 적용합니다. 레이아웃 컨테이너를 선택한 뒤 `Ctrl+Shift+B`를 누르면 `Break Selected Layout`과 동일하게 자식들을 원래 부모와 좌표 정책으로 되돌립니다.
 75y. Marquee 선택은 `IsLocked`인 컨트롤과 숨겨진 Tab 페이지처럼 `IsVisibleOnArtboard`가 false인 요소를 자동으로 건너뜁니다. 잠긴 컨트롤을 직접 클릭하면 기존처럼 선택해 속성을 검사할 수 있습니다.
 75z. 겹친 컨트롤을 편집할 때 `Alt+클릭`은 포인터 아래 visible 요소를 z-order 앞쪽부터 순환 선택하고, `Alt+Shift+클릭`은 뒤쪽 방향으로 순환합니다. 현재 선택이 같은 hit stack에 있으면 다음 요소로 이동하며, 숨겨진 요소는 제외하고 잠긴 요소는 속성 검사를 위해 선택할 수 있습니다.
-75aa. Object Tree에서 일반 클릭한 행이 선택 anchor가 됩니다. `Shift+클릭`은 현재 펼쳐진 계층과 검색 결과에 표시된 순서로 anchor부터 대상까지 선택하고, `Ctrl+Shift+클릭`은 기존 선택을 유지한 채 범위를 추가합니다. 접힌 부모 아래의 보이지 않는 자식은 범위에 포함하지 않습니다.
+75aa. Object Tree에서 일반 클릭한 행이 선택 anchor가 됩니다. `Shift+클릭` 또는 `Shift+Up/Down`은 현재 펼쳐진 계층과 검색 결과에 표시된 순서로 anchor부터 대상까지 선택하고, `Ctrl+Shift+클릭` 또는 `Ctrl+Shift+Up/Down`은 기존 선택을 유지한 채 범위를 추가합니다. 접힌 부모 아래의 보이지 않는 자식은 범위에 포함하지 않습니다.
 75ab. Edit 메뉴, Canvas context menu, `Ctrl+A`의 Select All은 `IsVisibleOnArtboard=true`이고 `IsLocked=false`인 요소만 선택합니다. 선택 가능한 요소가 없으면 기존 선택을 비우고 상태바에 안내하며, Object Tree나 직접 클릭으로 잠긴·숨겨진 요소를 검사하는 기능은 바뀌지 않습니다.
 75ac. 잠긴 컨트롤을 직접 선택해도 Object Tree와 Property Inspector에서 검사할 수 있지만 `Edit > Copy`·`Duplicate`와 `Ctrl+C`·`Ctrl+D`는 잠금 해제 선택만 처리합니다. 잠금 해제 요소와 잠긴 요소를 함께 선택하면 잠금 해제 계층만 복사·복제하고, 잠긴 요소만 대상으로 한 명령은 문서와 기존 클립보드를 변경하지 않습니다.
 75ad. 캔버스에서 일반 클릭한 요소가 Canvas 선택 anchor가 됩니다. `Shift+클릭`은 anchor부터 대상까지 visible Canvas 순서 범위를 선택하고, `Ctrl+Shift+클릭`은 기존 선택을 유지한 채 범위를 추가하며 reverse 방향에서도 클릭한 target을 Object Tree 활성 행으로 유지합니다. hidden 요소는 범위에서 제외하며, 유효한 anchor가 없으면 기존 Shift 단일 추가로 fallback하고, `Ctrl+클릭` 토글·잠긴 컨트롤 직접 검사·범위 입력의 이동/Quick Edit 차단을 유지합니다.
@@ -262,7 +262,7 @@ dotnet run --project src/AvaloniaUIDesigner.App/AvaloniaUIDesigner.App.csproj
 75ah. 캔버스에 포커스가 있고 단일 컨테이너 자식을 선택한 상태에서 `Escape`를 누르면 Object Tree·Property Inspector 선택을 부모 컨테이너로 함께 올립니다. 부모가 없는 root 선택, 다중 선택, 진행 중인 marquee 또는 Toolbox 배치에서는 기존처럼 선택 도구·배치 취소를 우선합니다.
 75ai. 캔버스에 포커스가 있고 단일 컨테이너를 선택한 상태에서 `Enter`는 첫 visible 직접 자식, `Shift+Enter`는 마지막 visible 직접 자식으로 선택을 내립니다. 숨겨진 자식만 있는 컨테이너·자식이 없는 컨트롤·다중 선택·Toolbox 배치 모드에서는 Window가 키를 소비하지 않으며, Object Tree와 Property Inspector 선택은 기존 동기화 경로를 사용합니다.
 75aj. 캔버스에 포커스가 있고 단일 요소를 선택한 상태에서 `Alt+Left/Up`은 같은 부모의 이전 visible 형제, `Alt+Right/Down`은 다음 visible 형제로 선택을 이동합니다. 현재 선택이 hidden이면 방향에 맞는 첫/마지막 visible sibling으로 복구하고, root 요소도 Window 형제로 취급하며, `Alt+Shift+Arrow`는 기존 10px nudge를 유지합니다.
-75ak. 캔버스 `Tab`/`Shift+Tab` 선택 순환은 `Edit Tab Order...` 또는 `Edit Tab Order Map...`으로 지정한 `TabIndex`를 낮은 값부터 반영합니다. `auto/-1` 컨트롤은 명시 순서 뒤에 원래 Canvas 순서로 배치되고, 숨겨진 컨트롤은 계속 제외되며 선택이 끝나면 처음/마지막으로 wrap합니다. `Shift+Tab`은 이전 후보를 기존 선택에 누적합니다.
+75ak. 캔버스 `Tab`/`Shift+Tab` 선택 순환은 `Edit Tab Order...` 또는 `Edit Tab Order Map...`으로 지정한 `TabIndex`를 낮은 값부터 반영합니다. `auto/-1` 컨트롤은 명시 순서 뒤에 원래 Canvas 순서로 배치되고, 숨겨진 컨트롤은 계속 제외되며 선택이 끝나면 처음/마지막으로 wrap합니다. `Shift+Tab`은 anchor부터 이전 target까지 Tab Order 범위를 기존 선택에 누적합니다.
 75al. Canvas `Tab`/`Shift+Tab`은 `IsTabStop=false`로 제외된 컨트롤을 건너뜁니다. `Edit > Include / Exclude from Tab Navigation`의 상태가 즉시 순환 후보에 반영되며, 모든 후보가 제외되면 기존처럼 선택 실패 상태를 표시합니다.
 75am. Canvas `Tab`/`Shift+Tab`은 `IsEnabled=false` 또는 `Focusable=false`인 컨트롤도 건너뛰어 Avalonia 키보드 포커스 조건과 맞춥니다. 활성화·포커스 가능·탭 정지 조건이 모두 맞는 후보만 기존 `TabIndex`와 Canvas 순서로 순환합니다.
 75an. 캔버스에서 단일 요소를 선택한 뒤 `Ctrl+Left/Right/Up/Down`은 해당 방향에 있는 보이는 후보 중 같은 축으로 겹치는 요소를 우선하고 축 거리·보조 거리·Canvas 순서로 가장 가까운 요소를 선택합니다. 후보가 없거나 다중 선택이면 입력을 소비하지 않아 기존 화살표 nudge 경로를 보존합니다.
@@ -270,6 +270,7 @@ dotnet run --project src/AvaloniaUIDesigner.App/AvaloniaUIDesigner.App.csproj
 75ap. Escape 부모 선택·Enter 자식 진입·Alt 형제 탐색도 같은 visibility 판정을 사용해 hidden 계층을 건너뜁니다. hidden 선택에서 형제 탐색을 시작하면 이전 방향은 마지막 visible sibling, 다음 방향은 첫 visible sibling을 선택해 키보드 탐색이 멈추지 않습니다.
 75aq. 캔버스에 포커스가 있고 Toolbox 배치 모드가 아닐 때 `Home`은 Canvas 순서의 첫 visible 컨트롤, `End`는 마지막 visible 컨트롤을 선택하고, `Shift+Home/End`는 해당 경계 요소를 기존 선택에 누적합니다. `Ctrl`·`Alt`가 붙은 입력이나 후보가 없는 캔버스에서는 기존 입력과 상태를 보존합니다.
 75ar. 캔버스에 포커스가 있고 Toolbox 배치 모드가 아닐 때 `PageUp`은 Canvas 순서의 이전 visible 컨트롤, `PageDown`은 다음 visible 컨트롤을 선택해 끝에서 반대쪽으로 wrap하고, `Shift+PageUp/PageDown`은 해당 요소를 기존 선택에 누적합니다. `Ctrl+Shift+PageUp/PageDown` 문서 탭 이동은 기존 동작을 유지합니다.
+75as. Object Tree에 포커스가 있을 때 `Shift+Up/Down`은 현재 펼쳐진 visible 행 순서에서 anchor부터 이전/다음 target까지 범위를 선택하고, `Ctrl+Shift+Up/Down`은 기존 선택에 범위를 추가합니다. 첫/마지막 visible 행에서는 범위를 wrap하지 않으며, 접힌 계층과 검색 결과 순서를 그대로 사용합니다.
 76. `File > Load Component Pack...` 또는 `File > Load Toolbox Preset Pack...`으로 외부 Toolbox 팩을 추가하면 파일 경로가 세션에 등록되어 다음 실행 때 자동으로 다시 로드됩니다. 파일이 없어도 문서 탭 복원은 계속되며 상태바에 경고가 표시됩니다.
 77. 외부 프로젝트의 컨트롤은 Component Pack 항목에 `designOnly: true`, `avaloniaTypeName`, `previewText`, `defaultProperties`를 지정해 등록합니다. 디자이너에서는 타입명 플레이스홀더로 편집하고, 생성 AXAML에는 원래 커스텀 타입과 속성을 출력합니다. 예시는 [custom-component-pack.example.json](docs/custom-component-pack.example.json)을 참고하세요.
 78. `File > Load Component Pack Plugin...`에서 `IComponentPackPlugin`을 구현한 신뢰할 수 있는 DLL을 선택하면 플러그인이 제공한 Component Pack을 Toolbox에 등록합니다. DLL 경로는 세션 JSON의 `ComponentPluginPaths`에 저장되고, 앱 재시작 시 플러그인·JSON 팩·프리셋 팩 순서로 복원됩니다.
@@ -455,6 +456,7 @@ AXAML 소스 편집기의 `Validate`와 `Preview`는 현재 디자인과 Undo �
 - v1.63: Canvas 범위 선택 reverse 활성 대상 동기화
 - v1.64: Shift+PageUp/PageDown Canvas 연속 범위 누적 선택
 - v1.65: Shift+Tab Tab Order 연속 범위 누적 선택
+- v1.66: Object Tree Shift+Arrow 키보드 범위 선택
 
 ## 컴포넌트 팩
 

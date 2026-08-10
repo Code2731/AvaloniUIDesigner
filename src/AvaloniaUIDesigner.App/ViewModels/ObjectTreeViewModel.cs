@@ -127,6 +127,24 @@ public partial class ObjectTreeViewModel : ViewModelBase
         return true;
     }
 
+    public bool TryGetAdjacentVisibleElement(
+        DesignElement current,
+        bool reverse,
+        out DesignElement? target)
+    {
+        var visible = GetVisibleElements();
+        var currentIndex = visible.IndexOf(current);
+        var targetIndex = currentIndex + (reverse ? -1 : 1);
+        if (currentIndex < 0 || targetIndex < 0 || targetIndex >= visible.Count)
+        {
+            target = null;
+            return false;
+        }
+
+        target = visible[targetIndex];
+        return true;
+    }
+
     public void SetDropFeedback(ObjectNodeViewModel? target, bool accepted)
         => SetDropFeedback(target, accepted, insertBefore: false, insertAfter: false);
 

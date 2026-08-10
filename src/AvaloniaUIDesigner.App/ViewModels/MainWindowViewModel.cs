@@ -1719,6 +1719,38 @@ public partial class MainWindowViewModel : ViewModelBase
         return true;
     }
 
+    public bool TrySelectNextObjectTreeRange(
+        DesignElement anchor,
+        bool reverse = false,
+        bool append = false)
+    {
+        var current = Canvas.SelectedElement ?? anchor;
+        if (!ObjectTree.TryGetAdjacentVisibleElement(current, reverse, out var target)
+            && !ReferenceEquals(current, anchor))
+        {
+            ObjectTree.TryGetAdjacentVisibleElement(anchor, reverse, out target);
+        }
+
+        var rangeAnchor = anchor;
+        if (!ObjectTree.TryGetVisibleElementRange(rangeAnchor, rangeAnchor, out _))
+        {
+            rangeAnchor = current;
+        }
+
+        if (target is null
+            || !ObjectTree.TryGetVisibleElementRange(rangeAnchor, target, out var range))
+        {
+            StatusText = "Object Tree range is already at the visible boundary.";
+            return false;
+        }
+
+        SelectElements(range, append, activeElement: target);
+        StatusText = append
+            ? $"Added Object Tree keyboard range ({range.Count} control(s))."
+            : $"Selected Object Tree keyboard range ({range.Count} control(s)).";
+        return true;
+    }
+
     public bool TrySelectCanvasRange(
         DesignElement anchor,
         DesignElement target,

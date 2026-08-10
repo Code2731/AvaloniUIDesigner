@@ -115,6 +115,8 @@ public partial class MainWindow : Window
         Delete / Backspace   Remove selection
         Object Tree F2       Rename selected control
         Object Tree Ctrl+L   Lock / unlock selected control
+        Object Tree Shift+Arrow Extend the visible row range
+        Object Tree Ctrl+Shift+Arrow Add a visible row range
         Object Tree Shift+click Select a visible row range
         Object Tree Ctrl+Shift+click Add a visible row range
         Object Tree arrows   Navigate the hierarchy without nudging the canvas
@@ -3952,6 +3954,35 @@ public partial class MainWindow : Window
         }
 
         var ctrl = e.KeyModifiers.HasFlag(KeyModifiers.Control);
+        var shift = e.KeyModifiers.HasFlag(KeyModifiers.Shift);
+        var alt = e.KeyModifiers.HasFlag(KeyModifiers.Alt);
+        if (shift
+            && !alt
+            && e.Key is (Key.Up or Key.Down)
+            && (_objectTreeSelectionAnchor ?? Vm.Canvas.SelectedElement) is { } anchor)
+        {
+            _isObjectTreeSelectionGesture = true;
+            bool rangeSelected;
+            try
+            {
+                rangeSelected = Vm.TrySelectNextObjectTreeRange(
+                    anchor,
+                    reverse: e.Key == Key.Up,
+                    append: ctrl);
+            }
+            finally
+            {
+                _isObjectTreeSelectionGesture = false;
+            }
+
+            if (rangeSelected)
+            {
+                _objectTreeSelectionAnchor = anchor;
+                e.Handled = true;
+                return;
+            }
+        }
+
         if (!ctrl && e.Key == Key.F2)
         {
             await RenameSelectedControlAsync();
