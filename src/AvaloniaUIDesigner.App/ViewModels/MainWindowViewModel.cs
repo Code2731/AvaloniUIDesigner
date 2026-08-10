@@ -603,6 +603,9 @@ public partial class MainWindowViewModel : ViewModelBase
     private DesignerSampleObject? _sampleDataRoot;
     private DesignerRootSettings _rootSettings = new();
     private DesignElement? _standaloneAxamlElement;
+    private HashSet<DesignElement>? _standaloneAxamlElements;
+    private double _standaloneAxamlOriginX;
+    private double _standaloneAxamlOriginY;
     private DocumentTabViewModel? _selectedDocumentTab;
     private WorkspacePanelState _workspacePanelState = WorkspacePanelState.Default;
 
@@ -10217,15 +10220,19 @@ public partial class MainWindowViewModel : ViewModelBase
         out string axaml,
         out string error)
     {
-        var selected = Canvas.SelectedElement;
-        if (selected is null)
+        if (!TryGetSelectedAxamlRoots(out var roots, out error))
         {
             controlName = string.Empty;
             axaml = string.Empty;
-            error = "Select a control before exporting selected AXAML.";
             return false;
         }
 
+        if (roots.Count > 1)
+        {
+            return TryExportSelectedAxamlGroup(roots, out controlName, out axaml, out error);
+        }
+
+        var selected = roots[0];
         controlName = selected.DisplayName;
         error = string.Empty;
         axaml = string.Empty;
@@ -10263,6 +10270,124 @@ public partial class MainWindowViewModel : ViewModelBase
         {
             _standaloneAxamlElement = null;
             axaml = string.Empty;
+            error = exception.Message;
+            return false;
+        }
+    }
+
+    private bool TryGetSelectedAxamlRoots(
+        out List<DesignElement> roots,
+        out string error)
+    {
+        var selected = Canvas.SelectedElements.ToList();
+        roots = selected
+            .Where(candidate => !selected.Any(ancestor =>
+                !ReferenceEquals(candidate, ancestor)
+                && IsDescendantOf(candidate, ancestor)))
+            .OrderBy(Canvas.Elements.IndexOf)
+            .ToList();
+        error = string.Empty;
+
+        if (roots.Count == 0)
+        {
+            error = "Select a control before exporting selected AXAML.";
+            return false;
+        }
+
+        if (roots.Count == 1)
+        {
+            return true;
+        }
+
+        var parentNames = roots
+            .Select(root => root.ParentName ?? string.Empty)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        if (parentNames.Count != 1)
+        {
+            error = "Selected AXAML controls must share the same parent.";
+            return false;
+        }
+
+        var parentName = parentNames[0];
+        if (string.IsNullOrEmpty(parentName))
+        {
+            return true;
+        }
+
+        var parent = Canvas.Elements.FirstOrDefault(element => string.Equals(
+            element.DisplayName,
+            parentName,
+            StringComparison.OrdinalIgnoreCase));
+        if (parent?.Visual is not Avalonia.Controls.Canvas || roots.Any(root => !root.IsCanvasChild))
+        {
+            error = "Multiple AXAML export supports root controls or siblings directly inside the same Canvas.";
+            return false;
+        }
+
+        return true;
+    }
+
+    private bool TryExportSelectedAxamlGroup(
+        IReadOnlyList<DesignElement> roots,
+        out string controlName,
+        out string axaml,
+        out string error)
+    {
+        controlName = "Selection";
+        axaml = string.Empty;
+        error = string.Empty;
+
+        try
+        {
+            var left = roots.Min(element => element.X);
+            var top = roots.Min(element => element.Y);
+            var right = roots.Max(element => element.X + element.Width);
+            var bottom = roots.Max(element => element.Y + element.Height);
+            var width = Math.Max(10, right - left);
+            var height = Math.Max(10, bottom - top);
+            var sb = new StringBuilder();
+            sb.AppendLine("<UserControl xmlns=\"https://github.com/avaloniaui\"");
+            sb.AppendLine("        xmlns:x=\"http://schemas.microsoft.com/winfx/2006/xaml\"");
+            sb.AppendLine("        xmlns:collections=\"clr-namespace:Avalonia.Collections;assembly=Avalonia.Base\"");
+            sb.AppendLine($"        Width=\"{FormatRootNumber(width)}\" Height=\"{FormatRootNumber(height)}\">");
+            sb.AppendLine("  <!-- Selected controls AXAML; provide the host DataContext for bindings. -->");
+            AppendColorResourcesAxaml(sb, "UserControl", "  ");
+            AppendDocumentStylesAxaml(sb, "UserControl", "  ");
+            sb.AppendLine($"  <Canvas Width=\"{FormatRootNumber(width)}\" Height=\"{FormatRootNumber(height)}\">");
+
+            _standaloneAxamlElements = roots.ToHashSet();
+            _standaloneAxamlOriginX = left;
+            _standaloneAxamlOriginY = top;
+            try
+            {
+                foreach (var root in roots)
+                {
+                    if (root.IsLocked)
+                    {
+                        sb.AppendLine($"    <!-- {DesignerMetadataPrefix} IsLocked=true -->");
+                    }
+
+                    WriteTopLevelElementAxaml(sb, root, "    ");
+                }
+            }
+            finally
+            {
+                _standaloneAxamlElements = null;
+                _standaloneAxamlOriginX = 0;
+                _standaloneAxamlOriginY = 0;
+            }
+
+            sb.AppendLine("  </Canvas>");
+            sb.AppendLine("</UserControl>");
+            axaml = sb.ToString();
+            return true;
+        }
+        catch (Exception exception)
+        {
+            _standaloneAxamlElements = null;
+            _standaloneAxamlOriginX = 0;
+            _standaloneAxamlOriginY = 0;
             error = exception.Message;
             return false;
         }
@@ -16464,7 +16589,20 @@ public partial class MainWindowViewModel : ViewModelBase
     private void AppendCanvasLayoutAttributes(StringBuilder sb, DesignElement element)
     {
         AppendAttribute(sb, "x:Name", element.DisplayName);
-        if (ReferenceEquals(element, _standaloneAxamlElement))
+        if (_standaloneAxamlElements?.Contains(element) == true)
+        {
+            AppendAttribute(
+                sb,
+                "Canvas.Left",
+                (element.X - _standaloneAxamlOriginX).ToString("0.###", CultureInfo.InvariantCulture));
+            AppendAttribute(
+                sb,
+                "Canvas.Top",
+                (element.Y - _standaloneAxamlOriginY).ToString("0.###", CultureInfo.InvariantCulture));
+            AppendAttribute(sb, "Width", FormatRootNumber(element.Width));
+            AppendAttribute(sb, "Height", FormatRootNumber(element.Height));
+        }
+        else if (ReferenceEquals(element, _standaloneAxamlElement))
         {
             AppendAttribute(sb, "Width", FormatRootNumber(element.Width));
             AppendAttribute(sb, "Height", FormatRootNumber(element.Height));
