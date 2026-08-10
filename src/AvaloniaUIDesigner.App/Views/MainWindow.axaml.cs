@@ -3027,8 +3027,7 @@ public partial class MainWindow : Window
 
     private void OnResetZoomMenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
-        Vm?.Canvas.ResetZoom();
-        UpdateZoomStatus();
+        SetZoomViewportAtCenter(1);
     }
 
     private void OnFitToViewMenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
@@ -3103,13 +3102,15 @@ public partial class MainWindow : Window
     {
         if (Vm is null
             || sender is not MenuItem { Tag: string rawScale }
-            || !double.TryParse(rawScale, NumberStyles.Float, CultureInfo.InvariantCulture, out var scale))
+            || !double.TryParse(rawScale, NumberStyles.Float, CultureInfo.InvariantCulture, out var scale)
+            || !double.IsFinite(scale)
+            || scale < 0.25
+            || scale > 2)
         {
             return;
         }
 
-        Vm.Canvas.SetZoomScale(scale);
-        UpdateZoomStatus();
+        SetZoomViewportAtCenter(scale);
     }
 
     private async void OnCustomZoomMenuClicked(
@@ -3124,8 +3125,7 @@ public partial class MainWindow : Window
         var zoomScale = await ShowZoomScaleDialogAsync(Vm.Canvas.ZoomScale);
         if (zoomScale is double value)
         {
-            Vm.Canvas.SetZoomScale(value);
-            UpdateZoomStatus();
+            SetZoomViewportAtCenter(value);
         }
     }
 
@@ -4843,8 +4843,7 @@ public partial class MainWindow : Window
 
         if (ctrl && e.Key == Key.D0)
         {
-            Vm.Canvas.ResetZoom();
-            UpdateZoomStatus();
+            SetZoomViewportAtCenter(1);
             e.Handled = true;
             return;
         }
@@ -6594,10 +6593,23 @@ public partial class MainWindow : Window
 
     private void ZoomViewportAtCenter(double wheelDelta)
     {
+        if (Vm is null)
+        {
+            return;
+        }
+
+        var zoomScale = wheelDelta > 0
+            ? Vm.Canvas.ZoomScale + 0.1
+            : Vm.Canvas.ZoomScale - 0.1;
+        SetZoomViewportAtCenter(zoomScale);
+    }
+
+    private void SetZoomViewportAtCenter(double zoomScale)
+    {
         var viewport = DesignScrollViewer.Viewport;
         var width = viewport.Width > 0 ? viewport.Width : DesignViewport.Bounds.Width;
         var height = viewport.Height > 0 ? viewport.Height : DesignViewport.Bounds.Height;
-        ZoomViewportAtPointer(wheelDelta, new Point(width / 2, height / 2));
+        SetZoomViewportAtPointer(zoomScale, new Point(width / 2, height / 2));
         UpdateZoomStatus();
     }
 
@@ -6608,25 +6620,31 @@ public partial class MainWindow : Window
             return;
         }
 
+        var zoomScale = wheelDelta > 0
+            ? Vm.Canvas.ZoomScale + 0.1
+            : Vm.Canvas.ZoomScale - 0.1;
+        SetZoomViewportAtPointer(zoomScale, pointer);
+    }
+
+    private void SetZoomViewportAtPointer(double zoomScale, Point pointer)
+    {
+        if (Vm is null)
+        {
+            return;
+        }
+
         var oldZoom = Vm.Canvas.ZoomScale;
-        var documentPoint = new Point(
-            (DesignScrollViewer.Offset.X + pointer.X) / oldZoom,
-            (DesignScrollViewer.Offset.Y + pointer.Y) / oldZoom);
-
-        if (wheelDelta > 0)
-        {
-            Vm.Canvas.ZoomIn();
-        }
-        else
-        {
-            Vm.Canvas.ZoomOut();
-        }
-
-        var newZoom = Vm.Canvas.ZoomScale;
+        var newZoom = Math.Clamp(zoomScale, 0.25, 2);
         if (Math.Abs(newZoom - oldZoom) < double.Epsilon)
         {
             return;
         }
+
+        var documentPoint = new Point(
+            (DesignScrollViewer.Offset.X + pointer.X) / oldZoom,
+            (DesignScrollViewer.Offset.Y + pointer.Y) / oldZoom);
+
+        Vm.Canvas.SetZoomScale(newZoom);
 
         void ApplyZoomOffset()
         {
