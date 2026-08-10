@@ -9310,38 +9310,101 @@ public partial class MainWindowViewModel : ViewModelBase
             return;
         }
 
+        var before = CaptureDocument();
+        var pasteTarget = GetSelectedAxamlPasteTarget();
         BeginCanvasMutation(HistoryActionType.PasteElement, "Pasted control.");
 
         var nameMap = BuildDuplicateNameMap(_clipboardSnapshots);
         var pastedSnapshots = CreateDuplicatedSnapshots(_clipboardSnapshots, nameMap);
-        var pastedElements = new List<DesignElement>();
-        foreach (var pastedSnapshot in pastedSnapshots)
+        var pastedRootNames = _clipboardSnapshots
+            .Where(snapshot => string.IsNullOrWhiteSpace(snapshot.ParentName))
+            .Select(snapshot => nameMap[snapshot.DisplayName])
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        if (pasteTarget?.Visual is Avalonia.Controls.Canvas)
         {
-            var pasted = Canvas.AddElementFromSnapshot(
-                pastedSnapshot,
-                select: false,
-                deferContainerReflow: true);
-            pastedElements.Add(pasted);
+            pastedSnapshots = ReparentAxamlPasteRootsToCanvas(
+                pastedSnapshots,
+                pasteTarget,
+                useSourceRelativeCoordinates: true);
         }
 
-        Canvas.NormalizeContainerRelationships();
-        ObjectTree.RebuildFrom(Canvas.Elements);
-        _isSyncingSelection = true;
+        var pastedElements = new List<DesignElement>();
         try
         {
-            Canvas.SelectMany(pastedElements);
-            ObjectTree.SelectByElement(Canvas.SelectedElement);
-        }
-        finally
-        {
-            _isSyncingSelection = false;
-        }
+            foreach (var pastedSnapshot in pastedSnapshots)
+            {
+                var pasted = Canvas.AddElementFromSnapshot(
+                    pastedSnapshot,
+                    select: false,
+                    deferContainerReflow: true);
+                pastedElements.Add(pasted);
+            }
 
-        CommitCanvasMutation();
+            if (pasteTarget is not null
+                && pasteTarget.Visual is not Avalonia.Controls.Canvas)
+            {
+                var appliedPasteTarget = Canvas.Elements.FirstOrDefault(element =>
+                    string.Equals(
+                        element.DisplayName,
+                        pasteTarget.DisplayName,
+                        StringComparison.OrdinalIgnoreCase));
+                if (appliedPasteTarget is null)
+                {
+                    throw new InvalidOperationException(
+                        $"The paste target '{pasteTarget.DisplayName}' is no longer available.");
+                }
+
+                var pastedRoots = pastedElements
+                    .Where(element => pastedRootNames.Contains(element.DisplayName))
+                    .ToList();
+                if (pastedRoots.Count == 0)
+                {
+                    throw new InvalidOperationException("The clipboard has no root controls to insert.");
+                }
+
+                foreach (var pastedRoot in pastedRoots)
+                {
+                    SelectElement(pastedRoot);
+                    if (!TryReparentSelectedElementTo(
+                            appliedPasteTarget,
+                            recordHistory: false,
+                            dropPoint: null,
+                            allowLockedSource: true))
+                    {
+                        throw new InvalidOperationException(StatusText);
+                    }
+                }
+            }
+
+            Canvas.NormalizeContainerRelationships();
+            ObjectTree.RebuildFrom(Canvas.Elements);
+            _isSyncingSelection = true;
+            try
+            {
+                Canvas.SelectMany(pastedElements);
+                ObjectTree.SelectByElement(Canvas.SelectedElement);
+            }
+            finally
+            {
+                _isSyncingSelection = false;
+            }
+
+            CommitCanvasMutation();
+        }
+        catch (Exception exception)
+        {
+            _pendingMutation = null;
+            ApplyDocument(before);
+            RefreshDirtyState();
+            StatusText = $"Could not paste controls: {exception.Message}";
+            return;
+        }
 
         // Cascade subsequent pastes so they remain visible instead of stacking.
         _clipboardSnapshots = pastedSnapshots;
-        StatusText = $"Pasted {pastedElements.Count} control(s)";
+        StatusText = pasteTarget is null
+            ? $"Pasted {pastedElements.Count} control(s)"
+            : $"Pasted {pastedElements.Count} control(s) into {pasteTarget.DisplayName}";
     }
 
     public bool TryPasteAxamlFragment(string axaml, out string result)
@@ -9562,7 +9625,8 @@ public partial class MainWindowViewModel : ViewModelBase
 
     private List<DesignerElementSnapshot> ReparentAxamlPasteRootsToCanvas(
         IReadOnlyList<DesignerElementSnapshot> snapshots,
-        DesignElement target)
+        DesignElement target,
+        bool useSourceRelativeCoordinates = false)
     {
         var nextChildIndex = Canvas.Elements.Count(element =>
             element.IsCanvasChild
@@ -9579,8 +9643,12 @@ public partial class MainWindowViewModel : ViewModelBase
                     return snapshot;
                 }
 
-                var localLeft = snapshot.X;
-                var localTop = snapshot.Y;
+                var localLeft = useSourceRelativeCoordinates
+                    ? snapshot.X - target.X
+                    : snapshot.X;
+                var localTop = useSourceRelativeCoordinates
+                    ? snapshot.Y - target.Y
+                    : snapshot.Y;
                 var reparented = snapshot with
                 {
                     X = target.X + localLeft,
