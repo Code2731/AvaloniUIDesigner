@@ -598,6 +598,8 @@ public partial class MainWindowViewModel : ViewModelBase
     private string? _currentDocumentPath;
     private DesignerCanvasDocument _lastSavedSnapshot = new(Array.Empty<DesignerElementSnapshot>());
     private List<DesignerElementSnapshot>? _clipboardSnapshots;
+    private IReadOnlyDictionary<string, string>? _clipboardColorResources;
+    private IReadOnlyList<DesignerStyleDefinition>? _clipboardStyles;
     private IReadOnlyDictionary<string, string>? _styleClipboard;
     private string? _sampleDataJson;
     private DesignerSampleObject? _sampleDataRoot;
@@ -9218,6 +9220,7 @@ public partial class MainWindowViewModel : ViewModelBase
         }
 
         _clipboardSnapshots = CaptureElementSnapshots(CollectSelectionSubtree(selected));
+        CaptureClipboardDocumentMetadata();
         OnPropertyChanged(nameof(CanPaste));
         StatusText = $"Copied {_clipboardSnapshots.Count} control(s)";
     }
@@ -9290,6 +9293,7 @@ public partial class MainWindowViewModel : ViewModelBase
         }
 
         _clipboardSnapshots = CaptureElementSnapshots(targets);
+        CaptureClipboardDocumentMetadata();
         OnPropertyChanged(nameof(CanPaste));
         BeginCanvasMutation(HistoryActionType.RemoveElement, "Cut control.");
         foreach (var target in targets.OrderByDescending(GetElementDepth).ToList())
@@ -9312,10 +9316,17 @@ public partial class MainWindowViewModel : ViewModelBase
 
         var before = CaptureDocument();
         var pasteTarget = GetSelectedAxamlPasteTarget();
+        var merged = MergeImportedResourcesAndStyles(
+            _clipboardColorResources,
+            _clipboardStyles);
         BeginCanvasMutation(HistoryActionType.PasteElement, "Pasted control.");
 
         var nameMap = BuildDuplicateNameMap(_clipboardSnapshots);
-        var pastedSnapshots = CreateDuplicatedSnapshots(_clipboardSnapshots, nameMap);
+        var pastedSnapshots = CreateDuplicatedSnapshots(
+            _clipboardSnapshots,
+            nameMap,
+            merged.ResourceMap,
+            merged.StyleClassMap);
         var pastedRootNames = _clipboardSnapshots
             .Where(snapshot => string.IsNullOrWhiteSpace(snapshot.ParentName))
             .Select(snapshot => nameMap[snapshot.DisplayName])
@@ -9331,6 +9342,7 @@ public partial class MainWindowViewModel : ViewModelBase
         var pastedElements = new List<DesignElement>();
         try
         {
+            ApplyMergedDocumentResourcesAndStyles(merged.Resources, merged.Styles);
             foreach (var pastedSnapshot in pastedSnapshots)
             {
                 var pasted = Canvas.AddElementFromSnapshot(
@@ -9402,9 +9414,15 @@ public partial class MainWindowViewModel : ViewModelBase
 
         // Cascade subsequent pastes so they remain visible instead of stacking.
         _clipboardSnapshots = pastedSnapshots;
-        StatusText = pasteTarget is null
-            ? $"Pasted {pastedElements.Count} control(s)"
-            : $"Pasted {pastedElements.Count} control(s) into {pasteTarget.DisplayName}";
+        var pasteStatus = pasteTarget is null
+            ? $"Pasted {pastedSnapshots.Count} control(s)"
+            : $"Pasted {pastedSnapshots.Count} control(s) into {pasteTarget.DisplayName}";
+        if (merged.Notes.Count > 0)
+        {
+            pasteStatus += $" {string.Join(" ", merged.Notes)}";
+        }
+
+        StatusText = pasteStatus;
     }
 
     public bool TryPasteAxamlFragment(string axaml, out string result)
@@ -9424,82 +9442,17 @@ public partial class MainWindowViewModel : ViewModelBase
         }
 
         var before = CaptureDocument();
-        var notes = new List<string>();
-        var mergedResources = new Dictionary<string, string>(
-            _colorResources,
-            StringComparer.Ordinal);
-        var resourceMap = new Dictionary<string, string>(StringComparer.Ordinal);
-        foreach (var pair in importedDocument.ColorResources
-                     ?? new Dictionary<string, string>(StringComparer.Ordinal))
-        {
-            if (!mergedResources.TryGetValue(pair.Key, out var currentValue))
-            {
-                mergedResources[pair.Key] = pair.Value;
-                resourceMap[pair.Key] = pair.Key;
-                continue;
-            }
-
-            if (string.Equals(currentValue, pair.Value, StringComparison.OrdinalIgnoreCase))
-            {
-                resourceMap[pair.Key] = pair.Key;
-                continue;
-            }
-
-            var renamedKey = BuildUniqueResourceKey(pair.Key, mergedResources.Keys);
-            mergedResources[renamedKey] = pair.Value;
-            resourceMap[pair.Key] = renamedKey;
-            notes.Add($"Color resource '{pair.Key}' was renamed to '{renamedKey}' to avoid a conflict.");
-        }
-
-        var mergedStyles = CloneStyles(_documentStyles).ToList();
-        var styleClassMap = new Dictionary<string, string>(StringComparer.Ordinal);
-        foreach (var style in importedDocument.Styles
-                     ?? Array.Empty<DesignerStyleDefinition>())
-        {
-            var setters = style.Setters.ToDictionary(
-                pair => pair.Key,
-                pair => RewriteResourceReference(pair.Value, resourceMap),
-                StringComparer.Ordinal);
-            var styleKey = BuildStyleClassKey(style.TargetType, style.ClassName);
-            if (!styleClassMap.TryGetValue(styleKey, out var mappedClassName))
-            {
-                var hasConflict = mergedStyles.Any(existing =>
-                    string.Equals(existing.TargetType, style.TargetType, StringComparison.Ordinal)
-                    && string.Equals(existing.ClassName, style.ClassName, StringComparison.Ordinal)
-                    && string.Equals(existing.PseudoClass, style.PseudoClass, StringComparison.Ordinal)
-                    && !DictionaryEquals(existing.Setters, setters));
-                mappedClassName = hasConflict
-                    ? BuildUniqueStyleClassName(style.TargetType, style.ClassName, mergedStyles)
-                    : style.ClassName;
-                styleClassMap[styleKey] = mappedClassName;
-                if (!string.Equals(mappedClassName, style.ClassName, StringComparison.Ordinal))
-                {
-                    notes.Add($"Style class '{style.ClassName}' was renamed to '{mappedClassName}' to avoid a conflict.");
-                }
-            }
-
-            var mappedStyle = style with
-            {
-                ClassName = mappedClassName,
-                Setters = setters,
-            };
-            if (!mergedStyles.Any(existing =>
-                    string.Equals(existing.TargetType, mappedStyle.TargetType, StringComparison.Ordinal)
-                    && string.Equals(existing.ClassName, mappedStyle.ClassName, StringComparison.Ordinal)
-                    && string.Equals(existing.PseudoClass, mappedStyle.PseudoClass, StringComparison.Ordinal)
-                    && DictionaryEquals(existing.Setters, mappedStyle.Setters)))
-            {
-                mergedStyles.Add(mappedStyle);
-            }
-        }
+        var merged = MergeImportedResourcesAndStyles(
+            importedDocument.ColorResources,
+            importedDocument.Styles);
 
         var nameMap = BuildDuplicateNameMap(importedDocument.Elements);
         var pasteTarget = GetSelectedAxamlPasteTarget();
         var pastedSnapshots = CreateAxamlPasteSnapshots(
             importedDocument.Elements,
             nameMap,
-            resourceMap,
-            styleClassMap);
+            merged.ResourceMap,
+            merged.StyleClassMap);
         var pastedRootNames = importedDocument.Elements
             .Where(snapshot => string.IsNullOrWhiteSpace(snapshot.ParentName))
             .Select(snapshot => nameMap[snapshot.DisplayName])
@@ -9517,8 +9470,8 @@ public partial class MainWindowViewModel : ViewModelBase
         var combinedDocument = before with
         {
             Elements = before.Elements.Concat(pastedSnapshots).ToList(),
-            ColorResources = mergedResources,
-            Styles = mergedStyles,
+            ColorResources = merged.Resources,
+            Styles = merged.Styles,
         };
 
         BeginCanvasMutation(HistoryActionType.PasteAxamlFragment, "Pasted AXAML controls.");
@@ -9600,7 +9553,7 @@ public partial class MainWindowViewModel : ViewModelBase
             details.Add(parseResult);
         }
 
-        details.AddRange(notes);
+        details.AddRange(merged.Notes);
         result = $"Pasted {rootCount} AXAML control(s) ({pastedSnapshots.Count} total).";
         if (pasteTarget is not null)
         {
@@ -11309,6 +11262,116 @@ public partial class MainWindowViewModel : ViewModelBase
                 element.Y))
             .ToList();
 
+    private void CaptureClipboardDocumentMetadata()
+    {
+        _clipboardColorResources = new Dictionary<string, string>(
+            _colorResources,
+            StringComparer.Ordinal);
+        _clipboardStyles = CloneStyles(_documentStyles);
+    }
+
+    private void ApplyMergedDocumentResourcesAndStyles(
+        IReadOnlyDictionary<string, string> resources,
+        IReadOnlyList<DesignerStyleDefinition> styles)
+    {
+        _colorResources.Clear();
+        foreach (var pair in resources)
+        {
+            _colorResources[pair.Key] = pair.Value;
+        }
+
+        _documentStyles.Clear();
+        _documentStyles.AddRange(CloneStyles(styles));
+        Canvas.SetColorResources(_colorResources);
+        Canvas.SetDocumentStyles(_documentStyles);
+        RefreshResourceBackedAppearance();
+    }
+
+    private (
+        Dictionary<string, string> Resources,
+        List<DesignerStyleDefinition> Styles,
+        Dictionary<string, string> ResourceMap,
+        Dictionary<string, string> StyleClassMap,
+        List<string> Notes) MergeImportedResourcesAndStyles(
+        IReadOnlyDictionary<string, string>? importedResources,
+        IEnumerable<DesignerStyleDefinition>? importedStyles)
+    {
+        var notes = new List<string>();
+        var mergedResources = new Dictionary<string, string>(
+            _colorResources,
+            StringComparer.Ordinal);
+        var resourceMap = new Dictionary<string, string>(StringComparer.Ordinal);
+        foreach (var pair in importedResources
+                     ?? new Dictionary<string, string>(StringComparer.Ordinal))
+        {
+            if (!mergedResources.TryGetValue(pair.Key, out var currentValue))
+            {
+                mergedResources[pair.Key] = pair.Value;
+                resourceMap[pair.Key] = pair.Key;
+                continue;
+            }
+
+            if (string.Equals(currentValue, pair.Value, StringComparison.OrdinalIgnoreCase))
+            {
+                resourceMap[pair.Key] = pair.Key;
+                continue;
+            }
+
+            var renamedKey = BuildUniqueResourceKey(pair.Key, mergedResources.Keys);
+            mergedResources[renamedKey] = pair.Value;
+            resourceMap[pair.Key] = renamedKey;
+            notes.Add($"Color resource '{pair.Key}' was renamed to '{renamedKey}' to avoid a conflict.");
+        }
+
+        var mergedStyles = CloneStyles(_documentStyles).ToList();
+        var styleClassMap = new Dictionary<string, string>(StringComparer.Ordinal);
+        foreach (var style in importedStyles ?? Array.Empty<DesignerStyleDefinition>())
+        {
+            var setters = style.Setters.ToDictionary(
+                pair => pair.Key,
+                pair => RewriteResourceReference(pair.Value, resourceMap),
+                StringComparer.Ordinal);
+            var styleKey = BuildStyleClassKey(style.TargetType, style.ClassName);
+            if (!styleClassMap.TryGetValue(styleKey, out var mappedClassName))
+            {
+                var hasConflict = mergedStyles.Any(existing =>
+                    string.Equals(existing.TargetType, style.TargetType, StringComparison.Ordinal)
+                    && string.Equals(existing.ClassName, style.ClassName, StringComparison.Ordinal)
+                    && string.Equals(existing.PseudoClass, style.PseudoClass, StringComparison.Ordinal)
+                    && !DictionaryEquals(existing.Setters, setters));
+                mappedClassName = hasConflict
+                    ? BuildUniqueStyleClassName(style.TargetType, style.ClassName, mergedStyles)
+                    : style.ClassName;
+                styleClassMap[styleKey] = mappedClassName;
+                if (!string.Equals(mappedClassName, style.ClassName, StringComparison.Ordinal))
+                {
+                    notes.Add($"Style class '{style.ClassName}' was renamed to '{mappedClassName}' to avoid a conflict.");
+                }
+            }
+
+            var mappedStyle = style with
+            {
+                ClassName = mappedClassName,
+                Setters = setters,
+            };
+            if (!mergedStyles.Any(existing =>
+                    string.Equals(existing.TargetType, mappedStyle.TargetType, StringComparison.Ordinal)
+                    && string.Equals(existing.ClassName, mappedStyle.ClassName, StringComparison.Ordinal)
+                    && string.Equals(existing.PseudoClass, mappedStyle.PseudoClass, StringComparison.Ordinal)
+                    && DictionaryEquals(existing.Setters, mappedStyle.Setters)))
+            {
+                mergedStyles.Add(mappedStyle);
+            }
+        }
+
+        return (
+            mergedResources,
+            mergedStyles,
+            resourceMap,
+            styleClassMap,
+            notes);
+    }
+
     private Dictionary<string, string> BuildDuplicateNameMap(
         IEnumerable<DesignerElementSnapshot> snapshots)
     {
@@ -11335,14 +11398,21 @@ public partial class MainWindowViewModel : ViewModelBase
 
     private static List<DesignerElementSnapshot> CreateDuplicatedSnapshots(
         IReadOnlyList<DesignerElementSnapshot> snapshots,
-        IReadOnlyDictionary<string, string> nameMap)
+        IReadOnlyDictionary<string, string> nameMap,
+        IReadOnlyDictionary<string, string>? resourceMap = null,
+        IReadOnlyDictionary<string, string>? styleClassMap = null)
         => snapshots
             .Select(snapshot => snapshot with
             {
                 DisplayName = nameMap[snapshot.DisplayName],
                 X = snapshot.X + 16,
                 Y = snapshot.Y + 16,
-                VisualProperties = CloneProperties(snapshot.VisualProperties),
+                VisualProperties = resourceMap is null && styleClassMap is null
+                    ? CloneProperties(snapshot.VisualProperties)
+                    : RewriteImportedSnapshotProperties(
+                        snapshot,
+                        resourceMap ?? new Dictionary<string, string>(StringComparer.Ordinal),
+                        styleClassMap ?? new Dictionary<string, string>(StringComparer.Ordinal)),
                 ParentName = snapshot.ParentName is not null
                     && nameMap.TryGetValue(snapshot.ParentName, out var duplicateParentName)
                         ? duplicateParentName
