@@ -77,6 +77,8 @@ public partial class MainWindow : Window
         Ctrl+Alt+I          Focus Property Inspector filter
         Ctrl+Alt+T          Focus Toolbox search
         Ctrl+Alt+P          Toggle Toolbox placement mode
+        Design > Select     Return to the canvas selection tool
+        Design > Pick       Toggle Toolbox placement mode
         Ctrl+0              Actual size (100%)
         Ctrl+Shift+F        Fit selected controls to view
         F                   Fit canvas to view
@@ -4461,15 +4463,7 @@ public partial class MainWindow : Window
 
         if (ctrl && alt && e.Key == Key.P)
         {
-            if (!ToolboxPane.IsVisible)
-            {
-                SetToolboxPaneVisible(true);
-            }
-
-            var isActive = Vm.Toolbox.TogglePlacementMode();
-            Vm.StatusText = isActive
-                ? $"Toolbox placement mode: {Vm.Toolbox.SelectedItem?.DisplayName}."
-                : "Toolbox placement mode cancelled.";
+            ToggleToolboxPlacementMode();
             e.Handled = true;
             return;
         }
@@ -6051,6 +6045,52 @@ public partial class MainWindow : Window
 
         Vm.PlaceSelectedToolboxItemQuickly();
         e.Handled = true;
+    }
+
+    private void OnSelectToolClicked(
+        object? sender,
+        Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        if (Vm is null)
+        {
+            return;
+        }
+
+        Vm.Toolbox.CancelPlacementMode();
+        HideToolboxPlacementPreview();
+        Vm.StatusText = "Selection tool active.";
+        e.Handled = true;
+    }
+
+    private void OnToggleToolboxPlacementModeClicked(
+        object? sender,
+        Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        ToggleToolboxPlacementMode();
+        e.Handled = true;
+    }
+
+    private void ToggleToolboxPlacementMode()
+    {
+        if (Vm is null)
+        {
+            return;
+        }
+
+        if (!ToolboxPane.IsVisible)
+        {
+            SetToolboxPaneVisible(true);
+        }
+
+        var isActive = Vm.Toolbox.TogglePlacementMode();
+        if (!isActive)
+        {
+            HideToolboxPlacementPreview();
+        }
+
+        Vm.StatusText = isActive
+            ? $"Toolbox placement mode: {Vm.Toolbox.SelectedItem?.DisplayName}."
+            : "Toolbox placement mode cancelled.";
     }
 
     private void OnCancelToolboxPlacementModeClicked(

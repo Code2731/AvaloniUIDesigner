@@ -53,7 +53,7 @@ dotnet run --project src/AvaloniaUIDesigner.App/AvaloniaUIDesigner.App.csproj
 - **잠금 인식 구조 해제**: `Ungroup Selected Canvas`와 `Break Selected Layout`은 잠긴 컨테이너 자식이 포함된 계층을 거부해 부분적인 부모·좌표 변경을 방지하고, 잠금 해제 후 기존 해제·Undo 흐름을 유지
 - **그리드/스냅 키보드 단축키**: `Ctrl+Alt+G`로 디자인 그리드를 표시·숨기고 `Ctrl+Alt+Shift+G`로 Grid snap을 토글하며 기존 문서 설정·Undo/AXAML 메타데이터를 유지
 - **Workspace 패널 키보드 단축키**: `Ctrl+Alt+1/2/3`으로 Toolbox·Object Tree·Property Inspector를 토글하고 `Ctrl+Alt+0`으로 기본 패널 레이아웃을 복원하며 기존 세션 저장 상태와 메뉴 체크를 동기화
-- **Design Toolbar**: 캔버스 상단의 Qt Designer식 도구 모음에서 New·Save·Undo/Redo·Copy/Paste/Delete·Preview, Align/Distribute/Size, z-order·아트보드 중앙 정렬, Group/Ungroup/Break, Stack/Grid/Uniform/Dock/Wrap Layout, Lock·Grid/Snap, Fit/Zoom 명령을 가로 스크롤 가능한 한 줄에서 실행하고 선택 상태에 따라 사용할 수 없는 작업을 자동 비활성화
+- **Design Toolbar**: 캔버스 상단의 Qt Designer식 도구 모음에서 Select/Pick 작업 모드, New·Save·Undo/Redo·Copy/Paste/Delete·Copy Style/Paste Style·Preview, Align/Distribute/Size, z-order·아트보드 중앙 정렬, Group/Ungroup/Break, Stack/Grid/Uniform/Dock/Wrap Layout, Lock·Grid/Snap, Fit/Zoom 명령을 가로 스크롤 가능한 한 줄에서 실행하고 선택·배치 상태에 따라 사용할 수 없는 작업을 자동 비활성화
 - **Selection Breadcrumb**: Design Surface 헤더에 현재 선택 컨트롤의 `Parent / Child` 계층 경로를 표시하고 각 경로 항목을 클릭해 해당 컨테이너를 바로 선택하며, `Up`·`Into` 버튼으로 기존 Escape 부모 선택·Enter 자식 진입도 직접 실행하고 재부모화·이름 변경을 즉시 반영
 - **패널 포커스 복구**: 숨겨진 패널에서도 `Ctrl+Alt+T/P/I` 또는 `Ctrl+F`를 누르면 필요한 Toolbox·Object Tree·Property Inspector를 자동으로 다시 표시한 뒤 검색·배치 작업으로 진입
 - **리사이즈 비율 잠금**: 코너 핸들을 `Shift`와 함께 드래그하면 단일 컨트롤과 다중 선택 bounding box의 원래 가로·세로 비율을 유지하며, 잠금 중에는 Smart Snap보다 비율을 우선합니다.
@@ -336,6 +336,7 @@ dotnet run --project src/AvaloniaUIDesigner.App/AvaloniaUIDesigner.App.csproj
 90. 캔버스 상단 `Design` 도구 모음은 메뉴를 열지 않고도 문서 저장·Undo/Redo·Live Preview, 선택 정렬·분배·크기 맞춤, Canvas 그룹·레이아웃 해제, StackPanel/Grid/UniformGrid 생성, Fit/Zoom을 실행합니다. 가로 공간이 부족하면 한 줄을 수평 스크롤하며, 다중 선택이 필요한 버튼은 선택 상태와 같은 검증 규칙으로 자동 비활성화됩니다.
 91. Selection Breadcrumb의 각 `Parent / Child` 항목은 클릭 가능한 선택 버튼으로 렌더링되어 깊은 중첩 계층의 원하는 컨테이너로 한 번에 이동합니다. `DesignElement.ParentName` 또는 `DisplayName`이 바뀌면 경로 항목·툴팁·선택 요약이 즉시 다시 계산되어 Object Tree 재탐색 없이 현재 편집 컨텍스트를 유지합니다.
 92. Design Toolbar에 `Copy`·`Paste`·`Delete`, `Front/Back/Forward/Backward`, 아트보드 `X/Y/XY` 중앙 정렬, `Dock H/V`·`Wrap H/V`, `Lock`, `Grid`·`Snap`을 추가해 반복적인 메뉴 탐색 없이 기본 Form Editor 작업을 수행합니다. 선택이 없거나 다중 선택이 필요한 조건에서는 동일한 기존 검증 규칙으로 버튼을 비활성화하며 Grid/Snap 토글은 View 메뉴 상태와 동기화됩니다.
+93. Design Toolbar의 `Select`는 현재 Toolbox 배치 모드와 배치 미리보기를 즉시 취소하고 Canvas 선택 도구로 돌아갑니다. `Pick`은 Toolbox의 첫 표시 항목을 기준으로 배치 모드를 토글하며 현재 `Place: ...` 상태와 `Ctrl+Alt+P` 경로를 같은 상태 바인딩으로 유지합니다. `Copy Style`·`Paste Style`은 기존 시각 스타일 클립보드를 Toolbar에서 바로 재사용합니다.
 
 DataGrid가 포함된 생성 AXAML을 다른 프로젝트에서 사용할 때는 같은 Avalonia 버전의 `Avalonia.Controls.DataGrid` 패키지와 `avares://Avalonia.Controls.DataGrid/Themes/Fluent.xaml` 스타일 include가 필요합니다.
 
@@ -546,6 +547,7 @@ AXAML 소스 편집기의 `Validate`와 `Preview`는 현재 디자인과 Undo �
 - v2.02: Design Surface Selection Breadcrumb과 계층 컨텍스트 이동 추가
 - v2.03: 클릭 가능한 Selection Breadcrumb과 계층 변경 실시간 갱신 추가
 - v2.04: Design Toolbar 편집·z-order·중앙 정렬·Grid/Snap·Dock/Wrap 명령 확장
+- v2.05: Design Toolbar Select/Pick 작업 모드·스타일 클립보드 명령 추가
 
 ## 컴포넌트 팩
 

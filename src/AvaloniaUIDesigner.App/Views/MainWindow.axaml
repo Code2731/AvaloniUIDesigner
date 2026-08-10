@@ -355,6 +355,23 @@
                                Foreground="#334155"
                                Margin="2,0,4,0"/>
                     <Border Width="1" Background="#CBD5E1" Margin="0,2"/>
+                    <Button Content="Select"
+                            Click="OnSelectToolClicked"
+                            ToolTip.Tip="Return to the canvas selection tool"
+                            Padding="8,3"/>
+                    <ToggleButton Content="Pick"
+                                  IsChecked="{Binding Toolbox.IsPlacementModeActive, Mode=OneWay}"
+                                  Click="OnToggleToolboxPlacementModeClicked"
+                                  ToolTip.Tip="Pick a Toolbox control and place it on the canvas"
+                                  Padding="8,3"/>
+                    <TextBlock Text="{Binding Toolbox.PlacementModeLabel}"
+                               IsVisible="{Binding Toolbox.IsPlacementModeActive}"
+                               VerticalAlignment="Center"
+                               FontSize="11"
+                               Foreground="#0369A1"
+                               MaxWidth="190"
+                               TextTrimming="CharacterEllipsis"/>
+                    <Border Width="1" Background="#CBD5E1" Margin="0,2"/>
                     <Button Content="New"
                             Click="OnNewMenuClicked"
                             ToolTip.Tip="Create a new document tab"
@@ -392,6 +409,16 @@
                             Click="OnDeleteMenuClicked"
                             IsEnabled="{Binding Canvas.IsSelectionActive}"
                             ToolTip.Tip="Delete the selected controls"
+                            Padding="7,3"/>
+                    <Button Content="Copy Style"
+                            Click="OnCopyStyleMenuClicked"
+                            IsEnabled="{Binding Canvas.IsSelectionActive}"
+                            ToolTip.Tip="Copy the selected visual style"
+                            Padding="7,3"/>
+                    <Button Content="Paste Style"
+                            Click="OnPasteStyleMenuClicked"
+                            IsEnabled="{Binding CanPasteStyle}"
+                            ToolTip.Tip="Paste the copied visual style"
                             Padding="7,3"/>
                     <Button Content="Preview"
                             Click="OnPreviewMenuClicked"
