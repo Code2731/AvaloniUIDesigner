@@ -78,6 +78,8 @@ public partial class MainWindow : Window
         Ctrl+Alt+P          Toggle Toolbox placement mode
         Ctrl+0              Actual size (100%)
         F                   Fit canvas to view
+        Space + left-drag   Temporarily pan the design viewport
+        Middle-drag         Pan the design viewport
         View > Zoom Presets Choose 25-200% or a custom zoom scale
         Ctrl+R              Open runtime Preview
         Ctrl+Z              Undo
@@ -212,6 +214,8 @@ public partial class MainWindow : Window
     private bool _marqueeSubtractive;
     private Point _marqueeStart;
     private bool _isPanningViewport;
+    private bool _isSpacePanModifier;
+    private bool _isSpacePanGesture;
     private Point _panStart;
     private Vector _panStartOffset;
     private Point? _viewportPointer;
@@ -4274,6 +4278,12 @@ public partial class MainWindow : Window
             return;
         }
 
+        if (e.Key == Key.Space)
+        {
+            _isSpacePanModifier = true;
+            return;
+        }
+
         var ctrl = e.KeyModifiers.HasFlag(KeyModifiers.Control);
         var shift = e.KeyModifiers.HasFlag(KeyModifiers.Shift);
         var alt = e.KeyModifiers.HasFlag(KeyModifiers.Alt);
@@ -4893,6 +4903,14 @@ public partial class MainWindow : Window
             FlushPendingPropertyHistory();
             Vm.RemoveSelectedElement();
             e.Handled = true;
+        }
+    }
+
+    private void OnWindowKeyUp(object? sender, KeyEventArgs e)
+    {
+        if (e.Key == Key.Space)
+        {
+            _isSpacePanModifier = false;
         }
     }
 
@@ -6387,12 +6405,15 @@ public partial class MainWindow : Window
 
     private bool TryBeginViewportPan(Control host, PointerPressedEventArgs e)
     {
-        if (!e.GetCurrentPoint(host).Properties.IsMiddleButtonPressed)
+        var point = e.GetCurrentPoint(host);
+        var isSpacePan = _isSpacePanModifier && point.Properties.IsLeftButtonPressed;
+        if (!point.Properties.IsMiddleButtonPressed && !isSpacePan)
         {
             return false;
         }
 
         _isPanningViewport = true;
+        _isSpacePanGesture = isSpacePan;
         _panStart = e.GetPosition(DesignScrollViewer);
         _panStartOffset = DesignScrollViewer.Offset;
         e.Pointer.Capture(DesignViewport);
@@ -6411,6 +6432,11 @@ public partial class MainWindow : Window
 
     private void OnDesignViewportPointerMoved(object? sender, PointerEventArgs e)
     {
+        if (TryEndReleasedSpacePan(e))
+        {
+            return;
+        }
+
         var point = e.GetPosition(DesignScrollViewer);
         if (_isDraggingGuide)
         {
@@ -6464,6 +6490,7 @@ public partial class MainWindow : Window
         }
 
         _isPanningViewport = false;
+        _isSpacePanGesture = false;
         e.Pointer.Capture(null);
         e.Handled = true;
     }
@@ -6538,8 +6565,27 @@ public partial class MainWindow : Window
             _panStartOffset.Y - delta.Y);
     }
 
+    private bool TryEndReleasedSpacePan(PointerEventArgs e)
+    {
+        if (!_isPanningViewport || !_isSpacePanGesture || _isSpacePanModifier)
+        {
+            return false;
+        }
+
+        _isPanningViewport = false;
+        _isSpacePanGesture = false;
+        e.Pointer.Capture(null);
+        e.Handled = true;
+        return true;
+    }
+
     private void OnDragPointerMoved(object? sender, PointerEventArgs e)
     {
+        if (TryEndReleasedSpacePan(e))
+        {
+            return;
+        }
+
         if (_isPanningViewport)
         {
             HideToolboxPlacementPreview();
@@ -7031,6 +7077,7 @@ public partial class MainWindow : Window
         if (_isPanningViewport)
         {
             _isPanningViewport = false;
+            _isSpacePanGesture = false;
             e.Pointer.Capture(null);
             e.Handled = true;
             return;

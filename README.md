@@ -37,6 +37,7 @@ dotnet run --project src/AvaloniaUIDesigner.App/AvaloniaUIDesigner.App.csproj
 - **선택 영역 Toolbox 프리셋**: 여러 root 컨트롤을 상대 좌표·현재 속성과 함께 Toolbox에 등록하고 JSON 팩으로 저장·불러오기
 - **배치**: 클릭-투-플레이스와 드래그 앤 드롭으로 실제 Avalonia 컨트롤 생성
 - **캔버스 뷰포트**: 큰 아트보드와 확대 상태를 양축 자동 스크롤로 탐색하고, Desktop·Tablet·Mobile·사용자 지정 아트보드 크기와 회전, Zoom In/Out·Actual Size·Fit to View·25~200% Zoom Presets와 스크롤 콘텐츠 크기를 동기화하며 `Ctrl+=`/`Ctrl+-`/`Ctrl+0`/`F` 단축키, 중간 마우스 드래그 팬, Ctrl+휠 포인터 중심 줌을 지원
+- **임시 viewport 팬**: Canvas·요소 위에서 `Space`를 누른 채 왼쪽 드래그하면 선택·배치를 잠시 멈추고 viewport를 이동하며, 중간 마우스 드래그 팬과 함께 사용할 수 있고 Space 해제 시 포인터 캡처를 안전하게 종료
 - **아트보드 배경**: White·Soft Gray·Ink 프리셋과 사용자 지정 `#RRGGBB`/`#AARRGGBB` 색상을 편집하고 Undo·Preview·AXAML 왕복에 보존
 - **디자인 룰러**: 가로·세로 눈금을 ScrollViewer 오프셋과 렌더 줌에 동기화하고 포인터 기준선을 표시해 현재 화면의 아트보드 좌표를 확인
 - **디자인 가이드**: 가로·세로 룰러에서 드래그해 가이드라인을 만들고 캔버스 이동·리사이즈 Smart Snap 후보로 사용하며, 캔버스 밖으로 드래그하면 제거합니다. View 메뉴에서 표시·가이드 스냅을 각각 끄거나 전체 가이드를 지울 수 있습니다.
@@ -283,6 +284,7 @@ dotnet run --project src/AvaloniaUIDesigner.App/AvaloniaUIDesigner.App.csproj
 75ax. 캔버스 요소 이동·리사이즈 또는 marquee 선택 중에도 같은 edge auto-pan을 사용합니다. 새 ScrollViewer offset을 반영한 DesignHost 좌표로 Transform·Smart Snap·포함/교차 marquee 판정을 계속 계산하며, middle-button viewport pan은 별도 입력으로 유지합니다.
 75ay. 가로·세로 ruler에서 guide를 드래그하는 동안에도 viewport 가장자리 auto-pan을 사용합니다. scroll offset이 바뀐 뒤 guide coordinate를 다시 계산해 화면 좌표가 아니라 실제 아트보드 좌표를 유지하며, guide를 viewport 밖으로 놓으면 기존 제거 정책을 적용합니다.
 75az. `Ctrl+Alt+P` Toolbox 배치 모드에서 빈 Canvas 가장자리로 ghost를 이동하면 같은 edge auto-pan을 사용합니다. offset을 먼저 갱신한 뒤 새 DesignSurface 좌표로 ghost와 target hint를 다시 계산해 큰 아트보드 끝 영역에도 클릭 배치할 수 있습니다.
+75ba. Canvas 또는 요소 위에서 `Space`를 누른 채 왼쪽 드래그하면 임시 viewport pan을 시작해 선택·marquee·Toolbox 배치 입력을 가로채지 않습니다. Space를 먼저 놓으면 다음 pointer move에서 캡처와 pan 상태를 정리하고, 중간 버튼 팬과 기존 배치·편집 드래그는 그대로 유지합니다.
 76. `File > Load Component Pack...` 또는 `File > Load Toolbox Preset Pack...`으로 외부 Toolbox 팩을 추가하면 파일 경로가 세션에 등록되어 다음 실행 때 자동으로 다시 로드됩니다. 파일이 없어도 문서 탭 복원은 계속되며 상태바에 경고가 표시됩니다.
 77. 외부 프로젝트의 컨트롤은 Component Pack 항목에 `designOnly: true`, `avaloniaTypeName`, `previewText`, `defaultProperties`를 지정해 등록합니다. 디자이너에서는 타입명 플레이스홀더로 편집하고, 생성 AXAML에는 원래 커스텀 타입과 속성을 출력합니다. 예시는 [custom-component-pack.example.json](docs/custom-component-pack.example.json)을 참고하세요.
 78. `File > Load Component Pack Plugin...`에서 `IComponentPackPlugin`을 구현한 신뢰할 수 있는 DLL을 선택하면 플러그인이 제공한 Component Pack을 Toolbox에 등록합니다. DLL 경로는 세션 JSON의 `ComponentPluginPaths`에 저장되고, 앱 재시작 시 플러그인·JSON 팩·프리셋 팩 순서로 복원됩니다.
@@ -477,6 +479,7 @@ AXAML 소스 편집기의 `Validate`와 `Preview`는 현재 디자인과 Undo �
 - v1.72: 요소 편집·marquee viewport edge auto-pan
 - v1.73: ruler guide viewport edge auto-pan
 - v1.74: Toolbox 배치 모드 viewport edge auto-pan
+- v1.75: Space+왼쪽 드래그 임시 viewport pan
 
 ## 컴포넌트 팩
 
