@@ -97,6 +97,7 @@ public partial class MainWindow : Window
         Shift+Tab           Select previous enabled focusable tab-stop control in Tab Order
         Home/End            Select the first/last visible control in Canvas order
         PageUp/PageDown     Select previous/next visible control in Canvas order
+        Shift+PageUp/Down   Add previous/next visible control to selection
         Ctrl+Arrow          Select nearest visible control in that direction
         Escape              Select the parent container on the canvas, or clear selection at the root
         Enter               Select the first child of the selected container
@@ -4420,11 +4421,10 @@ public partial class MainWindow : Window
 
         if (!ctrl
             && !alt
-            && !shift
             && e.Key is (Key.PageUp or Key.PageDown)
             && Vm.Toolbox.SelectedItem is null
             && ReferenceEquals(e.Source, DesignHost)
-            && Vm.SelectNextCanvasElement(e.Key == Key.PageUp))
+            && Vm.SelectNextCanvasElement(e.Key == Key.PageUp, append: shift))
         {
             e.Handled = true;
             return;
