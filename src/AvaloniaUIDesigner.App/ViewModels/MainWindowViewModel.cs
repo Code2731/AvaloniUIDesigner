@@ -2152,11 +2152,17 @@ public partial class MainWindowViewModel : ViewModelBase
     }
 
     public bool CanReparentElementTo(DesignElement source, DesignElement parent)
+        => CanReparentElementToCore(source, parent, allowLockedSource: false);
+
+    private bool CanReparentElementToCore(
+        DesignElement source,
+        DesignElement parent,
+        bool allowLockedSource)
     {
         if (!Canvas.Elements.Contains(source)
             || !Canvas.Elements.Contains(parent)
             || ReferenceEquals(source, parent)
-            || source.IsLocked
+            || (source.IsLocked && !allowLockedSource)
             || parent.IsLocked
             || string.Equals(source.ParentName, parent.DisplayName, StringComparison.OrdinalIgnoreCase)
             || IsDescendantOf(parent, source))
@@ -2181,15 +2187,17 @@ public partial class MainWindowViewModel : ViewModelBase
     private bool TryReparentSelectedElementTo(
         DesignElement parent,
         bool recordHistory,
-        Point? dropPoint)
+        Point? dropPoint,
+        bool allowLockedSource = false)
     {
-        if (Canvas.SelectedElement is not { IsLocked: false } source)
+        if (Canvas.SelectedElement is not { } source
+            || (source.IsLocked && !allowLockedSource))
         {
             StatusText = "Select an unlocked control before dragging it to a container.";
             return false;
         }
 
-        if (!CanReparentElementTo(source, parent))
+        if (!CanReparentElementToCore(source, parent, allowLockedSource))
         {
             StatusText = "The drop target cannot accept this control without replacing content or creating a cycle.";
             return false;
@@ -9429,7 +9437,11 @@ public partial class MainWindowViewModel : ViewModelBase
             nameMap,
             resourceMap,
             styleClassMap);
-        if (pasteTarget is not null)
+        var pastedRootNames = importedDocument.Elements
+            .Where(snapshot => string.IsNullOrWhiteSpace(snapshot.ParentName))
+            .Select(snapshot => nameMap[snapshot.DisplayName])
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        if (pasteTarget?.Visual is Avalonia.Controls.Canvas)
         {
             pastedSnapshots = ReparentAxamlPasteRootsToCanvas(
                 pastedSnapshots,
@@ -9456,6 +9468,42 @@ public partial class MainWindowViewModel : ViewModelBase
             if (pastedElements.Count == 0)
             {
                 throw new InvalidOperationException("The AXAML fragment could not be added to the canvas.");
+            }
+
+            if (pasteTarget is not null
+                && pasteTarget.Visual is not Avalonia.Controls.Canvas)
+            {
+                var appliedPasteTarget = Canvas.Elements.FirstOrDefault(element =>
+                    string.Equals(
+                        element.DisplayName,
+                        pasteTarget.DisplayName,
+                        StringComparison.OrdinalIgnoreCase));
+                if (appliedPasteTarget is null)
+                {
+                    throw new InvalidOperationException(
+                        $"The paste target '{pasteTarget.DisplayName}' is no longer available.");
+                }
+
+                var pastedRoots = pastedElements
+                    .Where(element => pastedRootNames.Contains(element.DisplayName))
+                    .ToList();
+                if (pastedRoots.Count == 0)
+                {
+                    throw new InvalidOperationException("The AXAML fragment has no root controls to insert.");
+                }
+
+                foreach (var pastedRoot in pastedRoots)
+                {
+                    SelectElement(pastedRoot);
+                    if (!TryReparentSelectedElementTo(
+                            appliedPasteTarget,
+                            recordHistory: false,
+                            dropPoint: null,
+                            allowLockedSource: true))
+                    {
+                        throw new InvalidOperationException(StatusText);
+                    }
+                }
             }
 
             _isSyncingSelection = true;
@@ -9507,7 +9555,8 @@ public partial class MainWindowViewModel : ViewModelBase
 
     private DesignElement? GetSelectedAxamlPasteTarget()
         => Canvas.SelectedElements.Count == 1
-            && Canvas.SelectedElement is { IsLocked: false, Visual: Avalonia.Controls.Canvas } target
+            && Canvas.SelectedElement is { IsLocked: false } target
+            && IsDesignerDropContainer(target.Visual)
                 ? target
                 : null;
 
