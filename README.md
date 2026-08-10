@@ -119,7 +119,7 @@ dotnet run --project src/AvaloniaUIDesigner.App/AvaloniaUIDesigner.App.csproj
 - **Object Tree 다중 선택 표시**: 다중 선택 항목에는 `SEL`, 잠긴 항목에는 `LOCK` 마커를 표시하고 헤더에 선택 개수를 표시
 - **Object Tree 다중 선택 입력**: 트리에서 일반 클릭은 단일 선택, `Ctrl+클릭`은 선택 항목 추가/해제로 동작
 - **Canvas 다중 선택 입력**: 캔버스에서 일반 클릭은 단일 선택, `Ctrl+클릭`은 선택 항목을 토글하고 `Shift+클릭`은 anchor부터 대상까지 visible Canvas 순서 범위를 선택하며 `Ctrl+Shift+클릭`은 해당 범위를 기존 선택에 추가하고, 범위 입력은 이동·더블클릭 편집으로 이어지지 않음
-- **Canvas 범위 선택**: hidden 요소를 건너뛰는 Canvas 순서 anchor 범위와 Object Tree 동기화를 지원하며, 유효한 anchor가 없으면 기존 단일 추가·토글 선택으로 안전하게 fallback
+- **Canvas 범위 선택**: hidden 요소를 건너뛰는 Canvas 순서 anchor 범위와 Object Tree 동기화를 지원하고 reverse 범위에서도 클릭한 target을 활성 요소로 유지하며, 유효한 anchor가 없으면 기존 단일 추가·토글 선택으로 안전하게 fallback
 - **계층 부모 선택**: 캔버스에서 단일 컨테이너 자식을 선택한 뒤 `Escape`를 누르면 부모 컨테이너를 선택하고, root·다중 선택에서는 기존처럼 선택을 해제하며 Toolbox 배치·marquee 취소를 우선
 - **계층 자식 진입**: 캔버스에서 단일 컨테이너를 선택한 뒤 `Enter`로 첫 visible 직접 자식, `Shift+Enter`로 마지막 visible 직접 자식을 선택하며, 자식이 없거나 다중 선택이면 기존 입력을 유지
 - **계층 형제 탐색**: 캔버스에서 `Alt+Left/Up`으로 같은 부모의 이전 visible 형제, `Alt+Right/Down`으로 다음 visible 형제를 선택하고, `Alt+Shift+Arrow`의 기존 10px nudge와 형제가 없는 경계에서의 기존 이동을 보존
@@ -255,7 +255,7 @@ dotnet run --project src/AvaloniaUIDesigner.App/AvaloniaUIDesigner.App.csproj
 75aa. Object Tree에서 일반 클릭한 행이 선택 anchor가 됩니다. `Shift+클릭`은 현재 펼쳐진 계층과 검색 결과에 표시된 순서로 anchor부터 대상까지 선택하고, `Ctrl+Shift+클릭`은 기존 선택을 유지한 채 범위를 추가합니다. 접힌 부모 아래의 보이지 않는 자식은 범위에 포함하지 않습니다.
 75ab. Edit 메뉴, Canvas context menu, `Ctrl+A`의 Select All은 `IsVisibleOnArtboard=true`이고 `IsLocked=false`인 요소만 선택합니다. 선택 가능한 요소가 없으면 기존 선택을 비우고 상태바에 안내하며, Object Tree나 직접 클릭으로 잠긴·숨겨진 요소를 검사하는 기능은 바뀌지 않습니다.
 75ac. 잠긴 컨트롤을 직접 선택해도 Object Tree와 Property Inspector에서 검사할 수 있지만 `Edit > Copy`·`Duplicate`와 `Ctrl+C`·`Ctrl+D`는 잠금 해제 선택만 처리합니다. 잠금 해제 요소와 잠긴 요소를 함께 선택하면 잠금 해제 계층만 복사·복제하고, 잠긴 요소만 대상으로 한 명령은 문서와 기존 클립보드를 변경하지 않습니다.
-75ad. 캔버스에서 일반 클릭한 요소가 Canvas 선택 anchor가 됩니다. `Shift+클릭`은 anchor부터 대상까지 visible Canvas 순서 범위를 선택하고, `Ctrl+Shift+클릭`은 기존 선택을 유지한 채 범위를 추가합니다. hidden 요소는 범위에서 제외하며, 유효한 anchor가 없으면 기존 Shift 단일 추가로 fallback하고, `Ctrl+클릭` 토글·잠긴 컨트롤 직접 검사·범위 입력의 이동/Quick Edit 차단을 유지합니다.
+75ad. 캔버스에서 일반 클릭한 요소가 Canvas 선택 anchor가 됩니다. `Shift+클릭`은 anchor부터 대상까지 visible Canvas 순서 범위를 선택하고, `Ctrl+Shift+클릭`은 기존 선택을 유지한 채 범위를 추가하며 reverse 방향에서도 클릭한 target을 Object Tree 활성 행으로 유지합니다. hidden 요소는 범위에서 제외하며, 유효한 anchor가 없으면 기존 Shift 단일 추가로 fallback하고, `Ctrl+클릭` 토글·잠긴 컨트롤 직접 검사·범위 입력의 이동/Quick Edit 차단을 유지합니다.
 75ae. `Ungroup Selected Canvas`와 `Break Selected Layout`은 선택된 컨테이너가 잠겼거나 직접 자식 중 하나라도 잠겨 있으면 실행하지 않습니다. 상태바에 잠금 보호 이유를 표시하고 계층·좌표·History를 변경하지 않으며, 잠금 해제 후 같은 명령을 다시 실행할 수 있습니다.
 75af. Canvas marquee는 `Ctrl+드래그`와 `Shift+드래그`를 같은 additive 선택으로 처리합니다. modifier가 없으면 기존 선택을 교체하고, 좌우 드래그 방향의 포함/교차 판정과 잠긴·숨겨진 컨트롤 제외 정책은 그대로 유지합니다.
 75ag. Canvas 빈 영역에서 `Alt+드래그`하면 marquee 결과에 포함된 보이는 잠금 해제 컨트롤만 현재 선택에서 제거합니다. 잠긴·숨겨진 선택은 보존하고, 이동하지 않은 작은 Alt 클릭도 선택을 비우지 않으며, 좌우 드래그의 포함/교차 판정은 일반 marquee와 같습니다.
@@ -452,6 +452,7 @@ AXAML 소스 편집기의 `Validate`와 `Preview`는 현재 디자인과 Undo �
 - v1.60: Shift+Tab Tab Order 누적 선택
 - v1.61: Shift+Home/End Canvas 경계 누적 선택
 - v1.62: Canvas Shift+클릭 범위 선택
+- v1.63: Canvas 범위 선택 reverse 활성 대상 동기화
 
 ## 컴포넌트 팩
 

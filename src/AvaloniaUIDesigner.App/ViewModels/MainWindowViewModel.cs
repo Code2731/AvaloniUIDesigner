@@ -1657,7 +1657,10 @@ public partial class MainWindowViewModel : ViewModelBase
         return true;
     }
 
-    public void SelectElements(IEnumerable<DesignElement> elements, bool append = false)
+    public void SelectElements(
+        IEnumerable<DesignElement> elements,
+        bool append = false,
+        DesignElement? activeElement = null)
     {
         var selection = append
             ? Canvas.SelectedElements.Concat(elements).Distinct().ToList()
@@ -1667,6 +1670,11 @@ public partial class MainWindowViewModel : ViewModelBase
         try
         {
             Canvas.SelectMany(selection);
+            if (activeElement is not null && selection.Contains(activeElement))
+            {
+                Canvas.SelectedElement = activeElement;
+            }
+
             ObjectTree.SelectByElement(Canvas.SelectedElement);
         }
         finally
@@ -1704,7 +1712,7 @@ public partial class MainWindowViewModel : ViewModelBase
             return false;
         }
 
-        SelectElements(range, append);
+        SelectElements(range, append, activeElement: target);
         StatusText = append
             ? $"Added Object Tree range ({range.Count} control(s))."
             : $"Selected Object Tree range ({range.Count} control(s)).";
@@ -1731,7 +1739,7 @@ public partial class MainWindowViewModel : ViewModelBase
             .Skip(start)
             .Take(Math.Abs(targetIndex - anchorIndex) + 1)
             .ToList();
-        SelectElements(range, append);
+        SelectElements(range, append, activeElement: target);
         StatusText = append
             ? $"Added Canvas range ({range.Count} control(s))."
             : $"Selected Canvas range ({range.Count} control(s)).";
