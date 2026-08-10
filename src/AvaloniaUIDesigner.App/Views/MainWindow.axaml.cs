@@ -6858,7 +6858,7 @@ public partial class MainWindow : Window
         // Match common design-tool marquee behavior: left-to-right contains, right-to-left crosses.
         var requiresContainment = current.X >= _marqueeStart.X;
         var selected = Vm.Canvas.Elements
-            .Where(element => !element.IsLocked && element.IsVisibleOnArtboard)
+            .Where(element => !element.IsLocked && Vm.Canvas.IsElementVisibleOnCanvas(element))
             .Where(element =>
             {
                 var bounds = new Rect(element.X, element.Y, element.Width, element.Height);

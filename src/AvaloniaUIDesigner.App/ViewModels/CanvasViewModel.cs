@@ -517,9 +517,36 @@ public partial class CanvasViewModel : ViewModelBase
     {
         var point = new Point(x, y);
         return Elements
-            .Where(element => element.IsVisibleOnArtboard)
+            .Where(IsElementVisibleOnCanvas)
             .Where(element => new Rect(element.X, element.Y, element.Width, element.Height).Contains(point))
             .ToList();
+    }
+
+    public bool IsElementVisibleOnCanvas(DesignElement element)
+    {
+        var visited = new HashSet<DesignElement>();
+        var current = element;
+        while (true)
+        {
+            if (!current.IsVisibleOnArtboard || !current.Visual.IsVisible || !visited.Add(current))
+            {
+                return false;
+            }
+
+            if (string.IsNullOrWhiteSpace(current.ParentName))
+            {
+                return true;
+            }
+
+            var parent = Elements.FirstOrDefault(candidate =>
+                string.Equals(candidate.DisplayName, current.ParentName, StringComparison.OrdinalIgnoreCase));
+            if (parent is null)
+            {
+                return false;
+            }
+
+            current = parent;
+        }
     }
 
     public void ClearSelection()

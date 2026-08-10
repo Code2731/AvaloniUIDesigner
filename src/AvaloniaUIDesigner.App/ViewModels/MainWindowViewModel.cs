@@ -900,7 +900,7 @@ public partial class MainWindowViewModel : ViewModelBase
     public DesignElement? FindDropContainer(Point point)
         => Canvas.Elements
             .Where(element => !element.IsLocked
-                && element.IsVisibleOnArtboard
+                && Canvas.IsElementVisibleOnCanvas(element)
                 && IsDesignerDropContainer(element.Visual)
                 && CanAcceptToolboxDrop(element)
                 && new Rect(element.X, element.Y, element.Width, element.Height).Contains(point))
@@ -1592,7 +1592,7 @@ public partial class MainWindowViewModel : ViewModelBase
 
         var candidates = Canvas.Elements
             .Where(element => !ReferenceEquals(element, selected)
-                && element.IsVisibleOnArtboard)
+                && Canvas.IsElementVisibleOnCanvas(element))
             .Select(element =>
             {
                 var centerX = element.X + element.Width / 2;
@@ -1666,7 +1666,7 @@ public partial class MainWindowViewModel : ViewModelBase
     public bool SelectAllVisibleUnlockedElements()
     {
         var selection = Canvas.Elements
-            .Where(element => !element.IsLocked && element.IsVisibleOnArtboard)
+            .Where(element => !element.IsLocked && Canvas.IsElementVisibleOnCanvas(element))
             .ToList();
         SelectElements(selection);
         if (selection.Count == 0)
@@ -1699,7 +1699,7 @@ public partial class MainWindowViewModel : ViewModelBase
     public bool SelectNextVisibleElement(bool reverse = false)
     {
         var candidates = Canvas.Elements
-            .Where(element => element.IsVisibleOnArtboard
+            .Where(element => Canvas.IsElementVisibleOnCanvas(element)
                 && element.Visual.IsEnabled
                 && element.Visual.Focusable
                 && element.Visual.IsTabStop)

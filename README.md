@@ -263,6 +263,7 @@ dotnet run --project src/AvaloniaUIDesigner.App/AvaloniaUIDesigner.App.csproj
 75al. Canvas `Tab`/`Shift+Tab`은 `IsTabStop=false`로 제외된 컨트롤을 건너뜁니다. `Edit > Include / Exclude from Tab Navigation`의 상태가 즉시 순환 후보에 반영되며, 모든 후보가 제외되면 기존처럼 선택 실패 상태를 표시합니다.
 75am. Canvas `Tab`/`Shift+Tab`은 `IsEnabled=false` 또는 `Focusable=false`인 컨트롤도 건너뛰어 Avalonia 키보드 포커스 조건과 맞춥니다. 활성화·포커스 가능·탭 정지 조건이 모두 맞는 후보만 기존 `TabIndex`와 Canvas 순서로 순환합니다.
 75an. 캔버스에서 단일 요소를 선택한 뒤 `Ctrl+Left/Right/Up/Down`은 해당 방향에 있는 보이는 후보 중 같은 축으로 겹치는 요소를 우선하고 축 거리·보조 거리·Canvas 순서로 가장 가까운 요소를 선택합니다. 후보가 없거나 다중 선택이면 입력을 소비하지 않아 기존 화살표 nudge 경로를 보존합니다.
+75ao. Canvas의 선택·marquee·겹침 hit-test·Toolbox drop·키보드 탐색은 요소 자신의 `Visual.IsVisible`과 모든 부모의 visibility를 함께 확인합니다. 숨겨진 부모 아래 자식이나 `Visual.IsVisible=false` 요소는 캔버스 후보에서 제외되지만 Object Tree와 직접 검사를 통한 편집 경로는 유지합니다.
 76. `File > Load Component Pack...` 또는 `File > Load Toolbox Preset Pack...`으로 외부 Toolbox 팩을 추가하면 파일 경로가 세션에 등록되어 다음 실행 때 자동으로 다시 로드됩니다. 파일이 없어도 문서 탭 복원은 계속되며 상태바에 경고가 표시됩니다.
 77. 외부 프로젝트의 컨트롤은 Component Pack 항목에 `designOnly: true`, `avaloniaTypeName`, `previewText`, `defaultProperties`를 지정해 등록합니다. 디자이너에서는 타입명 플레이스홀더로 편집하고, 생성 AXAML에는 원래 커스텀 타입과 속성을 출력합니다. 예시는 [custom-component-pack.example.json](docs/custom-component-pack.example.json)을 참고하세요.
 78. `File > Load Component Pack Plugin...`에서 `IComponentPackPlugin`을 구현한 신뢰할 수 있는 DLL을 선택하면 플러그인이 제공한 Component Pack을 Toolbox에 등록합니다. DLL 경로는 세션 JSON의 `ComponentPluginPaths`에 저장되고, 앱 재시작 시 플러그인·JSON 팩·프리셋 팩 순서로 복원됩니다.
@@ -436,6 +437,7 @@ AXAML 소스 편집기의 `Validate`와 `Preview`는 현재 디자인과 Undo �
 - v1.51: Canvas Tab Navigation IsTabStop 필터
 - v1.52: Canvas Tab Navigation 포커스 가능·활성화 필터
 - v1.53: Canvas Ctrl+Arrow 방향 선택
+- v1.54: Canvas 계층 visibility 인식 선택
 
 ## 컴포넌트 팩
 
