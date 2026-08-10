@@ -12053,6 +12053,29 @@ public partial class MainWindow : Window
         await dialog.ShowDialog(this);
     }
 
+    private static bool HandleAxamlSourceEditorShortcut(
+        KeyEventArgs e,
+        Action close,
+        Action apply)
+    {
+        if (e.Key == Key.Escape)
+        {
+            close();
+            e.Handled = true;
+            return true;
+        }
+
+        if (e.Key == Key.Enter
+            && e.KeyModifiers.HasFlag(KeyModifiers.Control))
+        {
+            apply();
+            e.Handled = true;
+            return true;
+        }
+
+        return false;
+    }
+
     private async Task ShowAxamlSourceEditorDialogAsync(string source)
     {
         if (Vm is null)
@@ -12122,7 +12145,7 @@ public partial class MainWindow : Window
             }
         };
         var applyButton = new Button { Content = "Apply", MinWidth = 84 };
-        applyButton.Click += (_, _) =>
+        void ApplySource()
         {
             if (!Vm.TryApplyAxamlSource(editor.Text ?? string.Empty, out var result))
             {
@@ -12133,6 +12156,11 @@ public partial class MainWindow : Window
 
             ClearDesignGuides();
             dialog.Close();
+        }
+        applyButton.Click += (_, _) => ApplySource();
+        editor.KeyDown += (_, e) =>
+        {
+            HandleAxamlSourceEditorShortcut(e, dialog.Close, ApplySource);
         };
         var cancelButton = new Button { Content = "Cancel", MinWidth = 84 };
         cancelButton.Click += (_, _) => dialog.Close();
