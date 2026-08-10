@@ -9425,6 +9425,7 @@ public partial class MainWindow : Window
 
             dialog.Close();
         };
+        WireEditorDialogShortcuts(dialog, applyButton);
         var cancelButton = new Button { Content = "Cancel", MinWidth = 84 };
         cancelButton.Click += (_, _) => dialog.Close();
         var buttons = new StackPanel
@@ -9555,6 +9556,7 @@ public partial class MainWindow : Window
 
             dialog.Close();
         };
+        WireEditorDialogShortcuts(dialog, applyButton);
         var cancelButton = new Button { Content = "Cancel", MinWidth = 84 };
         cancelButton.Click += (_, _) => dialog.Close();
         var buttons = new StackPanel
@@ -9666,6 +9668,7 @@ public partial class MainWindow : Window
 
             dialog.Close();
         };
+        WireEditorDialogShortcuts(dialog, applyButton);
         var cancelButton = new Button { Content = "Cancel", MinWidth = 84 };
         cancelButton.Click += (_, _) => dialog.Close();
         var buttons = new StackPanel
@@ -9894,6 +9897,7 @@ public partial class MainWindow : Window
 
             dialog.Close();
         };
+        WireEditorDialogShortcuts(dialog, applyButton);
         var cancelButton = new Button { Content = "Cancel", MinWidth = 84 };
         cancelButton.Click += (_, _) => dialog.Close();
         var buttons = new StackPanel
@@ -10308,6 +10312,7 @@ public partial class MainWindow : Window
 
             dialog.Close();
         };
+        WireEditorDialogShortcuts(dialog, applyButton);
         var cancelButton = new Button { Content = "Cancel", MinWidth = 84 };
         cancelButton.Click += (_, _) => dialog.Close();
         var buttons = new StackPanel
@@ -10532,6 +10537,7 @@ public partial class MainWindow : Window
 
             dialog.Close();
         };
+        WireEditorDialogShortcuts(dialog, applyButton);
         var cancelButton = new Button { Content = "Cancel", MinWidth = 84 };
         cancelButton.Click += (_, _) => dialog.Close();
         var buttons = new StackPanel
@@ -10690,6 +10696,7 @@ public partial class MainWindow : Window
 
             dialog.Close();
         };
+        WireEditorDialogShortcuts(dialog, applyButton);
         var cancelButton = new Button { Content = "Cancel", MinWidth = 84 };
         cancelButton.Click += (_, _) => dialog.Close();
         var buttons = new StackPanel
@@ -10856,6 +10863,7 @@ public partial class MainWindow : Window
 
             dialog.Close();
         };
+        WireEditorDialogShortcuts(dialog, applyButton);
         var cancelButton = new Button { Content = "Cancel", MinWidth = 84 };
         cancelButton.Click += (_, _) => dialog.Close();
         var buttons = new StackPanel
@@ -11128,6 +11136,7 @@ public partial class MainWindow : Window
 
             dialog.Close();
         };
+        WireEditorDialogShortcuts(dialog, applyButton);
         var cancelButton = new Button { Content = "Cancel", MinWidth = 84 };
         cancelButton.Click += (_, _) => dialog.Close();
         var buttons = new StackPanel
@@ -11295,6 +11304,7 @@ public partial class MainWindow : Window
 
             dialog.Close();
         };
+        WireEditorDialogShortcuts(dialog, applyButton);
         var cancelButton = new Button { Content = "Cancel", MinWidth = 84 };
         cancelButton.Click += (_, _) => dialog.Close();
         var buttons = new StackPanel
@@ -11458,6 +11468,7 @@ public partial class MainWindow : Window
 
             dialog.Close();
         };
+        WireEditorDialogShortcuts(dialog, applyButton);
         var cancelButton = new Button { Content = "Cancel", MinWidth = 84 };
         cancelButton.Click += (_, _) => dialog.Close();
         var buttons = new StackPanel
@@ -11758,6 +11769,7 @@ public partial class MainWindow : Window
 
             dialog.Close();
         };
+        WireEditorDialogShortcuts(dialog, applyButton);
         var cancelButton = new Button { Content = "Cancel", MinWidth = 84 };
         cancelButton.Click += (_, _) => dialog.Close();
         var buttons = new StackPanel
@@ -11898,6 +11910,7 @@ public partial class MainWindow : Window
 
             dialog.Close();
         };
+        WireEditorDialogShortcuts(dialog, applyButton);
         var cancelButton = new Button { Content = "Cancel", MinWidth = 84 };
         cancelButton.Click += (_, _) => dialog.Close();
         var buttons = new StackPanel
@@ -12489,6 +12502,7 @@ public partial class MainWindow : Window
 
             dialog.Close();
         };
+        WireEditorDialogShortcuts(dialog, applyButton);
         var cancelButton = new Button { Content = "Cancel", MinWidth = 84 };
         cancelButton.Click += (_, _) => dialog.Close();
         var buttons = new StackPanel
