@@ -53,6 +53,7 @@ dotnet run --project src/AvaloniaUIDesigner.App/AvaloniaUIDesigner.App.csproj
 - **잠금 인식 구조 해제**: `Ungroup Selected Canvas`와 `Break Selected Layout`은 잠긴 컨테이너 자식이 포함된 계층을 거부해 부분적인 부모·좌표 변경을 방지하고, 잠금 해제 후 기존 해제·Undo 흐름을 유지
 - **그리드/스냅 키보드 단축키**: `Ctrl+Alt+G`로 디자인 그리드를 표시·숨기고 `Ctrl+Alt+Shift+G`로 Grid snap을 토글하며 기존 문서 설정·Undo/AXAML 메타데이터를 유지
 - **Workspace 패널 키보드 단축키**: `Ctrl+Alt+1/2/3`으로 Toolbox·Object Tree·Property Inspector를 토글하고 `Ctrl+Alt+0`으로 기본 패널 레이아웃을 복원하며 기존 세션 저장 상태와 메뉴 체크를 동기화
+- **Design Toolbar**: 캔버스 상단의 Qt Designer식 도구 모음에서 New·Save·Undo/Redo·Preview, 다중 선택 Align/Distribute/Size, Group/Ungroup/Break, 주요 Layout, Fit/Zoom 명령을 가로 스크롤 가능한 한 줄에서 실행하고 선택 상태에 따라 사용할 수 없는 작업을 자동 비활성화
 - **패널 포커스 복구**: 숨겨진 패널에서도 `Ctrl+Alt+T/P/I` 또는 `Ctrl+F`를 누르면 필요한 Toolbox·Object Tree·Property Inspector를 자동으로 다시 표시한 뒤 검색·배치 작업으로 진입
 - **리사이즈 비율 잠금**: 코너 핸들을 `Shift`와 함께 드래그하면 단일 컨트롤과 다중 선택 bounding box의 원래 가로·세로 비율을 유지하며, 잠금 중에는 Smart Snap보다 비율을 우선합니다.
 - **디자인 그리드**: 그리드 표시·Snap to Grid를 전환하고 4·8·16px 프리셋 또는 4~32px 사용자 지정 간격을 편집하며 문서 설정·Undo/Redo·Preview·AXAML 메타데이터에 보존
@@ -331,6 +332,7 @@ dotnet run --project src/AvaloniaUIDesigner.App/AvaloniaUIDesigner.App.csproj
 87. 정밀 target feedback은 Grid/UniformGrid의 `R# C#` 셀, StackPanel/DockPanel/WrapPanel의 `insert #` 삽입선, TabControl/SplitView/Content의 슬롯 bounds를 ghost 상세에 표시해 클릭 전에 실제 계층 배치 결과를 확인하게 합니다.
 88. Properties 패널 헤더에서 선택 컨트롤의 타입을 확인하고 `Categories`/`Flat`으로 속성 그룹을 전환하거나 `Expand`/`Collapse`로 모든 카테고리를 펼치고 접습니다. Quick Filter에 속성명을 입력하면 현재 선택 컨트롤의 속성을 즉시 좁힙니다.
 89. Properties 패널의 `Filter properties...` 입력창에 속성명을 입력하고 `Clear` 또는 `Escape`로 초기화합니다. `Ctrl+Alt+I`는 필터에 포커스하고 현재 입력을 선택하며, 컨트롤을 바꿔도 필터가 유지됩니다.
+90. 캔버스 상단 `Design` 도구 모음은 메뉴를 열지 않고도 문서 저장·Undo/Redo·Live Preview, 선택 정렬·분배·크기 맞춤, Canvas 그룹·레이아웃 해제, StackPanel/Grid/UniformGrid 생성, Fit/Zoom을 실행합니다. 가로 공간이 부족하면 한 줄을 수평 스크롤하며, 다중 선택이 필요한 버튼은 선택 상태와 같은 검증 규칙으로 자동 비활성화됩니다.
 
 DataGrid가 포함된 생성 AXAML을 다른 프로젝트에서 사용할 때는 같은 Avalonia 버전의 `Avalonia.Controls.DataGrid` 패키지와 `avares://Avalonia.Controls.DataGrid/Themes/Fluent.xaml` 스타일 include가 필요합니다.
 
@@ -537,6 +539,7 @@ AXAML 소스 편집기의 `Validate`와 `Preview`는 현재 디자인과 Undo �
 - v1.98: 문서 탭별 Canvas viewport 스크롤 위치 저장·복원
 - v1.99: 탭 viewport 복원과 선택 자동 추적 우선순위 안정화
 - v2.00: 단일 Tab Order 편집기와 Tab Order Map 입력 규칙 통합
+- v2.01: Qt Designer식 Canvas Design Toolbar 추가
 
 ## 컴포넌트 팩
 
