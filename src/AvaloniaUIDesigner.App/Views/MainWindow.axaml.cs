@@ -2919,20 +2919,22 @@ public partial class MainWindow : Window
 
         var updatedTabIndex = await ShowTextEditorDialogAsync(
             $"Edit Tab Order - {controlName}",
-            tabIndex.ToString(CultureInfo.InvariantCulture),
-            "Enter an integer. Lower values receive keyboard focus first.");
+            tabIndex == int.MaxValue
+                ? "auto"
+                : tabIndex.ToString(CultureInfo.InvariantCulture),
+            "Enter 0-10000, auto, or -1. Lower values receive keyboard focus first.");
         if (updatedTabIndex is null)
         {
             return;
         }
 
-        if (!int.TryParse(updatedTabIndex.Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsedTabIndex))
+        if (!MainWindowViewModel.TryParseTabOrderIndex(updatedTabIndex, out var parsedTabIndex))
         {
-            Vm.StatusText = "Tab order must be a whole number.";
+            Vm.StatusText = "Tab order must be auto, -1, or between 0 and 10000.";
             return;
         }
 
-        Vm.SetSelectedTabIndex(parsedTabIndex);
+        Vm.SetSelectedTabIndex(parsedTabIndex == int.MaxValue ? -1 : parsedTabIndex);
     }
 
     private async void OnEditTabOrderMapMenuClicked(

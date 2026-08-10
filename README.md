@@ -71,6 +71,7 @@ dotnet run --project src/AvaloniaUIDesigner.App/AvaloniaUIDesigner.App.csproj
 - **레이아웃 해제**: 선택한 Canvas·Grid·StackPanel·DockPanel·WrapPanel·UniformGrid 컨테이너를 `Break Selected Layout`으로 제거하고 자식을 독립 컨트롤 또는 원래 Canvas 형제로 복원하며 좌표·순서·다중 선택을 보존
 - **다중 선택 레이아웃 안전성**: Arrange와 Center on Artboard를 root 또는 같은 Canvas의 형제에 적용하고, 부모가 좌표를 관리하는 Grid·StackPanel·DockPanel·WrapPanel·UniformGrid·TabControl·SplitView·Content 자식은 부모 전용 배치 명령으로 보호
 - **Tab Order Map**: `Edit Tab Order Map...`에서 전체 컨트롤의 `TabIndex | ControlName` 목록을 한 번에 편집하고 중복 순서·존재하지 않는 이름·잠긴 컨트롤 변경을 검증하며, 명시적 순서는 캔버스 `TAB #` 배지와 AXAML에 반영
+- **단일 Tab Order 편집**: `Edit Tab Order...`에서 선택 컨트롤의 순서를 `0~10000`, `auto`, `-1`로 편집하고 자동 순서를 `auto`로 표시하며, Tab Order Map과 동일한 범위 검증·Undo 규칙을 사용
 - **데이터 바인딩**: 선택 컨트롤의 지원 속성에 Path·Mode·Fallback을 여러 개 선언하고, 디자인 샘플을 유지한 채 ReflectionBinding·Undo/Redo·복제·미리보기·AXAML 왕복에 보존
 - **샘플 DataContext**: 문서 단위 JSON을 바인딩 Path에 연결해 Text·상태·숫자·선택·ItemsSource를 캔버스와 Preview에서 확인하고, 원래 디자인 값·Undo/Redo·AXAML 왕복에 보존
 - **공통 레이아웃 속성**: Margin·Padding·수평/수직 정렬·Min/Max 크기를 편집하고 컨테이너 자식, Undo/Redo, 복제, Preview, AXAML 왕복에 보존
@@ -315,6 +316,7 @@ dotnet run --project src/AvaloniaUIDesigner.App/AvaloniaUIDesigner.App.csproj
 75bw. Design Guide snapshot은 문서 탭 세션 JSON에도 함께 저장되므로 정상 종료 후 앱을 다시 시작하거나 닫힌 탭을 다시 열어도 가이드 좌표·표시·스냅 상태가 복원됩니다. 기존 세션 JSON에 guide 필드가 없거나 잘못된 좌표가 포함된 경우에는 현재 아트보드 범위의 유효한 좌표만 적용하고 나머지는 기본값으로 안전하게 무시합니다.
 75bx. 문서 탭의 Canvas ScrollViewer 가로·세로 오프셋도 탭 상태와 세션 JSON에 저장됩니다. 탭 전환·앱 재시작·닫힌 탭 복원 후 새 문서의 실제 viewport/extent 범위에 맞춰 안전하게 clamp하므로 확대된 아트보드에서 작업하던 위치를 잃지 않으며, 기존 세션에는 `(0, 0)`을 적용합니다.
 75by. viewport 복원에는 pending 세대가 부여되며, 이전 탭의 늦은 `LayoutUpdated`/dispatcher callback은 무시됩니다. 복원 pending 동안에는 선택 요소의 자동 `ScrollIntoView`도 보류하고, 저장 오프셋을 적용한 뒤 idle 시점에만 정상 선택 추적을 재개해 빠른 탭 순환에서도 작업 위치가 흔들리지 않습니다.
+75bz. `Edit Tab Order...`의 초기값은 자동 순서일 때 `2147483647` 대신 `auto`로 표시하며, `auto`/`-1`은 Avalonia 자동 순서로 정규화합니다. 단일 편집기와 `Edit Tab Order Map...`은 `0~10000` 범위·중복 검증·Undo/Redo 규칙을 같은 parser로 공유해 입력 결과가 달라지지 않습니다.
 76. `File > Load Component Pack...` 또는 `File > Load Toolbox Preset Pack...`으로 외부 Toolbox 팩을 추가하면 파일 경로가 세션에 등록되어 다음 실행 때 자동으로 다시 로드됩니다. 파일이 없어도 문서 탭 복원은 계속되며 상태바에 경고가 표시됩니다.
 77. 외부 프로젝트의 컨트롤은 Component Pack 항목에 `designOnly: true`, `avaloniaTypeName`, `previewText`, `defaultProperties`를 지정해 등록합니다. 디자이너에서는 타입명 플레이스홀더로 편집하고, 생성 AXAML에는 원래 커스텀 타입과 속성을 출력합니다. 예시는 [custom-component-pack.example.json](docs/custom-component-pack.example.json)을 참고하세요.
 78. `File > Load Component Pack Plugin...`에서 `IComponentPackPlugin`을 구현한 신뢰할 수 있는 DLL을 선택하면 플러그인이 제공한 Component Pack을 Toolbox에 등록합니다. DLL 경로는 세션 JSON의 `ComponentPluginPaths`에 저장되고, 앱 재시작 시 플러그인·JSON 팩·프리셋 팩 순서로 복원됩니다.
@@ -534,6 +536,7 @@ AXAML 소스 편집기의 `Validate`와 `Preview`는 현재 디자인과 Undo �
 - v1.97: Design Guide 상태의 Workspace Session 저장·복원
 - v1.98: 문서 탭별 Canvas viewport 스크롤 위치 저장·복원
 - v1.99: 탭 viewport 복원과 선택 자동 추적 우선순위 안정화
+- v2.00: 단일 Tab Order 편집기와 Tab Order Map 입력 규칙 통합
 
 ## 컴포넌트 팩
 

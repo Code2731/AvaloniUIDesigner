@@ -8246,6 +8246,12 @@ public partial class MainWindowViewModel : ViewModelBase
         }
 
         var normalizedTabIndex = tabIndex < 0 ? int.MaxValue : tabIndex;
+        if (normalizedTabIndex != int.MaxValue && normalizedTabIndex > 10000)
+        {
+            StatusText = "Tab order must be auto, -1, or between 0 and 10000.";
+            return;
+        }
+
         if (target.Visual.TabIndex == normalizedTabIndex)
         {
             StatusText = "Tab order is unchanged.";
@@ -8259,6 +8265,28 @@ public partial class MainWindowViewModel : ViewModelBase
         StatusText = normalizedTabIndex == int.MaxValue
             ? $"Reset tab order for {target.DisplayName}."
             : $"Set tab order to {normalizedTabIndex} for {target.DisplayName}.";
+    }
+
+    public static bool TryParseTabOrderIndex(string? text, out int tabIndex)
+    {
+        var normalized = text?.Trim() ?? string.Empty;
+        if (string.Equals(normalized, "auto", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(normalized, "-1", StringComparison.Ordinal))
+        {
+            tabIndex = int.MaxValue;
+            return true;
+        }
+
+        if (int.TryParse(normalized, NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsed)
+            && parsed >= 0
+            && parsed <= 10000)
+        {
+            tabIndex = parsed;
+            return true;
+        }
+
+        tabIndex = 0;
+        return false;
     }
 
     public string GetTabOrderEditorText()
@@ -8317,19 +8345,11 @@ public partial class MainWindowViewModel : ViewModelBase
 
             var indexText = line[..separator].Trim();
             var name = line[(separator + 1)..].Trim();
-            var isAutomatic = string.Equals(indexText, "auto", StringComparison.OrdinalIgnoreCase)
-                || string.Equals(indexText, "-1", StringComparison.Ordinal);
-            if (!isAutomatic
-                && (!int.TryParse(indexText, NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsedTabIndex)
-                    || parsedTabIndex < 0
-                    || parsedTabIndex > 10000))
+            if (!TryParseTabOrderIndex(indexText, out var tabIndex))
             {
                 errors.Add($"Line {meaningfulLineCount}: TabIndex must be auto, -1, or between 0 and 10000.");
                 continue;
             }
-            var tabIndex = isAutomatic
-                ? int.MaxValue
-                : int.Parse(indexText, NumberStyles.Integer, CultureInfo.InvariantCulture);
 
             if (!elementsByName.TryGetValue(name, out var element))
             {
