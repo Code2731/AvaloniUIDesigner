@@ -112,7 +112,7 @@ dotnet run --project src/AvaloniaUIDesigner.App/AvaloniaUIDesigner.App.csproj
 - **안전한 Select All**: Edit/Canvas context menu와 `Ctrl+A`는 현재 아트보드에 표시되는 잠금 해제 컨트롤만 선택하고, 잠긴·숨겨진 요소의 직접 검사는 유지
 - **잠금 인식 Copy/Duplicate**: 잠긴 컨트롤은 직접 검사할 수 있지만 `Copy`·`Duplicate`는 잠금 해제 선택만 처리하고, 혼합 선택에서는 잠금 해제 계층만 복사·복제하며 거부된 명령은 기존 클립보드를 보존
 - **겹친 요소 순환 선택**: `Alt+클릭`으로 포인터 아래의 visible 컨트롤을 앞쪽부터 순환 선택하고, `Alt+Shift+클릭`으로 반대 방향으로 이동하며 잠긴 요소도 속성 검사를 위해 순환
-- **키보드 선택 순환**: 캔버스에 포커스가 있을 때 `Tab`/`Shift+Tab`으로 보이고 활성화된 `Focusable=true`, `IsTabStop=true` 컨트롤을 순환 선택하며, 명시 `TabIndex`를 낮은 값부터 적용하고 `auto/-1` 요소는 기존 Canvas 순서를 유지
+- **키보드 선택 순환**: 캔버스에 포커스가 있을 때 `Tab`/`Shift+Tab`으로 보이고 활성화된 `Focusable=true`, `IsTabStop=true` 컨트롤을 순환 선택하고 `Shift+Tab`은 이전 컨트롤을 기존 선택에 누적하며, 명시 `TabIndex`를 낮은 값부터 적용하고 `auto/-1` 요소는 기존 Canvas 순서를 유지
 - **Canvas 경계 선택**: 캔버스에 포커스가 있을 때 `Home`/`End`로 Canvas 순서의 첫/마지막 visible 컨트롤을 즉시 선택하고 Object Tree를 동기화하며, hidden 요소는 경계 후보에서 제외
 - **Canvas 순차 선택**: 캔버스에 포커스가 있을 때 `PageUp`/`PageDown`으로 Canvas 순서의 이전/다음 visible 컨트롤을 순환 선택하고, `Shift+PageUp/PageDown`으로 해당 요소를 기존 선택에 누적하며 hidden 요소를 건너뛰고 Object Tree를 동기화
 - **Object Tree 자동 동기화**: 배치된 요소가 루트(Window) 아래에 추가
@@ -202,7 +202,7 @@ dotnet run --project src/AvaloniaUIDesigner.App/AvaloniaUIDesigner.App.csproj
 50. 캔버스에서 텍스트·버튼·토글·라벨·fallback 컨트롤을 더블클릭하면 해당 요소의 visible `Text`/`Content`를 빠르게 편집하고, 적용 시 Undo·AXAML·Preview에 함께 반영
 51. View > `Live Preview`를 열어두면 배치·속성·Undo/Redo·AXAML 적용·문서 로드가 같은 Preview 창에 자동 반영되며, 창을 다시 열면 현재 문서로 즉시 갱신
 52. Object Tree 검색에서 `Enter`를 누르면 다음 일치 컨트롤, `Shift+Enter`를 누르면 이전 일치 컨트롤을 선택하고 결과 위치를 확인
-53. 캔버스를 클릭한 뒤 `Tab`/`Shift+Tab`을 누르면 보이고 활성화된 `Focusable=true`, `IsTabStop=true` 컨트롤만 대상으로 명시 `TabIndex`를 낮은 값부터 선택하고, `auto/-1` 요소는 기존 Canvas 순서로 순환하며 숨겨진 TabControl 페이지와 비활성·비포커스·탭 제외 컨트롤은 자동으로 건너뜁니다.
+53. 캔버스를 클릭한 뒤 `Tab`/`Shift+Tab`을 누르면 보이고 활성화된 `Focusable=true`, `IsTabStop=true` 컨트롤만 대상으로 명시 `TabIndex`를 낮은 값부터 선택하고, `Shift+Tab`은 이전 후보를 기존 선택에 누적합니다. `auto/-1` 요소는 기존 Canvas 순서로 순환하며 숨겨진 TabControl 페이지와 비활성·비포커스·탭 제외 컨트롤은 자동으로 건너뜁니다.
 54. 여러 컨트롤을 선택하면 Object Tree의 각 항목에 `SEL` 마커와 헤더의 선택 개수가 표시되고, 잠긴 컨트롤에는 `LOCK` 마커가 표시됨
 55. Object Tree에서 일반 클릭은 하나만 선택하고, `Ctrl+클릭`은 여러 컨트롤을 추가 선택하거나 선택 해제함
 56. Object Tree 행을 우클릭하면 해당 컨트롤을 먼저 선택한 뒤 Rename·Lock/Unlock·Copy·Cut·Duplicate·Delete 명령을 실행할 수 있음
@@ -261,7 +261,7 @@ dotnet run --project src/AvaloniaUIDesigner.App/AvaloniaUIDesigner.App.csproj
 75ah. 캔버스에 포커스가 있고 단일 컨테이너 자식을 선택한 상태에서 `Escape`를 누르면 Object Tree·Property Inspector 선택을 부모 컨테이너로 함께 올립니다. 부모가 없는 root 선택, 다중 선택, 진행 중인 marquee 또는 Toolbox 배치에서는 기존처럼 선택 도구·배치 취소를 우선합니다.
 75ai. 캔버스에 포커스가 있고 단일 컨테이너를 선택한 상태에서 `Enter`는 첫 visible 직접 자식, `Shift+Enter`는 마지막 visible 직접 자식으로 선택을 내립니다. 숨겨진 자식만 있는 컨테이너·자식이 없는 컨트롤·다중 선택·Toolbox 배치 모드에서는 Window가 키를 소비하지 않으며, Object Tree와 Property Inspector 선택은 기존 동기화 경로를 사용합니다.
 75aj. 캔버스에 포커스가 있고 단일 요소를 선택한 상태에서 `Alt+Left/Up`은 같은 부모의 이전 visible 형제, `Alt+Right/Down`은 다음 visible 형제로 선택을 이동합니다. 현재 선택이 hidden이면 방향에 맞는 첫/마지막 visible sibling으로 복구하고, root 요소도 Window 형제로 취급하며, `Alt+Shift+Arrow`는 기존 10px nudge를 유지합니다.
-75ak. 캔버스 `Tab`/`Shift+Tab` 선택 순환은 `Edit Tab Order...` 또는 `Edit Tab Order Map...`으로 지정한 `TabIndex`를 낮은 값부터 반영합니다. `auto/-1` 컨트롤은 명시 순서 뒤에 원래 Canvas 순서로 배치되고, 숨겨진 컨트롤은 계속 제외되며 선택이 끝나면 처음/마지막으로 wrap합니다.
+75ak. 캔버스 `Tab`/`Shift+Tab` 선택 순환은 `Edit Tab Order...` 또는 `Edit Tab Order Map...`으로 지정한 `TabIndex`를 낮은 값부터 반영합니다. `auto/-1` 컨트롤은 명시 순서 뒤에 원래 Canvas 순서로 배치되고, 숨겨진 컨트롤은 계속 제외되며 선택이 끝나면 처음/마지막으로 wrap합니다. `Shift+Tab`은 이전 후보를 기존 선택에 누적합니다.
 75al. Canvas `Tab`/`Shift+Tab`은 `IsTabStop=false`로 제외된 컨트롤을 건너뜁니다. `Edit > Include / Exclude from Tab Navigation`의 상태가 즉시 순환 후보에 반영되며, 모든 후보가 제외되면 기존처럼 선택 실패 상태를 표시합니다.
 75am. Canvas `Tab`/`Shift+Tab`은 `IsEnabled=false` 또는 `Focusable=false`인 컨트롤도 건너뛰어 Avalonia 키보드 포커스 조건과 맞춥니다. 활성화·포커스 가능·탭 정지 조건이 모두 맞는 후보만 기존 `TabIndex`와 Canvas 순서로 순환합니다.
 75an. 캔버스에서 단일 요소를 선택한 뒤 `Ctrl+Left/Right/Up/Down`은 해당 방향에 있는 보이는 후보 중 같은 축으로 겹치는 요소를 우선하고 축 거리·보조 거리·Canvas 순서로 가장 가까운 요소를 선택합니다. 후보가 없거나 다중 선택이면 입력을 소비하지 않아 기존 화살표 nudge 경로를 보존합니다.
@@ -448,6 +448,7 @@ AXAML 소스 편집기의 `Validate`와 `Preview`는 현재 디자인과 Undo �
 - v1.57: Canvas Home/End 경계 선택
 - v1.58: Canvas PageUp/PageDown 순차 선택
 - v1.59: Shift+PageUp/PageDown Canvas 누적 선택
+- v1.60: Shift+Tab Tab Order 누적 선택
 
 ## 컴포넌트 팩
 

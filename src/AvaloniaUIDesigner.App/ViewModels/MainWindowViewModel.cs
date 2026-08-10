@@ -1711,7 +1711,7 @@ public partial class MainWindowViewModel : ViewModelBase
         return true;
     }
 
-    public bool SelectNextVisibleElement(bool reverse = false)
+    public bool SelectNextVisibleElement(bool reverse = false, bool append = false)
     {
         var candidates = Canvas.Elements
             .Where(element => Canvas.IsElementVisibleOnCanvas(element)
@@ -1736,8 +1736,17 @@ public partial class MainWindowViewModel : ViewModelBase
             : currentIndex < 0 || currentIndex == candidates.Count - 1 ? 0 : currentIndex + 1;
 
         var next = candidates[nextIndex];
-        SelectElement(next);
-        StatusText = $"Selected {next.DisplayName} ({nextIndex + 1}/{candidates.Count})";
+        if (append)
+        {
+            SelectElements(Canvas.SelectedElements.Concat([next]));
+            StatusText = $"Added {next.DisplayName} from Tab Order ({Canvas.SelectedElements.Count} selected).";
+        }
+        else
+        {
+            SelectElement(next);
+            StatusText = $"Selected {next.DisplayName} ({nextIndex + 1}/{candidates.Count})";
+        }
+
         return true;
     }
 

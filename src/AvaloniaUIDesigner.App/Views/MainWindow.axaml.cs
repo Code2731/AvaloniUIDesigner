@@ -94,7 +94,7 @@ public partial class MainWindow : Window
         Ctrl+Shift+V        Paste visual style
         Ctrl+Shift+G        Clear design guides
         Tab                 Select next enabled focusable tab-stop control in Tab Order
-        Shift+Tab           Select previous enabled focusable tab-stop control in Tab Order
+        Shift+Tab           Add previous enabled focusable tab-stop control to selection
         Home/End            Select the first/last visible control in Canvas order
         PageUp/PageDown     Select previous/next visible control in Canvas order
         Shift+PageUp/Down   Add previous/next visible control to selection
@@ -4402,7 +4402,7 @@ public partial class MainWindow : Window
 
         if (!ctrl && e.Key == Key.Tab && ReferenceEquals(e.Source, DesignHost))
         {
-            Vm.SelectNextVisibleElement(shift);
+            Vm.SelectNextVisibleElement(shift, append: shift);
             e.Handled = true;
             return;
         }
