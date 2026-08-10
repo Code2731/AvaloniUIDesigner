@@ -189,6 +189,8 @@ public partial class MainWindow : Window
     private const double MarqueeThreshold = 3;
     private const double SmartSnapThreshold = 6;
     private const double GuideHitThreshold = 8;
+    private const double ViewportEdgePanThreshold = 48;
+    private const double ViewportEdgePanStep = 24;
     private static readonly DataFormat<string> ToolboxDragDataFormat =
         DataFormat.CreateStringApplicationFormat("AvaloniaUIDesigner.ToolboxItem");
     private static readonly DataFormat<string> ObjectTreeDragDataFormat =
@@ -5901,6 +5903,7 @@ public partial class MainWindow : Window
             return;
         }
 
+        TryAutoPanDesignViewport(e.GetPosition(DesignViewport));
         var parent = item.IsPreset
             ? null
             : Vm.FindDropContainer(e.GetPosition(host));
@@ -5925,6 +5928,41 @@ public partial class MainWindow : Window
 
         e.DragEffects = DragDropEffects.Copy;
         e.Handled = true;
+    }
+
+    private bool TryAutoPanDesignViewport(Point viewportPoint)
+    {
+        var viewport = DesignScrollViewer.Viewport;
+        var extent = DesignScrollViewer.Extent;
+        if (viewport.Width <= 0
+            || viewport.Height <= 0
+            || extent.Width <= viewport.Width && extent.Height <= viewport.Height)
+        {
+            return false;
+        }
+
+        var deltaX = viewportPoint.X < ViewportEdgePanThreshold
+            ? -ViewportEdgePanStep
+            : viewportPoint.X > viewport.Width - ViewportEdgePanThreshold
+                ? ViewportEdgePanStep
+                : 0;
+        var deltaY = viewportPoint.Y < ViewportEdgePanThreshold
+            ? -ViewportEdgePanStep
+            : viewportPoint.Y > viewport.Height - ViewportEdgePanThreshold
+                ? ViewportEdgePanStep
+                : 0;
+        var maxX = Math.Max(0, extent.Width - viewport.Width);
+        var maxY = Math.Max(0, extent.Height - viewport.Height);
+        var nextOffset = new Vector(
+            Math.Clamp(DesignScrollViewer.Offset.X + deltaX, 0, maxX),
+            Math.Clamp(DesignScrollViewer.Offset.Y + deltaY, 0, maxY));
+        if (nextOffset == DesignScrollViewer.Offset)
+        {
+            return false;
+        }
+
+        DesignScrollViewer.Offset = nextOffset;
+        return true;
     }
 
     private void OnDesignSurfaceDrop(object? sender, DragEventArgs e)

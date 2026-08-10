@@ -25,6 +25,7 @@ dotnet run --project src/AvaloniaUIDesigner.App/AvaloniaUIDesigner.App.csproj
 - **Toolbox 키보드 작업**: 검색창 `Enter`로 첫 결과를 아트보드 중앙에 빠르게 배치하고, 카테고리 내부 ListBox에서 방향키로 이동한 뒤 `Enter`로 배치·`Space`로 즐겨찾기를 토글
 - **Toolbox 배치 모드**: `Ctrl+Alt+T`로 검색창에 포커스하고 `Ctrl+Alt+P` 또는 Toolbox 헤더의 `Pick`으로 첫 검색 결과를 선택해 배치 모드를 시작하며, 헤더 `Cancel`·`Ctrl+Alt+P` 재입력·`Escape`로 종료
 - **Toolbox 배치 미리보기**: 배치 모드에서 Canvas 위에 항목의 실제 기본 크기·그리드 스냅 좌표를 ghost로 표시하고, 클릭 시 미리 본 위치에 배치하며 Canvas 밖·드래그 작업에서는 미리보기를 숨김
+- **Toolbox 드래그 viewport 추적**: 큰 아트보드에서 Toolbox 항목을 드래그해 viewport 가장자리에 머물면 ScrollViewer가 수평·수직으로 자동 이동하고, 이동한 좌표에서 target preview·drop 검증을 다시 계산
 - **Toolbox 컨테이너 배치**: 배치 모드에서 포인터 아래 수용 가능한 컨테이너를 주황색 outline으로 강조하고, 클릭하면 Grid 셀·StackPanel/DockPanel/WrapPanel/UniformGrid 순서·Canvas 상대 좌표·Content 슬롯 규칙을 사용해 해당 컨테이너에 삽입
 - **Toolbox 정밀 target 피드백**: Grid·UniformGrid는 예상 셀 bounds, StackPanel·DockPanel·WrapPanel은 삽입선, TabControl·SplitView·Content는 슬롯 bounds를 표시하고 ghost 상세에 target label을 함께 표시
 - **Component Pack Plugins**: `IComponentPackPlugin`을 구현한 외부 DLL을 `File > Load Component Pack Plugin...`에서 로드하고, 플러그인 경로를 세션에 저장해 Toolbox 정의를 재사용
@@ -275,6 +276,7 @@ dotnet run --project src/AvaloniaUIDesigner.App/AvaloniaUIDesigner.App.csproj
 75at. Object Tree에 포커스가 있을 때 `Shift+Home/End`는 anchor부터 첫/마지막 visible 행까지 범위를 선택하고, `Ctrl+Shift+Home/End`는 기존 선택에 해당 경계 범위를 추가합니다. 검색 결과·펼침 상태를 반영하며 현재 경계에서 다시 누르면 선택과 active 행을 유지합니다.
 75au. Canvas·Object Tree·Undo/Redo·문서 탭 전환으로 선택이 바뀌면 Object Tree는 접힌 조상 경로를 먼저 펼치고 선택된 행을 자동으로 `ScrollIntoView`합니다. 지연된 선택 변경이 뒤늦게 실행되어도 최신 선택 행만 스크롤해 이전 선택으로 되돌아가지 않습니다.
 75av. Object Tree·Canvas 키보드·문서 탭 전환으로 visible 컨트롤을 선택하면 DesignHost도 최신 active 요소를 `ScrollIntoView`해 큰 아트보드의 viewport를 따라갑니다. hidden·부모 visibility 제외 요소는 직접 검사 정책을 유지하며 자동 이동하지 않습니다.
+75aw. Toolbox 항목을 아트보드로 드래그할 때 viewport 가장자리 48px 안쪽에 포인터가 있으면 수평·수직 ScrollViewer offset을 한 번에 24px씩 자동 이동합니다. 이동 후 Grid·StackPanel·Content target preview와 drop 판정을 새 좌표로 갱신하고, 이미 scroll 한계에 도달하면 offset을 더 변경하지 않습니다.
 76. `File > Load Component Pack...` 또는 `File > Load Toolbox Preset Pack...`으로 외부 Toolbox 팩을 추가하면 파일 경로가 세션에 등록되어 다음 실행 때 자동으로 다시 로드됩니다. 파일이 없어도 문서 탭 복원은 계속되며 상태바에 경고가 표시됩니다.
 77. 외부 프로젝트의 컨트롤은 Component Pack 항목에 `designOnly: true`, `avaloniaTypeName`, `previewText`, `defaultProperties`를 지정해 등록합니다. 디자이너에서는 타입명 플레이스홀더로 편집하고, 생성 AXAML에는 원래 커스텀 타입과 속성을 출력합니다. 예시는 [custom-component-pack.example.json](docs/custom-component-pack.example.json)을 참고하세요.
 78. `File > Load Component Pack Plugin...`에서 `IComponentPackPlugin`을 구현한 신뢰할 수 있는 DLL을 선택하면 플러그인이 제공한 Component Pack을 Toolbox에 등록합니다. DLL 경로는 세션 JSON의 `ComponentPluginPaths`에 저장되고, 앱 재시작 시 플러그인·JSON 팩·프리셋 팩 순서로 복원됩니다.
@@ -465,6 +467,7 @@ AXAML 소스 편집기의 `Validate`와 `Preview`는 현재 디자인과 Undo �
 - v1.68: Object Tree Shift+Home/End 경계 범위 선택
 - v1.69: Object Tree 선택 행 자동 스크롤
 - v1.70: Canvas active 요소 자동 viewport 추적
+- v1.71: Toolbox 드래그 viewport edge auto-pan
 
 ## 컴포넌트 팩
 
