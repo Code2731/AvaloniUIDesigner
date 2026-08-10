@@ -5848,15 +5848,22 @@ public partial class MainWindow : Window
             UpdateElementNameEditor();
         }
 
-        if (e.PropertyName == nameof(DesignElement.IsLocked))
+        if (e.PropertyName is nameof(DesignElement.IsLocked)
+            or nameof(DesignElement.ParentName)
+            or nameof(DesignElement.ParentLayout)
+            or nameof(DesignElement.IsContainerChild)
+            or nameof(DesignElement.IsCanvasChild))
         {
             UpdateSelectionEditability();
+            UpdateLayoutEditors();
         }
 
         if (e.PropertyName is nameof(DesignElement.X)
             or nameof(DesignElement.Y)
             or nameof(DesignElement.Width)
-            or nameof(DesignElement.Height))
+            or nameof(DesignElement.Height)
+            or nameof(DesignElement.CanvasChildLeft)
+            or nameof(DesignElement.CanvasChildTop))
         {
             UpdateLayoutEditors();
             UpdateHandlePositions();
@@ -5906,7 +5913,9 @@ public partial class MainWindow : Window
     private void UpdateSelectionEditability()
     {
         var canEdit = _boundElement is { IsLocked: false };
-        var canEditLayout = canEdit && _boundElement is not { IsContainerChild: true };
+        var canEditLayout = canEdit
+            && (_boundElement is not { IsContainerChild: true }
+                || _boundElement.IsCanvasChild);
         var canResizeSelection = CanResizeSelection();
 
         PropGrid.IsEnabled = canEdit;
@@ -5962,15 +5971,34 @@ public partial class MainWindow : Window
             return;
         }
 
-        if (double.TryParse(editor.Text, NumberStyles.Float, CultureInfo.InvariantCulture, out var value))
+        if (double.TryParse(
+                editor.Text,
+                NumberStyles.Float,
+                CultureInfo.InvariantCulture,
+                out var value)
+            && double.IsFinite(value))
         {
             switch (editor.Name)
             {
                 case "LayoutXEditor":
-                    _boundElement.X = Math.Max(0, value);
+                    if (_boundElement.IsCanvasChild)
+                    {
+                        _boundElement.CanvasChildLeft = Math.Max(0, value);
+                    }
+                    else
+                    {
+                        _boundElement.X = Math.Max(0, value);
+                    }
                     break;
                 case "LayoutYEditor":
-                    _boundElement.Y = Math.Max(0, value);
+                    if (_boundElement.IsCanvasChild)
+                    {
+                        _boundElement.CanvasChildTop = Math.Max(0, value);
+                    }
+                    else
+                    {
+                        _boundElement.Y = Math.Max(0, value);
+                    }
                     break;
                 case "LayoutWidthEditor":
                     _boundElement.Width = Math.Max(MinSize, value);
@@ -5979,6 +6007,10 @@ public partial class MainWindow : Window
                     _boundElement.Height = Math.Max(MinSize, value);
                     break;
             }
+
+            Vm?.StatusText = _boundElement.IsCanvasChild
+                ? "Updated Canvas child Left/Top/Width/Height values."
+                : "Updated element X/Y/Width/Height values.";
         }
 
         UpdateLayoutEditors();
@@ -5993,11 +6025,18 @@ public partial class MainWindow : Window
             LayoutYEditor.Text = string.Empty;
             LayoutWidthEditor.Text = string.Empty;
             LayoutHeightEditor.Text = string.Empty;
+            LayoutXLabel.Text = "X";
+            LayoutYLabel.Text = "Y";
             return;
         }
 
-        LayoutXEditor.Text = _boundElement.X.ToString("0.###", CultureInfo.InvariantCulture);
-        LayoutYEditor.Text = _boundElement.Y.ToString("0.###", CultureInfo.InvariantCulture);
+        var isCanvasChild = _boundElement.IsCanvasChild;
+        LayoutXLabel.Text = isCanvasChild ? "Left" : "X";
+        LayoutYLabel.Text = isCanvasChild ? "Top" : "Y";
+        LayoutXEditor.Text = (isCanvasChild ? _boundElement.CanvasChildLeft : _boundElement.X)
+            .ToString("0.###", CultureInfo.InvariantCulture);
+        LayoutYEditor.Text = (isCanvasChild ? _boundElement.CanvasChildTop : _boundElement.Y)
+            .ToString("0.###", CultureInfo.InvariantCulture);
         LayoutWidthEditor.Text = _boundElement.Width.ToString("0.###", CultureInfo.InvariantCulture);
         LayoutHeightEditor.Text = _boundElement.Height.ToString("0.###", CultureInfo.InvariantCulture);
     }

@@ -69,6 +69,7 @@ dotnet run --project src/AvaloniaUIDesigner.App/AvaloniaUIDesigner.App.csproj
 - **디자인 그리드**: 그리드 표시·Snap to Grid를 전환하고 4·8·16px 프리셋 또는 4~32px 사용자 지정 간격을 편집하며 문서 설정·Undo/Redo·Preview·AXAML 메타데이터에 보존
 - **계층 클립보드**: 컨테이너를 선택해 복사·잘라내기·붙여넣기·복제하면 내부 자식 계층과 부모별 배치 메타데이터를 함께 보존하고, 선택된 지원 컨테이너가 있으면 `Ctrl+V`/Paste로 해당 부모의 슬롯에 삽입하며, 붙여넣은 부모 이름은 새 이름으로 재매핑
 - **컨테이너 편집**: Grid 셀, StackPanel 순서·주축 크기, DockPanel 순서·방향·크기·LastChildFill, WrapPanel 순서·방향·항목 크기·간격·정렬, UniformGrid 순서·행·열·첫 열·간격, 중첩 Canvas 로컬 좌표·직접 변형·z-order, TabControl 탭 정의·탭별 단일 자식·활성 페이지·TabStripPlacement·콘텐츠 정렬, SplitView Pane·Content 슬롯·Inline/Overlay·배치 방향, Border·ContentControl·UserControl·ScrollViewer·Expander의 단일 Content 자식을 편집하고 재귀 Object Tree·AXAML·미리보기에 보존
+- **Canvas 자식 기하 편집**: Property Inspector의 X/Y/W/H 입력을 Canvas 자식에서는 로컬 `Canvas.Left`·`Canvas.Top`·Width·Height로 전환해 직접 편집하고, 부모 기준 화면 좌표·Object Tree·Undo/Redo·AXAML을 동기화
 - **계층 항목 편집**: TreeView 항목을 `[-]`(펼침), `[+]`(접힘), 두 칸 들여쓰기 문법으로 편집하고 Undo/Redo, 복제, 미리보기, AXAML 왕복에 보존
 - **메뉴 구조 편집**: Menu 항목을 두 칸 들여쓰기로 중첩하고 `---` 구분선, `[x]/[ ]` 체크, `(x)/( )` 라디오와 `{Group}`, `| Ctrl+N` 표시·실행 단축키를 편집해 Undo/Redo, 복제, 미리보기, AXAML 왕복에 보존
 - **DataGrid 열 설계**: Text·CheckBox 열의 Header·Binding·Width·ReadOnly를 편집하고 샘플 행, Undo/Redo, 복제, 미리보기, AXAML 왕복에 보존
@@ -188,6 +189,7 @@ dotnet run --project src/AvaloniaUIDesigner.App/AvaloniaUIDesigner.App.csproj
 11. `Edit > Edit Sample Data...`에서 JSON 샘플 DataContext를 검증하고 바인딩된 컨트롤에 적용
 12. `Edit > Edit Layout Properties...`에서 선택 컨트롤의 Margin·Padding·Alignment·Min/Max 크기 편집
 12a. 두 개 이상의 호환 컨트롤을 선택한 뒤 `Edit > Edit Selection Bounds...`에서 union bounds의 `X/Y/W/H`를 직접 입력해 선택 영역을 정밀 배치·확대/축소
+12b. Canvas 안의 자식 컨트롤을 선택하면 Property Inspector의 `Left`·`Top`·`W`·`H`에서 부모 Canvas 기준 로컬 좌표와 크기를 직접 편집
 13. `Edit > Edit Typography Properties...`에서 글꼴과 지원 컨트롤의 텍스트 정렬·줄바꿈 편집
 14. `Edit > Edit Transform Properties...`에서 선택 컨트롤의 이동·회전·크기·기울기와 변환 기준점 편집
 15. `Edit > Edit Accessibility & Navigation...`에서 스크린리더 메타데이터와 키보드 포커스 순서 편집
@@ -359,6 +361,7 @@ dotnet run --project src/AvaloniaUIDesigner.App/AvaloniaUIDesigner.App.csproj
 103. Design Toolbar의 Grid 그룹은 `4`, `8`, `16`, `...` 버튼을 제공해 Grid Size 메뉴를 열지 않고도 자주 쓰는 간격을 즉시 적용하거나 Custom Grid Size 대화상자를 열 수 있습니다. 버튼은 기존 `SetCanvasGridSize`와 같은 Undo·문서 메타데이터·상태 메시지 경로를 사용합니다.
 104. Grid 그룹의 현재 간격 표시(`8 px`, 사용자 지정 `12.5 px` 등)는 `Canvas.GridSize` 변경 알림에 연결되어 프리셋·Custom 입력·AXAML 문서 메타데이터 로드·Undo/Redo 뒤에도 실제 스냅 간격과 일치합니다.
 105. 두 개 이상의 같은 root 또는 같은 Canvas 형제 컨트롤을 선택해 `Edit > Edit Selection Bounds...`를 열면 현재 union bounds가 `X/Y/W/H` 입력값으로 채워집니다. `X/Y`는 0 이상, `W/H`는 최소 10px로 검증하고, 적용 시 각 컨트롤의 상대 위치·크기를 같은 비율로 변환해 Canvas 로컬 좌표·Preview·AXAML·하나의 Transform Undo에 반영합니다. Grid·StackPanel·Content 자식, 잠긴 컨트롤, 서로 다른 부모가 섞인 선택에서는 메뉴 규칙과 상태 메시지로 안전하게 차단합니다.
+106. Canvas 자식을 선택하면 Property Inspector의 첫 번째 기하 행이 문서 절대 `X/Y` 대신 부모 기준 `Left/Top`으로 표시됩니다. 값을 잃으면 기존 Canvas reflow가 `DesignElement.X/Y`를 부모 위치와 합산해 다시 계산하고, Width/Height 변경과 함께 하나의 layout Transform Undo, Canvas.Left/Top AXAML, Preview 결과를 유지합니다. Canvas 이외 부모 레이아웃 자식의 기하 입력은 계속 비활성화됩니다.
 
 DataGrid가 포함된 생성 AXAML을 다른 프로젝트에서 사용할 때는 같은 Avalonia 버전의 `Avalonia.Controls.DataGrid` 패키지와 `avares://Avalonia.Controls.DataGrid/Themes/Fluent.xaml` 스타일 include가 필요합니다.
 
@@ -582,6 +585,7 @@ AXAML 소스 편집기의 `Validate`와 `Preview`는 현재 디자인과 Undo �
 - v2.15: Design Toolbar Grid Size Quick Controls 추가
 - v2.16: Design Toolbar 현재 Grid Size 상태 피드백 추가
 - v2.17: 다중 선택 Selection Bounds 숫자 직접 편집 추가
+- v2.18: Canvas 자식 로컬 기하값 Property Inspector 직접 편집 추가
 
 ## 컴포넌트 팩
 
