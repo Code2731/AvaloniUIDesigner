@@ -206,12 +206,6 @@ public partial class MainWindow : Window
 
     private enum GuideOrientation { Horizontal, Vertical }
 
-    private sealed record GuideState(
-        IReadOnlyList<double> HorizontalGuides,
-        IReadOnlyList<double> VerticalGuides,
-        bool ShowDesignGuides,
-        bool SnapToGuides);
-
     private DragMode _dragMode = DragMode.None;
     private Point _dragStart;
     private double _origX, _origY, _origW, _origH;
@@ -232,7 +226,7 @@ public partial class MainWindow : Window
     private Point? _viewportPointer;
     private readonly List<double> _horizontalGuides = new();
     private readonly List<double> _verticalGuides = new();
-    private readonly Dictionary<DocumentTabViewModel, GuideState> _documentGuideStates = new();
+    private readonly Dictionary<DocumentTabViewModel, DocumentGuideState> _documentGuideStates = new();
     private DocumentTabViewModel? _guideStateTab;
     private bool _showDesignGuides = true;
     private bool _snapToGuides = true;
@@ -5304,11 +5298,13 @@ public partial class MainWindow : Window
             return;
         }
 
-        _documentGuideStates[tab] = new GuideState(
+        var state = new DocumentGuideState(
             _horizontalGuides.ToArray(),
             _verticalGuides.ToArray(),
             _showDesignGuides,
             _snapToGuides);
+        _documentGuideStates[tab] = state;
+        tab.GuideState = state;
     }
 
     private void RestoreDesignGuidesForTab(DocumentTabViewModel? tab)
@@ -5318,19 +5314,20 @@ public partial class MainWindow : Window
         _isDraggingGuide = false;
         _guideIndex = -1;
 
-        if (tab is not null
-            && _documentGuideStates.TryGetValue(tab, out var state))
+        var state = tab is not null
+            && _documentGuideStates.TryGetValue(tab, out var cachedState)
+            ? cachedState
+            : tab?.GuideState ?? DocumentGuideState.Default;
+        if (tab is not null)
         {
-            _horizontalGuides.AddRange(state.HorizontalGuides);
-            _verticalGuides.AddRange(state.VerticalGuides);
-            _showDesignGuides = state.ShowDesignGuides;
-            _snapToGuides = state.SnapToGuides;
+            _documentGuideStates[tab] = state;
+            tab.GuideState = state;
         }
-        else
-        {
-            _showDesignGuides = true;
-            _snapToGuides = true;
-        }
+
+        _horizontalGuides.AddRange(state.HorizontalGuides);
+        _verticalGuides.AddRange(state.VerticalGuides);
+        _showDesignGuides = state.ShowDesignGuides;
+        _snapToGuides = state.SnapToGuides;
 
         ShowDesignGuidesMenu.IsChecked = _showDesignGuides;
         SnapToGuidesMenu.IsChecked = _snapToGuides;
@@ -13923,6 +13920,7 @@ public partial class MainWindow : Window
         }
 
         SyncWorkspacePanelState();
+        CaptureDesignGuidesForTab(Vm.SelectedDocumentTab);
         Vm.SaveSession();
         _allowCloseWithoutPrompt = true;
         _previewWindow?.Close();

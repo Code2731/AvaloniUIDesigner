@@ -4,6 +4,19 @@ using Avalonia.Media;
 
 namespace AvaloniaUIDesigner.App.ViewModels;
 
+public sealed record DocumentGuideState(
+    IReadOnlyList<double> HorizontalGuides,
+    IReadOnlyList<double> VerticalGuides,
+    bool ShowDesignGuides,
+    bool SnapToGuides)
+{
+    public static DocumentGuideState Default { get; } = new(
+        Array.Empty<double>(),
+        Array.Empty<double>(),
+        ShowDesignGuides: true,
+        SnapToGuides: true);
+}
+
 public sealed class DocumentTabViewModel : ViewModelBase
 {
     private static readonly IBrush ActiveTabBackground = Brush.Parse("#FFFFFF");
@@ -41,6 +54,8 @@ public sealed class DocumentTabViewModel : ViewModelBase
     public bool IsDirty => _isDirty;
 
     public bool CanClose => _canClose;
+
+    internal DocumentGuideState GuideState { get; set; } = DocumentGuideState.Default;
 
     internal void SetDropTarget(bool isDropTarget)
     {

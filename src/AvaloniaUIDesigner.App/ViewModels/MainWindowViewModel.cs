@@ -9795,7 +9795,11 @@ public partial class MainWindowViewModel : ViewModelBase
             state.PropertyInspectorFilterText,
             state.PropertyInspectorCategoriesVisible,
             state.PropertyInspectorAllCategoriesExpanded,
-            state.CustomDisplayName);
+            state.CustomDisplayName,
+            state.Tab.GuideState.HorizontalGuides.ToList(),
+            state.Tab.GuideState.VerticalGuides.ToList(),
+            state.Tab.GuideState.ShowDesignGuides,
+            state.Tab.GuideState.SnapToGuides);
 
     public bool TryRestoreSessionJson(string json, out string error)
     {
@@ -9868,6 +9872,7 @@ public partial class MainWindowViewModel : ViewModelBase
                 lastSavedSnapshot: restoredDocument.SavedDocument,
                 activate: false);
             var state = _documentTabStates[tab];
+            tab.GuideState = restoredDocument.GuideState;
             CopyHistoryStack(CreateHistoryStack(restoredDocument.UndoHistory), state.UndoStack);
             CopyHistoryStack(CreateHistoryStack(restoredDocument.RedoHistory), state.RedoStack);
             state.ZoomScale = restoredDocument.ZoomScale;
@@ -9934,6 +9939,7 @@ public partial class MainWindowViewModel : ViewModelBase
             ?? new List<string>();
         var propertyInspectorFilterText = persistedTab.PropertyInspectorFilterText?.Trim()
             ?? string.Empty;
+        var guideState = ParseDocumentGuideState(persistedTab, currentDocument);
         return new RestoredDocumentTab(
             persistedTab.DocumentPath,
             displayName,
@@ -9946,7 +9952,37 @@ public partial class MainWindowViewModel : ViewModelBase
             selectedElementNames,
             propertyInspectorFilterText,
             persistedTab.PropertyInspectorCategoriesVisible,
-            persistedTab.PropertyInspectorAllCategoriesExpanded);
+            persistedTab.PropertyInspectorAllCategoriesExpanded,
+            guideState);
+    }
+
+    private static DocumentGuideState ParseDocumentGuideState(
+        PersistedDocumentTab persistedTab,
+        DesignerCanvasDocument document)
+    {
+        var settings = document.Settings;
+        var width = settings?.Width ?? 1280;
+        var height = settings?.Height ?? 800;
+        return new DocumentGuideState(
+            NormalizeGuidePositions(persistedTab.HorizontalGuides, height),
+            NormalizeGuidePositions(persistedTab.VerticalGuides, width),
+            persistedTab.ShowDesignGuides,
+            persistedTab.SnapToGuides);
+    }
+
+    private static List<double> NormalizeGuidePositions(
+        IEnumerable<double>? positions,
+        double maximum)
+    {
+        var limit = double.IsFinite(maximum) && maximum > 0
+            ? maximum
+            : 100_000;
+        return (positions ?? [])
+            .Where(position => double.IsFinite(position) && position >= 0 && position <= limit)
+            .Distinct()
+            .OrderBy(position => position)
+            .Take(128)
+            .ToList();
     }
 
     private static DocumentTabState CreateRestoredDocumentTabState(
@@ -9966,6 +10002,7 @@ public partial class MainWindowViewModel : ViewModelBase
         state.PropertyInspectorCategoriesVisible = restoredDocument.PropertyInspectorCategoriesVisible;
         state.PropertyInspectorAllCategoriesExpanded = restoredDocument.PropertyInspectorAllCategoriesExpanded;
         state.CustomDisplayName = restoredDocument.CustomDisplayName;
+        state.Tab.GuideState = restoredDocument.GuideState;
         return state;
     }
 
@@ -17803,7 +17840,11 @@ public partial class MainWindowViewModel : ViewModelBase
         string? PropertyInspectorFilterText = null,
         bool PropertyInspectorCategoriesVisible = true,
         bool PropertyInspectorAllCategoriesExpanded = true,
-        string? TabTitle = null);
+        string? TabTitle = null,
+        List<double>? HorizontalGuides = null,
+        List<double>? VerticalGuides = null,
+        bool ShowDesignGuides = true,
+        bool SnapToGuides = true);
 
     private sealed record PersistedHistoryEntry(
         string BeforeAxaml,
@@ -17827,7 +17868,8 @@ public partial class MainWindowViewModel : ViewModelBase
         List<string> SelectedElementNames,
         string PropertyInspectorFilterText,
         bool PropertyInspectorCategoriesVisible,
-        bool PropertyInspectorAllCategoriesExpanded);
+        bool PropertyInspectorAllCategoriesExpanded,
+        DocumentGuideState GuideState);
 
     private sealed record PendingMutation(DesignerCanvasDocument Before, HistoryActionType ActionType, string Message);
 
