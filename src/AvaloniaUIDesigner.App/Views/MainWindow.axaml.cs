@@ -61,6 +61,7 @@ public partial class MainWindow : Window
         Ctrl+Alt+Shift+W/H/S Match selected control widths/heights/sizes
         Ctrl+Alt+Shift+X/Y Center selection on artboard horizontally/vertically
         Ctrl+Alt+Shift+C   Center selection on artboard on both axes
+        Ctrl+Alt+Shift+Arrow Align selection to the matching artboard edge
         Ctrl+Alt+G          Toggle design grid
         Ctrl+Alt+Shift+G    Toggle snap to grid
         Ctrl+Alt+1          Toggle Toolbox panel
@@ -3943,6 +3944,26 @@ public partial class MainWindow : Window
     private void OnCenterOnArtboardMenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
         => CenterSelectedElementsOnArtboard(horizontally: true, vertically: true);
 
+    private void OnAlignLeftToArtboardMenuClicked(
+        object? sender,
+        Avalonia.Interactivity.RoutedEventArgs e)
+        => AlignSelectedElementsToArtboard(MainWindowViewModel.ArtboardAlignment.Left);
+
+    private void OnAlignRightToArtboardMenuClicked(
+        object? sender,
+        Avalonia.Interactivity.RoutedEventArgs e)
+        => AlignSelectedElementsToArtboard(MainWindowViewModel.ArtboardAlignment.Right);
+
+    private void OnAlignTopToArtboardMenuClicked(
+        object? sender,
+        Avalonia.Interactivity.RoutedEventArgs e)
+        => AlignSelectedElementsToArtboard(MainWindowViewModel.ArtboardAlignment.Top);
+
+    private void OnAlignBottomToArtboardMenuClicked(
+        object? sender,
+        Avalonia.Interactivity.RoutedEventArgs e)
+        => AlignSelectedElementsToArtboard(MainWindowViewModel.ArtboardAlignment.Bottom);
+
     private void OnLayoutSelectedHorizontallyMenuClicked(
         object? sender,
         Avalonia.Interactivity.RoutedEventArgs e)
@@ -4084,6 +4105,12 @@ public partial class MainWindow : Window
     {
         FlushPendingPropertyHistory();
         Vm?.CenterSelectedElementsOnArtboard(horizontally, vertically);
+    }
+
+    private void AlignSelectedElementsToArtboard(MainWindowViewModel.ArtboardAlignment alignment)
+    {
+        FlushPendingPropertyHistory();
+        Vm?.AlignSelectedElementsToArtboard(alignment);
     }
 
     private void OnObjectTreeSearchKeyDown(object? sender, KeyEventArgs e)
@@ -4642,6 +4669,21 @@ public partial class MainWindow : Window
         if (ctrl && alt && shift && keyboardArtboardCenter is { } center)
         {
             CenterSelectedElementsOnArtboard(center.Horizontally, center.Vertically);
+            e.Handled = true;
+            return;
+        }
+
+        var keyboardArtboardEdge = e.Key switch
+        {
+            Key.Left => MainWindowViewModel.ArtboardAlignment.Left,
+            Key.Right => MainWindowViewModel.ArtboardAlignment.Right,
+            Key.Up => MainWindowViewModel.ArtboardAlignment.Top,
+            Key.Down => MainWindowViewModel.ArtboardAlignment.Bottom,
+            _ => (MainWindowViewModel.ArtboardAlignment?)null,
+        };
+        if (ctrl && alt && shift && keyboardArtboardEdge is { } artboardEdge)
+        {
+            AlignSelectedElementsToArtboard(artboardEdge);
             e.Handled = true;
             return;
         }

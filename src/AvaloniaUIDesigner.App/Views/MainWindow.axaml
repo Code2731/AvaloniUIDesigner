@@ -207,6 +207,12 @@
                     <MenuItem Header="Vertically (Ctrl+Alt+Shift+Y)" Click="OnCenterVerticallyOnArtboardMenuClicked"/>
                     <MenuItem Header="Both (Ctrl+Alt+Shift+C)" Click="OnCenterOnArtboardMenuClicked"/>
                 </MenuItem>
+                <MenuItem Header="Align to Artboard" IsEnabled="{Binding Canvas.IsSelectionActive}">
+                    <MenuItem Header="Left (Ctrl+Alt+Shift+Left)" Click="OnAlignLeftToArtboardMenuClicked"/>
+                    <MenuItem Header="Right (Ctrl+Alt+Shift+Right)" Click="OnAlignRightToArtboardMenuClicked"/>
+                    <MenuItem Header="Top (Ctrl+Alt+Shift+Up)" Click="OnAlignTopToArtboardMenuClicked"/>
+                    <MenuItem Header="Bottom (Ctrl+Alt+Shift+Down)" Click="OnAlignBottomToArtboardMenuClicked"/>
+                </MenuItem>
                 <MenuItem Header="Arrange" IsEnabled="{Binding Canvas.HasMultipleSelection}">
                     <MenuItem Header="Align Left (Ctrl+Shift+Left)" Click="OnAlignLeftMenuClicked"/>
                     <MenuItem Header="Align Center (Ctrl+Shift+E)" Click="OnAlignCenterMenuClicked"/>
@@ -549,6 +555,31 @@
                             ToolTip.Tip="Center selected controls on both axes"
                             MinWidth="34"
                             Padding="5,3"/>
+                    <TextBlock Text="Form"
+                               VerticalAlignment="Center"
+                               FontSize="11"
+                               Foreground="#64748B"
+                               Margin="2,0,0,0"/>
+                    <Button Content="Left"
+                            Click="OnAlignLeftToArtboardMenuClicked"
+                            IsEnabled="{Binding Canvas.IsSelectionActive}"
+                            ToolTip.Tip="Align selected root controls to the artboard left edge"
+                            Padding="7,3"/>
+                    <Button Content="Right"
+                            Click="OnAlignRightToArtboardMenuClicked"
+                            IsEnabled="{Binding Canvas.IsSelectionActive}"
+                            ToolTip.Tip="Align selected root controls to the artboard right edge"
+                            Padding="7,3"/>
+                    <Button Content="Top"
+                            Click="OnAlignTopToArtboardMenuClicked"
+                            IsEnabled="{Binding Canvas.IsSelectionActive}"
+                            ToolTip.Tip="Align selected root controls to the artboard top edge"
+                            Padding="7,3"/>
+                    <Button Content="Bottom"
+                            Click="OnAlignBottomToArtboardMenuClicked"
+                            IsEnabled="{Binding Canvas.IsSelectionActive}"
+                            ToolTip.Tip="Align selected root controls to the artboard bottom edge"
+                            Padding="7,3"/>
                     <Border Width="1" Background="#CBD5E1" Margin="0,2"/>
                     <Button Content="Group"
                             Click="OnGroupSelectedMenuClicked"

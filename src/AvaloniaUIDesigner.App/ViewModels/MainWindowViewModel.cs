@@ -9041,6 +9041,49 @@ public partial class MainWindowViewModel : ViewModelBase
                 : $"Vertically centered {targets.Count} control(s) on the artboard.";
     }
 
+    public void AlignSelectedElementsToArtboard(ArtboardAlignment alignment)
+    {
+        var targets = Canvas.SelectedElements.Where(element => !element.IsLocked).ToList();
+        if (targets.Count == 0)
+        {
+            StatusText = "Select an unlocked control to align to the artboard.";
+            return;
+        }
+
+        if (!TryValidateRootOrCanvasSiblingSelection(
+                targets,
+                "Align to Artboard",
+                allowCanvasChildren: false,
+                out var selectionError))
+        {
+            StatusText = selectionError;
+            return;
+        }
+
+        BeginCanvasMutation(HistoryActionType.TransformElement, "Aligned controls to artboard edge.");
+        foreach (var element in targets)
+        {
+            switch (alignment)
+            {
+                case ArtboardAlignment.Left:
+                    element.X = 0;
+                    break;
+                case ArtboardAlignment.Right:
+                    element.X = Math.Max(0, Canvas.ArtboardWidth - element.Width);
+                    break;
+                case ArtboardAlignment.Top:
+                    element.Y = 0;
+                    break;
+                case ArtboardAlignment.Bottom:
+                    element.Y = Math.Max(0, Canvas.ArtboardHeight - element.Height);
+                    break;
+            }
+        }
+
+        CommitCanvasMutation();
+        StatusText = $"Aligned {targets.Count} control(s) to the artboard {alignment.ToString().ToLowerInvariant()} edge.";
+    }
+
     private bool TryValidateRootOrCanvasSiblingSelection(
         IReadOnlyList<DesignElement> targets,
         string operation,
@@ -17799,6 +17842,14 @@ public partial class MainWindowViewModel : ViewModelBase
         MakeSameWidth,
         MakeSameHeight,
         MakeSameSize,
+    }
+
+    public enum ArtboardAlignment
+    {
+        Left,
+        Right,
+        Top,
+        Bottom,
     }
 
     public enum LayerOrderAction
