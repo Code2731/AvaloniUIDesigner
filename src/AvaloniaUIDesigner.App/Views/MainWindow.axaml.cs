@@ -194,6 +194,7 @@ public partial class MainWindow : Window
     }
 
     private const double HandlePixelSize = 10;
+    private const double SelectionOutlinePixelSize = 1;
     private const double MinSize = 10;
     private const double MarqueeThreshold = 3;
     private const double SmartSnapThreshold = 6;
@@ -6002,6 +6003,8 @@ public partial class MainWindow : Window
 
         SelectionBoundsRectangle.Width = bounds.Width;
         SelectionBoundsRectangle.Height = bounds.Height;
+        var zoom = Math.Clamp(Vm?.Canvas.ZoomScale ?? 1, 0.25, 2);
+        SelectionBoundsRectangle.StrokeThickness = SelectionOutlinePixelSize / zoom;
         Canvas.SetLeft(SelectionBoundsRectangle, bounds.X);
         Canvas.SetTop(SelectionBoundsRectangle, bounds.Y);
 

@@ -59,6 +59,7 @@ dotnet run --project src/AvaloniaUIDesigner.App/AvaloniaUIDesigner.App.csproj
 - **Selection Breadcrumb**: Design Surface 헤더에 현재 선택 컨트롤의 `Parent / Child` 계층 경로를 표시하고 각 경로 항목을 클릭해 해당 컨테이너를 바로 선택하며, `Up`·`Into` 버튼으로 기존 Escape 부모 선택·Enter 자식 진입도 직접 실행하고 재부모화·이름 변경을 즉시 반영
 - **Selection Bounds HUD**: Design Surface 헤더에 선택 영역의 아트보드 기준 `X/Y/W/H` bounds를 실시간 표시해 단일·다중 선택의 위치와 크기를 메뉴를 열지 않고 확인
 - **Aggregate Selection Adorner**: 다중 선택 시 8방향 핸들을 연결하는 전체 선택 영역 외곽선을 표시해 이동·리사이즈 대상과 선택 범위를 캔버스에서 즉시 식별
+- **줌 독립 선택 외곽선**: Aggregate Selection Adorner 외곽선의 StrokeThickness를 확대 배율과 반비례하게 조정해 25~200%에서도 화면상 약 1px 선명도를 유지
 - **패널 포커스 복구**: 숨겨진 패널에서도 `Ctrl+Alt+T/P/I` 또는 `Ctrl+F`를 누르면 필요한 Toolbox·Object Tree·Property Inspector를 자동으로 다시 표시한 뒤 검색·배치 작업으로 진입
 - **리사이즈 비율 잠금**: 코너 핸들을 `Shift`와 함께 드래그하면 단일 컨트롤과 다중 선택 bounding box의 원래 가로·세로 비율을 유지하며, 잠금 중에는 Smart Snap보다 비율을 우선합니다.
 - **줌 독립 리사이즈 핸들**: 선택 핸들의 화면상 클릭 영역을 약 10px로 유지해 25~200% 확대·축소에서도 핸들이 지나치게 작거나 커지지 않으며, 줌 변경 시 문서 좌표 크기를 자동으로 역산합니다.
@@ -350,6 +351,7 @@ dotnet run --project src/AvaloniaUIDesigner.App/AvaloniaUIDesigner.App.csproj
 99. 선택 Adorner의 8방향 리사이즈 핸들은 아트보드 확대 배율과 반비례하는 문서 좌표 크기를 사용해 화면상 약 10px로 고정됩니다. 따라서 25%에서는 충분한 hit target을 확보하고 200%에서도 핸들이 선택 영역을 과도하게 가리지 않으며, 단일·다중 선택과 기존 Smart Snap/Shift 비율 잠금 동작은 그대로 유지됩니다.
 100. Design Surface 헤더의 Selection Bounds HUD는 선택된 컨트롤들의 실제 아트보드 bounds를 `X: ... Y: ... W: ... H: ...` 형식으로 표시합니다. 단일·다중 선택 변경과 이동·리사이즈·속성 편집에 즉시 반응하며, 선택이 없을 때는 숨겨져 기존 헤더와 계층 breadcrumb 공간을 침범하지 않습니다.
 101. 다중 선택의 Selection Adorner는 선택된 컨트롤들의 union bounds에 맞춰 투명한 외곽선을 그리고, 8방향 리사이즈 핸들과 같은 아트보드 좌표로 갱신됩니다. 외곽선은 입력을 가로채지 않아 기존 컨트롤 선택·드래그·리사이즈 동작을 유지합니다.
+102. Aggregate Selection Adorner 외곽선은 현재 ZoomScale의 역수로 StrokeThickness를 계산합니다. 따라서 25%에서는 문서상 4px, 100%에서는 1px, 200%에서는 0.5px을 사용해 각 확대 단계에서 화면상 약 1px으로 보이며, 줌 변경 시 bounds·핸들과 함께 즉시 갱신됩니다.
 
 DataGrid가 포함된 생성 AXAML을 다른 프로젝트에서 사용할 때는 같은 Avalonia 버전의 `Avalonia.Controls.DataGrid` 패키지와 `avares://Avalonia.Controls.DataGrid/Themes/Fluent.xaml` 스타일 include가 필요합니다.
 
@@ -569,6 +571,7 @@ AXAML 소스 편집기의 `Validate`와 `Preview`는 현재 디자인과 Undo �
 - v2.11: 줌 독립 선택 리사이즈 핸들 추가
 - v2.12: Selection Bounds HUD와 실시간 위치·크기 피드백 추가
 - v2.13: 다중 선택 Aggregate Selection Adorner 추가
+- v2.14: 줌 독립 Aggregate Selection Adorner 외곽선 추가
 
 ## 컴포넌트 팩
 
