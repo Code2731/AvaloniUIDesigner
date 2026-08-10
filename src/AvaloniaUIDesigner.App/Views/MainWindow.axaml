@@ -727,6 +727,14 @@
                             ToolTip.Tip="Set a custom design grid spacing"
                             MinWidth="32"
                             Padding="5,3"/>
+                    <TextBlock Name="GridSizeSummaryToolbar"
+                               Text="{Binding Canvas.GridSizeSummary}"
+                               VerticalAlignment="Center"
+                               FontSize="11"
+                               Foreground="#0369A1"
+                               MinWidth="48"
+                               TextAlignment="Center"
+                               ToolTip.Tip="Current design grid spacing"/>
                     <TextBlock Text="Guides"
                                VerticalAlignment="Center"
                                FontSize="11"

@@ -69,6 +69,7 @@ public partial class CanvasViewModel : ViewModelBase
     private bool _snapToGrid = true;
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(GridSizeSummary))]
     private double _gridSize = 8;
 
     [ObservableProperty]
@@ -155,6 +156,11 @@ public partial class CanvasViewModel : ViewModelBase
     public string? ActiveStylePreviewPseudoClass => _stylePreviewPseudoClass;
 
     public string ZoomPercentage => $"{ZoomScale * 100:0}%";
+
+    public string GridSizeSummary => string.Format(
+        CultureInfo.InvariantCulture,
+        "{0:0.###} px",
+        GridSize);
 
     public string ArtboardSizeSummary => $"{ArtboardWidth:0} x {ArtboardHeight:0}";
 

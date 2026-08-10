@@ -61,6 +61,7 @@ dotnet run --project src/AvaloniaUIDesigner.App/AvaloniaUIDesigner.App.csproj
 - **Aggregate Selection Adorner**: 다중 선택 시 8방향 핸들을 연결하는 전체 선택 영역 외곽선을 표시해 이동·리사이즈 대상과 선택 범위를 캔버스에서 즉시 식별
 - **줌 독립 선택 외곽선**: Aggregate Selection Adorner 외곽선의 StrokeThickness를 확대 배율과 반비례하게 조정해 25~200%에서도 화면상 약 1px 선명도를 유지
 - **Grid Size Quick Controls**: Design Toolbar의 Grid 그룹에서 `4`·`8`·`16`px 프리셋과 Custom Grid Size 대화상자를 메뉴 이동 없이 바로 실행
+- **Grid Size 상태 피드백**: Design Toolbar에 현재 Grid 간격을 `px` 단위로 표시하고 프리셋·Custom·문서 복원·Undo/Redo 변경을 즉시 반영
 - **패널 포커스 복구**: 숨겨진 패널에서도 `Ctrl+Alt+T/P/I` 또는 `Ctrl+F`를 누르면 필요한 Toolbox·Object Tree·Property Inspector를 자동으로 다시 표시한 뒤 검색·배치 작업으로 진입
 - **리사이즈 비율 잠금**: 코너 핸들을 `Shift`와 함께 드래그하면 단일 컨트롤과 다중 선택 bounding box의 원래 가로·세로 비율을 유지하며, 잠금 중에는 Smart Snap보다 비율을 우선합니다.
 - **줌 독립 리사이즈 핸들**: 선택 핸들의 화면상 클릭 영역을 약 10px로 유지해 25~200% 확대·축소에서도 핸들이 지나치게 작거나 커지지 않으며, 줌 변경 시 문서 좌표 크기를 자동으로 역산합니다.
@@ -354,6 +355,7 @@ dotnet run --project src/AvaloniaUIDesigner.App/AvaloniaUIDesigner.App.csproj
 101. 다중 선택의 Selection Adorner는 선택된 컨트롤들의 union bounds에 맞춰 투명한 외곽선을 그리고, 8방향 리사이즈 핸들과 같은 아트보드 좌표로 갱신됩니다. 외곽선은 입력을 가로채지 않아 기존 컨트롤 선택·드래그·리사이즈 동작을 유지합니다.
 102. Aggregate Selection Adorner 외곽선은 현재 ZoomScale의 역수로 StrokeThickness를 계산합니다. 따라서 25%에서는 문서상 4px, 100%에서는 1px, 200%에서는 0.5px을 사용해 각 확대 단계에서 화면상 약 1px으로 보이며, 줌 변경 시 bounds·핸들과 함께 즉시 갱신됩니다.
 103. Design Toolbar의 Grid 그룹은 `4`, `8`, `16`, `...` 버튼을 제공해 Grid Size 메뉴를 열지 않고도 자주 쓰는 간격을 즉시 적용하거나 Custom Grid Size 대화상자를 열 수 있습니다. 버튼은 기존 `SetCanvasGridSize`와 같은 Undo·문서 메타데이터·상태 메시지 경로를 사용합니다.
+104. Grid 그룹의 현재 간격 표시(`8 px`, 사용자 지정 `12.5 px` 등)는 `Canvas.GridSize` 변경 알림에 연결되어 프리셋·Custom 입력·AXAML 문서 메타데이터 로드·Undo/Redo 뒤에도 실제 스냅 간격과 일치합니다.
 
 DataGrid가 포함된 생성 AXAML을 다른 프로젝트에서 사용할 때는 같은 Avalonia 버전의 `Avalonia.Controls.DataGrid` 패키지와 `avares://Avalonia.Controls.DataGrid/Themes/Fluent.xaml` 스타일 include가 필요합니다.
 
@@ -575,6 +577,7 @@ AXAML 소스 편집기의 `Validate`와 `Preview`는 현재 디자인과 Undo �
 - v2.13: 다중 선택 Aggregate Selection Adorner 추가
 - v2.14: 줌 독립 Aggregate Selection Adorner 외곽선 추가
 - v2.15: Design Toolbar Grid Size Quick Controls 추가
+- v2.16: Design Toolbar 현재 Grid Size 상태 피드백 추가
 
 ## 컴포넌트 팩
 
