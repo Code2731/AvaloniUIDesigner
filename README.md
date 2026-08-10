@@ -113,6 +113,7 @@ dotnet run --project src/AvaloniaUIDesigner.App/AvaloniaUIDesigner.App.csproj
 - **잠금 인식 Copy/Duplicate**: 잠긴 컨트롤은 직접 검사할 수 있지만 `Copy`·`Duplicate`는 잠금 해제 선택만 처리하고, 혼합 선택에서는 잠금 해제 계층만 복사·복제하며 거부된 명령은 기존 클립보드를 보존
 - **겹친 요소 순환 선택**: `Alt+클릭`으로 포인터 아래의 visible 컨트롤을 앞쪽부터 순환 선택하고, `Alt+Shift+클릭`으로 반대 방향으로 이동하며 잠긴 요소도 속성 검사를 위해 순환
 - **키보드 선택 순환**: 캔버스에 포커스가 있을 때 `Tab`/`Shift+Tab`으로 보이고 활성화된 `Focusable=true`, `IsTabStop=true` 컨트롤을 순환 선택하며, 명시 `TabIndex`를 낮은 값부터 적용하고 `auto/-1` 요소는 기존 Canvas 순서를 유지
+- **Canvas 경계 선택**: 캔버스에 포커스가 있을 때 `Home`/`End`로 Canvas 순서의 첫/마지막 visible 컨트롤을 즉시 선택하고 Object Tree를 동기화하며, hidden 요소는 경계 후보에서 제외
 - **Object Tree 자동 동기화**: 배치된 요소가 루트(Window) 아래에 추가
 - **Object Tree 다중 선택 표시**: 다중 선택 항목에는 `SEL`, 잠긴 항목에는 `LOCK` 마커를 표시하고 헤더에 선택 개수를 표시
 - **Object Tree 다중 선택 입력**: 트리에서 일반 클릭은 단일 선택, `Ctrl+클릭`은 선택 항목 추가/해제로 동작
@@ -265,6 +266,7 @@ dotnet run --project src/AvaloniaUIDesigner.App/AvaloniaUIDesigner.App.csproj
 75an. 캔버스에서 단일 요소를 선택한 뒤 `Ctrl+Left/Right/Up/Down`은 해당 방향에 있는 보이는 후보 중 같은 축으로 겹치는 요소를 우선하고 축 거리·보조 거리·Canvas 순서로 가장 가까운 요소를 선택합니다. 후보가 없거나 다중 선택이면 입력을 소비하지 않아 기존 화살표 nudge 경로를 보존합니다.
 75ao. Canvas의 선택·marquee·겹침 hit-test·Toolbox drop·키보드 탐색은 요소 자신의 `Visual.IsVisible`과 모든 부모의 visibility를 함께 확인합니다. 숨겨진 부모 아래 자식이나 `Visual.IsVisible=false` 요소는 캔버스 후보에서 제외되지만 Object Tree와 직접 검사를 통한 편집 경로는 유지합니다.
 75ap. Escape 부모 선택·Enter 자식 진입·Alt 형제 탐색도 같은 visibility 판정을 사용해 hidden 계층을 건너뜁니다. hidden 선택에서 형제 탐색을 시작하면 이전 방향은 마지막 visible sibling, 다음 방향은 첫 visible sibling을 선택해 키보드 탐색이 멈추지 않습니다.
+75aq. 캔버스에 포커스가 있고 Toolbox 배치 모드가 아닐 때 `Home`은 Canvas 순서의 첫 visible 컨트롤, `End`는 마지막 visible 컨트롤을 선택합니다. `Shift`·`Ctrl`·`Alt`가 붙은 입력이나 후보가 없는 캔버스에서는 기존 입력과 상태를 보존합니다.
 76. `File > Load Component Pack...` 또는 `File > Load Toolbox Preset Pack...`으로 외부 Toolbox 팩을 추가하면 파일 경로가 세션에 등록되어 다음 실행 때 자동으로 다시 로드됩니다. 파일이 없어도 문서 탭 복원은 계속되며 상태바에 경고가 표시됩니다.
 77. 외부 프로젝트의 컨트롤은 Component Pack 항목에 `designOnly: true`, `avaloniaTypeName`, `previewText`, `defaultProperties`를 지정해 등록합니다. 디자이너에서는 타입명 플레이스홀더로 편집하고, 생성 AXAML에는 원래 커스텀 타입과 속성을 출력합니다. 예시는 [custom-component-pack.example.json](docs/custom-component-pack.example.json)을 참고하세요.
 78. `File > Load Component Pack Plugin...`에서 `IComponentPackPlugin`을 구현한 신뢰할 수 있는 DLL을 선택하면 플러그인이 제공한 Component Pack을 Toolbox에 등록합니다. DLL 경로는 세션 JSON의 `ComponentPluginPaths`에 저장되고, 앱 재시작 시 플러그인·JSON 팩·프리셋 팩 순서로 복원됩니다.
@@ -441,6 +443,7 @@ AXAML 소스 편집기의 `Validate`와 `Preview`는 현재 디자인과 Undo �
 - v1.54: Canvas 계층 visibility 인식 선택
 - v1.55: Canvas Alt+Arrow 전체 방향 형제 탐색
 - v1.56: 계층 키보드 탐색 visibility 필터
+- v1.57: Canvas Home/End 경계 선택
 
 ## 컴포넌트 팩
 

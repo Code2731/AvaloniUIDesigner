@@ -1741,6 +1741,24 @@ public partial class MainWindowViewModel : ViewModelBase
         return true;
     }
 
+    public bool SelectBoundaryVisibleElement(bool last = false)
+    {
+        var candidates = Canvas.Elements
+            .Where(Canvas.IsElementVisibleOnCanvas)
+            .ToList();
+        if (candidates.Count == 0)
+        {
+            StatusText = "No visible controls to select.";
+            return false;
+        }
+
+        var index = last ? candidates.Count - 1 : 0;
+        var boundary = candidates[index];
+        SelectElement(boundary);
+        StatusText = $"Selected {(last ? "last" : "first")} visible control ({index + 1}/{candidates.Count}).";
+        return true;
+    }
+
     public bool MoveSelectedElementInParentOrder(int offset)
     {
         if (offset is not (-1 or 1))
