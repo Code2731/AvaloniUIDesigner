@@ -6424,6 +6424,11 @@ public partial class MainWindow : Window
         UpdateViewportCursor(point);
         if (!_isPanningViewport)
         {
+            if (Vm?.Toolbox.SelectedItem is not null)
+            {
+                TryAutoPanDesignViewport(point);
+            }
+
             UpdateToolboxPlacementPreview(e.GetPosition(DesignSurface));
             return;
         }
