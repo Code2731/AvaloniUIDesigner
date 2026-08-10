@@ -2267,6 +2267,32 @@ public partial class MainWindow : Window
         await ShowLayoutPropertiesDialogAsync(state);
     }
 
+    private async void OnEditSelectionBoundsMenuClicked(
+        object? sender,
+        Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        FlushPendingLayoutHistory();
+        if (Vm is null
+            || Vm.Canvas.SelectedElements.Count < 2
+            || !CanResizeSelection()
+            || !TryGetSelectionBounds(out var currentBounds))
+        {
+            Vm?.StatusText = "Select at least two unlocked controls with the same root or Canvas parent to edit shared bounds.";
+            return;
+        }
+
+        var updatedBounds = await ShowSelectionBoundsDialogAsync(currentBounds);
+        if (updatedBounds is null
+            || Vm is null
+            || !CanResizeSelection()
+            || !TryGetSelectionBounds(out currentBounds))
+        {
+            return;
+        }
+
+        ApplySelectionBounds(currentBounds, updatedBounds.Value);
+    }
+
     private async void OnEditTypographyPropertiesMenuClicked(
         object? sender,
         Avalonia.Interactivity.RoutedEventArgs e)
@@ -7342,6 +7368,42 @@ public partial class MainWindow : Window
         UpdateSmartSnapGuides(guideX, guideY);
     }
 
+    private void ApplySelectionBounds(Rect original, Rect target)
+    {
+        if (Vm is null
+            || Vm.Canvas.SelectedElements.Count < 2
+            || original.Width <= 0
+            || original.Height <= 0
+            || (original.Position == target.Position && original.Size == target.Size))
+        {
+            return;
+        }
+
+        var selected = Vm.Canvas.SelectedElements.ToList();
+        Vm.BeginCanvasMutation(
+            MainWindowViewModel.HistoryActionType.TransformElement,
+            "Updated selection bounds.");
+
+        var scaleX = target.Width / original.Width;
+        var scaleY = target.Height / original.Height;
+        foreach (var element in selected)
+        {
+            element.X = Math.Max(0, target.X + ((element.X - original.X) * scaleX));
+            element.Y = Math.Max(0, target.Y + ((element.Y - original.Y) * scaleY));
+            element.Width = Math.Max(MinSize, element.Width * scaleX);
+            element.Height = Math.Max(MinSize, element.Height * scaleY);
+        }
+
+        Vm.CommitCanvasMutation();
+        Vm.StatusText = $"Updated bounds for {selected.Count} controls to {FormatSelectionBounds(target)}.";
+    }
+
+    private static string FormatSelectionBounds(Rect bounds)
+        => $"X:{bounds.X.ToString("0.###", CultureInfo.InvariantCulture)} "
+            + $"Y:{bounds.Y.ToString("0.###", CultureInfo.InvariantCulture)} "
+            + $"W:{bounds.Width.ToString("0.###", CultureInfo.InvariantCulture)} "
+            + $"H:{bounds.Height.ToString("0.###", CultureInfo.InvariantCulture)}";
+
     private Rect GetGridResizeBounds(Rect original, DragMode mode, double dx, double dy)
     {
         var left = original.X;
@@ -12114,6 +12176,148 @@ public partial class MainWindow : Window
             Grid.SetRow(field, row);
             Grid.SetColumn(field, column);
             Grid.SetColumnSpan(field, columnSpan);
+            fields.Children.Add(field);
+        }
+    }
+
+    private async Task<Rect?> ShowSelectionBoundsDialogAsync(Rect bounds)
+    {
+        var xEditor = new TextBox
+        {
+            Text = bounds.X.ToString("0.###", CultureInfo.InvariantCulture),
+            Watermark = "0 or greater",
+        };
+        var yEditor = new TextBox
+        {
+            Text = bounds.Y.ToString("0.###", CultureInfo.InvariantCulture),
+            Watermark = "0 or greater",
+        };
+        var widthEditor = new TextBox
+        {
+            Text = bounds.Width.ToString("0.###", CultureInfo.InvariantCulture),
+            Watermark = $"At least {MinSize:0.#}",
+        };
+        var heightEditor = new TextBox
+        {
+            Text = bounds.Height.ToString("0.###", CultureInfo.InvariantCulture),
+            Watermark = $"At least {MinSize:0.#}",
+        };
+        var errorText = new TextBlock
+        {
+            Foreground = Avalonia.Media.Brushes.IndianRed,
+            TextWrapping = Avalonia.Media.TextWrapping.Wrap,
+        };
+        var dialog = new Window
+        {
+            Title = "Edit Selection Bounds",
+            Width = 460,
+            Height = 360,
+            MinWidth = 420,
+            MinHeight = 320,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner,
+        };
+
+        void ApplyBounds()
+        {
+            if (!TryParse(xEditor, "X", out var x)
+                || !TryParse(yEditor, "Y", out var y)
+                || !TryParse(widthEditor, "W", out var width)
+                || !TryParse(heightEditor, "H", out var height))
+            {
+                return;
+            }
+
+            if (x < 0 || y < 0)
+            {
+                errorText.Text = "X and Y must be 0 or greater.";
+                return;
+            }
+
+            if (width < MinSize || height < MinSize)
+            {
+                errorText.Text = $"W and H must be at least {MinSize:0.#} px.";
+                return;
+            }
+
+            dialog.Close(new Rect(x, y, width, height));
+        }
+
+        bool TryParse(TextBox editor, string label, out double value)
+        {
+            if (double.TryParse(
+                    editor.Text,
+                    NumberStyles.Float,
+                    CultureInfo.InvariantCulture,
+                    out value)
+                && double.IsFinite(value))
+            {
+                return true;
+            }
+
+            errorText.Text = $"{label} must be a finite number using invariant decimal notation.";
+            return false;
+        }
+
+        var applyButton = new Button { Content = "Apply", MinWidth = 84 };
+        applyButton.Click += (_, _) => ApplyBounds();
+        WireEditorDialogShortcuts(dialog, dialog.Close, ApplyBounds);
+        var cancelButton = new Button { Content = "Cancel", MinWidth = 84 };
+        cancelButton.Click += (_, _) => dialog.Close(null);
+        var buttons = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            Spacing = 8,
+            HorizontalAlignment = HorizontalAlignment.Right,
+            Children = { cancelButton, applyButton },
+        };
+        var fields = new Grid
+        {
+            ColumnDefinitions = new ColumnDefinitions("*,*"),
+            RowDefinitions = new RowDefinitions("Auto,Auto"),
+            ColumnSpacing = 12,
+            RowSpacing = 10,
+        };
+        AddField("X (px)", xEditor, 0, 0);
+        AddField("Y (px)", yEditor, 0, 1);
+        AddField("W (px)", widthEditor, 1, 0);
+        AddField("H (px)", heightEditor, 1, 1);
+
+        var content = new Grid
+        {
+            Margin = new Thickness(16),
+            RowDefinitions = new RowDefinitions("Auto,Auto,*,Auto"),
+            RowSpacing = 12,
+            Children =
+            {
+                new TextBlock
+                {
+                    Text = "Set the union bounds for the selected controls. Each control keeps its relative position and scales with the shared bounds.",
+                    TextWrapping = Avalonia.Media.TextWrapping.Wrap,
+                },
+                fields,
+                errorText,
+                buttons,
+            },
+        };
+        Grid.SetRow(fields, 1);
+        Grid.SetRow(errorText, 2);
+        Grid.SetRow(buttons, 3);
+        dialog.Content = content;
+        return await dialog.ShowDialog<Rect?>(this);
+
+        void AddField(string label, Control editor, int row, int column)
+        {
+            var field = new StackPanel
+            {
+                Spacing = 4,
+                Children =
+                {
+                    new TextBlock { Text = label },
+                    editor,
+                },
+            };
+            Grid.SetRow(field, row);
+            Grid.SetColumn(field, column);
             fields.Children.Add(field);
         }
     }

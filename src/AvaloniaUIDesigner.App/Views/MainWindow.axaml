@@ -99,6 +99,7 @@
                 <MenuItem Header="Edit Bindings..." Click="OnEditBindingsMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
                 <MenuItem Header="Edit Common Properties..." Click="OnEditCommonPropertiesMenuClicked" IsEnabled="{Binding Canvas.HasMultipleSelection}"/>
                 <MenuItem Header="Edit Layout Properties..." Click="OnEditLayoutPropertiesMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
+                <MenuItem Header="Edit Selection Bounds..." Click="OnEditSelectionBoundsMenuClicked" IsEnabled="{Binding Canvas.HasMultipleSelection}"/>
                 <MenuItem Header="Edit Typography Properties..." Click="OnEditTypographyPropertiesMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
                 <MenuItem Header="Edit Transform Properties..." Click="OnEditTransformPropertiesMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
                 <MenuItem Header="Edit Accessibility &amp; Navigation..." Click="OnEditAccessibilityPropertiesMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
