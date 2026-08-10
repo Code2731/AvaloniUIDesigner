@@ -9799,7 +9799,9 @@ public partial class MainWindowViewModel : ViewModelBase
             state.Tab.GuideState.HorizontalGuides.ToList(),
             state.Tab.GuideState.VerticalGuides.ToList(),
             state.Tab.GuideState.ShowDesignGuides,
-            state.Tab.GuideState.SnapToGuides);
+            state.Tab.GuideState.SnapToGuides,
+            state.Tab.ViewportState.HorizontalOffset,
+            state.Tab.ViewportState.VerticalOffset);
 
     public bool TryRestoreSessionJson(string json, out string error)
     {
@@ -9873,6 +9875,7 @@ public partial class MainWindowViewModel : ViewModelBase
                 activate: false);
             var state = _documentTabStates[tab];
             tab.GuideState = restoredDocument.GuideState;
+            tab.ViewportState = restoredDocument.ViewportState;
             CopyHistoryStack(CreateHistoryStack(restoredDocument.UndoHistory), state.UndoStack);
             CopyHistoryStack(CreateHistoryStack(restoredDocument.RedoHistory), state.RedoStack);
             state.ZoomScale = restoredDocument.ZoomScale;
@@ -9940,6 +9943,7 @@ public partial class MainWindowViewModel : ViewModelBase
         var propertyInspectorFilterText = persistedTab.PropertyInspectorFilterText?.Trim()
             ?? string.Empty;
         var guideState = ParseDocumentGuideState(persistedTab, currentDocument);
+        var viewportState = ParseDocumentViewportState(persistedTab);
         return new RestoredDocumentTab(
             persistedTab.DocumentPath,
             displayName,
@@ -9953,7 +9957,8 @@ public partial class MainWindowViewModel : ViewModelBase
             propertyInspectorFilterText,
             persistedTab.PropertyInspectorCategoriesVisible,
             persistedTab.PropertyInspectorAllCategoriesExpanded,
-            guideState);
+            guideState,
+            viewportState);
     }
 
     private static DocumentGuideState ParseDocumentGuideState(
@@ -9985,6 +9990,15 @@ public partial class MainWindowViewModel : ViewModelBase
             .ToList();
     }
 
+    private static DocumentViewportState ParseDocumentViewportState(
+        PersistedDocumentTab persistedTab)
+        => new(
+            NormalizeSessionViewportOffset(persistedTab.HorizontalScrollOffset),
+            NormalizeSessionViewportOffset(persistedTab.VerticalScrollOffset));
+
+    private static double NormalizeSessionViewportOffset(double value)
+        => double.IsFinite(value) && value > 0 ? Math.Min(value, 1_000_000) : 0;
+
     private static DocumentTabState CreateRestoredDocumentTabState(
         RestoredDocumentTab restoredDocument)
     {
@@ -10003,6 +10017,7 @@ public partial class MainWindowViewModel : ViewModelBase
         state.PropertyInspectorAllCategoriesExpanded = restoredDocument.PropertyInspectorAllCategoriesExpanded;
         state.CustomDisplayName = restoredDocument.CustomDisplayName;
         state.Tab.GuideState = restoredDocument.GuideState;
+        state.Tab.ViewportState = restoredDocument.ViewportState;
         return state;
     }
 
@@ -17844,7 +17859,9 @@ public partial class MainWindowViewModel : ViewModelBase
         List<double>? HorizontalGuides = null,
         List<double>? VerticalGuides = null,
         bool ShowDesignGuides = true,
-        bool SnapToGuides = true);
+        bool SnapToGuides = true,
+        double HorizontalScrollOffset = 0,
+        double VerticalScrollOffset = 0);
 
     private sealed record PersistedHistoryEntry(
         string BeforeAxaml,
@@ -17869,7 +17886,8 @@ public partial class MainWindowViewModel : ViewModelBase
         string PropertyInspectorFilterText,
         bool PropertyInspectorCategoriesVisible,
         bool PropertyInspectorAllCategoriesExpanded,
-        DocumentGuideState GuideState);
+        DocumentGuideState GuideState,
+        DocumentViewportState ViewportState);
 
     private sealed record PendingMutation(DesignerCanvasDocument Before, HistoryActionType ActionType, string Message);
 

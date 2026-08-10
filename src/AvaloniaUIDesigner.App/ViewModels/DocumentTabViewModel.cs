@@ -17,6 +17,13 @@ public sealed record DocumentGuideState(
         SnapToGuides: true);
 }
 
+public sealed record DocumentViewportState(
+    double HorizontalOffset,
+    double VerticalOffset)
+{
+    public static DocumentViewportState Default { get; } = new(0, 0);
+}
+
 public sealed class DocumentTabViewModel : ViewModelBase
 {
     private static readonly IBrush ActiveTabBackground = Brush.Parse("#FFFFFF");
@@ -56,6 +63,8 @@ public sealed class DocumentTabViewModel : ViewModelBase
     public bool CanClose => _canClose;
 
     internal DocumentGuideState GuideState { get; set; } = DocumentGuideState.Default;
+
+    internal DocumentViewportState ViewportState { get; set; } = DocumentViewportState.Default;
 
     internal void SetDropTarget(bool isDropTarget)
     {

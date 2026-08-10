@@ -228,6 +228,9 @@ public partial class MainWindow : Window
     private readonly List<double> _verticalGuides = new();
     private readonly Dictionary<DocumentTabViewModel, DocumentGuideState> _documentGuideStates = new();
     private DocumentTabViewModel? _guideStateTab;
+    private DocumentTabViewModel? _viewportStateTab;
+    private bool _isRestoringViewport;
+    private int _viewportRestoreVersion;
     private bool _showDesignGuides = true;
     private bool _snapToGuides = true;
     private bool _isDraggingGuide;
@@ -5068,6 +5071,7 @@ public partial class MainWindow : Window
         if (_boundVm is not null)
         {
             CaptureDesignGuidesForTab(_guideStateTab ?? _boundVm.SelectedDocumentTab);
+            CaptureViewportForTab(_viewportStateTab ?? _boundVm.SelectedDocumentTab);
         }
 
         if (_boundCanvas is not null)
@@ -5088,7 +5092,9 @@ public partial class MainWindow : Window
         _boundVm = Vm;
         _boundCanvas = _boundVm?.Canvas;
         _guideStateTab = _boundVm?.SelectedDocumentTab;
+        _viewportStateTab = _boundVm?.SelectedDocumentTab;
         RestoreDesignGuidesForTab(_guideStateTab);
+        RestoreViewportForTab(_viewportStateTab);
 
         if (_boundCanvas is not null)
         {
@@ -5119,6 +5125,7 @@ public partial class MainWindow : Window
     {
         if (e.PropertyName == nameof(MainWindowViewModel.SelectedDocumentTab))
         {
+            CaptureViewportForTab(_viewportStateTab);
             CaptureDesignGuidesForTab(_guideStateTab);
             if (_guideStateTab is not null
                 && (Vm is null || !Vm.DocumentTabs.Contains(_guideStateTab)))
@@ -5127,7 +5134,9 @@ public partial class MainWindow : Window
             }
 
             _guideStateTab = Vm?.SelectedDocumentTab;
+            _viewportStateTab = Vm?.SelectedDocumentTab;
             RestoreDesignGuidesForTab(_guideStateTab);
+            RestoreViewportForTab(_viewportStateTab);
             ApplyPropertyInspectorState();
         }
 
@@ -5240,6 +5249,7 @@ public partial class MainWindow : Window
         if (e.Property == ScrollViewer.OffsetProperty)
         {
             UpdateViewportRulers();
+            CaptureViewportForTab(_viewportStateTab ?? Vm?.SelectedDocumentTab);
         }
     }
 
@@ -6574,6 +6584,76 @@ public partial class MainWindow : Window
 
         return index;
     }
+
+    private void CaptureViewportForTab(DocumentTabViewModel? tab)
+    {
+        if (tab is null || _isRestoringViewport)
+        {
+            return;
+        }
+
+        var offset = DesignScrollViewer.Offset;
+        tab.ViewportState = new DocumentViewportState(
+            NormalizeViewportOffset(offset.X),
+            NormalizeViewportOffset(offset.Y));
+    }
+
+    private void RestoreViewportForTab(DocumentTabViewModel? tab)
+    {
+        var state = tab?.ViewportState ?? DocumentViewportState.Default;
+        var restoreVersion = ++_viewportRestoreVersion;
+
+        void ApplyViewportOffset()
+        {
+            if (restoreVersion != _viewportRestoreVersion)
+            {
+                return;
+            }
+
+            var viewport = DesignScrollViewer.Viewport;
+            var viewportWidth = NormalizeViewportDimension(viewport.Width);
+            var viewportHeight = NormalizeViewportDimension(viewport.Height);
+            var extentWidth = NormalizeViewportDimension(DesignScrollViewer.Extent.Width);
+            var extentHeight = NormalizeViewportDimension(DesignScrollViewer.Extent.Height);
+            var maxX = Math.Max(0, extentWidth - viewportWidth);
+            var maxY = Math.Max(0, extentHeight - viewportHeight);
+            var offset = new Vector(
+                Math.Clamp(state.HorizontalOffset, 0, maxX),
+                Math.Clamp(state.VerticalOffset, 0, maxY));
+
+            _isRestoringViewport = true;
+            try
+            {
+                DesignScrollViewer.Offset = offset;
+            }
+            finally
+            {
+                _isRestoringViewport = false;
+            }
+        }
+
+        void OnLayoutUpdated(object? sender, EventArgs e)
+        {
+            if (restoreVersion != _viewportRestoreVersion)
+            {
+                DesignScrollViewer.LayoutUpdated -= OnLayoutUpdated;
+                return;
+            }
+
+            ApplyViewportOffset();
+            DesignScrollViewer.LayoutUpdated -= OnLayoutUpdated;
+        }
+
+        DesignScrollViewer.LayoutUpdated += OnLayoutUpdated;
+        ApplyViewportOffset();
+        Dispatcher.UIThread.Post(ApplyViewportOffset, DispatcherPriority.Normal);
+    }
+
+    private static double NormalizeViewportOffset(double value)
+        => double.IsFinite(value) && value > 0 ? value : 0;
+
+    private static double NormalizeViewportDimension(double value)
+        => double.IsFinite(value) && value > 0 ? value : 0;
 
     private static double GetGuideCoordinate(DesignerRuler ruler, Point point)
     {
@@ -13921,6 +14001,7 @@ public partial class MainWindow : Window
 
         SyncWorkspacePanelState();
         CaptureDesignGuidesForTab(Vm.SelectedDocumentTab);
+        CaptureViewportForTab(Vm.SelectedDocumentTab);
         Vm.SaveSession();
         _allowCloseWithoutPrompt = true;
         _previewWindow?.Close();
