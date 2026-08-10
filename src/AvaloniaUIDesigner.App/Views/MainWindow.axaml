@@ -1090,9 +1090,68 @@
                                    DragDrop.Drop="OnDesignSurfaceDrop">
                             <Panel.ContextMenu>
                                 <ContextMenu>
+                                    <MenuItem Header="Copy"
+                                              Click="OnCopyMenuClicked"
+                                              IsEnabled="{Binding Canvas.IsSelectionActive}"/>
+                                    <MenuItem Header="Copy Style"
+                                              Click="OnCopyStyleMenuClicked"
+                                              IsEnabled="{Binding Canvas.IsSelectionActive}"/>
+                                    <MenuItem Header="Cut"
+                                              Click="OnCutMenuClicked"
+                                              IsEnabled="{Binding Canvas.IsSelectionActive}"/>
                                     <MenuItem Header="Paste" Click="OnPasteMenuClicked"/>
+                                    <MenuItem Header="Paste Style"
+                                              Click="OnPasteStyleMenuClicked"
+                                              IsEnabled="{Binding CanPasteStyle}"/>
                                     <MenuItem Header="Paste AXAML from Clipboard" Click="OnPasteAxamlFromClipboardMenuClicked"/>
+                                    <MenuItem Header="Duplicate"
+                                              Click="OnDuplicateMenuClicked"
+                                              IsEnabled="{Binding Canvas.IsSelectionActive}"/>
+                                    <MenuItem Header="Delete"
+                                              Click="OnDeleteMenuClicked"
+                                              IsEnabled="{Binding Canvas.IsSelectionActive}"/>
                                     <MenuItem Header="Select All" Click="OnSelectAllMenuClicked"/>
+                                    <Separator/>
+                                    <MenuItem Header="Lock / Unlock Selection"
+                                              Click="OnToggleLockMenuClicked"
+                                              IsEnabled="{Binding Canvas.IsSelectionActive}"/>
+                                    <MenuItem Header="Order" IsEnabled="{Binding Canvas.IsSelectionActive}">
+                                        <MenuItem Header="Bring to Front" Click="OnBringToFrontMenuClicked"/>
+                                        <MenuItem Header="Send to Back" Click="OnSendToBackMenuClicked"/>
+                                        <MenuItem Header="Bring Forward" Click="OnBringForwardMenuClicked"/>
+                                        <MenuItem Header="Send Backward" Click="OnSendBackwardMenuClicked"/>
+                                    </MenuItem>
+                                    <MenuItem Header="Arrange" IsEnabled="{Binding Canvas.HasMultipleSelection}">
+                                        <MenuItem Header="Align Left" Click="OnAlignLeftMenuClicked"/>
+                                        <MenuItem Header="Align Center" Click="OnAlignCenterMenuClicked"/>
+                                        <MenuItem Header="Align Right" Click="OnAlignRightMenuClicked"/>
+                                        <MenuItem Header="Align Top" Click="OnAlignTopMenuClicked"/>
+                                        <MenuItem Header="Align Middle" Click="OnAlignMiddleMenuClicked"/>
+                                        <MenuItem Header="Align Bottom" Click="OnAlignBottomMenuClicked"/>
+                                        <Separator/>
+                                        <MenuItem Header="Distribute Horizontally" Click="OnDistributeHorizontallyMenuClicked"/>
+                                        <MenuItem Header="Distribute Vertically" Click="OnDistributeVerticallyMenuClicked"/>
+                                    </MenuItem>
+                                    <MenuItem Header="Center on Artboard" IsEnabled="{Binding Canvas.IsSelectionActive}">
+                                        <MenuItem Header="Horizontally" Click="OnCenterHorizontallyOnArtboardMenuClicked"/>
+                                        <MenuItem Header="Vertically" Click="OnCenterVerticallyOnArtboardMenuClicked"/>
+                                        <MenuItem Header="Both" Click="OnCenterOnArtboardMenuClicked"/>
+                                    </MenuItem>
+                                    <MenuItem Header="Align to Artboard" IsEnabled="{Binding Canvas.IsSelectionActive}">
+                                        <MenuItem Header="Left" Click="OnAlignLeftToArtboardMenuClicked"/>
+                                        <MenuItem Header="Right" Click="OnAlignRightToArtboardMenuClicked"/>
+                                        <MenuItem Header="Top" Click="OnAlignTopToArtboardMenuClicked"/>
+                                        <MenuItem Header="Bottom" Click="OnAlignBottomToArtboardMenuClicked"/>
+                                    </MenuItem>
+                                    <MenuItem Header="Group Selected into Canvas"
+                                              Click="OnGroupSelectedMenuClicked"
+                                              IsEnabled="{Binding Canvas.HasMultipleSelection}"/>
+                                    <MenuItem Header="Break Selected Layout"
+                                              Click="OnBreakSelectedLayoutMenuClicked"
+                                              IsEnabled="{Binding Canvas.IsSelectionActive}"/>
+                                    <MenuItem Header="Ungroup Selected Canvas"
+                                              Click="OnUngroupSelectedMenuClicked"
+                                              IsEnabled="{Binding Canvas.IsSelectionActive}"/>
                                     <Separator/>
                                     <MenuItem Header="Live Preview" Click="OnPreviewMenuClicked"/>
                                     <MenuItem Header="Fit to View" Click="OnFitToViewMenuClicked"/>
