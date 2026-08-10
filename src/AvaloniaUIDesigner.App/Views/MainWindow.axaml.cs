@@ -193,6 +193,7 @@ public partial class MainWindow : Window
     private const double GuideHitThreshold = 8;
     private const double ViewportEdgePanThreshold = 48;
     private const double ViewportEdgePanStep = 24;
+    private const double ViewportKeyboardPanStep = 96;
     private static readonly DataFormat<string> ToolboxDragDataFormat =
         DataFormat.CreateStringApplicationFormat("AvaloniaUIDesigner.ToolboxItem");
     private static readonly DataFormat<string> ObjectTreeDragDataFormat =
@@ -4401,6 +4402,19 @@ public partial class MainWindow : Window
             return;
         }
 
+        if (ctrl && alt && !shift && e.Key is (Key.Left or Key.Right or Key.Up or Key.Down))
+        {
+            PanViewportBy(e.Key switch
+            {
+                Key.Left => new Vector(-ViewportKeyboardPanStep, 0),
+                Key.Right => new Vector(ViewportKeyboardPanStep, 0),
+                Key.Up => new Vector(0, -ViewportKeyboardPanStep),
+                _ => new Vector(0, ViewportKeyboardPanStep),
+            });
+            e.Handled = true;
+            return;
+        }
+
         var keyboardArrangeAction = e.Key switch
         {
             Key.Left => MainWindowViewModel.SelectionLayoutAction.AlignLeft,
@@ -6563,6 +6577,17 @@ public partial class MainWindow : Window
         DesignScrollViewer.Offset = new Vector(
             _panStartOffset.X - delta.X,
             _panStartOffset.Y - delta.Y);
+    }
+
+    private void PanViewportBy(Vector delta)
+    {
+        var viewport = DesignScrollViewer.Viewport;
+        var extent = DesignScrollViewer.Extent;
+        var maxX = Math.Max(0, extent.Width - viewport.Width);
+        var maxY = Math.Max(0, extent.Height - viewport.Height);
+        DesignScrollViewer.Offset = new Vector(
+            Math.Clamp(DesignScrollViewer.Offset.X + delta.X, 0, maxX),
+            Math.Clamp(DesignScrollViewer.Offset.Y + delta.Y, 0, maxY));
     }
 
     private bool TryEndReleasedSpacePan(PointerEventArgs e)

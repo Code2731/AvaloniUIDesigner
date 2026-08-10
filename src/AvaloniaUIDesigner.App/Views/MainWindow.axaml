@@ -255,7 +255,7 @@
                 <MenuItem Header="Zoom Out (Ctrl+-)" Click="OnZoomOutMenuClicked"/>
                 <MenuItem Header="Actual Size (100%, Ctrl+0)" Click="OnResetZoomMenuClicked"/>
                 <MenuItem Header="Fit to View (F)" Click="OnFitToViewMenuClicked"/>
-                <MenuItem Header="Pan Canvas (Space + Left Drag / Middle Drag)" IsEnabled="False"/>
+                <MenuItem Header="Pan Canvas (Space + Left Drag / Middle Drag / Ctrl+Alt+Arrow)" IsEnabled="False"/>
                 <MenuItem Header="Zoom Presets">
                     <MenuItem Header="25%" Tag="0.25" Click="OnZoomPresetMenuClicked"/>
                     <MenuItem Header="50%" Tag="0.5" Click="OnZoomPresetMenuClicked"/>
