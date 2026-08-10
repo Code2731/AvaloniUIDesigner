@@ -139,7 +139,7 @@ dotnet run --project src/AvaloniaUIDesigner.App/AvaloniaUIDesigner.App.csproj
 - **Object Tree 드래그 재배치**: 지원 컨테이너의 자식 행을 같은 부모의 다른 행 앞에 드래그해 순서를 변경하거나 Grid·StackPanel·DockPanel·WrapPanel·UniformGrid·Canvas·TabControl·SplitView·Content 컨테이너 행으로 드래그해 부모를 변경하며, 잠긴 대상·순환 계층·가득 찬 슬롯은 거부
 - **Object Tree 드롭 피드백**: 드래그 중 유효한 대상 행은 초록색, 거부되는 대상 행은 빨간색으로 강조하고 드롭·취소·트리 이탈 시 상태를 정리
 - **Object Tree 삽입 위치 표시**: 같은 부모의 행 위쪽/아래쪽 절반에 드롭하면 앞/뒤 삽입선을 표시하고, 표시된 위치 그대로 StackPanel·DockPanel·WrapPanel·UniformGrid·Canvas 순서를 변경
-- **Object Tree 검색 순환**: 검색 결과를 `Enter`로 다음, `Shift+Enter`로 이전 항목으로 순환하고 현재 위치/전체 개수를 표시
+- **Object Tree 검색 순환**: 검색 결과를 `Enter`로 다음, `Shift+Enter`로 이전 항목으로 순환하고 현재 위치/전체 개수를 표시하며 `Escape`로 검색을 지우고 TreeView 포커스로 복귀
 - **Object Tree 키보드 편집**: 트리에 포커스가 있을 때 방향키는 계층을 탐색하고, `F2`로 이름 변경, `Delete`/`Backspace`로 삭제, `Ctrl+L`로 잠금 전환
 - **이동/리사이즈 기즈모**: 선택된 요소를 드래그로 이동, 8방향 핸들로 리사이즈 (최소 10px)
 - **PropertyGrid 연동**: 선택된 컨트롤의 속성을 bodong PropertyGrid로 실시간 편집
@@ -209,7 +209,7 @@ dotnet run --project src/AvaloniaUIDesigner.App/AvaloniaUIDesigner.App.csproj
 49. 코너 핸들을 `Shift`와 함께 드래그하면 원래 가로·세로 비율을 유지하며, 잠금 중에는 Smart Snap 기준선보다 비율 보존을 우선함
 50. 캔버스에서 텍스트·버튼·토글·라벨·fallback 컨트롤을 더블클릭하면 해당 요소의 visible `Text`/`Content`를 빠르게 편집하고, 적용 시 Undo·AXAML·Preview에 함께 반영
 51. View > `Live Preview`를 열어두면 배치·속성·Undo/Redo·AXAML 적용·문서 로드가 같은 Preview 창에 자동 반영되며, 창을 다시 열면 현재 문서로 즉시 갱신
-52. Object Tree 검색에서 `Enter`를 누르면 다음 일치 컨트롤, `Shift+Enter`를 누르면 이전 일치 컨트롤을 선택하고 결과 위치를 확인
+52. Object Tree 검색에서 `Enter`를 누르면 다음 일치 컨트롤, `Shift+Enter`를 누르면 이전 일치 컨트롤을 선택하고 결과 위치를 확인하며 `Escape`는 검색을 지우고 트리 탐색으로 돌아갑니다.
 53. 캔버스를 클릭한 뒤 `Tab`/`Shift+Tab`을 누르면 보이고 활성화된 `Focusable=true`, `IsTabStop=true` 컨트롤만 대상으로 명시 `TabIndex`를 낮은 값부터 선택하고, `Shift+Tab`은 Tab Order anchor부터 이전 target까지 범위를 기존 선택에 누적합니다. `auto/-1` 요소는 기존 Canvas 순서로 순환하며 숨겨진 TabControl 페이지와 비활성·비포커스·탭 제외 컨트롤은 자동으로 건너뜁니다.
 54. 여러 컨트롤을 선택하면 Object Tree의 각 항목에 `SEL` 마커와 헤더의 선택 개수가 표시되고, 잠긴 컨트롤에는 `LOCK` 마커가 표시됨
 55. Object Tree에서 일반 클릭은 하나만 선택하고, `Ctrl+클릭`은 여러 컨트롤을 추가 선택하거나 선택 해제함
@@ -291,6 +291,7 @@ dotnet run --project src/AvaloniaUIDesigner.App/AvaloniaUIDesigner.App.csproj
 75bd. `Ctrl+=`/`Ctrl+Plus`/`Ctrl+-`/`Ctrl+Minus`와 `View > Zoom In`/`Zoom Out`은 viewport 중앙의 아트보드 좌표를 확대·축소 전후 동일하게 유지합니다. 기존 Ctrl+휠은 포인터 좌표를 기준으로 동작하며 모든 입력은 layout 갱신 후에도 ScrollViewer offset을 재적용합니다.
 75be. `Ctrl+0`, `View > Actual Size`, `View > Zoom Presets` 및 `Custom...`도 같은 viewport 중앙 좌표 보존 경로를 사용합니다. 25~200% 범위 밖이거나 유한하지 않은 preset 값은 적용하지 않으며 Fit to View·Fit Selected to View처럼 의도적으로 화면을 재구성하는 명령은 기존 중심 맞춤 정책을 유지합니다.
 75bf. Desktop·Tablet·Mobile·Rotate·Custom Artboard Size 변경은 layout 이전 viewport 중앙의 아트보드 좌표를 저장하고 새 ScrollViewer extent·scrollbar 상태에 맞춰 offset을 다시 적용합니다. 따라서 큰 아트보드에서 작업하던 위치가 preset 전환으로 튀지 않으며, 새 아트보드 경계를 벗어난 좌표는 기존 clamp 정책을 사용합니다.
+75bg. Object Tree 검색창에서 `Escape`를 누르면 검색어·검색 결과 표시를 지우고 TreeView로 포커스를 돌려보냅니다. 현재 Canvas 선택과 Object Tree 선택은 유지하므로 검색 결과를 확인한 뒤 즉시 방향키·F2·Delete·`Ctrl+L` 계층 편집을 이어갈 수 있습니다.
 76. `File > Load Component Pack...` 또는 `File > Load Toolbox Preset Pack...`으로 외부 Toolbox 팩을 추가하면 파일 경로가 세션에 등록되어 다음 실행 때 자동으로 다시 로드됩니다. 파일이 없어도 문서 탭 복원은 계속되며 상태바에 경고가 표시됩니다.
 77. 외부 프로젝트의 컨트롤은 Component Pack 항목에 `designOnly: true`, `avaloniaTypeName`, `previewText`, `defaultProperties`를 지정해 등록합니다. 디자이너에서는 타입명 플레이스홀더로 편집하고, 생성 AXAML에는 원래 커스텀 타입과 속성을 출력합니다. 예시는 [custom-component-pack.example.json](docs/custom-component-pack.example.json)을 참고하세요.
 78. `File > Load Component Pack Plugin...`에서 `IComponentPackPlugin`을 구현한 신뢰할 수 있는 DLL을 선택하면 플러그인이 제공한 Component Pack을 Toolbox에 등록합니다. DLL 경로는 세션 JSON의 `ComponentPluginPaths`에 저장되고, 앱 재시작 시 플러그인·JSON 팩·프리셋 팩 순서로 복원됩니다.
@@ -491,6 +492,7 @@ AXAML 소스 편집기의 `Validate`와 `Preview`는 현재 디자인과 Undo �
 - v1.78: 키보드·View 메뉴 Zoom viewport 중심 보존
 - v1.79: Zoom Preset·Actual Size viewport 중심 보존
 - v1.80: Artboard Size·Rotate viewport 중심 보존
+- v1.81: Object Tree 검색 Escape 초기화·포커스 복귀
 
 ## 컴포넌트 팩
 

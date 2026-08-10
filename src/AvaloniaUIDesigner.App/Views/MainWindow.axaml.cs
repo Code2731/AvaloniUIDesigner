@@ -4012,6 +4012,15 @@ public partial class MainWindow : Window
             return;
         }
 
+        if (e.Key == Key.Escape)
+        {
+            ObjectTreeSearch.Text = string.Empty;
+            ObjectTreeView.Focus();
+            Vm.StatusText = "Object Tree search cleared.";
+            e.Handled = true;
+            return;
+        }
+
         if (e.Key == Key.Enter)
         {
             var reverse = e.KeyModifiers.HasFlag(KeyModifiers.Shift);

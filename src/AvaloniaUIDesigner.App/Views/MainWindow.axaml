@@ -1037,6 +1037,7 @@
                                   SelectedItem="{Binding ObjectTree.SelectedNode, Mode=TwoWay}"
                                   Background="Transparent"
                                   BorderThickness="0"
+                                  Focusable="True"
                                   KeyDown="OnObjectTreeKeyDown"
                                   DragDrop.AllowDrop="True"
                                   DragDrop.DragOver="OnObjectTreeDragOver"
