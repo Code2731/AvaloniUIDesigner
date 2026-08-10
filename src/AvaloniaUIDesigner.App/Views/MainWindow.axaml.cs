@@ -6545,6 +6545,7 @@ public partial class MainWindow : Window
         if (_isMarqueeSelecting)
         {
             HideToolboxPlacementPreview();
+            TryAutoPanDesignViewport(e.GetPosition(DesignViewport));
             UpdateMarquee(e.GetPosition(DesignHost));
             return;
         }
@@ -6556,6 +6557,7 @@ public partial class MainWindow : Window
         }
 
         HideToolboxPlacementPreview();
+        TryAutoPanDesignViewport(e.GetPosition(DesignViewport));
         var p = e.GetPosition(DesignHost);
         var dx = p.X - _dragStart.X;
         var dy = p.Y - _dragStart.Y;
