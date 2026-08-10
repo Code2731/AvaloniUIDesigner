@@ -7631,7 +7631,7 @@ public partial class MainWindow : Window
             Foreground = Avalonia.Media.Brushes.IndianRed,
             TextWrapping = Avalonia.Media.TextWrapping.Wrap,
         };
-        applyButton.Click += (_, _) =>
+        void ApplyItems()
         {
             var updatedItems = (editor.Text ?? string.Empty)
                 .Replace("\r\n", "\n", StringComparison.Ordinal)
@@ -7661,6 +7661,14 @@ public partial class MainWindow : Window
             }
 
             dialog.Close(updatedItems);
+        }
+        applyButton.Click += (_, _) => ApplyItems();
+        editor.KeyDown += (_, e) =>
+        {
+            HandleTextEditorShortcut(
+                e,
+                () => dialog.Close(null),
+                ApplyItems);
         };
 
         var cancelButton = new Button { Content = "Cancel", MinWidth = 84 };
@@ -12020,7 +12028,7 @@ public partial class MainWindow : Window
             dialog.Close();
         };
         var applyButton = new Button { Content = "Apply", MinWidth = 84 };
-        applyButton.Click += (_, _) =>
+        void ApplySampleData()
         {
             if (!Vm.TrySetSampleDataJson(editor.Text ?? string.Empty, out var result))
             {
@@ -12030,6 +12038,14 @@ public partial class MainWindow : Window
             }
 
             dialog.Close();
+        }
+        applyButton.Click += (_, _) => ApplySampleData();
+        editor.KeyDown += (_, e) =>
+        {
+            HandleTextEditorShortcut(
+                e,
+                dialog.Close,
+                ApplySampleData);
         };
         var cancelButton = new Button { Content = "Cancel", MinWidth = 84 };
         cancelButton.Click += (_, _) => dialog.Close();
@@ -12207,7 +12223,7 @@ public partial class MainWindow : Window
             WindowStartupLocation = WindowStartupLocation.CenterOwner,
         };
         var applyButton = new Button { Content = "Apply", MinWidth = 84 };
-        applyButton.Click += (_, _) =>
+        void ApplyBindings()
         {
             var lines = (editor.Text ?? string.Empty)
                 .Replace("\r\n", "\n", StringComparison.Ordinal)
@@ -12224,6 +12240,14 @@ public partial class MainWindow : Window
             }
 
             dialog.Close(lines);
+        }
+        applyButton.Click += (_, _) => ApplyBindings();
+        editor.KeyDown += (_, e) =>
+        {
+            HandleTextEditorShortcut(
+                e,
+                () => dialog.Close(null),
+                ApplyBindings);
         };
         var cancelButton = new Button { Content = "Cancel", MinWidth = 84 };
         cancelButton.Click += (_, _) => dialog.Close(null);

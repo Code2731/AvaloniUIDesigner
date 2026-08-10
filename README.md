@@ -152,7 +152,7 @@ dotnet run --project src/AvaloniaUIDesigner.App/AvaloniaUIDesigner.App.csproj
 - **AXAML 워크플로**: Window 저장/열기, UserControl 내보내기, 복사, 현재 문서 유효성 확인과 런타임 미리보기
 - **Live Preview**: Preview 창을 한 번 열어두면 컨트롤 배치·속성·Undo/Redo·AXAML 적용과 문서 로드 결과를 별도 창에 자동 반영하고, Preview 창은 하나만 유지
 - **Crash-safe 저장**: 기존 AXAML을 `.bak`으로 원자적으로 보존하고 File > Recover Backup...에서 복구하며, 복구 결과를 dirty 상태와 Undo/Redo에 연결
-- **텍스트 편집기 키보드 흐름**: 공통 텍스트·AXAML 편집기에서 `Escape`로 변경을 취소하고 `Ctrl+Enter`로 적용하며, multiline 입력의 일반 `Enter`는 그대로 유지
+- **텍스트 편집기 키보드 흐름**: 공통 텍스트·AXAML·Binding·Items/Columns·Sample Data 편집기에서 `Escape`로 변경을 취소하고 `Ctrl+Enter`로 적용하며, multiline 입력의 일반 `Enter`는 그대로 유지
 - **디자인 ↔ 소스 왕복 편집**: 전체 Window/UserControl AXAML을 직접 편집하고, 캔버스를 바꾸지 않는 검증·미리보기 후 파일 경로를 유지한 채 단일 Undo/Redo 작업으로 적용하며 `Escape`로 취소·`Ctrl+Enter`로 적용
 - **도움말**: Help 메뉴에서 실제 편집·저장·Preview·AXAML 작업에 연결된 키보드 단축키와 앱 정보를 확인
 - 상태바 피드백
@@ -297,6 +297,7 @@ dotnet run --project src/AvaloniaUIDesigner.App/AvaloniaUIDesigner.App.csproj
 75bi. Toolbox 검색창에서 일반 상태로 `Escape`를 누르면 검색어·필터 결과만 지우고 검색 포커스를 유지합니다. 배치 모드 중 `Escape`는 검색어와 현재 Canvas 선택을 보존한 채 배치 모드와 ghost만 취소합니다.
 75bj. `Edit AXAML Source...`의 multiline 편집기에서 `Escape`는 소스 변경을 적용하지 않고 대화상자를 닫으며, `Ctrl+Enter`는 기존 Apply 검증·단일 Undo 경로를 실행합니다. 유효하지 않은 소스는 오류를 표시한 채 편집을 계속할 수 있습니다.
 75bk. 이름·스타일·색상 리소스·경로·툴팁·이벤트 맵 등 공통 텍스트 편집기에서도 `Escape`는 취소 결과를 반환하고 `Ctrl+Enter`는 Apply 결과를 반환합니다. multiline 편집의 일반 `Enter`는 줄바꿈을 유지합니다.
+75bl. Binding·Items/Columns·Sample Data 전문 편집기도 같은 키보드 계약을 사용합니다. `Ctrl+Enter`의 검증이 실패하면 오류를 편집기에 남기고, `Escape`는 변경·Undo 기록 없이 취소합니다.
 76. `File > Load Component Pack...` 또는 `File > Load Toolbox Preset Pack...`으로 외부 Toolbox 팩을 추가하면 파일 경로가 세션에 등록되어 다음 실행 때 자동으로 다시 로드됩니다. 파일이 없어도 문서 탭 복원은 계속되며 상태바에 경고가 표시됩니다.
 77. 외부 프로젝트의 컨트롤은 Component Pack 항목에 `designOnly: true`, `avaloniaTypeName`, `previewText`, `defaultProperties`를 지정해 등록합니다. 디자이너에서는 타입명 플레이스홀더로 편집하고, 생성 AXAML에는 원래 커스텀 타입과 속성을 출력합니다. 예시는 [custom-component-pack.example.json](docs/custom-component-pack.example.json)을 참고하세요.
 78. `File > Load Component Pack Plugin...`에서 `IComponentPackPlugin`을 구현한 신뢰할 수 있는 DLL을 선택하면 플러그인이 제공한 Component Pack을 Toolbox에 등록합니다. DLL 경로는 세션 JSON의 `ComponentPluginPaths`에 저장되고, 앱 재시작 시 플러그인·JSON 팩·프리셋 팩 순서로 복원됩니다.
@@ -502,6 +503,7 @@ AXAML 소스 편집기의 `Validate`와 `Preview`는 현재 디자인과 Undo �
 - v1.83: Toolbox 검색 Escape 초기화·배치 취소 선택 보존
 - v1.84: AXAML Source Editor Escape 취소·Ctrl+Enter 적용
 - v1.85: 공통 Text Editor Escape 취소·Ctrl+Enter 적용
+- v1.86: Binding·Items·Sample Data 편집기 키보드 취소·적용
 
 ## 컴포넌트 팩
 
