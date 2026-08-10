@@ -1785,6 +1785,54 @@ public partial class MainWindowViewModel : ViewModelBase
         return true;
     }
 
+    public bool TrySelectNextTabOrderRange(
+        DesignElement anchor,
+        bool reverse = true,
+        bool append = true)
+    {
+        var candidates = Canvas.Elements
+            .Where(element => Canvas.IsElementVisibleOnCanvas(element)
+                && element.Visual.IsEnabled
+                && element.Visual.Focusable
+                && element.Visual.IsTabStop)
+            .OrderBy(element => element.HasTabOrder ? 0 : 1)
+            .ThenBy(element => element.HasTabOrder ? element.Visual.TabIndex : int.MaxValue)
+            .ThenBy(Canvas.Elements.IndexOf)
+            .ToList();
+        var anchorIndex = candidates.IndexOf(anchor);
+        if (anchorIndex < 0 || candidates.Count == 0)
+        {
+            return false;
+        }
+
+        var currentIndex = Canvas.SelectedElement is { } selected
+            ? candidates.IndexOf(selected)
+            : anchorIndex;
+        if (currentIndex < 0)
+        {
+            currentIndex = anchorIndex;
+        }
+
+        var targetIndex = currentIndex + (reverse ? -1 : 1);
+        if (targetIndex < 0 || targetIndex >= candidates.Count)
+        {
+            StatusText = "Tab Order range is already at the visible boundary.";
+            return true;
+        }
+
+        var target = candidates[targetIndex];
+        var start = Math.Min(anchorIndex, targetIndex);
+        var range = candidates
+            .Skip(start)
+            .Take(Math.Abs(targetIndex - anchorIndex) + 1)
+            .ToList();
+        SelectElements(range, append, activeElement: target);
+        StatusText = append
+            ? $"Added Tab Order keyboard range ({range.Count} control(s))."
+            : $"Selected Tab Order keyboard range ({range.Count} control(s)).";
+        return true;
+    }
+
     public bool SelectBoundaryVisibleElement(bool last = false, bool append = false)
     {
         var candidates = Canvas.Elements
