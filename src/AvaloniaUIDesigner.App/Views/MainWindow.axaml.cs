@@ -109,7 +109,8 @@ public partial class MainWindow : Window
         Shift+corner handle  Lock aspect ratio while resizing
         Alt+click           Cycle through overlapping controls at the pointer
         Alt+Shift+click     Cycle backward through overlapping controls
-        Shift+click         Add a control to the current selection
+        Shift+click         Select a visible Canvas range
+        Ctrl+Shift+click    Add a visible Canvas range
         Double-click element Quick edit visible content
         Delete / Backspace   Remove selection
         Object Tree F2       Rename selected control
@@ -223,6 +224,7 @@ public partial class MainWindow : Window
     private Point _documentTabDragStart;
     private DocumentTabViewModel? _documentTabDropTarget;
     private DesignElement? _objectTreeSelectionAnchor;
+    private DesignElement? _canvasSelectionAnchor;
     private bool _isObjectTreeSelectionGesture;
 
     private CanvasViewModel? _boundCanvas;
@@ -3982,6 +3984,7 @@ public partial class MainWindow : Window
             return;
         }
 
+        _canvasSelectionAnchor = null;
         var point = e.GetCurrentPoint((Control)sender);
         if (!point.Properties.IsLeftButtonPressed)
         {
@@ -5808,6 +5811,7 @@ public partial class MainWindow : Window
 
         DesignHost.Focus();
         _objectTreeSelectionAnchor = null;
+        _canvasSelectionAnchor = null;
 
         if (TryBeginViewportPan(host, e))
         {
@@ -5859,6 +5863,7 @@ public partial class MainWindow : Window
                 Vm.SelectElement(element);
             }
 
+            _canvasSelectionAnchor = element;
             Vm.StatusText = $"Selected {element.DisplayName}.";
             return;
         }
@@ -5878,6 +5883,19 @@ public partial class MainWindow : Window
                 placementPoint,
                 e.KeyModifiers.HasFlag(KeyModifiers.Shift)))
         {
+            _canvasSelectionAnchor = Vm.Canvas.SelectedElement;
+            e.Handled = true;
+            return;
+        }
+
+        var toggleSelection = e.KeyModifiers.HasFlag(KeyModifiers.Control);
+        var additiveSelection = e.KeyModifiers.HasFlag(KeyModifiers.Shift);
+        var anchor = _canvasSelectionAnchor ?? Vm.Canvas.SelectedElement;
+        if (additiveSelection
+            && anchor is not null
+            && Vm.TrySelectCanvasRange(anchor, element, append: toggleSelection))
+        {
+            _canvasSelectionAnchor = anchor;
             e.Handled = true;
             return;
         }
@@ -5887,15 +5905,18 @@ public partial class MainWindow : Window
             if (e.KeyModifiers.HasFlag(KeyModifiers.Control))
             {
                 Vm.SelectElement(element, toggle: true);
+                _canvasSelectionAnchor = element;
                 Vm.StatusText = "Selected locked control.";
             }
             else if (e.KeyModifiers.HasFlag(KeyModifiers.Shift))
             {
                 Vm.AddElementToSelection(element);
+                _canvasSelectionAnchor = element;
             }
             else
             {
                 Vm.SelectElement(element);
+                _canvasSelectionAnchor = element;
                 Vm.StatusText = "Selected locked control.";
             }
 
@@ -5903,11 +5924,10 @@ public partial class MainWindow : Window
             return;
         }
 
-        var toggleSelection = e.KeyModifiers.HasFlag(KeyModifiers.Control);
-        var additiveSelection = e.KeyModifiers.HasFlag(KeyModifiers.Shift);
         if (additiveSelection && !toggleSelection)
         {
             Vm.AddElementToSelection(element);
+            _canvasSelectionAnchor = element;
             e.Handled = true;
             return;
         }
@@ -5916,6 +5936,8 @@ public partial class MainWindow : Window
         {
             Vm.SelectElement(element, toggleSelection);
         }
+
+        _canvasSelectionAnchor = element;
 
         if (toggleSelection)
         {

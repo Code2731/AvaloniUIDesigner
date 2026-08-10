@@ -1711,6 +1711,33 @@ public partial class MainWindowViewModel : ViewModelBase
         return true;
     }
 
+    public bool TrySelectCanvasRange(
+        DesignElement anchor,
+        DesignElement target,
+        bool append = false)
+    {
+        var visible = Canvas.Elements
+            .Where(Canvas.IsElementVisibleOnCanvas)
+            .ToList();
+        var anchorIndex = visible.IndexOf(anchor);
+        var targetIndex = visible.IndexOf(target);
+        if (anchorIndex < 0 || targetIndex < 0)
+        {
+            return false;
+        }
+
+        var start = Math.Min(anchorIndex, targetIndex);
+        var range = visible
+            .Skip(start)
+            .Take(Math.Abs(targetIndex - anchorIndex) + 1)
+            .ToList();
+        SelectElements(range, append);
+        StatusText = append
+            ? $"Added Canvas range ({range.Count} control(s))."
+            : $"Selected Canvas range ({range.Count} control(s)).";
+        return true;
+    }
+
     public bool SelectNextVisibleElement(bool reverse = false, bool append = false)
     {
         var candidates = Canvas.Elements
