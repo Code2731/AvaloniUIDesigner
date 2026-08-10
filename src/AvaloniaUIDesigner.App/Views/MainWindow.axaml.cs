@@ -6415,6 +6415,7 @@ public partial class MainWindow : Window
         if (_isDraggingGuide)
         {
             HideToolboxPlacementPreview();
+            TryAutoPanDesignViewport(point);
             UpdateGuidePosition(point);
             e.Handled = true;
             return;
