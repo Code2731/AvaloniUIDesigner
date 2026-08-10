@@ -11,6 +11,7 @@ using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
 using Avalonia.Controls.Shapes;
 using Avalonia.Input;
+using Avalonia.Input.Platform;
 using Avalonia.Layout;
 using Avalonia.Media;
 using Avalonia.Platform.Storage;
@@ -93,6 +94,7 @@ public partial class MainWindow : Window
         Ctrl+C              Copy selection
         Ctrl+X              Cut selection
         Ctrl+V              Paste selection
+        Ctrl+Alt+V          Paste AXAML controls from the OS clipboard
         Ctrl+Shift+C        Copy visual style
         Ctrl+Shift+V        Paste visual style
         Ctrl+Shift+G        Clear design guides
@@ -1516,6 +1518,41 @@ public partial class MainWindow : Window
         }
     }
 
+    private async Task PasteAxamlFromClipboardAsync()
+    {
+        if (Vm is null)
+        {
+            return;
+        }
+
+        var clipboard = TopLevel.GetTopLevel(this)?.Clipboard;
+        if (clipboard is null)
+        {
+            Vm.StatusText = "Clipboard is unavailable.";
+            return;
+        }
+
+        string? axaml;
+        try
+        {
+            axaml = await clipboard.TryGetTextAsync();
+        }
+        catch (Exception exception)
+        {
+            Vm.StatusText = $"Could not read AXAML from the clipboard: {exception.Message}";
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(axaml))
+        {
+            Vm.StatusText = "The clipboard does not contain AXAML text.";
+            return;
+        }
+
+        FlushPendingPropertyHistory();
+        Vm.TryPasteAxamlFragment(axaml, out _);
+    }
+
     private void OnValidateAxamlMenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
         FlushPendingPropertyHistory();
@@ -2099,6 +2136,11 @@ public partial class MainWindow : Window
         FlushPendingPropertyHistory();
         Vm?.PasteElement();
     }
+
+    private async void OnPasteAxamlFromClipboardMenuClicked(
+        object? sender,
+        Avalonia.Interactivity.RoutedEventArgs e)
+        => await PasteAxamlFromClipboardAsync();
 
     private void OnPasteStyleMenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
@@ -4925,6 +4967,13 @@ public partial class MainWindow : Window
         {
             FlushPendingPropertyHistory();
             Vm.CutSelectedElement();
+            e.Handled = true;
+            return;
+        }
+
+        if (ctrl && alt && e.Key == Key.V)
+        {
+            await PasteAxamlFromClipboardAsync();
             e.Handled = true;
             return;
         }

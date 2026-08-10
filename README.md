@@ -109,6 +109,7 @@ dotnet run --project src/AvaloniaUIDesigner.App/AvaloniaUIDesigner.App.csproj
 - **Workspace Panels**: `View > Panels`에서 Toolbox·Object Tree·Property Inspector를 독립적으로 숨기거나 다시 표시하고, 패널 크기와 가시성·Object Tree 분할 위치를 세션에 저장합니다. `Reset Panel Layout`으로 기본 작업 공간을 복원합니다.
 - **Workspace Session Restore**: 앱을 정상적으로 닫으면 열린 탭 목록·활성 탭·현재 AXAML·저장 기준 스냅샷·줌·Object Tree 선택·Property Inspector 탐색 상태를 로컬 세션에 저장하고, 다음 실행 시 dirty 문서를 포함해 복원합니다. 세션 JSON이 손상되면 현재 새 문서 상태를 유지하고 안전하게 시작합니다.
 - **선택 요소 AXAML 재사용**: 선택한 컨트롤을 하위 계층·리소스·스타일·바인딩·컨트롤 전용 선언과 함께 독립 UserControl AXAML로 클립보드 복사하거나 파일로 내보냄
+- **AXAML Fragment Clipboard**: `Edit > Paste AXAML from Clipboard` 또는 `Ctrl+Alt+V`로 OS 클립보드의 Window/UserControl AXAML을 현재 문서에 새 컨트롤로 붙여넣고, 이름 충돌·색상 리소스·스타일 충돌을 자동으로 분리하며 하나의 Undo 작업으로 되돌림
 - **문서 루트 속성**: Window/UserControl 루트 종류와 Window 제목·리사이즈·시작 위치, 루트 Min/Max 크기를 편집하고 Undo/Redo, Preview, Draft·Full AXAML 왕복에 보존
 - **벡터 Shape 편집**: Rectangle, Ellipse, Line, Path의 Fill·Stroke·대시·끝점·결합 스타일과 반지름·점 좌표를 편집하고, 검증된 Path geometry를 리소스·Undo/Redo·복제·미리보기·AXAML 왕복에 보존
 - **요소 선택**: 배치된 요소 클릭 시 파란 외곽선
@@ -190,7 +191,7 @@ dotnet run --project src/AvaloniaUIDesigner.App/AvaloniaUIDesigner.App.csproj
 29. `Edit > Edit TabControl Behavior...`에서 TabControl 탭 스트립 위치와 선택 콘텐츠 정렬 편집
 30. `Edit > Edit Image Source & Rendering...`에서 Image의 파일, 배율, 보간, edge, blending 동작 편집
 31. `Edit > Edit Button Actions & Commands...`에서 Button의 포인터·키보드 활성화, Window 기본/취소 역할, command data와 Click 이벤트 편집
-32. `File > Copy Selected AXAML`로 선택 컨트롤을 클립보드에 복사하거나 `File > Export Selected AXAML...`로 독립 UserControl AXAML 파일로 내보냄
+32. `File > Copy Selected AXAML`로 선택 컨트롤을 클립보드에 복사하거나 `File > Export Selected AXAML...`로 독립 UserControl AXAML 파일로 내보냅니다. `Edit > Paste AXAML from Clipboard` 또는 `Ctrl+Alt+V`는 해당 AXAML을 현재 문서에 새 컨트롤로 병합하며 일반 `Ctrl+V` 내부 디자이너 clipboard와 분리됩니다.
 33. ContentControl과 UserControl은 `Edit > Edit Content...`에서 fallback 텍스트를 편집하거나 `Assign as Container Content...`에서 단일 디자이너 자식을 할당
 34. GridSplitter는 `Edit > Edit GridSplitter Behavior...`에서 방향·resize behavior·preview·keyboard/drag 증분을 편집하고 `Assign to Grid Cell...`로 Grid에 배치
 35. 같은 root 또는 같은 Canvas 안의 형제 컨트롤을 여러 개 선택한 뒤 `Edit > Group Selected into Canvas`로 묶고, Canvas 그룹을 선택해 `Edit > Ungroup Selected Canvas`로 해제
@@ -301,6 +302,7 @@ dotnet run --project src/AvaloniaUIDesigner.App/AvaloniaUIDesigner.App.csproj
 75bm. Grid Definitions·DataGrid Behavior·Typography·Transform 속성 편집기는 입력 컨트롤 종류와 관계없이 dialog 포커스에서 `Escape` 취소와 `Ctrl+Enter` 적용을 지원하며, 검증 실패 시 대화상자를 유지합니다.
 75bn. Accessibility·Interaction·Effects·Range·Text Input·SelectableTextBlock 속성 편집기도 기존 Apply Click 검증 경로를 키보드에서 재사용해 dialog 포커스에서 `Escape` 취소와 `Ctrl+Enter` 적용을 지원합니다.
 75bo. SplitView·TabControl·MaskedTextBox·Selection·Date & Time·ColorPicker·AutoCompleteBox·Toggle·Disclosure & Scrolling·Image·Button·Layout·Root·GridSplitter 속성 편집기도 기존 Apply Click 경로를 재사용해 dialog 포커스에서 `Escape` 취소와 `Ctrl+Enter` 적용을 지원합니다.
+75bp. OS 클립보드의 Window/UserControl AXAML을 `Edit > Paste AXAML from Clipboard` 또는 `Ctrl+Alt+V`로 현재 문서에 붙여넣을 수 있습니다. imported control 이름은 `_copy` 계열로 고유화되고, 색상 리소스·스타일 클래스 충돌은 별칭 처리되며 모든 컨트롤·리소스·스타일 변경은 하나의 Undo entry로 기록됩니다.
 76. `File > Load Component Pack...` 또는 `File > Load Toolbox Preset Pack...`으로 외부 Toolbox 팩을 추가하면 파일 경로가 세션에 등록되어 다음 실행 때 자동으로 다시 로드됩니다. 파일이 없어도 문서 탭 복원은 계속되며 상태바에 경고가 표시됩니다.
 77. 외부 프로젝트의 컨트롤은 Component Pack 항목에 `designOnly: true`, `avaloniaTypeName`, `previewText`, `defaultProperties`를 지정해 등록합니다. 디자이너에서는 타입명 플레이스홀더로 편집하고, 생성 AXAML에는 원래 커스텀 타입과 속성을 출력합니다. 예시는 [custom-component-pack.example.json](docs/custom-component-pack.example.json)을 참고하세요.
 78. `File > Load Component Pack Plugin...`에서 `IComponentPackPlugin`을 구현한 신뢰할 수 있는 DLL을 선택하면 플러그인이 제공한 Component Pack을 Toolbox에 등록합니다. DLL 경로는 세션 JSON의 `ComponentPluginPaths`에 저장되고, 앱 재시작 시 플러그인·JSON 팩·프리셋 팩 순서로 복원됩니다.
@@ -510,6 +512,7 @@ AXAML 소스 편집기의 `Validate`와 `Preview`는 현재 디자인과 Undo �
 - v1.87: 주요 속성 편집기 dialog-level 키보드 취소·적용
 - v1.88: Accessibility·Interaction·Effects·Range·Text Input·SelectableTextBlock dialog-level 키보드 취소·적용
 - v1.89: 나머지 속성 편집기 dialog-level 키보드 취소·적용
+- v1.90: OS clipboard AXAML fragment 붙여넣기와 리소스·스타일 충돌 병합
 
 ## 컴포넌트 팩
 

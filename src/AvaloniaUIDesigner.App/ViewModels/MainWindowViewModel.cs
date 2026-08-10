@@ -9333,6 +9333,162 @@ public partial class MainWindowViewModel : ViewModelBase
         StatusText = $"Pasted {pastedElements.Count} control(s)";
     }
 
+    public bool TryPasteAxamlFragment(string axaml, out string result)
+    {
+        if (!TryParseAxamlSource(axaml, out var importedDocument, out var parseResult))
+        {
+            result = parseResult;
+            StatusText = $"Could not paste AXAML: {result}";
+            return false;
+        }
+
+        if (importedDocument.Elements.Count == 0)
+        {
+            result = "The AXAML fragment does not contain any supported controls.";
+            StatusText = result;
+            return false;
+        }
+
+        var before = CaptureDocument();
+        var notes = new List<string>();
+        var mergedResources = new Dictionary<string, string>(
+            _colorResources,
+            StringComparer.Ordinal);
+        var resourceMap = new Dictionary<string, string>(StringComparer.Ordinal);
+        foreach (var pair in importedDocument.ColorResources
+                     ?? new Dictionary<string, string>(StringComparer.Ordinal))
+        {
+            if (!mergedResources.TryGetValue(pair.Key, out var currentValue))
+            {
+                mergedResources[pair.Key] = pair.Value;
+                resourceMap[pair.Key] = pair.Key;
+                continue;
+            }
+
+            if (string.Equals(currentValue, pair.Value, StringComparison.OrdinalIgnoreCase))
+            {
+                resourceMap[pair.Key] = pair.Key;
+                continue;
+            }
+
+            var renamedKey = BuildUniqueResourceKey(pair.Key, mergedResources.Keys);
+            mergedResources[renamedKey] = pair.Value;
+            resourceMap[pair.Key] = renamedKey;
+            notes.Add($"Color resource '{pair.Key}' was renamed to '{renamedKey}' to avoid a conflict.");
+        }
+
+        var mergedStyles = CloneStyles(_documentStyles).ToList();
+        var styleClassMap = new Dictionary<string, string>(StringComparer.Ordinal);
+        foreach (var style in importedDocument.Styles
+                     ?? Array.Empty<DesignerStyleDefinition>())
+        {
+            var setters = style.Setters.ToDictionary(
+                pair => pair.Key,
+                pair => RewriteResourceReference(pair.Value, resourceMap),
+                StringComparer.Ordinal);
+            var styleKey = BuildStyleClassKey(style.TargetType, style.ClassName);
+            if (!styleClassMap.TryGetValue(styleKey, out var mappedClassName))
+            {
+                var hasConflict = mergedStyles.Any(existing =>
+                    string.Equals(existing.TargetType, style.TargetType, StringComparison.Ordinal)
+                    && string.Equals(existing.ClassName, style.ClassName, StringComparison.Ordinal)
+                    && string.Equals(existing.PseudoClass, style.PseudoClass, StringComparison.Ordinal)
+                    && !DictionaryEquals(existing.Setters, setters));
+                mappedClassName = hasConflict
+                    ? BuildUniqueStyleClassName(style.TargetType, style.ClassName, mergedStyles)
+                    : style.ClassName;
+                styleClassMap[styleKey] = mappedClassName;
+                if (!string.Equals(mappedClassName, style.ClassName, StringComparison.Ordinal))
+                {
+                    notes.Add($"Style class '{style.ClassName}' was renamed to '{mappedClassName}' to avoid a conflict.");
+                }
+            }
+
+            var mappedStyle = style with
+            {
+                ClassName = mappedClassName,
+                Setters = setters,
+            };
+            if (!mergedStyles.Any(existing =>
+                    string.Equals(existing.TargetType, mappedStyle.TargetType, StringComparison.Ordinal)
+                    && string.Equals(existing.ClassName, mappedStyle.ClassName, StringComparison.Ordinal)
+                    && string.Equals(existing.PseudoClass, mappedStyle.PseudoClass, StringComparison.Ordinal)
+                    && DictionaryEquals(existing.Setters, mappedStyle.Setters)))
+            {
+                mergedStyles.Add(mappedStyle);
+            }
+        }
+
+        var nameMap = BuildDuplicateNameMap(importedDocument.Elements);
+        var pastedSnapshots = CreateAxamlPasteSnapshots(
+            importedDocument.Elements,
+            nameMap,
+            resourceMap,
+            styleClassMap);
+        var pastedNames = pastedSnapshots
+            .Select(snapshot => snapshot.DisplayName)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var combinedDocument = before with
+        {
+            Elements = before.Elements.Concat(pastedSnapshots).ToList(),
+            ColorResources = mergedResources,
+            Styles = mergedStyles,
+        };
+
+        BeginCanvasMutation(HistoryActionType.PasteAxamlFragment, "Pasted AXAML controls.");
+        try
+        {
+            ApplyDocument(combinedDocument);
+            var pastedElements = Canvas.Elements
+                .Where(element => pastedNames.Contains(element.DisplayName))
+                .ToList();
+            if (pastedElements.Count == 0)
+            {
+                throw new InvalidOperationException("The AXAML fragment could not be added to the canvas.");
+            }
+
+            _isSyncingSelection = true;
+            try
+            {
+                Canvas.SelectMany(pastedElements);
+                ObjectTree.SelectByElement(Canvas.SelectedElement);
+            }
+            finally
+            {
+                _isSyncingSelection = false;
+            }
+
+            CommitCanvasMutation();
+        }
+        catch (Exception exception)
+        {
+            _pendingMutation = null;
+            ApplyDocument(before);
+            RefreshDirtyState();
+            result = $"AXAML controls could not be pasted: {exception.Message}";
+            StatusText = result;
+            return false;
+        }
+
+        var rootCount = importedDocument.Elements.Count(snapshot =>
+            string.IsNullOrWhiteSpace(snapshot.ParentName));
+        var details = new List<string>();
+        if (!string.IsNullOrWhiteSpace(parseResult))
+        {
+            details.Add(parseResult);
+        }
+
+        details.AddRange(notes);
+        result = $"Pasted {rootCount} AXAML control(s) ({pastedSnapshots.Count} total).";
+        if (details.Count > 0)
+        {
+            result += $" {string.Join(" ", details)}";
+        }
+
+        StatusText = result;
+        return true;
+    }
+
     public DocumentTabViewModel CreateNewDocumentTab()
     {
         var tab = AddDocumentTab(
@@ -10848,9 +11004,21 @@ public partial class MainWindowViewModel : ViewModelBase
         IEnumerable<DesignerElementSnapshot> snapshots)
     {
         var nameMap = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        var usedNames = Canvas.Elements
+            .Select(element => element.DisplayName)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
         foreach (var snapshot in snapshots)
         {
-            nameMap[snapshot.DisplayName] = BuildDuplicateDisplayName(snapshot.DisplayName);
+            var candidate = $"{snapshot.DisplayName}_copy";
+            var suffix = 2;
+            while (usedNames.Contains(candidate))
+            {
+                candidate = $"{snapshot.DisplayName}_copy{suffix}";
+                suffix++;
+            }
+
+            nameMap[snapshot.DisplayName] = candidate;
+            usedNames.Add(candidate);
         }
 
         return nameMap;
@@ -10872,6 +11040,116 @@ public partial class MainWindowViewModel : ViewModelBase
                         : snapshot.ParentName,
             })
             .ToList();
+
+    private static List<DesignerElementSnapshot> CreateAxamlPasteSnapshots(
+        IReadOnlyList<DesignerElementSnapshot> snapshots,
+        IReadOnlyDictionary<string, string> nameMap,
+        IReadOnlyDictionary<string, string> resourceMap,
+        IReadOnlyDictionary<string, string> styleClassMap)
+        => snapshots
+            .Select(snapshot => snapshot with
+            {
+                DisplayName = nameMap[snapshot.DisplayName],
+                X = snapshot.X + 16,
+                Y = snapshot.Y + 16,
+                VisualProperties = RewriteImportedSnapshotProperties(
+                    snapshot,
+                    resourceMap,
+                    styleClassMap),
+                ParentName = snapshot.ParentName is not null
+                    && nameMap.TryGetValue(snapshot.ParentName, out var duplicateParentName)
+                        ? duplicateParentName
+                        : snapshot.ParentName,
+            })
+            .ToList();
+
+    private static IReadOnlyDictionary<string, string>? RewriteImportedSnapshotProperties(
+        DesignerElementSnapshot snapshot,
+        IReadOnlyDictionary<string, string> resourceMap,
+        IReadOnlyDictionary<string, string> styleClassMap)
+    {
+        if (snapshot.VisualProperties is null)
+        {
+            return null;
+        }
+
+        var properties = snapshot.VisualProperties.ToDictionary(
+            pair => pair.Key,
+            pair => RewriteResourceReference(pair.Value, resourceMap),
+            StringComparer.Ordinal);
+        if (properties.TryGetValue("Classes", out var classes)
+            && styleClassMap.Count > 0)
+        {
+            var targetType = GetStyleTargetType(snapshot.TypeName);
+            properties["Classes"] = string.Join(
+                " ",
+                classes.Split(
+                        [' ', '\t', '\r', '\n'],
+                        StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                    .Select(className => styleClassMap.TryGetValue(
+                            BuildStyleClassKey(targetType, className),
+                            out var mappedClassName)
+                        ? mappedClassName
+                        : className));
+        }
+
+        return properties;
+    }
+
+    private static string RewriteResourceReference(
+        string value,
+        IReadOnlyDictionary<string, string> resourceMap)
+        => DesignerResourceReferenceMetadata.TryParseExpression(value, out var resourceKey)
+            && resourceMap.TryGetValue(resourceKey, out var mappedResourceKey)
+                ? DesignerResourceReferenceMetadata.FormatExpression(mappedResourceKey)
+                : value;
+
+    private static string BuildUniqueResourceKey(
+        string sourceKey,
+        IEnumerable<string> usedKeys)
+    {
+        var used = usedKeys.ToHashSet(StringComparer.Ordinal);
+        var candidate = $"{sourceKey}_Imported";
+        var suffix = 2;
+        while (used.Contains(candidate))
+        {
+            candidate = $"{sourceKey}_Imported{suffix}";
+            suffix++;
+        }
+
+        return candidate;
+    }
+
+    private static string BuildStyleClassKey(string targetType, string className)
+        => $"{targetType}|{className}";
+
+    private static string BuildUniqueStyleClassName(
+        string targetType,
+        string sourceClassName,
+        IEnumerable<DesignerStyleDefinition> styles)
+    {
+        var used = styles
+            .Where(style => string.Equals(style.TargetType, targetType, StringComparison.Ordinal))
+            .Select(style => style.ClassName)
+            .ToHashSet(StringComparer.Ordinal);
+        var candidate = $"{sourceClassName}_Imported";
+        var suffix = 2;
+        while (used.Contains(candidate))
+        {
+            candidate = $"{sourceClassName}_Imported{suffix}";
+            suffix++;
+        }
+
+        return candidate;
+    }
+
+    private static string GetStyleTargetType(string typeName)
+    {
+        var separator = typeName.LastIndexOf('.');
+        return separator >= 0 && separator < typeName.Length - 1
+            ? typeName[(separator + 1)..]
+            : typeName;
+    }
 
     private DesignerElementSnapshot CreateSnapshot(
         DesignElement element,
@@ -14200,6 +14478,7 @@ public partial class MainWindowViewModel : ViewModelBase
             HistoryActionType.AddElement => "add element",
             HistoryActionType.DuplicateElement => "duplicate element",
             HistoryActionType.PasteElement => "paste element",
+            HistoryActionType.PasteAxamlFragment => "paste AXAML controls",
             HistoryActionType.RemoveElement => "remove element",
             HistoryActionType.TransformElement => "move/resize element",
             HistoryActionType.EditProperty => "edit properties",
@@ -17032,6 +17311,7 @@ public partial class MainWindowViewModel : ViewModelBase
         AddElement,
         DuplicateElement,
         PasteElement,
+        PasteAxamlFragment,
         RemoveElement,
         TransformElement,
         EditProperty,
