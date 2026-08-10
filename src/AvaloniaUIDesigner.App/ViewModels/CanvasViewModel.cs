@@ -83,11 +83,14 @@ public partial class CanvasViewModel : ViewModelBase
     private double _zoomScale = 1;
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(SelectionPathSummary))]
     private DesignElement? _selectedElement;
 
     public bool IsSelectionActive => SelectedElements.Count > 0;
 
     public bool HasMultipleSelection => SelectedElements.Count > 1;
+
+    public bool CanNavigateHierarchy => SelectedElements.Count == 1;
 
     public string SelectionSummary => SelectedElements.Count switch
     {
@@ -95,6 +98,46 @@ public partial class CanvasViewModel : ViewModelBase
         1 => "1 selected",
         var count => $"{count} selected",
     };
+
+    public string SelectionPathSummary
+    {
+        get
+        {
+            if (SelectedElements.Count == 0)
+            {
+                return "No selection";
+            }
+
+            if (SelectedElements.Count > 1)
+            {
+                return $"{SelectedElements.Count} controls selected";
+            }
+
+            var current = SelectedElement ?? SelectedElements[0];
+            var path = new List<string>();
+            var visited = new HashSet<DesignElement>();
+            while (visited.Add(current))
+            {
+                path.Add(current.DisplayName);
+                if (string.IsNullOrWhiteSpace(current.ParentName))
+                {
+                    break;
+                }
+
+                var parent = Elements.FirstOrDefault(candidate =>
+                    string.Equals(candidate.DisplayName, current.ParentName, StringComparison.OrdinalIgnoreCase));
+                if (parent is null)
+                {
+                    break;
+                }
+
+                current = parent;
+            }
+
+            path.Reverse();
+            return string.Join(" / ", path);
+        }
+    }
 
     public string? ActiveStylePreviewPseudoClass => _stylePreviewPseudoClass;
 
@@ -2483,7 +2526,9 @@ public partial class CanvasViewModel : ViewModelBase
     {
         OnPropertyChanged(nameof(IsSelectionActive));
         OnPropertyChanged(nameof(HasMultipleSelection));
+        OnPropertyChanged(nameof(CanNavigateHierarchy));
         OnPropertyChanged(nameof(SelectionSummary));
+        OnPropertyChanged(nameof(SelectionPathSummary));
     }
 
     private void SetStylePreviewBadge(Control visual, string? label)

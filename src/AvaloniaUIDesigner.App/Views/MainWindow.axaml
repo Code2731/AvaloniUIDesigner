@@ -763,6 +763,28 @@
                         <DockPanel>
                             <StackPanel DockPanel.Dock="Right"
                                         Orientation="Horizontal"
+                                        Spacing="5"
+                                        IsVisible="{Binding Canvas.IsSelectionActive}">
+                                <Button Content="Up"
+                                        Click="OnSelectionParentButtonClicked"
+                                        IsEnabled="{Binding Canvas.CanNavigateHierarchy}"
+                                        ToolTip.Tip="Select the selected control's parent"
+                                        Padding="7,2"/>
+                                <Button Content="Into"
+                                        Click="OnSelectionChildButtonClicked"
+                                        IsEnabled="{Binding Canvas.CanNavigateHierarchy}"
+                                        ToolTip.Tip="Enter the selected container's first child"
+                                        Padding="7,2"/>
+                                <TextBlock Text="{Binding Canvas.SelectionPathSummary}"
+                                           VerticalAlignment="Center"
+                                           MaxWidth="340"
+                                           TextTrimming="CharacterEllipsis"
+                                           FontSize="11"
+                                           Foreground="#A5F3FC"
+                                           ToolTip.Tip="Current selection hierarchy"/>
+                            </StackPanel>
+                            <StackPanel DockPanel.Dock="Right"
+                                        Orientation="Horizontal"
                                         Spacing="6"
                                         IsVisible="{Binding HasStylePreviewOptions}">
                                 <TextBlock Text="State"

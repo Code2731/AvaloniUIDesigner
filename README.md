@@ -54,6 +54,7 @@ dotnet run --project src/AvaloniaUIDesigner.App/AvaloniaUIDesigner.App.csproj
 - **그리드/스냅 키보드 단축키**: `Ctrl+Alt+G`로 디자인 그리드를 표시·숨기고 `Ctrl+Alt+Shift+G`로 Grid snap을 토글하며 기존 문서 설정·Undo/AXAML 메타데이터를 유지
 - **Workspace 패널 키보드 단축키**: `Ctrl+Alt+1/2/3`으로 Toolbox·Object Tree·Property Inspector를 토글하고 `Ctrl+Alt+0`으로 기본 패널 레이아웃을 복원하며 기존 세션 저장 상태와 메뉴 체크를 동기화
 - **Design Toolbar**: 캔버스 상단의 Qt Designer식 도구 모음에서 New·Save·Undo/Redo·Preview, 다중 선택 Align/Distribute/Size, Group/Ungroup/Break, 주요 Layout, Fit/Zoom 명령을 가로 스크롤 가능한 한 줄에서 실행하고 선택 상태에 따라 사용할 수 없는 작업을 자동 비활성화
+- **Selection Breadcrumb**: Design Surface 헤더에 현재 선택 컨트롤의 `Parent / Child` 계층 경로를 표시하고 `Up`·`Into` 버튼으로 기존 Escape 부모 선택·Enter 자식 진입을 직접 실행해 중첩 레이아웃 편집 위치를 잃지 않음
 - **패널 포커스 복구**: 숨겨진 패널에서도 `Ctrl+Alt+T/P/I` 또는 `Ctrl+F`를 누르면 필요한 Toolbox·Object Tree·Property Inspector를 자동으로 다시 표시한 뒤 검색·배치 작업으로 진입
 - **리사이즈 비율 잠금**: 코너 핸들을 `Shift`와 함께 드래그하면 단일 컨트롤과 다중 선택 bounding box의 원래 가로·세로 비율을 유지하며, 잠금 중에는 Smart Snap보다 비율을 우선합니다.
 - **디자인 그리드**: 그리드 표시·Snap to Grid를 전환하고 4·8·16px 프리셋 또는 4~32px 사용자 지정 간격을 편집하며 문서 설정·Undo/Redo·Preview·AXAML 메타데이터에 보존
@@ -540,6 +541,7 @@ AXAML 소스 편집기의 `Validate`와 `Preview`는 현재 디자인과 Undo �
 - v1.99: 탭 viewport 복원과 선택 자동 추적 우선순위 안정화
 - v2.00: 단일 Tab Order 편집기와 Tab Order Map 입력 규칙 통합
 - v2.01: Qt Designer식 Canvas Design Toolbar 추가
+- v2.02: Design Surface Selection Breadcrumb과 계층 컨텍스트 이동 추가
 
 ## 컴포넌트 팩
 

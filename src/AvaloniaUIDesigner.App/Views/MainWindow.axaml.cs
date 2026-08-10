@@ -3026,6 +3026,22 @@ public partial class MainWindow : Window
         Vm.StatusText = "Opened live preview. Changes update automatically.";
     }
 
+    private void OnSelectionParentButtonClicked(
+        object? sender,
+        Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        FlushPendingPropertyHistory();
+        Vm?.SelectParentOfSelectedElement();
+    }
+
+    private void OnSelectionChildButtonClicked(
+        object? sender,
+        Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        FlushPendingPropertyHistory();
+        Vm?.SelectChildOfSelectedElement();
+    }
+
     private async void OnEditAxamlSourceMenuClicked(
         object? sender,
         Avalonia.Interactivity.RoutedEventArgs e)
