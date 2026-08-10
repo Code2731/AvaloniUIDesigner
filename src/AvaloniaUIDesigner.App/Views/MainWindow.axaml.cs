@@ -99,7 +99,7 @@ public partial class MainWindow : Window
         Escape              Select the parent container on the canvas, or clear selection at the root
         Enter               Select the first child of the selected container
         Shift+Enter         Select the last child of the selected container
-        Alt+Up/Down          Select the previous/next sibling on the canvas
+        Alt+Arrow            Select the previous/next sibling on the canvas
         Arrow keys           Nudge selection by 1 px
         Shift+Arrow keys     Nudge selection by 10 px
         Shift+corner handle  Lock aspect ratio while resizing
@@ -4418,9 +4418,9 @@ public partial class MainWindow : Window
         if (alt
             && !ctrl
             && !shift
-            && e.Key is (Key.Up or Key.Down)
+            && e.Key is (Key.Left or Key.Right or Key.Up or Key.Down)
             && ReferenceEquals(e.Source, DesignHost)
-            && Vm.SelectSiblingOfSelectedElement(e.Key == Key.Up ? -1 : 1))
+            && Vm.SelectSiblingOfSelectedElement(e.Key is (Key.Left or Key.Up) ? -1 : 1))
         {
             e.Handled = true;
             return;
