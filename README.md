@@ -106,6 +106,7 @@ dotnet run --project src/AvaloniaUIDesigner.App/AvaloniaUIDesigner.App.csproj
 - **Document Tab Direct Shortcuts**: `Ctrl+1`~`Ctrl+9`로 1-9번째 문서 탭을 즉시 활성화하고, `Ctrl+Tab` 순환이나 탭 드래그/이동과 함께 사용할 수 있습니다.
 - **Document Tab Quick Switcher**: `View > Quick Switch Document Tab...` 또는 `Ctrl+K`로 열린 탭의 별칭·파일 경로를 검색하고 Enter로 즉시 전환합니다.
 - **Tab View Navigation**: `Ctrl+Tab`/`Ctrl+Shift+Tab`으로 문서 탭을 순환하고, `Ctrl+Shift+PageUp/PageDown` 또는 탭 컨텍스트 메뉴로 활성 탭을 좌우 이동하며, 탭별 캔버스 줌·스크롤 위치와 Object Tree 선택을 전환·세션 복원 때 보존합니다.
+- **Viewport 복원 우선순위**: 문서 탭을 복원하는 짧은 pending 구간에는 선택 컨트롤 자동 스크롤을 보류해 저장된 Canvas 위치가 Object Tree/Canvas 선택 추적에 의해 덮어써지지 않도록 합니다.
 - **Workspace Panels**: `View > Panels`에서 Toolbox·Object Tree·Property Inspector를 독립적으로 숨기거나 다시 표시하고, 패널 크기와 가시성·Object Tree 분할 위치를 세션에 저장합니다. `Reset Panel Layout`으로 기본 작업 공간을 복원합니다.
 - **Workspace Session Restore**: 앱을 정상적으로 닫으면 열린 탭 목록·활성 탭·현재 AXAML·저장 기준 스냅샷·줌·Canvas 스크롤 위치·Object Tree 선택·Property Inspector 탐색 상태를 로컬 세션에 저장하고, 다음 실행 시 dirty 문서를 포함해 복원합니다. 세션 JSON이 손상되면 현재 새 문서 상태를 유지하고 안전하게 시작합니다.
 - **문서 탭별 Design Guide**: 가로·세로 ruler에서 만든 guide 좌표와 `Show Design Guides`·`Snap to Guides` 설정을 문서 탭마다 독립 보존해 탭 전환·앱 재시작·닫힌 탭 복원 후에도 되살리고, 새 문서·새 AXAML·명시적 `Clear Design Guides`에서는 해당 탭만 초기화합니다.
@@ -313,6 +314,7 @@ dotnet run --project src/AvaloniaUIDesigner.App/AvaloniaUIDesigner.App.csproj
 75bv. 가로·세로 ruler에서 만든 Design Guide와 `Show Design Guides`·`Snap to Guides` 상태는 활성 문서 탭 전환 시 이전 탭 snapshot에 저장되고 새 탭의 snapshot을 복원합니다. 따라서 여러 화면을 번갈아 정렬해도 guide가 섞이지 않으며, 새 문서·새 AXAML·명시적 `Clear Design Guides`는 현재 탭의 guide만 비웁니다.
 75bw. Design Guide snapshot은 문서 탭 세션 JSON에도 함께 저장되므로 정상 종료 후 앱을 다시 시작하거나 닫힌 탭을 다시 열어도 가이드 좌표·표시·스냅 상태가 복원됩니다. 기존 세션 JSON에 guide 필드가 없거나 잘못된 좌표가 포함된 경우에는 현재 아트보드 범위의 유효한 좌표만 적용하고 나머지는 기본값으로 안전하게 무시합니다.
 75bx. 문서 탭의 Canvas ScrollViewer 가로·세로 오프셋도 탭 상태와 세션 JSON에 저장됩니다. 탭 전환·앱 재시작·닫힌 탭 복원 후 새 문서의 실제 viewport/extent 범위에 맞춰 안전하게 clamp하므로 확대된 아트보드에서 작업하던 위치를 잃지 않으며, 기존 세션에는 `(0, 0)`을 적용합니다.
+75by. viewport 복원에는 pending 세대가 부여되며, 이전 탭의 늦은 `LayoutUpdated`/dispatcher callback은 무시됩니다. 복원 pending 동안에는 선택 요소의 자동 `ScrollIntoView`도 보류하고, 저장 오프셋을 적용한 뒤 idle 시점에만 정상 선택 추적을 재개해 빠른 탭 순환에서도 작업 위치가 흔들리지 않습니다.
 76. `File > Load Component Pack...` 또는 `File > Load Toolbox Preset Pack...`으로 외부 Toolbox 팩을 추가하면 파일 경로가 세션에 등록되어 다음 실행 때 자동으로 다시 로드됩니다. 파일이 없어도 문서 탭 복원은 계속되며 상태바에 경고가 표시됩니다.
 77. 외부 프로젝트의 컨트롤은 Component Pack 항목에 `designOnly: true`, `avaloniaTypeName`, `previewText`, `defaultProperties`를 지정해 등록합니다. 디자이너에서는 타입명 플레이스홀더로 편집하고, 생성 AXAML에는 원래 커스텀 타입과 속성을 출력합니다. 예시는 [custom-component-pack.example.json](docs/custom-component-pack.example.json)을 참고하세요.
 78. `File > Load Component Pack Plugin...`에서 `IComponentPackPlugin`을 구현한 신뢰할 수 있는 DLL을 선택하면 플러그인이 제공한 Component Pack을 Toolbox에 등록합니다. DLL 경로는 세션 JSON의 `ComponentPluginPaths`에 저장되고, 앱 재시작 시 플러그인·JSON 팩·프리셋 팩 순서로 복원됩니다.
@@ -422,7 +424,7 @@ Button Actions & Commands 편집기는 Release·Press ClickMode와 Avalonia key 
 
 AXAML 소스 편집기의 `Validate`와 `Preview`는 현재 디자인과 Undo 스택을 변경하지 않습니다. `Apply`는 파싱에 성공한 문서만 반영하며, 현재 저장 경로를 유지하고 전체 변경을 한 번의 Undo/Redo 작업으로 기록합니다.
 
-캔버스 뷰포트는 아트보드의 원본 레이아웃 크기와 렌더 줌을 분리해 유지합니다. `Zoom In`·`Zoom Out`을 실행하면 ScrollViewer의 실제 콘텐츠 영역도 같은 배율로 갱신되므로 확대된 컨트롤을 가로·세로 스크롤하며 편집할 수 있고, `Fit to View`는 현재 뷰포트 크기를 기준으로 배율을 계산합니다. 중간 마우스 드래그는 선택·이동과 분리된 팬 입력으로 ScrollViewer 오프셋만 이동하고, Ctrl+휠은 포인터 아래의 아트보드 좌표를 고정한 채 확대·축소하므로 둘 다 문서 Undo 기록을 만들지 않습니다. 아트보드 preset·회전·Custom Size 변경도 layout 갱신 전의 viewport 중앙 문서 좌표를 복원해 scrollbar 표시 상태가 달라져도 작업 위치를 유지합니다. 가로·세로 디자인 룰러는 같은 오프셋과 배율을 사용해 화면 가장자리의 눈금과 라벨을 실제 아트보드 좌표로 표시하며, 포인터가 뷰포트 안에 있을 때는 청록색 기준선으로 해당 좌표를 강조합니다. 문서 탭마다 Canvas ScrollViewer 오프셋을 저장하고 탭 전환·Workspace Session Restore·닫힌 탭 복원 후 실제 extent 범위에 맞춰 복원합니다. 룰러에서 만든 가이드라인은 주황색으로 캔버스에 표시되고 이동·리사이즈 시 Smart Snap에 참여합니다. 가이드는 문서 AXAML과 Undo 스택에 포함되지 않는 작업 보조 상태이며, 문서 탭 전환·Workspace Session Restore·닫힌 탭 복원에서 탭별 좌표와 표시·스냅 상태를 되살리고 새 문서·새 AXAML·명시적 Clear에서는 해당 탭만 초기화됩니다.
+캔버스 뷰포트는 아트보드의 원본 레이아웃 크기와 렌더 줌을 분리해 유지합니다. `Zoom In`·`Zoom Out`을 실행하면 ScrollViewer의 실제 콘텐츠 영역도 같은 배율로 갱신되므로 확대된 컨트롤을 가로·세로 스크롤하며 편집할 수 있고, `Fit to View`는 현재 뷰포트 크기를 기준으로 배율을 계산합니다. 중간 마우스 드래그는 선택·이동과 분리된 팬 입력으로 ScrollViewer 오프셋만 이동하고, Ctrl+휠은 포인터 아래의 아트보드 좌표를 고정한 채 확대·축소하므로 둘 다 문서 Undo 기록을 만들지 않습니다. 아트보드 preset·회전·Custom Size 변경도 layout 갱신 전의 viewport 중앙 문서 좌표를 복원해 scrollbar 표시 상태가 달라져도 작업 위치를 유지합니다. 가로·세로 디자인 룰러는 같은 오프셋과 배율을 사용해 화면 가장자리의 눈금과 라벨을 실제 아트보드 좌표로 표시하며, 포인터가 뷰포트 안에 있을 때는 청록색 기준선으로 해당 좌표를 강조합니다. 문서 탭마다 Canvas ScrollViewer 오프셋을 저장하고 탭 전환·Workspace Session Restore·닫힌 탭 복원 후 실제 extent 범위에 맞춰 복원하며, 복원 pending 동안 선택 자동 추적이 저장 위치를 덮어쓰지 않도록 순서를 조정합니다. 룰러에서 만든 가이드라인은 주황색으로 캔버스에 표시되고 이동·리사이즈 시 Smart Snap에 참여합니다. 가이드는 문서 AXAML과 Undo 스택에 포함되지 않는 작업 보조 상태이며, 문서 탭 전환·Workspace Session Restore·닫힌 탭 복원에서 탭별 좌표와 표시·스냅 상태를 되살리고 새 문서·새 AXAML·명시적 Clear에서는 해당 탭만 초기화됩니다.
 
 ## 로드맵
 
@@ -531,6 +533,7 @@ AXAML 소스 편집기의 `Validate`와 `Preview`는 현재 디자인과 Undo �
 - v1.96: 문서 탭별 Design Guide 좌표·표시·스냅 상태 보존
 - v1.97: Design Guide 상태의 Workspace Session 저장·복원
 - v1.98: 문서 탭별 Canvas viewport 스크롤 위치 저장·복원
+- v1.99: 탭 viewport 복원과 선택 자동 추적 우선순위 안정화
 
 ## 컴포넌트 팩
 

@@ -230,6 +230,7 @@ public partial class MainWindow : Window
     private DocumentTabViewModel? _guideStateTab;
     private DocumentTabViewModel? _viewportStateTab;
     private bool _isRestoringViewport;
+    private bool _isViewportRestorePending;
     private int _viewportRestoreVersion;
     private bool _showDesignGuides = true;
     private bool _snapToGuides = true;
@@ -5422,6 +5423,11 @@ public partial class MainWindow : Window
         Dispatcher.UIThread.Post(
             () =>
             {
+                if (_isViewportRestorePending)
+                {
+                    return;
+                }
+
                 if (Vm?.Canvas.SelectedElement is { } currentElement
                     && ReferenceEquals(currentElement, selectedElement)
                     && Vm.Canvas.IsElementVisibleOnCanvas(currentElement))
@@ -6602,6 +6608,7 @@ public partial class MainWindow : Window
     {
         var state = tab?.ViewportState ?? DocumentViewportState.Default;
         var restoreVersion = ++_viewportRestoreVersion;
+        _isViewportRestorePending = true;
 
         void ApplyViewportOffset()
         {
@@ -6647,6 +6654,18 @@ public partial class MainWindow : Window
         DesignScrollViewer.LayoutUpdated += OnLayoutUpdated;
         ApplyViewportOffset();
         Dispatcher.UIThread.Post(ApplyViewportOffset, DispatcherPriority.Normal);
+        Dispatcher.UIThread.Post(
+            () =>
+            {
+                if (restoreVersion != _viewportRestoreVersion)
+                {
+                    return;
+                }
+
+                ApplyViewportOffset();
+                _isViewportRestorePending = false;
+            },
+            DispatcherPriority.ApplicationIdle);
     }
 
     private static double NormalizeViewportOffset(double value)
