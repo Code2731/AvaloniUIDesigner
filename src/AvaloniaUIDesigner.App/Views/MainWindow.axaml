@@ -1503,6 +1503,11 @@
                                                         ArtboardHeight="{Binding Canvas.ArtboardHeight}"
                                                         IsHitTestVisible="False"/>
                             <Canvas Name="SelectionOverlay" ZIndex="30" IsVisible="{Binding Canvas.IsSelectionActive}">
+                                <Rectangle Name="SelectionBoundsRectangle"
+                                           Fill="Transparent"
+                                           Stroke="#60A5FA"
+                                           StrokeThickness="1"
+                                           IsHitTestVisible="False"/>
                                 <Rectangle Name="HandleNW" Tag="NW" Width="10" Height="10" Fill="DodgerBlue" PointerPressed="OnHandlePressed"/>
                                 <Rectangle Name="HandleN" Tag="N" Width="10" Height="10" Fill="DodgerBlue" PointerPressed="OnHandlePressed"/>
                                 <Rectangle Name="HandleNE" Tag="NE" Width="10" Height="10" Fill="DodgerBlue" PointerPressed="OnHandlePressed"/>

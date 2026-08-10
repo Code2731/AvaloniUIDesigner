@@ -5335,6 +5335,11 @@ public partial class MainWindow : Window
             UpdateHandlePositions();
         }
 
+        if (e.PropertyName == nameof(CanvasViewModel.SelectionBoundsSummary))
+        {
+            UpdateHandlePositions();
+        }
+
         UpdateViewportRulers();
     }
 
@@ -5994,6 +5999,11 @@ public partial class MainWindow : Window
         var bottom = bounds.Bottom;
         var midX = bounds.X + bounds.Width / 2;
         var midY = bounds.Y + bounds.Height / 2;
+
+        SelectionBoundsRectangle.Width = bounds.Width;
+        SelectionBoundsRectangle.Height = bounds.Height;
+        Canvas.SetLeft(SelectionBoundsRectangle, bounds.X);
+        Canvas.SetTop(SelectionBoundsRectangle, bounds.Y);
 
         Place(HandleNW, left, top);
         Place(HandleN, midX, top);
