@@ -5151,6 +5151,7 @@ public partial class MainWindow : Window
         UpdateElementNameEditor();
         UpdateHandlePositions();
         QueueObjectTreeSelectionIntoView();
+        QueueCanvasSelectionIntoView();
     }
 
     private void QueueObjectTreeSelectionIntoView()
@@ -5167,6 +5168,27 @@ public partial class MainWindow : Window
                     && ReferenceEquals(currentNode, selectedNode))
                 {
                     ObjectTreeView.ScrollIntoView(currentNode);
+                }
+            },
+            DispatcherPriority.Background);
+    }
+
+    private void QueueCanvasSelectionIntoView()
+    {
+        if (Vm?.Canvas.SelectedElement is not { } selectedElement
+            || !Vm.Canvas.IsElementVisibleOnCanvas(selectedElement))
+        {
+            return;
+        }
+
+        Dispatcher.UIThread.Post(
+            () =>
+            {
+                if (Vm?.Canvas.SelectedElement is { } currentElement
+                    && ReferenceEquals(currentElement, selectedElement)
+                    && Vm.Canvas.IsElementVisibleOnCanvas(currentElement))
+                {
+                    DesignHost.ScrollIntoView(currentElement);
                 }
             },
             DispatcherPriority.Background);

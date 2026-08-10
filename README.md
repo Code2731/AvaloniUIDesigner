@@ -129,6 +129,7 @@ dotnet run --project src/AvaloniaUIDesigner.App/AvaloniaUIDesigner.App.csproj
 - **Object Tree 계층 편집**: 트리 행의 컨텍스트 메뉴에서 지원 컨테이너 할당과 부모 컨테이너 해제를 바로 실행
 - **Object Tree 순서 편집**: StackPanel·DockPanel·WrapPanel·UniformGrid·Canvas 자식의 순서를 `Move Earlier/Later`로 바로 변경
 - **Object Tree 탐색 상태**: 트리 노드의 펼침 상태를 계층 재빌드 후에도 보존하고, Canvas·키보드·Undo/탭 전환으로 자식을 선택하면 접힌 부모 경로를 자동으로 펼치며 선택 행을 화면에 스크롤
+- **선택 대상 viewport 추적**: Object Tree·Canvas 키보드·문서 탭 전환으로 visible 컨트롤을 선택하면 Object Tree 선택 행과 Canvas active 요소를 각각 자동 스크롤해 큰 아트보드에서도 현재 작업 대상을 잃지 않음
 - **Object Tree 드래그 재배치**: 지원 컨테이너의 자식 행을 같은 부모의 다른 행 앞에 드래그해 순서를 변경하거나 Grid·StackPanel·DockPanel·WrapPanel·UniformGrid·Canvas·TabControl·SplitView·Content 컨테이너 행으로 드래그해 부모를 변경하며, 잠긴 대상·순환 계층·가득 찬 슬롯은 거부
 - **Object Tree 드롭 피드백**: 드래그 중 유효한 대상 행은 초록색, 거부되는 대상 행은 빨간색으로 강조하고 드롭·취소·트리 이탈 시 상태를 정리
 - **Object Tree 삽입 위치 표시**: 같은 부모의 행 위쪽/아래쪽 절반에 드롭하면 앞/뒤 삽입선을 표시하고, 표시된 위치 그대로 StackPanel·DockPanel·WrapPanel·UniformGrid·Canvas 순서를 변경
@@ -273,6 +274,7 @@ dotnet run --project src/AvaloniaUIDesigner.App/AvaloniaUIDesigner.App.csproj
 75as. Object Tree에 포커스가 있을 때 `Shift+Up/Down`은 현재 펼쳐진 visible 행 순서에서 anchor부터 이전/다음 target까지 범위를 선택하고, `Ctrl+Shift+Up/Down`은 기존 선택에 범위를 추가합니다. 첫/마지막 visible 행에서는 범위를 wrap하지 않으며, 접힌 계층과 검색 결과 순서를 그대로 사용합니다.
 75at. Object Tree에 포커스가 있을 때 `Shift+Home/End`는 anchor부터 첫/마지막 visible 행까지 범위를 선택하고, `Ctrl+Shift+Home/End`는 기존 선택에 해당 경계 범위를 추가합니다. 검색 결과·펼침 상태를 반영하며 현재 경계에서 다시 누르면 선택과 active 행을 유지합니다.
 75au. Canvas·Object Tree·Undo/Redo·문서 탭 전환으로 선택이 바뀌면 Object Tree는 접힌 조상 경로를 먼저 펼치고 선택된 행을 자동으로 `ScrollIntoView`합니다. 지연된 선택 변경이 뒤늦게 실행되어도 최신 선택 행만 스크롤해 이전 선택으로 되돌아가지 않습니다.
+75av. Object Tree·Canvas 키보드·문서 탭 전환으로 visible 컨트롤을 선택하면 DesignHost도 최신 active 요소를 `ScrollIntoView`해 큰 아트보드의 viewport를 따라갑니다. hidden·부모 visibility 제외 요소는 직접 검사 정책을 유지하며 자동 이동하지 않습니다.
 76. `File > Load Component Pack...` 또는 `File > Load Toolbox Preset Pack...`으로 외부 Toolbox 팩을 추가하면 파일 경로가 세션에 등록되어 다음 실행 때 자동으로 다시 로드됩니다. 파일이 없어도 문서 탭 복원은 계속되며 상태바에 경고가 표시됩니다.
 77. 외부 프로젝트의 컨트롤은 Component Pack 항목에 `designOnly: true`, `avaloniaTypeName`, `previewText`, `defaultProperties`를 지정해 등록합니다. 디자이너에서는 타입명 플레이스홀더로 편집하고, 생성 AXAML에는 원래 커스텀 타입과 속성을 출력합니다. 예시는 [custom-component-pack.example.json](docs/custom-component-pack.example.json)을 참고하세요.
 78. `File > Load Component Pack Plugin...`에서 `IComponentPackPlugin`을 구현한 신뢰할 수 있는 DLL을 선택하면 플러그인이 제공한 Component Pack을 Toolbox에 등록합니다. DLL 경로는 세션 JSON의 `ComponentPluginPaths`에 저장되고, 앱 재시작 시 플러그인·JSON 팩·프리셋 팩 순서로 복원됩니다.
@@ -462,6 +464,7 @@ AXAML 소스 편집기의 `Validate`와 `Preview`는 현재 디자인과 Undo �
 - v1.67: Shift+Home/End Canvas 경계 연속 범위 누적 선택
 - v1.68: Object Tree Shift+Home/End 경계 범위 선택
 - v1.69: Object Tree 선택 행 자동 스크롤
+- v1.70: Canvas active 요소 자동 viewport 추적
 
 ## 컴포넌트 팩
 
