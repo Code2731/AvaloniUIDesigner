@@ -3042,6 +3042,19 @@ public partial class MainWindow : Window
         Vm?.SelectChildOfSelectedElement();
     }
 
+    private void OnSelectionBreadcrumbSegmentClicked(
+        object? sender,
+        Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        if (Vm is null || (sender as Button)?.Tag is not DesignElement element)
+        {
+            return;
+        }
+
+        FlushPendingPropertyHistory();
+        Vm.SelectElement(element);
+    }
+
     private async void OnEditAxamlSourceMenuClicked(
         object? sender,
         Avalonia.Interactivity.RoutedEventArgs e)

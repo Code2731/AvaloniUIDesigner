@@ -775,13 +775,36 @@
                                         IsEnabled="{Binding Canvas.CanNavigateHierarchy}"
                                         ToolTip.Tip="Enter the selected container's first child"
                                         Padding="7,2"/>
+                                <ItemsControl ItemsSource="{Binding Canvas.SelectionPathSegments}"
+                                              MaxWidth="340"
+                                              ToolTip.Tip="Click a hierarchy segment to select it">
+                                    <ItemsControl.ItemsPanel>
+                                        <ItemsPanelTemplate>
+                                            <StackPanel Orientation="Horizontal" Spacing="1"/>
+                                        </ItemsPanelTemplate>
+                                    </ItemsControl.ItemsPanel>
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <StackPanel Orientation="Horizontal" Spacing="1">
+                                                <TextBlock Text="/"
+                                                           IsVisible="{Binding HasSeparator}"
+                                                           VerticalAlignment="Center"
+                                                           Foreground="#64748B"/>
+                                                <Button Content="{Binding DisplayName}"
+                                                        Tag="{Binding Element}"
+                                                        Click="OnSelectionBreadcrumbSegmentClicked"
+                                                        Padding="3,2"
+                                                        FontSize="11"
+                                                        Foreground="#A5F3FC"/>
+                                            </StackPanel>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
                                 <TextBlock Text="{Binding Canvas.SelectionPathSummary}"
+                                           IsVisible="{Binding Canvas.HasMultipleSelection}"
                                            VerticalAlignment="Center"
-                                           MaxWidth="340"
-                                           TextTrimming="CharacterEllipsis"
                                            FontSize="11"
-                                           Foreground="#A5F3FC"
-                                           ToolTip.Tip="Current selection hierarchy"/>
+                                           Foreground="#A5F3FC"/>
                             </StackPanel>
                             <StackPanel DockPanel.Dock="Right"
                                         Orientation="Horizontal"

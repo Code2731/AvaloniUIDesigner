@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Collections.Specialized;
+using System.ComponentModel;
 using System.Globalization;
 using System.Linq;
 using System.Text.Json;
@@ -23,6 +24,12 @@ using RectangleShape = Avalonia.Controls.Shapes.Rectangle;
 
 namespace AvaloniaUIDesigner.App.ViewModels;
 
+public sealed record SelectionPathSegment(
+    string DisplayName,
+    DesignElement Element,
+    bool HasSeparator,
+    bool IsCurrent);
+
 public partial class CanvasViewModel : ViewModelBase
 {
     private readonly IComponentCatalog _componentCatalog;
@@ -32,6 +39,7 @@ public partial class CanvasViewModel : ViewModelBase
     private Control? _stylePreviewControl;
     private string? _stylePreviewPseudoClass;
     private bool _isReflowingContainerChildren;
+    private readonly HashSet<DesignElement> _observedElements = new();
 
     public CanvasViewModel()
         : this(new BuiltInComponentCatalog(), new DefaultControlRenderer())
@@ -49,6 +57,8 @@ public partial class CanvasViewModel : ViewModelBase
     public ObservableCollection<DesignElement> Elements { get; } = new();
 
     public ObservableCollection<DesignElement> SelectedElements { get; } = new();
+
+    public ObservableCollection<SelectionPathSegment> SelectionPathSegments { get; } = new();
 
     public string PlaceholderText { get; } = "Select a control in Toolbox, then click the canvas.";
 
@@ -113,29 +123,7 @@ public partial class CanvasViewModel : ViewModelBase
                 return $"{SelectedElements.Count} controls selected";
             }
 
-            var current = SelectedElement ?? SelectedElements[0];
-            var path = new List<string>();
-            var visited = new HashSet<DesignElement>();
-            while (visited.Add(current))
-            {
-                path.Add(current.DisplayName);
-                if (string.IsNullOrWhiteSpace(current.ParentName))
-                {
-                    break;
-                }
-
-                var parent = Elements.FirstOrDefault(candidate =>
-                    string.Equals(candidate.DisplayName, current.ParentName, StringComparison.OrdinalIgnoreCase));
-                if (parent is null)
-                {
-                    break;
-                }
-
-                current = parent;
-            }
-
-            path.Reverse();
-            return string.Join(" / ", path);
+            return string.Join(" / ", GetSelectionPath().Select(element => element.DisplayName));
         }
     }
 
@@ -148,6 +136,9 @@ public partial class CanvasViewModel : ViewModelBase
     public double ZoomedArtboardHeight => Math.Max(1, ArtboardHeight * ZoomScale);
 
     public IBrush ArtboardBrush => Brush.Parse(ArtboardBackground);
+
+    partial void OnSelectedElementChanged(DesignElement? value)
+        => RefreshSelectionPresentation();
 
     public double SnapPosition(double value)
         => SnapToGrid && GridSize > 0 ? Math.Round(value / GridSize) * GridSize : value;
@@ -2520,7 +2511,44 @@ public partial class CanvasViewModel : ViewModelBase
     }
 
     private void OnElementsChanged(object? sender, NotifyCollectionChangedEventArgs e)
-        => HasElements = Elements.Count > 0;
+    {
+        if (e.Action == NotifyCollectionChangedAction.Reset)
+        {
+            foreach (var element in _observedElements)
+            {
+                element.PropertyChanged -= OnElementPropertyChanged;
+            }
+
+            _observedElements.Clear();
+        }
+        else
+        {
+            if (e.OldItems is not null)
+            {
+                foreach (DesignElement element in e.OldItems)
+                {
+                    if (_observedElements.Remove(element))
+                    {
+                        element.PropertyChanged -= OnElementPropertyChanged;
+                    }
+                }
+            }
+
+            if (e.NewItems is not null)
+            {
+                foreach (DesignElement element in e.NewItems)
+                {
+                    if (_observedElements.Add(element))
+                    {
+                        element.PropertyChanged += OnElementPropertyChanged;
+                    }
+                }
+            }
+        }
+
+        HasElements = Elements.Count > 0;
+        RefreshSelectionPresentation();
+    }
 
     private void OnSelectedElementsChanged(object? sender, NotifyCollectionChangedEventArgs e)
     {
@@ -2528,7 +2556,67 @@ public partial class CanvasViewModel : ViewModelBase
         OnPropertyChanged(nameof(HasMultipleSelection));
         OnPropertyChanged(nameof(CanNavigateHierarchy));
         OnPropertyChanged(nameof(SelectionSummary));
+        RefreshSelectionPresentation();
+    }
+
+    private void OnElementPropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName is nameof(DesignElement.DisplayName) or nameof(DesignElement.ParentName))
+        {
+            RefreshSelectionPresentation();
+        }
+    }
+
+    private void RefreshSelectionPresentation()
+    {
         OnPropertyChanged(nameof(SelectionPathSummary));
+        SelectionPathSegments.Clear();
+        if (SelectedElements.Count != 1)
+        {
+            return;
+        }
+
+        var path = GetSelectionPath();
+        for (var index = 0; index < path.Count; index++)
+        {
+            SelectionPathSegments.Add(new SelectionPathSegment(
+                path[index].DisplayName,
+                path[index],
+                HasSeparator: index > 0,
+                IsCurrent: index == path.Count - 1));
+        }
+    }
+
+    private IReadOnlyList<DesignElement> GetSelectionPath()
+    {
+        if (SelectedElements.Count != 1)
+        {
+            return Array.Empty<DesignElement>();
+        }
+
+        var current = SelectedElement ?? SelectedElements[0];
+        var path = new List<DesignElement>();
+        var visited = new HashSet<DesignElement>();
+        while (visited.Add(current))
+        {
+            path.Add(current);
+            if (string.IsNullOrWhiteSpace(current.ParentName))
+            {
+                break;
+            }
+
+            var parent = Elements.FirstOrDefault(candidate =>
+                string.Equals(candidate.DisplayName, current.ParentName, StringComparison.OrdinalIgnoreCase));
+            if (parent is null)
+            {
+                break;
+            }
+
+            current = parent;
+        }
+
+        path.Reverse();
+        return path;
     }
 
     private void SetStylePreviewBadge(Control visual, string? label)
