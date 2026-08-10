@@ -1196,6 +1196,7 @@
                                     Click="OnPropertyInspectorFilterClearClicked"/>
                         </Grid>
                         <pg:PropertyGrid Name="PropGrid"
+                                         Focusable="True"
                                          IsQuickFilterVisible="True"
                                          IsHeaderVisible="False"
                                          IsCategoryVisible="True"

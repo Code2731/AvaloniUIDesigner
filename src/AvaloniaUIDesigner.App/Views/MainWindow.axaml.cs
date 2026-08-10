@@ -1725,6 +1725,8 @@ public partial class MainWindow : Window
         if (e.Key == Key.Escape)
         {
             PropertyInspectorFilter.Text = string.Empty;
+            PropGrid.Focus();
+            Vm?.StatusText = "Property Inspector filter cleared.";
             e.Handled = true;
         }
     }

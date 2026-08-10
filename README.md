@@ -144,7 +144,7 @@ dotnet run --project src/AvaloniaUIDesigner.App/AvaloniaUIDesigner.App.csproj
 - **이동/리사이즈 기즈모**: 선택된 요소를 드래그로 이동, 8방향 핸들로 리사이즈 (최소 10px)
 - **PropertyGrid 연동**: 선택된 컨트롤의 속성을 bodong PropertyGrid로 실시간 편집
 - **Property Inspector 탐색**: 선택 컨트롤 타입을 헤더에 표시하고 `Categories`/`Flat`, `Expand`/`Collapse`로 속성 그룹과 표시 밀도를 즉시 전환하며, 내장 카테고리 순서·알파벳 속성 정렬을 함께 제공
-- **Property Inspector 검색**: 전용 필터 입력창과 Clear·Escape 초기화, `Ctrl+Alt+I` 포커스를 제공하고 선택 컨트롤·문서 탭이 바뀌어도 필터를 유지해 속성 이름을 즉시 좁힘
+- **Property Inspector 검색**: 전용 필터 입력창과 Clear·Escape 초기화, `Ctrl+Alt+I` 포커스를 제공하고 선택 컨트롤·문서 탭이 바뀌어도 필터를 유지해 속성 이름을 즉시 좁히며, Escape 후 PropertyGrid 포커스로 속성 편집을 바로 이어감
 - **Appearance 편집**: 배경·전경·테두리·두께·모서리를 편집하고 Undo/Redo, 미리보기, AXAML 왕복에 보존
 - **색상 리소스**: 문서 단위 SolidColorBrush를 편집하고 DynamicResource로 컨트롤에 적용
 - **클래스·상태 스타일**: `[Button.primary:pointerover]` 형식의 Setter, 선택 컨트롤별 상태 선택기와 캔버스 배지, 대화형 미리보기, 로컬 속성 우선순위 지원
@@ -292,6 +292,7 @@ dotnet run --project src/AvaloniaUIDesigner.App/AvaloniaUIDesigner.App.csproj
 75be. `Ctrl+0`, `View > Actual Size`, `View > Zoom Presets` 및 `Custom...`도 같은 viewport 중앙 좌표 보존 경로를 사용합니다. 25~200% 범위 밖이거나 유한하지 않은 preset 값은 적용하지 않으며 Fit to View·Fit Selected to View처럼 의도적으로 화면을 재구성하는 명령은 기존 중심 맞춤 정책을 유지합니다.
 75bf. Desktop·Tablet·Mobile·Rotate·Custom Artboard Size 변경은 layout 이전 viewport 중앙의 아트보드 좌표를 저장하고 새 ScrollViewer extent·scrollbar 상태에 맞춰 offset을 다시 적용합니다. 따라서 큰 아트보드에서 작업하던 위치가 preset 전환으로 튀지 않으며, 새 아트보드 경계를 벗어난 좌표는 기존 clamp 정책을 사용합니다.
 75bg. Object Tree 검색창에서 `Escape`를 누르면 검색어·검색 결과 표시를 지우고 TreeView로 포커스를 돌려보냅니다. 현재 Canvas 선택과 Object Tree 선택은 유지하므로 검색 결과를 확인한 뒤 즉시 방향키·F2·Delete·`Ctrl+L` 계층 편집을 이어갈 수 있습니다.
+75bh. Property Inspector 필터에서 `Escape`를 누르면 필터·결과를 지우고 focusable PropertyGrid로 포커스를 돌려보냅니다. 속성 검색을 끝낸 뒤 즉시 방향키 기반 탐색과 속성 편집을 이어갈 수 있습니다.
 76. `File > Load Component Pack...` 또는 `File > Load Toolbox Preset Pack...`으로 외부 Toolbox 팩을 추가하면 파일 경로가 세션에 등록되어 다음 실행 때 자동으로 다시 로드됩니다. 파일이 없어도 문서 탭 복원은 계속되며 상태바에 경고가 표시됩니다.
 77. 외부 프로젝트의 컨트롤은 Component Pack 항목에 `designOnly: true`, `avaloniaTypeName`, `previewText`, `defaultProperties`를 지정해 등록합니다. 디자이너에서는 타입명 플레이스홀더로 편집하고, 생성 AXAML에는 원래 커스텀 타입과 속성을 출력합니다. 예시는 [custom-component-pack.example.json](docs/custom-component-pack.example.json)을 참고하세요.
 78. `File > Load Component Pack Plugin...`에서 `IComponentPackPlugin`을 구현한 신뢰할 수 있는 DLL을 선택하면 플러그인이 제공한 Component Pack을 Toolbox에 등록합니다. DLL 경로는 세션 JSON의 `ComponentPluginPaths`에 저장되고, 앱 재시작 시 플러그인·JSON 팩·프리셋 팩 순서로 복원됩니다.
@@ -493,6 +494,7 @@ AXAML 소스 편집기의 `Validate`와 `Preview`는 현재 디자인과 Undo �
 - v1.79: Zoom Preset·Actual Size viewport 중심 보존
 - v1.80: Artboard Size·Rotate viewport 중심 보존
 - v1.81: Object Tree 검색 Escape 초기화·포커스 복귀
+- v1.82: Property Inspector 필터 Escape 초기화·PropertyGrid 포커스 복귀
 
 ## 컴포넌트 팩
 
