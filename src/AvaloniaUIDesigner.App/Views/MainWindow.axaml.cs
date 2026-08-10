@@ -83,6 +83,7 @@ public partial class MainWindow : Window
         Ctrl+0              Actual size (100%)
         Ctrl+Shift+F        Fit selected controls to view
         F                   Fit canvas to view
+        H                   Activate the Pan tool (press H again to return to Select)
         Space + left-drag   Temporarily pan the design viewport
         Middle-drag         Pan the design viewport
         View > Zoom Presets Choose 25-200% or a custom zoom scale
@@ -222,6 +223,7 @@ public partial class MainWindow : Window
     private bool _marqueeSubtractive;
     private Point _marqueeStart;
     private bool _isPanningViewport;
+    private bool _isPanToolActive;
     private bool _isSpacePanModifier;
     private bool _isSpacePanGesture;
     private Point _panStart;
@@ -4550,6 +4552,17 @@ public partial class MainWindow : Window
             return;
         }
 
+        if (!ctrl
+            && !shift
+            && !alt
+            && e.Key == Key.H
+            && ReferenceEquals(e.Source, DesignHost))
+        {
+            SetPanToolActive(!_isPanToolActive);
+            e.Handled = true;
+            return;
+        }
+
         if (ctrl && !shift && !alt && e.Key == Key.K)
         {
             await QuickSwitchDocumentTabAsync();
@@ -5356,6 +5369,11 @@ public partial class MainWindow : Window
         VerticalRuler.CursorPosition = (offset.Y + pointer.Y) / zoom;
     }
 
+    private void UpdatePanCursor()
+        => DesignViewport.Cursor = _isPanToolActive || _isPanningViewport
+            ? new Cursor(StandardCursorType.Hand)
+            : null;
+
     private void ClearViewportCursor()
     {
         _viewportPointer = null;
@@ -6019,6 +6037,7 @@ public partial class MainWindow : Window
             return;
         }
 
+        SetPanToolActive(false);
         Vm?.Toolbox.SelectedItem = item;
         HideToolboxPlacementPreview();
         _pendingToolboxDragItem = item;
@@ -6105,10 +6124,53 @@ public partial class MainWindow : Window
             return;
         }
 
+        SetPanToolActive(false);
         Vm.Toolbox.CancelPlacementMode();
         HideToolboxPlacementPreview();
         Vm.StatusText = "Selection tool active.";
         e.Handled = true;
+    }
+
+    private void OnPanToolClicked(
+        object? sender,
+        Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        SetPanToolActive(!_isPanToolActive);
+        e.Handled = true;
+    }
+
+    private void OnPanToolMenuClicked(
+        object? sender,
+        Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        SetPanToolActive(!_isPanToolActive);
+        e.Handled = true;
+    }
+
+    private void SetPanToolActive(bool isActive)
+    {
+        _isPanToolActive = isActive;
+        PanTool.IsChecked = isActive;
+        PanCanvasMenu.IsChecked = isActive;
+        UpdatePanCursor();
+
+        if (isActive)
+        {
+            if (Vm?.Toolbox.IsPlacementModeActive == true)
+            {
+                Vm.Toolbox.CancelPlacementMode();
+            }
+
+            HideToolboxPlacementPreview();
+            if (Vm is not null)
+            {
+                Vm.StatusText = "Pan tool active. Drag the design viewport to scroll.";
+            }
+        }
+        else if (Vm is not null)
+        {
+            Vm.StatusText = "Selection tool active.";
+        }
     }
 
     private void OnToggleToolboxPlacementModeClicked(
@@ -6125,6 +6187,8 @@ public partial class MainWindow : Window
         {
             return;
         }
+
+        SetPanToolActive(false);
 
         if (!ToolboxPane.IsVisible)
         {
@@ -6857,16 +6921,18 @@ public partial class MainWindow : Window
     private bool TryBeginViewportPan(Control host, PointerPressedEventArgs e)
     {
         var point = e.GetCurrentPoint(host);
+        var isPanTool = _isPanToolActive && point.Properties.IsLeftButtonPressed;
         var isSpacePan = _isSpacePanModifier && point.Properties.IsLeftButtonPressed;
-        if (!point.Properties.IsMiddleButtonPressed && !isSpacePan)
+        if (!point.Properties.IsMiddleButtonPressed && !isSpacePan && !isPanTool)
         {
             return false;
         }
 
         _isPanningViewport = true;
-        _isSpacePanGesture = isSpacePan;
+        _isSpacePanGesture = isSpacePan && !isPanTool;
         _panStart = e.GetPosition(DesignScrollViewer);
         _panStartOffset = DesignScrollViewer.Offset;
+        UpdatePanCursor();
         e.Pointer.Capture(DesignViewport);
         e.Handled = true;
         return true;
@@ -6942,6 +7008,7 @@ public partial class MainWindow : Window
 
         _isPanningViewport = false;
         _isSpacePanGesture = false;
+        UpdatePanCursor();
         e.Pointer.Capture(null);
         e.Handled = true;
     }
@@ -7105,6 +7172,7 @@ public partial class MainWindow : Window
 
         _isPanningViewport = false;
         _isSpacePanGesture = false;
+        UpdatePanCursor();
         e.Pointer.Capture(null);
         e.Handled = true;
         return true;
@@ -7609,6 +7677,7 @@ public partial class MainWindow : Window
         {
             _isPanningViewport = false;
             _isSpacePanGesture = false;
+            UpdatePanCursor();
             e.Pointer.Capture(null);
             e.Handled = true;
             return;

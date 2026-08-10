@@ -265,7 +265,10 @@
                 <MenuItem Header="Fit Selected to View (Ctrl+Shift+F)"
                           Click="OnFitSelectedToViewMenuClicked"
                           IsEnabled="{Binding Canvas.IsSelectionActive}"/>
-                <MenuItem Header="Pan Canvas (Space + Left Drag / Middle Drag / Ctrl+Alt+Arrow)" IsEnabled="False"/>
+                <MenuItem x:Name="PanCanvasMenu"
+                          Header="Pan Canvas (Space + Left Drag / Middle Drag / Ctrl+Alt+Arrow) | Pan Tool (H)"
+                          Click="OnPanToolMenuClicked"
+                          IsChecked="False"/>
                 <MenuItem Header="Zoom Presets">
                     <MenuItem Header="25%" Tag="0.25" Click="OnZoomPresetMenuClicked"/>
                     <MenuItem Header="50%" Tag="0.5" Click="OnZoomPresetMenuClicked"/>
@@ -369,6 +372,11 @@
                                   IsChecked="{Binding Toolbox.IsPlacementModeActive, Mode=OneWay}"
                                   Click="OnToggleToolboxPlacementModeClicked"
                                   ToolTip.Tip="Pick a Toolbox control and place it on the canvas"
+                                  Padding="8,3"/>
+                    <ToggleButton Name="PanTool"
+                                  Content="Pan"
+                                  Click="OnPanToolClicked"
+                                  ToolTip.Tip="Pan the design viewport with left drag"
                                   Padding="8,3"/>
                     <TextBlock Text="{Binding Toolbox.PlacementModeLabel}"
                                IsVisible="{Binding Toolbox.IsPlacementModeActive}"
