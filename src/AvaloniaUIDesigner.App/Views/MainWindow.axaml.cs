@@ -5150,6 +5150,26 @@ public partial class MainWindow : Window
         UpdateLayoutEditors();
         UpdateElementNameEditor();
         UpdateHandlePositions();
+        QueueObjectTreeSelectionIntoView();
+    }
+
+    private void QueueObjectTreeSelectionIntoView()
+    {
+        if (Vm?.ObjectTree.SelectedNode is not { } selectedNode)
+        {
+            return;
+        }
+
+        Dispatcher.UIThread.Post(
+            () =>
+            {
+                if (Vm?.ObjectTree.SelectedNode is { } currentNode
+                    && ReferenceEquals(currentNode, selectedNode))
+                {
+                    ObjectTreeView.ScrollIntoView(currentNode);
+                }
+            },
+            DispatcherPriority.Background);
     }
 
     private void OnSelectedVisualPropertyChanged(object? sender, AvaloniaPropertyChangedEventArgs e)
