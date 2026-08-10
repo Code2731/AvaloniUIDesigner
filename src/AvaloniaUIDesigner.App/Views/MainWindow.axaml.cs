@@ -7873,7 +7873,7 @@ public partial class MainWindow : Window
             WindowStartupLocation = WindowStartupLocation.CenterOwner,
         };
         var applyButton = new Button { Content = "Apply", MinWidth = 84 };
-        applyButton.Click += (_, _) =>
+        void ApplyDataGridBehavior()
         {
             var input = new DesignerDataGridBehaviorEditorInput(
                 autoGenerateEditor.IsChecked == true,
@@ -7904,7 +7904,9 @@ public partial class MainWindow : Window
             }
 
             dialog.Close();
-        };
+        }
+        applyButton.Click += (_, _) => ApplyDataGridBehavior();
+        WireEditorDialogShortcuts(dialog, dialog.Close, ApplyDataGridBehavior);
         var cancelButton = new Button { Content = "Cancel", MinWidth = 84 };
         cancelButton.Click += (_, _) => dialog.Close();
         var buttons = new StackPanel
@@ -8024,7 +8026,7 @@ public partial class MainWindow : Window
             WindowStartupLocation = WindowStartupLocation.CenterOwner,
         };
         var applyButton = new Button { Content = "Apply", MinWidth = 84 };
-        applyButton.Click += (_, _) =>
+        void ApplyTypography()
         {
             if (!Vm.SetSelectedTypographyProperties(
                     fontFamilyEditor.Text ?? string.Empty,
@@ -8039,7 +8041,9 @@ public partial class MainWindow : Window
             }
 
             dialog.Close();
-        };
+        }
+        applyButton.Click += (_, _) => ApplyTypography();
+        WireEditorDialogShortcuts(dialog, dialog.Close, ApplyTypography);
         var cancelButton = new Button { Content = "Cancel", MinWidth = 84 };
         cancelButton.Click += (_, _) => dialog.Close();
         var buttons = new StackPanel
@@ -8135,7 +8139,7 @@ public partial class MainWindow : Window
             WindowStartupLocation = WindowStartupLocation.CenterOwner,
         };
         var applyButton = new Button { Content = "Apply", MinWidth = 84 };
-        applyButton.Click += (_, _) =>
+        void ApplyTransform()
         {
             if (!Vm.SetSelectedTransformProperties(
                     translateXEditor.Text ?? string.Empty,
@@ -8153,7 +8157,9 @@ public partial class MainWindow : Window
             }
 
             dialog.Close();
-        };
+        }
+        applyButton.Click += (_, _) => ApplyTransform();
+        WireEditorDialogShortcuts(dialog, dialog.Close, ApplyTransform);
         var resetButton = new Button { Content = "Reset", MinWidth = 84 };
         resetButton.Click += (_, _) =>
         {
@@ -12092,6 +12098,17 @@ public partial class MainWindow : Window
         return false;
     }
 
+    private static void WireEditorDialogShortcuts(
+        Window dialog,
+        Action close,
+        Action apply)
+    {
+        dialog.KeyDown += (_, e) =>
+        {
+            HandleTextEditorShortcut(e, close, apply);
+        };
+    }
+
     private async Task ShowAxamlSourceEditorDialogAsync(string source)
     {
         if (Vm is null)
@@ -12314,7 +12331,7 @@ public partial class MainWindow : Window
         };
 
         var applyButton = new Button { Content = "Apply", MinWidth = 84 };
-        applyButton.Click += (_, _) =>
+        void ApplyGridDefinitions()
         {
             var rowDefinitions = rowsEditor.Text ?? string.Empty;
             var columnDefinitions = columnsEditor.Text ?? string.Empty;
@@ -12333,7 +12350,9 @@ public partial class MainWindow : Window
                 rowDefinitions,
                 columnDefinitions,
                 showLinesEditor.IsChecked == true));
-        };
+        }
+        applyButton.Click += (_, _) => ApplyGridDefinitions();
+        WireEditorDialogShortcuts(dialog, () => dialog.Close(null), ApplyGridDefinitions);
         var cancelButton = new Button { Content = "Cancel", MinWidth = 84 };
         cancelButton.Click += (_, _) => dialog.Close(null);
         var buttons = new StackPanel
