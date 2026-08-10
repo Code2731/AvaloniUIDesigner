@@ -1514,7 +1514,7 @@ public partial class MainWindowViewModel : ViewModelBase
 
         var parent = Canvas.Elements.FirstOrDefault(element =>
             string.Equals(element.DisplayName, child.ParentName, StringComparison.OrdinalIgnoreCase));
-        if (parent is null)
+        if (parent is null || !Canvas.IsElementVisibleOnCanvas(parent))
         {
             return false;
         }
@@ -1537,6 +1537,7 @@ public partial class MainWindowViewModel : ViewModelBase
                 element.ParentName,
                 parent.DisplayName,
                 StringComparison.OrdinalIgnoreCase))
+            .Where(Canvas.IsElementVisibleOnCanvas)
             .ToList();
         if (children.Count == 0)
         {
@@ -1563,8 +1564,22 @@ public partial class MainWindowViewModel : ViewModelBase
                 element.ParentName,
                 selected.ParentName,
                 StringComparison.OrdinalIgnoreCase))
+            .Where(Canvas.IsElementVisibleOnCanvas)
             .ToList();
+        if (siblings.Count == 0)
+        {
+            return false;
+        }
+
         var currentIndex = siblings.IndexOf(selected);
+        if (currentIndex < 0)
+        {
+            var recovery = offset < 0 ? siblings[^1] : siblings[0];
+            SelectElement(recovery);
+            StatusText = $"Selected sibling {recovery.DisplayName}.";
+            return true;
+        }
+
         var nextIndex = currentIndex + offset;
         if (currentIndex < 0 || nextIndex < 0 || nextIndex >= siblings.Count)
         {
