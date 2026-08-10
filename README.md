@@ -36,7 +36,7 @@ dotnet run --project src/AvaloniaUIDesigner.App/AvaloniaUIDesigner.App.csproj
 - **Custom Control Metadata**: `DesignOnly: true` 컴포넌트 팩으로 외부 Avalonia 타입을 디자인 타임 플레이스홀더로 등록하고, 커스텀 기본 속성·Preview 문구·AXAML 타입명을 보존
 - **선택 영역 Toolbox 프리셋**: 여러 root 컨트롤을 상대 좌표·현재 속성과 함께 Toolbox에 등록하고 JSON 팩으로 저장·불러오기
 - **배치**: 클릭-투-플레이스와 드래그 앤 드롭으로 실제 Avalonia 컨트롤 생성
-- **캔버스 뷰포트**: 큰 아트보드와 확대 상태를 양축 자동 스크롤로 탐색하고, Desktop·Tablet·Mobile·사용자 지정 아트보드 크기와 회전, Zoom In/Out·Actual Size·Fit to View·Fit Selected to View·25~200% Zoom Presets와 스크롤 콘텐츠 크기를 동기화하며 `Ctrl+=`/`Ctrl+-`/`Ctrl+0`/`F`/`Ctrl+Shift+F` 단축키, `Ctrl+Alt+Arrow` 키보드 팬, 중간 마우스 드래그 팬, Ctrl+휠 포인터 중심 줌, 키보드·View 메뉴·Zoom Preset viewport 중심 줌을 지원
+- **캔버스 뷰포트**: 큰 아트보드와 확대 상태를 양축 자동 스크롤로 탐색하고, Desktop·Tablet·Mobile·사용자 지정 아트보드 크기와 회전, Zoom In/Out·Actual Size·Fit to View·Fit Selected to View·25~200% Zoom Presets와 스크롤 콘텐츠 크기를 동기화하며 `Ctrl+=`/`Ctrl+-`/`Ctrl+0`/`F`/`Ctrl+Shift+F` 단축키, `Ctrl+Alt+Arrow` 키보드 팬, 중간 마우스 드래그 팬, Ctrl+휠 포인터 중심 줌, 키보드·View 메뉴·Zoom Preset viewport 중심 줌, 아트보드 크기 변경 시 문서 중심 보존을 지원
 - **임시 viewport 팬**: Canvas·요소 위에서 `Space`를 누른 채 왼쪽 드래그하면 선택·배치를 잠시 멈추고 viewport를 이동하며, 중간 마우스 드래그 팬과 함께 사용할 수 있고 Space 해제 시 포인터 캡처를 안전하게 종료
 - **선택 영역 viewport 맞춤**: `Ctrl+Shift+F` 또는 View/context menu의 `Fit Selected to View`로 하나 이상의 선택 컨트롤을 안전한 여백과 함께 확대해 viewport 중앙에 맞추고, 큰 아트보드의 선택 위치까지 offset을 동기화
 - **아트보드 배경**: White·Soft Gray·Ink 프리셋과 사용자 지정 `#RRGGBB`/`#AARRGGBB` 색상을 편집하고 Undo·Preview·AXAML 왕복에 보존
@@ -290,6 +290,7 @@ dotnet run --project src/AvaloniaUIDesigner.App/AvaloniaUIDesigner.App.csproj
 75bc. `Ctrl+Shift+F` 또는 Canvas context menu의 `Fit Selected to View`는 선택 bounds와 viewport 여백으로 25~200% 배율을 계산하고, zoom layout 이후 선택 중심을 다시 계산해 ScrollViewer offset을 맞춥니다. 선택이 없으면 문서·zoom·history를 변경하지 않고 안내 상태만 표시하며, 기존 `Ctrl+F` Object Tree 검색과 `F` 전체 canvas fit은 유지합니다.
 75bd. `Ctrl+=`/`Ctrl+Plus`/`Ctrl+-`/`Ctrl+Minus`와 `View > Zoom In`/`Zoom Out`은 viewport 중앙의 아트보드 좌표를 확대·축소 전후 동일하게 유지합니다. 기존 Ctrl+휠은 포인터 좌표를 기준으로 동작하며 모든 입력은 layout 갱신 후에도 ScrollViewer offset을 재적용합니다.
 75be. `Ctrl+0`, `View > Actual Size`, `View > Zoom Presets` 및 `Custom...`도 같은 viewport 중앙 좌표 보존 경로를 사용합니다. 25~200% 범위 밖이거나 유한하지 않은 preset 값은 적용하지 않으며 Fit to View·Fit Selected to View처럼 의도적으로 화면을 재구성하는 명령은 기존 중심 맞춤 정책을 유지합니다.
+75bf. Desktop·Tablet·Mobile·Rotate·Custom Artboard Size 변경은 layout 이전 viewport 중앙의 아트보드 좌표를 저장하고 새 ScrollViewer extent·scrollbar 상태에 맞춰 offset을 다시 적용합니다. 따라서 큰 아트보드에서 작업하던 위치가 preset 전환으로 튀지 않으며, 새 아트보드 경계를 벗어난 좌표는 기존 clamp 정책을 사용합니다.
 76. `File > Load Component Pack...` 또는 `File > Load Toolbox Preset Pack...`으로 외부 Toolbox 팩을 추가하면 파일 경로가 세션에 등록되어 다음 실행 때 자동으로 다시 로드됩니다. 파일이 없어도 문서 탭 복원은 계속되며 상태바에 경고가 표시됩니다.
 77. 외부 프로젝트의 컨트롤은 Component Pack 항목에 `designOnly: true`, `avaloniaTypeName`, `previewText`, `defaultProperties`를 지정해 등록합니다. 디자이너에서는 타입명 플레이스홀더로 편집하고, 생성 AXAML에는 원래 커스텀 타입과 속성을 출력합니다. 예시는 [custom-component-pack.example.json](docs/custom-component-pack.example.json)을 참고하세요.
 78. `File > Load Component Pack Plugin...`에서 `IComponentPackPlugin`을 구현한 신뢰할 수 있는 DLL을 선택하면 플러그인이 제공한 Component Pack을 Toolbox에 등록합니다. DLL 경로는 세션 JSON의 `ComponentPluginPaths`에 저장되고, 앱 재시작 시 플러그인·JSON 팩·프리셋 팩 순서로 복원됩니다.
@@ -399,7 +400,7 @@ Button Actions & Commands 편집기는 Release·Press ClickMode와 Avalonia key 
 
 AXAML 소스 편집기의 `Validate`와 `Preview`는 현재 디자인과 Undo 스택을 변경하지 않습니다. `Apply`는 파싱에 성공한 문서만 반영하며, 현재 저장 경로를 유지하고 전체 변경을 한 번의 Undo/Redo 작업으로 기록합니다.
 
-캔버스 뷰포트는 아트보드의 원본 레이아웃 크기와 렌더 줌을 분리해 유지합니다. `Zoom In`·`Zoom Out`을 실행하면 ScrollViewer의 실제 콘텐츠 영역도 같은 배율로 갱신되므로 확대된 컨트롤을 가로·세로 스크롤하며 편집할 수 있고, `Fit to View`는 현재 뷰포트 크기를 기준으로 배율을 계산합니다. 중간 마우스 드래그는 선택·이동과 분리된 팬 입력으로 ScrollViewer 오프셋만 이동하고, Ctrl+휠은 포인터 아래의 아트보드 좌표를 고정한 채 확대·축소하므로 둘 다 문서 Undo 기록을 만들지 않습니다. 가로·세로 디자인 룰러는 같은 오프셋과 배율을 사용해 화면 가장자리의 눈금과 라벨을 실제 아트보드 좌표로 표시하며, 포인터가 뷰포트 안에 있을 때는 청록색 기준선으로 해당 좌표를 강조합니다. 룰러에서 만든 가이드라인은 주황색으로 캔버스에 표시되고 이동·리사이즈 시 Smart Snap에 참여합니다. 가이드는 문서 AXAML과 Undo 스택에 포함되지 않는 작업 보조 상태이며 새 문서·AXAML을 열면 초기화됩니다.
+캔버스 뷰포트는 아트보드의 원본 레이아웃 크기와 렌더 줌을 분리해 유지합니다. `Zoom In`·`Zoom Out`을 실행하면 ScrollViewer의 실제 콘텐츠 영역도 같은 배율로 갱신되므로 확대된 컨트롤을 가로·세로 스크롤하며 편집할 수 있고, `Fit to View`는 현재 뷰포트 크기를 기준으로 배율을 계산합니다. 중간 마우스 드래그는 선택·이동과 분리된 팬 입력으로 ScrollViewer 오프셋만 이동하고, Ctrl+휠은 포인터 아래의 아트보드 좌표를 고정한 채 확대·축소하므로 둘 다 문서 Undo 기록을 만들지 않습니다. 아트보드 preset·회전·Custom Size 변경도 layout 갱신 전의 viewport 중앙 문서 좌표를 복원해 scrollbar 표시 상태가 달라져도 작업 위치를 유지합니다. 가로·세로 디자인 룰러는 같은 오프셋과 배율을 사용해 화면 가장자리의 눈금과 라벨을 실제 아트보드 좌표로 표시하며, 포인터가 뷰포트 안에 있을 때는 청록색 기준선으로 해당 좌표를 강조합니다. 룰러에서 만든 가이드라인은 주황색으로 캔버스에 표시되고 이동·리사이즈 시 Smart Snap에 참여합니다. 가이드는 문서 AXAML과 Undo 스택에 포함되지 않는 작업 보조 상태이며 새 문서·AXAML을 열면 초기화됩니다.
 
 ## 로드맵
 
@@ -489,6 +490,7 @@ AXAML 소스 편집기의 `Validate`와 `Preview`는 현재 디자인과 Undo �
 - v1.77: 선택 영역 Fit Selected to View
 - v1.78: 키보드·View 메뉴 Zoom viewport 중심 보존
 - v1.79: Zoom Preset·Actual Size viewport 중심 보존
+- v1.80: Artboard Size·Rotate viewport 중심 보존
 
 ## 컴포넌트 팩
 

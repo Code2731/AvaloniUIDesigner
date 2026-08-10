@@ -3687,9 +3687,17 @@ public partial class MainWindow : Window
             return;
         }
 
+        var preserveViewport = TryGetViewportDocumentPointAtCenter(
+            out var documentPoint,
+            out var viewportPoint);
         Vm.BeginCanvasMutation(MainWindowViewModel.HistoryActionType.TransformElement, "Updated artboard size.");
         Vm.Canvas.SetArtboard(width, height);
         Vm.CommitCanvasMutation();
+        if (preserveViewport)
+        {
+            RestoreViewportDocumentPoint(documentPoint, viewportPoint);
+        }
+
         Vm.StatusText = $"Artboard: {Vm.Canvas.ArtboardWidth:0} x {Vm.Canvas.ArtboardHeight:0}";
     }
 
@@ -6646,22 +6654,63 @@ public partial class MainWindow : Window
 
         Vm.Canvas.SetZoomScale(newZoom);
 
-        void ApplyZoomOffset()
+        RestoreViewportDocumentPoint(documentPoint, pointer);
+    }
+
+    private bool TryGetViewportDocumentPointAtCenter(
+        out Point documentPoint,
+        out Point viewportPoint)
+    {
+        documentPoint = default;
+        viewportPoint = default;
+        if (Vm is null || !double.IsFinite(Vm.Canvas.ZoomScale) || Vm.Canvas.ZoomScale <= 0)
         {
-            DesignScrollViewer.Offset = new Vector(
-                documentPoint.X * newZoom - pointer.X,
-                documentPoint.Y * newZoom - pointer.Y);
+            return false;
         }
 
-        ApplyZoomOffset();
+        var viewport = DesignScrollViewer.Viewport;
+        var width = viewport.Width > 0 ? viewport.Width : DesignViewport.Bounds.Width;
+        var height = viewport.Height > 0 ? viewport.Height : DesignViewport.Bounds.Height;
+        if (width <= 0 || height <= 0)
+        {
+            return false;
+        }
+
+        viewportPoint = new Point(width / 2, height / 2);
+        documentPoint = new Point(
+            (DesignScrollViewer.Offset.X + viewportPoint.X) / Vm.Canvas.ZoomScale,
+            (DesignScrollViewer.Offset.Y + viewportPoint.Y) / Vm.Canvas.ZoomScale);
+        return true;
+    }
+
+    private void RestoreViewportDocumentPoint(Point documentPoint, Point viewportPoint)
+    {
+        if (Vm is null || !double.IsFinite(Vm.Canvas.ZoomScale) || Vm.Canvas.ZoomScale <= 0)
+        {
+            return;
+        }
+
+        void ApplyViewportOffset()
+        {
+            var viewport = DesignScrollViewer.Viewport;
+            var width = viewport.Width > 0 ? viewport.Width : DesignViewport.Bounds.Width;
+            var height = viewport.Height > 0 ? viewport.Height : DesignViewport.Bounds.Height;
+            var maxX = Math.Max(0, DesignScrollViewer.Extent.Width - width);
+            var maxY = Math.Max(0, DesignScrollViewer.Extent.Height - height);
+            DesignScrollViewer.Offset = new Vector(
+                Math.Clamp(documentPoint.X * Vm.Canvas.ZoomScale - viewportPoint.X, 0, maxX),
+                Math.Clamp(documentPoint.Y * Vm.Canvas.ZoomScale - viewportPoint.Y, 0, maxY));
+        }
+
+        ApplyViewportOffset();
         EventHandler? layoutUpdated = null;
         layoutUpdated = (_, _) =>
         {
             DesignScrollViewer.LayoutUpdated -= layoutUpdated;
-            ApplyZoomOffset();
+            ApplyViewportOffset();
         };
         DesignScrollViewer.LayoutUpdated += layoutUpdated;
-        Dispatcher.UIThread.Post(ApplyZoomOffset, DispatcherPriority.Normal);
+        Dispatcher.UIThread.Post(ApplyViewportOffset, DispatcherPriority.Normal);
     }
 
     private void UpdateViewportPan(Point current)
