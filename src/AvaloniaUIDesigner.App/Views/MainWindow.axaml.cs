@@ -205,6 +205,13 @@ public partial class MainWindow : Window
         DataFormat.CreateStringApplicationFormat("AvaloniaUIDesigner.DocumentTab");
 
     private enum GuideOrientation { Horizontal, Vertical }
+
+    private sealed record GuideState(
+        IReadOnlyList<double> HorizontalGuides,
+        IReadOnlyList<double> VerticalGuides,
+        bool ShowDesignGuides,
+        bool SnapToGuides);
+
     private DragMode _dragMode = DragMode.None;
     private Point _dragStart;
     private double _origX, _origY, _origW, _origH;
@@ -225,6 +232,8 @@ public partial class MainWindow : Window
     private Point? _viewportPointer;
     private readonly List<double> _horizontalGuides = new();
     private readonly List<double> _verticalGuides = new();
+    private readonly Dictionary<DocumentTabViewModel, GuideState> _documentGuideStates = new();
+    private DocumentTabViewModel? _guideStateTab;
     private bool _showDesignGuides = true;
     private bool _snapToGuides = true;
     private bool _isDraggingGuide;
@@ -298,9 +307,9 @@ public partial class MainWindow : Window
 
         FlushPendingPropertyHistory();
         var selectedTab = await ShowDocumentTabSwitcherAsync();
-        if (selectedTab is not null && Vm.ActivateDocumentTab(selectedTab))
+        if (selectedTab is not null)
         {
-            ClearDesignGuides();
+            Vm.ActivateDocumentTab(selectedTab);
         }
     }
 
@@ -486,7 +495,6 @@ public partial class MainWindow : Window
         {
             FlushPendingPropertyHistory();
             Vm.ActivateDocumentTab(tab);
-            ClearDesignGuides();
         }
     }
 
@@ -853,7 +861,6 @@ public partial class MainWindow : Window
         }
 
         RestoreDocumentTabIfPresent(preferredTab);
-        ClearDesignGuides();
         return true;
     }
 
@@ -946,7 +953,6 @@ public partial class MainWindow : Window
         }
 
         Vm.CloseDocumentTab(tab);
-        ClearDesignGuides();
     }
 
     private async Task<bool> CloseAllDocumentTabsAsync()
@@ -5065,6 +5071,11 @@ public partial class MainWindow : Window
     {
         _objectTreeSelectionAnchor = null;
 
+        if (_boundVm is not null)
+        {
+            CaptureDesignGuidesForTab(_guideStateTab ?? _boundVm.SelectedDocumentTab);
+        }
+
         if (_boundCanvas is not null)
         {
             _boundCanvas.PropertyChanged -= OnCanvasPropertyChanged;
@@ -5082,6 +5093,8 @@ public partial class MainWindow : Window
 
         _boundVm = Vm;
         _boundCanvas = _boundVm?.Canvas;
+        _guideStateTab = _boundVm?.SelectedDocumentTab;
+        RestoreDesignGuidesForTab(_guideStateTab);
 
         if (_boundCanvas is not null)
         {
@@ -5112,6 +5125,15 @@ public partial class MainWindow : Window
     {
         if (e.PropertyName == nameof(MainWindowViewModel.SelectedDocumentTab))
         {
+            CaptureDesignGuidesForTab(_guideStateTab);
+            if (_guideStateTab is not null
+                && (Vm is null || !Vm.DocumentTabs.Contains(_guideStateTab)))
+            {
+                _documentGuideStates.Remove(_guideStateTab);
+            }
+
+            _guideStateTab = Vm?.SelectedDocumentTab;
+            RestoreDesignGuidesForTab(_guideStateTab);
             ApplyPropertyInspectorState();
         }
 
@@ -5275,12 +5297,54 @@ public partial class MainWindow : Window
         GuideOverlay.HorizontalGuides = _horizontalGuides.ToArray();
     }
 
+    private void CaptureDesignGuidesForTab(DocumentTabViewModel? tab)
+    {
+        if (tab is null)
+        {
+            return;
+        }
+
+        _documentGuideStates[tab] = new GuideState(
+            _horizontalGuides.ToArray(),
+            _verticalGuides.ToArray(),
+            _showDesignGuides,
+            _snapToGuides);
+    }
+
+    private void RestoreDesignGuidesForTab(DocumentTabViewModel? tab)
+    {
+        _horizontalGuides.Clear();
+        _verticalGuides.Clear();
+        _isDraggingGuide = false;
+        _guideIndex = -1;
+
+        if (tab is not null
+            && _documentGuideStates.TryGetValue(tab, out var state))
+        {
+            _horizontalGuides.AddRange(state.HorizontalGuides);
+            _verticalGuides.AddRange(state.VerticalGuides);
+            _showDesignGuides = state.ShowDesignGuides;
+            _snapToGuides = state.SnapToGuides;
+        }
+        else
+        {
+            _showDesignGuides = true;
+            _snapToGuides = true;
+        }
+
+        ShowDesignGuidesMenu.IsChecked = _showDesignGuides;
+        SnapToGuidesMenu.IsChecked = _snapToGuides;
+        GuideOverlay.IsVisible = _showDesignGuides;
+        UpdateGuideOverlay();
+    }
+
     private void ClearDesignGuides()
     {
         _horizontalGuides.Clear();
         _verticalGuides.Clear();
         _isDraggingGuide = false;
         _guideIndex = -1;
+        CaptureDesignGuidesForTab(_guideStateTab);
         UpdateGuideOverlay();
     }
 

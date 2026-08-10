@@ -108,6 +108,7 @@ dotnet run --project src/AvaloniaUIDesigner.App/AvaloniaUIDesigner.App.csproj
 - **Tab View Navigation**: `Ctrl+Tab`/`Ctrl+Shift+Tab`으로 문서 탭을 순환하고, `Ctrl+Shift+PageUp/PageDown` 또는 탭 컨텍스트 메뉴로 활성 탭을 좌우 이동하며, 탭별 캔버스 줌과 Object Tree 선택을 전환·세션 복원 때 보존합니다.
 - **Workspace Panels**: `View > Panels`에서 Toolbox·Object Tree·Property Inspector를 독립적으로 숨기거나 다시 표시하고, 패널 크기와 가시성·Object Tree 분할 위치를 세션에 저장합니다. `Reset Panel Layout`으로 기본 작업 공간을 복원합니다.
 - **Workspace Session Restore**: 앱을 정상적으로 닫으면 열린 탭 목록·활성 탭·현재 AXAML·저장 기준 스냅샷·줌·Object Tree 선택·Property Inspector 탐색 상태를 로컬 세션에 저장하고, 다음 실행 시 dirty 문서를 포함해 복원합니다. 세션 JSON이 손상되면 현재 새 문서 상태를 유지하고 안전하게 시작합니다.
+- **문서 탭별 Design Guide**: 가로·세로 ruler에서 만든 guide 좌표와 `Show Design Guides`·`Snap to Guides` 설정을 문서 탭마다 독립 보존해 탭 전환 후에도 복원하고, 새 문서·새 AXAML·명시적 `Clear Design Guides`에서는 해당 탭만 초기화합니다.
 - **선택 요소 AXAML 재사용**: 하나 이상의 선택 컨트롤을 하위 계층·리소스·스타일·바인딩·컨트롤 전용 선언과 함께 독립 UserControl AXAML로 클립보드 복사하거나 파일로 내보내며, 다중 선택은 bounding box 기준의 상대 Canvas 좌표를 보존
 - **AXAML Fragment Clipboard**: `Edit > Paste AXAML from Clipboard` 또는 `Ctrl+Alt+V`로 OS 클립보드의 Window/UserControl AXAML을 현재 문서에 새 컨트롤로 붙여넣고, 선택된 잠금 해제 지원 컨테이너가 있으면 해당 부모의 Grid·StackPanel·Canvas·Tab·Content 슬롯 규칙으로 배치하며 이름 충돌·색상 리소스·스타일 충돌을 자동으로 분리하고 하나의 Undo 작업으로 되돌림
 - **문서 루트 속성**: Window/UserControl 루트 종류와 Window 제목·리사이즈·시작 위치, 루트 Min/Max 크기를 편집하고 Undo/Redo, Preview, Draft·Full AXAML 왕복에 보존
@@ -309,6 +310,7 @@ dotnet run --project src/AvaloniaUIDesigner.App/AvaloniaUIDesigner.App.csproj
 75bs. 지원 컨테이너 context paste는 AXAML 파싱 시점의 root 이름을 별도로 추적해 문서 적용 후에도 모든 imported root를 정확히 재부모화합니다. 잠긴 imported root도 부모 슬롯 배치만 허용하고 기존 잠금 상태는 유지하며, 여러 root 중 하나라도 슬롯 검증에 실패하면 전체 컨트롤·부모 관계·리소스·스타일 변경을 원자적으로 rollback합니다.
 75bt. 내부 `Ctrl+V` hierarchy clipboard도 선택된 잠금 해제 지원 컨테이너를 대상으로 사용합니다. Canvas는 원래 아트보드 좌표와 target origin의 차이를 로컬 좌표로 보정하고, 다른 컨테이너는 기존 빈 셀·순서·탭·Content 슬롯 재부모화 경로를 사용하며, 대상 슬롯이 부족하면 붙여넣기 전 문서 snapshot으로 복원합니다.
 75bu. 내부 `Copy`·`Cut`은 선택 계층뿐 아니라 복사 시점의 색상 리소스와 문서 스타일을 clipboard metadata로 보존합니다. 다른 문서 탭에 `Ctrl+V`하면 충돌 리소스와 스타일 클래스는 `_Imported` 계열로 고유화되고, 스냅샷의 `DynamicResource`·`Classes` 참조도 같은 별칭으로 재작성되며 컨트롤·부모 관계·리소스·스타일 변경 전체가 하나의 Undo entry로 되돌아갑니다.
+75bv. 가로·세로 ruler에서 만든 Design Guide와 `Show Design Guides`·`Snap to Guides` 상태는 활성 문서 탭 전환 시 이전 탭 snapshot에 저장되고 새 탭의 snapshot을 복원합니다. 따라서 여러 화면을 번갈아 정렬해도 guide가 섞이지 않으며, 새 문서·새 AXAML·명시적 `Clear Design Guides`는 현재 탭의 guide만 비웁니다.
 76. `File > Load Component Pack...` 또는 `File > Load Toolbox Preset Pack...`으로 외부 Toolbox 팩을 추가하면 파일 경로가 세션에 등록되어 다음 실행 때 자동으로 다시 로드됩니다. 파일이 없어도 문서 탭 복원은 계속되며 상태바에 경고가 표시됩니다.
 77. 외부 프로젝트의 컨트롤은 Component Pack 항목에 `designOnly: true`, `avaloniaTypeName`, `previewText`, `defaultProperties`를 지정해 등록합니다. 디자이너에서는 타입명 플레이스홀더로 편집하고, 생성 AXAML에는 원래 커스텀 타입과 속성을 출력합니다. 예시는 [custom-component-pack.example.json](docs/custom-component-pack.example.json)을 참고하세요.
 78. `File > Load Component Pack Plugin...`에서 `IComponentPackPlugin`을 구현한 신뢰할 수 있는 DLL을 선택하면 플러그인이 제공한 Component Pack을 Toolbox에 등록합니다. DLL 경로는 세션 JSON의 `ComponentPluginPaths`에 저장되고, 앱 재시작 시 플러그인·JSON 팩·프리셋 팩 순서로 복원됩니다.
@@ -418,7 +420,7 @@ Button Actions & Commands 편집기는 Release·Press ClickMode와 Avalonia key 
 
 AXAML 소스 편집기의 `Validate`와 `Preview`는 현재 디자인과 Undo 스택을 변경하지 않습니다. `Apply`는 파싱에 성공한 문서만 반영하며, 현재 저장 경로를 유지하고 전체 변경을 한 번의 Undo/Redo 작업으로 기록합니다.
 
-캔버스 뷰포트는 아트보드의 원본 레이아웃 크기와 렌더 줌을 분리해 유지합니다. `Zoom In`·`Zoom Out`을 실행하면 ScrollViewer의 실제 콘텐츠 영역도 같은 배율로 갱신되므로 확대된 컨트롤을 가로·세로 스크롤하며 편집할 수 있고, `Fit to View`는 현재 뷰포트 크기를 기준으로 배율을 계산합니다. 중간 마우스 드래그는 선택·이동과 분리된 팬 입력으로 ScrollViewer 오프셋만 이동하고, Ctrl+휠은 포인터 아래의 아트보드 좌표를 고정한 채 확대·축소하므로 둘 다 문서 Undo 기록을 만들지 않습니다. 아트보드 preset·회전·Custom Size 변경도 layout 갱신 전의 viewport 중앙 문서 좌표를 복원해 scrollbar 표시 상태가 달라져도 작업 위치를 유지합니다. 가로·세로 디자인 룰러는 같은 오프셋과 배율을 사용해 화면 가장자리의 눈금과 라벨을 실제 아트보드 좌표로 표시하며, 포인터가 뷰포트 안에 있을 때는 청록색 기준선으로 해당 좌표를 강조합니다. 룰러에서 만든 가이드라인은 주황색으로 캔버스에 표시되고 이동·리사이즈 시 Smart Snap에 참여합니다. 가이드는 문서 AXAML과 Undo 스택에 포함되지 않는 작업 보조 상태이며 새 문서·AXAML을 열면 초기화됩니다.
+캔버스 뷰포트는 아트보드의 원본 레이아웃 크기와 렌더 줌을 분리해 유지합니다. `Zoom In`·`Zoom Out`을 실행하면 ScrollViewer의 실제 콘텐츠 영역도 같은 배율로 갱신되므로 확대된 컨트롤을 가로·세로 스크롤하며 편집할 수 있고, `Fit to View`는 현재 뷰포트 크기를 기준으로 배율을 계산합니다. 중간 마우스 드래그는 선택·이동과 분리된 팬 입력으로 ScrollViewer 오프셋만 이동하고, Ctrl+휠은 포인터 아래의 아트보드 좌표를 고정한 채 확대·축소하므로 둘 다 문서 Undo 기록을 만들지 않습니다. 아트보드 preset·회전·Custom Size 변경도 layout 갱신 전의 viewport 중앙 문서 좌표를 복원해 scrollbar 표시 상태가 달라져도 작업 위치를 유지합니다. 가로·세로 디자인 룰러는 같은 오프셋과 배율을 사용해 화면 가장자리의 눈금과 라벨을 실제 아트보드 좌표로 표시하며, 포인터가 뷰포트 안에 있을 때는 청록색 기준선으로 해당 좌표를 강조합니다. 룰러에서 만든 가이드라인은 주황색으로 캔버스에 표시되고 이동·리사이즈 시 Smart Snap에 참여합니다. 가이드는 문서 AXAML과 Undo 스택에 포함되지 않는 작업 보조 상태이며, 문서 탭 전환 시 탭별로 복원되고 새 문서·새 AXAML·명시적 Clear에서는 해당 탭만 초기화됩니다.
 
 ## 로드맵
 
@@ -524,6 +526,7 @@ AXAML 소스 편집기의 `Validate`와 `Preview`는 현재 디자인과 Undo �
 - v1.93: 지원 컨테이너 전반의 AXAML fragment 컨텍스트 붙여넣기
 - v1.94: AXAML context paste root 추적·잠금 보존·원자적 rollback 안정화
 - v1.95: 내부 clipboard의 문서 색상 리소스·스타일 보존 및 충돌 별칭 병합
+- v1.96: 문서 탭별 Design Guide 좌표·표시·스냅 상태 보존
 
 ## 컴포넌트 팩
 
