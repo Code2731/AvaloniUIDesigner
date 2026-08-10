@@ -1750,7 +1750,7 @@ public partial class MainWindowViewModel : ViewModelBase
         return true;
     }
 
-    public bool SelectBoundaryVisibleElement(bool last = false)
+    public bool SelectBoundaryVisibleElement(bool last = false, bool append = false)
     {
         var candidates = Canvas.Elements
             .Where(Canvas.IsElementVisibleOnCanvas)
@@ -1763,8 +1763,17 @@ public partial class MainWindowViewModel : ViewModelBase
 
         var index = last ? candidates.Count - 1 : 0;
         var boundary = candidates[index];
-        SelectElement(boundary);
-        StatusText = $"Selected {(last ? "last" : "first")} visible control ({index + 1}/{candidates.Count}).";
+        if (append)
+        {
+            SelectElements(Canvas.SelectedElements.Concat([boundary]));
+            StatusText = $"Added {boundary.DisplayName} from Canvas boundary ({Canvas.SelectedElements.Count} selected).";
+        }
+        else
+        {
+            SelectElement(boundary);
+            StatusText = $"Selected {(last ? "last" : "first")} visible control ({index + 1}/{candidates.Count}).";
+        }
+
         return true;
     }
 
