@@ -9423,11 +9423,19 @@ public partial class MainWindowViewModel : ViewModelBase
         }
 
         var nameMap = BuildDuplicateNameMap(importedDocument.Elements);
+        var pasteTarget = GetSelectedAxamlPasteTarget();
         var pastedSnapshots = CreateAxamlPasteSnapshots(
             importedDocument.Elements,
             nameMap,
             resourceMap,
             styleClassMap);
+        if (pasteTarget is not null)
+        {
+            pastedSnapshots = ReparentAxamlPasteRootsToCanvas(
+                pastedSnapshots,
+                pasteTarget);
+        }
+
         var pastedNames = pastedSnapshots
             .Select(snapshot => snapshot.DisplayName)
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
@@ -9483,6 +9491,11 @@ public partial class MainWindowViewModel : ViewModelBase
 
         details.AddRange(notes);
         result = $"Pasted {rootCount} AXAML control(s) ({pastedSnapshots.Count} total).";
+        if (pasteTarget is not null)
+        {
+            result += $" Inserted into Canvas '{pasteTarget.DisplayName}'.";
+        }
+
         if (details.Count > 0)
         {
             result += $" {string.Join(" ", details)}";
@@ -9490,6 +9503,60 @@ public partial class MainWindowViewModel : ViewModelBase
 
         StatusText = result;
         return true;
+    }
+
+    private DesignElement? GetSelectedAxamlPasteTarget()
+        => Canvas.SelectedElements.Count == 1
+            && Canvas.SelectedElement is { IsLocked: false, Visual: Avalonia.Controls.Canvas } target
+                ? target
+                : null;
+
+    private List<DesignerElementSnapshot> ReparentAxamlPasteRootsToCanvas(
+        IReadOnlyList<DesignerElementSnapshot> snapshots,
+        DesignElement target)
+    {
+        var nextChildIndex = Canvas.Elements.Count(element =>
+            element.IsCanvasChild
+            && string.Equals(
+                element.ParentName,
+                target.DisplayName,
+                StringComparison.OrdinalIgnoreCase));
+        var rootIndex = 0;
+        return snapshots
+            .Select(snapshot =>
+            {
+                if (!string.IsNullOrWhiteSpace(snapshot.ParentName))
+                {
+                    return snapshot;
+                }
+
+                var localLeft = snapshot.X;
+                var localTop = snapshot.Y;
+                var reparented = snapshot with
+                {
+                    X = target.X + localLeft,
+                    Y = target.Y + localTop,
+                    ParentName = target.DisplayName,
+                    ParentLayout = DesignerParentLayoutKind.Canvas,
+                    GridRow = 0,
+                    GridColumn = 0,
+                    GridRowSpan = 1,
+                    GridColumnSpan = 1,
+                    StackPanelIndex = -1,
+                    DockPanelIndex = -1,
+                    WrapPanelIndex = -1,
+                    UniformGridIndex = -1,
+                    CanvasChildIndex = nextChildIndex + rootIndex,
+                    CanvasChildLeft = localLeft,
+                    CanvasChildTop = localTop,
+                    TabIndex = -1,
+                    TabHeader = null,
+                    SplitViewSlot = DesignerSplitViewSlot.Content,
+                };
+                rootIndex++;
+                return reparented;
+            })
+            .ToList();
     }
 
     public DocumentTabViewModel CreateNewDocumentTab()
