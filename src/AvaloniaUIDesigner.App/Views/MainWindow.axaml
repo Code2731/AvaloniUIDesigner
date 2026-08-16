@@ -97,7 +97,7 @@
                 <MenuItem Header="Edit Items / Columns..." Click="OnEditItemsMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
                 <MenuItem Header="Edit DataGrid Behavior..." Click="OnEditDataGridBehaviorPropertiesMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
                 <MenuItem Header="Edit Bindings..." Click="OnEditBindingsMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
-                <MenuItem Header="Edit Common Properties..." Click="OnEditCommonPropertiesMenuClicked" IsEnabled="{Binding Canvas.HasMultipleSelection}"/>
+                <MenuItem Header="Edit Common Properties... (Ctrl+Alt+M)" Click="OnEditCommonPropertiesMenuClicked" IsEnabled="{Binding Canvas.HasMultipleSelection}"/>
                 <MenuItem Header="Edit Layout Properties..." Click="OnEditLayoutPropertiesMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
                 <MenuItem Header="Edit Selection Bounds... (Ctrl+Alt+B)" Click="OnEditSelectionBoundsMenuClicked" IsEnabled="{Binding Canvas.HasMultipleSelection}"/>
                 <MenuItem Header="Edit Typography Properties..." Click="OnEditTypographyPropertiesMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
@@ -519,6 +519,12 @@
                             Click="OnEditSelectionBoundsMenuClicked"
                             IsEnabled="{Binding Canvas.HasMultipleSelection}"
                             ToolTip.Tip="Edit the numeric bounds of the selection (Ctrl+Alt+B)"
+                            Padding="7,3"/>
+                    <Button Name="EditCommonPropertiesToolbar"
+                            Content="Common"
+                            Click="OnEditCommonPropertiesMenuClicked"
+                            IsEnabled="{Binding Canvas.HasMultipleSelection}"
+                            ToolTip.Tip="Edit common properties for the selection (Ctrl+Alt+M)"
                             Padding="7,3"/>
                     <Border Width="1" Background="#CBD5E1" Margin="0,2"/>
                     <TextBlock Text="Order"
@@ -1194,6 +1200,10 @@
                                     <MenuItem Name="EditSelectionBoundsContextMenu"
                                               Header="Edit Selection Bounds... (Ctrl+Alt+B)"
                                               Click="OnEditSelectionBoundsMenuClicked"
+                                              IsEnabled="{Binding Canvas.HasMultipleSelection}"/>
+                                    <MenuItem Name="EditCommonPropertiesContextMenu"
+                                              Header="Edit Common Properties... (Ctrl+Alt+M)"
+                                              Click="OnEditCommonPropertiesMenuClicked"
                                               IsEnabled="{Binding Canvas.HasMultipleSelection}"/>
                                     <MenuItem Header="Center on Artboard" IsEnabled="{Binding Canvas.IsSelectionActive}">
                                         <MenuItem Header="Horizontally" Click="OnCenterHorizontallyOnArtboardMenuClicked"/>

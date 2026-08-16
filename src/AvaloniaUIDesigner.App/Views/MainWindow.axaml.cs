@@ -63,6 +63,7 @@ public partial class MainWindow : Window
         Ctrl+Alt+Shift+C   Center selection on artboard on both axes
         Ctrl+Alt+Shift+Arrow Align selection to the matching artboard edge
         Ctrl+Alt+B          Edit numeric bounds for a multi-selection
+        Ctrl+Alt+M          Edit common properties for a multi-selection
         Ctrl+Alt+G          Toggle design grid
         Ctrl+Alt+Shift+G    Toggle snap to grid
         Ctrl+Alt+1          Toggle Toolbox panel
@@ -2234,6 +2235,9 @@ public partial class MainWindow : Window
     private async void OnEditCommonPropertiesMenuClicked(
         object? sender,
         Avalonia.Interactivity.RoutedEventArgs e)
+        => await EditCommonPropertiesAsync();
+
+    private async Task EditCommonPropertiesAsync()
     {
         FlushPendingPropertyHistory();
         if (Vm is null || !Vm.TryGetSelectedCommonProperties(out var state))
@@ -4586,6 +4590,13 @@ public partial class MainWindow : Window
         if (ctrl && alt && !shift && e.Key == Key.B)
         {
             await EditSelectionBoundsAsync();
+            e.Handled = true;
+            return;
+        }
+
+        if (ctrl && alt && !shift && e.Key == Key.M)
+        {
+            await EditCommonPropertiesAsync();
             e.Handled = true;
             return;
         }
