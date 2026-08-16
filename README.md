@@ -45,6 +45,7 @@ dotnet run --project src/AvaloniaUIDesigner.App/AvaloniaUIDesigner.App.csproj
 - **리사이즈 Smart Snap**: 8방향 핸들로 크기를 조정할 때 아트보드 경계·중앙선, 디자인 가이드, 다른 컨트롤의 모서리·중앙선에 맞추고 스냅 기준선을 표시하며 최소 10px 크기를 보호합니다. 크기 변경은 이동과 같은 Undo·AXAML 왕복 흐름을 사용합니다.
 - **다중 선택 리사이즈**: 같은 root 또는 같은 Canvas의 여러 컨트롤을 선택하면 bounding box 핸들로 위치·크기를 비율 조정하고 Canvas 자식의 로컬 좌표도 동기화합니다. Grid·StackPanel·Content 자식이나 서로 다른 부모를 섞은 선택은 좌표 손실을 막기 위해 리사이즈를 차단합니다.
 - **다중 선택 bounds 직접 편집**: `Edit > Edit Selection Bounds...`에서 같은 root 또는 같은 Canvas 형제 선택의 union bounds `X/Y/W/H`를 숫자로 입력하고, 상대 배치·크기를 함께 비율 조정하며 하나의 Transform Undo로 기록합니다. 잠긴 컨트롤·부모 레이아웃 자식·서로 다른 부모가 섞인 선택은 기존 리사이즈 규칙으로 차단합니다.
+- **Selection Bounds 빠른 접근**: 다중 선택의 숫자 bounds 편집을 Design Toolbar의 `Bounds`, Canvas Context Menu, `Ctrl+Alt+B`에서 같은 대화상자와 Undo 흐름으로 바로 실행합니다.
 - **다중 선택 공통 속성**: `Edit > Edit Common Properties...`에서 선택된 여러 컨트롤의 공통 Margin·정렬·Opacity·입력/표시 상태를 한 번에 적용하고, 서로 다른 값은 비워 둔 채 개별 값을 유지하며 하나의 Undo 작업으로 기록
 - **Arrange 키보드 단축키**: 캔버스에서 다중 선택 후 `Ctrl+Shift+Left/Right/Up/Down`으로 선택 컨트롤을 좌·우·상·하 경계에 정렬하고 `Ctrl+Shift+E/M`으로 가로 중앙·세로 중앙에 정렬하며 `Ctrl+Alt+H/V`로 가로·세로 균등 분배하고 기존 Arrange Undo/AXAML 흐름을 그대로 사용
 - **레이어 순서 키보드 단축키**: 선택 컨트롤을 `Ctrl+]`/`Ctrl+[`로 한 단계 앞·뒤로 이동하고 `Ctrl+Shift+]`/`Ctrl+Shift+[`로 맨 앞·뒤로 보내며 기존 Order Undo/AXAML 흐름과 선택 상태를 유지
@@ -190,6 +191,7 @@ dotnet run --project src/AvaloniaUIDesigner.App/AvaloniaUIDesigner.App.csproj
 12. `Edit > Edit Layout Properties...`에서 선택 컨트롤의 Margin·Padding·Alignment·Min/Max 크기 편집
 12a. 두 개 이상의 호환 컨트롤을 선택한 뒤 `Edit > Edit Selection Bounds...`에서 union bounds의 `X/Y/W/H`를 직접 입력해 선택 영역을 정밀 배치·확대/축소
 12b. Canvas 안의 자식 컨트롤을 선택하면 Property Inspector의 `Left`·`Top`·`W`·`H`에서 부모 Canvas 기준 로컬 좌표와 크기를 직접 편집
+12c. 두 개 이상의 호환 컨트롤을 선택한 뒤 Design Toolbar의 `Bounds`, Canvas Context Menu 또는 `Ctrl+Alt+B`로 같은 Selection Bounds 편집기를 바로 엽니다.
 13. `Edit > Edit Typography Properties...`에서 글꼴과 지원 컨트롤의 텍스트 정렬·줄바꿈 편집
 14. `Edit > Edit Transform Properties...`에서 선택 컨트롤의 이동·회전·크기·기울기와 변환 기준점 편집
 15. `Edit > Edit Accessibility & Navigation...`에서 스크린리더 메타데이터와 키보드 포커스 순서 편집
@@ -362,6 +364,7 @@ dotnet run --project src/AvaloniaUIDesigner.App/AvaloniaUIDesigner.App.csproj
 104. Grid 그룹의 현재 간격 표시(`8 px`, 사용자 지정 `12.5 px` 등)는 `Canvas.GridSize` 변경 알림에 연결되어 프리셋·Custom 입력·AXAML 문서 메타데이터 로드·Undo/Redo 뒤에도 실제 스냅 간격과 일치합니다.
 105. 두 개 이상의 같은 root 또는 같은 Canvas 형제 컨트롤을 선택해 `Edit > Edit Selection Bounds...`를 열면 현재 union bounds가 `X/Y/W/H` 입력값으로 채워집니다. `X/Y`는 0 이상, `W/H`는 최소 10px로 검증하고, 적용 시 각 컨트롤의 상대 위치·크기를 같은 비율로 변환해 Canvas 로컬 좌표·Preview·AXAML·하나의 Transform Undo에 반영합니다. Grid·StackPanel·Content 자식, 잠긴 컨트롤, 서로 다른 부모가 섞인 선택에서는 메뉴 규칙과 상태 메시지로 안전하게 차단합니다.
 106. Canvas 자식을 선택하면 Property Inspector의 첫 번째 기하 행이 문서 절대 `X/Y` 대신 부모 기준 `Left/Top`으로 표시됩니다. 값을 잃으면 기존 Canvas reflow가 `DesignElement.X/Y`를 부모 위치와 합산해 다시 계산하고, Width/Height 변경과 함께 하나의 layout Transform Undo, Canvas.Left/Top AXAML, Preview 결과를 유지합니다. Canvas 이외 부모 레이아웃 자식의 기하 입력은 계속 비활성화됩니다.
+107. Selection Bounds 편집은 Design Toolbar의 `Bounds`, Canvas Context Menu의 `Edit Selection Bounds... (Ctrl+Alt+B)`, Edit 메뉴, `Ctrl+Alt+B`에서 동일한 공용 명령으로 접근합니다. 다중 선택 조건·잠금·부모 레이아웃 검증, 숫자 입력, 비율 변환, Transform Undo 결과는 진입 경로와 관계없이 동일하게 유지됩니다.
 
 DataGrid가 포함된 생성 AXAML을 다른 프로젝트에서 사용할 때는 같은 Avalonia 버전의 `Avalonia.Controls.DataGrid` 패키지와 `avares://Avalonia.Controls.DataGrid/Themes/Fluent.xaml` 스타일 include가 필요합니다.
 
@@ -586,6 +589,7 @@ AXAML 소스 편집기의 `Validate`와 `Preview`는 현재 디자인과 Undo �
 - v2.16: Design Toolbar 현재 Grid Size 상태 피드백 추가
 - v2.17: 다중 선택 Selection Bounds 숫자 직접 편집 추가
 - v2.18: Canvas 자식 로컬 기하값 Property Inspector 직접 편집 추가
+- v2.19: Selection Bounds 편집 Toolbar·Context Menu·Ctrl+Alt+B 빠른 접근 추가
 
 ## 컴포넌트 팩
 

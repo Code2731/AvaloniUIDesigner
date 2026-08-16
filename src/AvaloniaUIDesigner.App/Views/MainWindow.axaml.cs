@@ -62,6 +62,7 @@ public partial class MainWindow : Window
         Ctrl+Alt+Shift+X/Y Center selection on artboard horizontally/vertically
         Ctrl+Alt+Shift+C   Center selection on artboard on both axes
         Ctrl+Alt+Shift+Arrow Align selection to the matching artboard edge
+        Ctrl+Alt+B          Edit numeric bounds for a multi-selection
         Ctrl+Alt+G          Toggle design grid
         Ctrl+Alt+Shift+G    Toggle snap to grid
         Ctrl+Alt+1          Toggle Toolbox panel
@@ -2270,6 +2271,9 @@ public partial class MainWindow : Window
     private async void OnEditSelectionBoundsMenuClicked(
         object? sender,
         Avalonia.Interactivity.RoutedEventArgs e)
+        => await EditSelectionBoundsAsync();
+
+    private async Task EditSelectionBoundsAsync()
     {
         FlushPendingLayoutHistory();
         if (Vm is null
@@ -4576,6 +4580,13 @@ public partial class MainWindow : Window
         // Keep text editing inside the PropertyGrid native to the focused editor.
         if (e.Source is TextBox)
         {
+            return;
+        }
+
+        if (ctrl && alt && !shift && e.Key == Key.B)
+        {
+            await EditSelectionBoundsAsync();
+            e.Handled = true;
             return;
         }
 

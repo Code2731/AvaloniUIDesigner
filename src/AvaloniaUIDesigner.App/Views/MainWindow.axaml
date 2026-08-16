@@ -99,7 +99,7 @@
                 <MenuItem Header="Edit Bindings..." Click="OnEditBindingsMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
                 <MenuItem Header="Edit Common Properties..." Click="OnEditCommonPropertiesMenuClicked" IsEnabled="{Binding Canvas.HasMultipleSelection}"/>
                 <MenuItem Header="Edit Layout Properties..." Click="OnEditLayoutPropertiesMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
-                <MenuItem Header="Edit Selection Bounds..." Click="OnEditSelectionBoundsMenuClicked" IsEnabled="{Binding Canvas.HasMultipleSelection}"/>
+                <MenuItem Header="Edit Selection Bounds... (Ctrl+Alt+B)" Click="OnEditSelectionBoundsMenuClicked" IsEnabled="{Binding Canvas.HasMultipleSelection}"/>
                 <MenuItem Header="Edit Typography Properties..." Click="OnEditTypographyPropertiesMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
                 <MenuItem Header="Edit Transform Properties..." Click="OnEditTransformPropertiesMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
                 <MenuItem Header="Edit Accessibility &amp; Navigation..." Click="OnEditAccessibilityPropertiesMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
@@ -514,6 +514,12 @@
                             IsEnabled="{Binding Canvas.HasMultipleSelection}"
                             ToolTip.Tip="Make selected controls the same size"
                             Padding="6,3"/>
+                    <Button Name="EditSelectionBoundsToolbar"
+                            Content="Bounds"
+                            Click="OnEditSelectionBoundsMenuClicked"
+                            IsEnabled="{Binding Canvas.HasMultipleSelection}"
+                            ToolTip.Tip="Edit the numeric bounds of the selection (Ctrl+Alt+B)"
+                            Padding="7,3"/>
                     <Border Width="1" Background="#CBD5E1" Margin="0,2"/>
                     <TextBlock Text="Order"
                                VerticalAlignment="Center"
@@ -1185,6 +1191,10 @@
                                         <MenuItem Header="Distribute Horizontally" Click="OnDistributeHorizontallyMenuClicked"/>
                                         <MenuItem Header="Distribute Vertically" Click="OnDistributeVerticallyMenuClicked"/>
                                     </MenuItem>
+                                    <MenuItem Name="EditSelectionBoundsContextMenu"
+                                              Header="Edit Selection Bounds... (Ctrl+Alt+B)"
+                                              Click="OnEditSelectionBoundsMenuClicked"
+                                              IsEnabled="{Binding Canvas.HasMultipleSelection}"/>
                                     <MenuItem Header="Center on Artboard" IsEnabled="{Binding Canvas.IsSelectionActive}">
                                         <MenuItem Header="Horizontally" Click="OnCenterHorizontallyOnArtboardMenuClicked"/>
                                         <MenuItem Header="Vertically" Click="OnCenterVerticallyOnArtboardMenuClicked"/>
