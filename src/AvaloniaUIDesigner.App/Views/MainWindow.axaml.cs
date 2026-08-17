@@ -74,6 +74,7 @@ public partial class MainWindow : Window
         Ctrl+Alt+Shift+T    Edit text input properties for the selected TextBox
         Ctrl+Alt+Shift+B    Edit SelectableTextBlock selection styling
         Ctrl+Alt+Shift+M    Edit MaskedTextBox mask behavior
+        Ctrl+Alt+Shift+Q    Edit selection behavior for ComboBox/ListBox/TreeView
         Ctrl+Alt+G          Toggle design grid
         Ctrl+Alt+Shift+G    Toggle snap to grid
         Ctrl+Alt+1          Toggle Toolbox panel
@@ -2429,6 +2430,9 @@ public partial class MainWindow : Window
     private async void OnEditSelectionPropertiesMenuClicked(
         object? sender,
         Avalonia.Interactivity.RoutedEventArgs e)
+        => await EditSelectionPropertiesAsync();
+
+    private async Task EditSelectionPropertiesAsync()
     {
         FlushPendingPropertyHistory();
         if (Vm is null || !Vm.TryGetSelectedSelectionProperties(out var state))
@@ -4707,6 +4711,13 @@ public partial class MainWindow : Window
         if (ctrl && alt && shift && e.Key == Key.M)
         {
             await EditMaskedTextBoxPropertiesAsync();
+            e.Handled = true;
+            return;
+        }
+
+        if (ctrl && alt && shift && e.Key == Key.Q)
+        {
+            await EditSelectionPropertiesAsync();
             e.Handled = true;
             return;
         }

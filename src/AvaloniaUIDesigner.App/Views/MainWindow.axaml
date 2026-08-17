@@ -109,7 +109,7 @@
                 <MenuItem Header="Edit Text Input... (Ctrl+Alt+Shift+T)" Click="OnEditTextInputPropertiesMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
                 <MenuItem Header="Edit SelectableTextBlock... (Ctrl+Alt+Shift+B)" Click="OnEditSelectableTextBlockPropertiesMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
                 <MenuItem Header="Edit MaskedTextBox... (Ctrl+Alt+Shift+M)" Click="OnEditMaskedTextBoxPropertiesMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
-                <MenuItem Header="Edit Selection Behavior..." Click="OnEditSelectionPropertiesMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
+                <MenuItem Header="Edit Selection Behavior... (Ctrl+Alt+Shift+Q)" Click="OnEditSelectionPropertiesMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
                 <MenuItem Header="Edit Date &amp; Time Input..." Click="OnEditDateTimePropertiesMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
                 <MenuItem Header="Edit ColorPicker..." Click="OnEditColorPickerPropertiesMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
                 <MenuItem Header="Edit AutoCompleteBox..." Click="OnEditAutoCompleteBoxPropertiesMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
@@ -585,6 +585,12 @@
                             Click="OnEditMaskedTextBoxPropertiesMenuClicked"
                             IsEnabled="{Binding Canvas.IsSelectionActive}"
                             ToolTip.Tip="Edit MaskedTextBox mask behavior (Ctrl+Alt+Shift+M)"
+                            Padding="7,3"/>
+                    <Button Name="EditSelectionPropertiesToolbar"
+                            Content="Selection"
+                            Click="OnEditSelectionPropertiesMenuClicked"
+                            IsEnabled="{Binding Canvas.IsSelectionActive}"
+                            ToolTip.Tip="Edit selection behavior for ComboBox, ListBox, or TreeView (Ctrl+Alt+Shift+Q)"
                             Padding="7,3"/>
                     <Border Width="1" Background="#CBD5E1" Margin="0,2"/>
                     <TextBlock Text="Order"
@@ -1305,6 +1311,10 @@
                                               Header="Edit MaskedTextBox... (Ctrl+Alt+Shift+M)"
                                               Click="OnEditMaskedTextBoxPropertiesMenuClicked"
                                               IsEnabled="{Binding Canvas.IsSelectionActive}"/>
+                                    <MenuItem Name="EditSelectionPropertiesContextMenu"
+                                              Header="Edit Selection Behavior... (Ctrl+Alt+Shift+Q)"
+                                              Click="OnEditSelectionPropertiesMenuClicked"
+                                              IsEnabled="{Binding Canvas.IsSelectionActive}"/>
                                     <MenuItem Header="Center on Artboard" IsEnabled="{Binding Canvas.IsSelectionActive}">
                                         <MenuItem Header="Horizontally" Click="OnCenterHorizontallyOnArtboardMenuClicked"/>
                                         <MenuItem Header="Vertically" Click="OnCenterVerticallyOnArtboardMenuClicked"/>
@@ -1427,7 +1437,7 @@
                                                     <MenuItem Header="Edit Text Input... (Ctrl+Alt+Shift+T)" Click="OnEditTextInputPropertiesMenuClicked"/>
                                                     <MenuItem Header="Edit SelectableTextBlock... (Ctrl+Alt+Shift+B)" Click="OnEditSelectableTextBlockPropertiesMenuClicked"/>
                                                     <MenuItem Header="Edit MaskedTextBox... (Ctrl+Alt+Shift+M)" Click="OnEditMaskedTextBoxPropertiesMenuClicked"/>
-                                                    <MenuItem Header="Edit Selection Behavior..." Click="OnEditSelectionPropertiesMenuClicked"/>
+                                                    <MenuItem Header="Edit Selection Behavior... (Ctrl+Alt+Shift+Q)" Click="OnEditSelectionPropertiesMenuClicked"/>
                                                     <MenuItem Header="Edit Date &amp; Time Input..." Click="OnEditDateTimePropertiesMenuClicked"/>
                                                     <MenuItem Header="Edit Toggle &amp; Choice Behavior..." Click="OnEditTogglePropertiesMenuClicked"/>
                                                     <MenuItem Header="Edit Disclosure &amp; Scrolling..." Click="OnEditContainerBehaviorPropertiesMenuClicked"/>
