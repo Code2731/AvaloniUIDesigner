@@ -71,6 +71,7 @@ public partial class MainWindow : Window
         Ctrl+Alt+E          Edit interaction and rendering properties for the selected control
         Ctrl+Alt+F          Edit visual effects for the selected control
         Ctrl+Alt+Shift+R    Edit range and value properties for the selected control
+        Ctrl+Alt+Shift+T    Edit text input properties for the selected TextBox
         Ctrl+Alt+G          Toggle design grid
         Ctrl+Alt+Shift+G    Toggle snap to grid
         Ctrl+Alt+1          Toggle Toolbox panel
@@ -2410,6 +2411,9 @@ public partial class MainWindow : Window
     private async void OnEditTextInputPropertiesMenuClicked(
         object? sender,
         Avalonia.Interactivity.RoutedEventArgs e)
+        => await EditTextInputPropertiesAsync();
+
+    private async Task EditTextInputPropertiesAsync()
     {
         FlushPendingPropertyHistory();
         if (Vm is null || !Vm.TryGetSelectedTextInputProperties(out var state))
@@ -4548,7 +4552,7 @@ public partial class MainWindow : Window
         var shift = e.KeyModifiers.HasFlag(KeyModifiers.Shift);
         var alt = e.KeyModifiers.HasFlag(KeyModifiers.Alt);
 
-        if (ctrl && alt && e.Key == Key.T)
+        if (ctrl && alt && !shift && e.Key == Key.T)
         {
             if (!ToolboxPane.IsVisible)
             {
@@ -4674,6 +4678,13 @@ public partial class MainWindow : Window
         if (ctrl && alt && shift && e.Key == Key.R)
         {
             await EditRangePropertiesAsync();
+            e.Handled = true;
+            return;
+        }
+
+        if (ctrl && alt && shift && e.Key == Key.T)
+        {
+            await EditTextInputPropertiesAsync();
             e.Handled = true;
             return;
         }
