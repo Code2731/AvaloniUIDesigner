@@ -75,6 +75,7 @@ public partial class MainWindow : Window
         Ctrl+Alt+Shift+B    Edit SelectableTextBlock selection styling
         Ctrl+Alt+Shift+M    Edit MaskedTextBox mask behavior
         Ctrl+Alt+Shift+Q    Edit selection behavior for ComboBox/ListBox/TreeView
+        Ctrl+Alt+Shift+D    Edit DatePicker/Calendar/TimePicker date and time input
         Ctrl+Alt+G          Toggle design grid
         Ctrl+Alt+Shift+G    Toggle snap to grid
         Ctrl+Alt+1          Toggle Toolbox panel
@@ -2478,6 +2479,9 @@ public partial class MainWindow : Window
     private async void OnEditDateTimePropertiesMenuClicked(
         object? sender,
         Avalonia.Interactivity.RoutedEventArgs e)
+        => await EditDateTimePropertiesAsync();
+
+    private async Task EditDateTimePropertiesAsync()
     {
         FlushPendingPropertyHistory();
         if (Vm is null || !Vm.TryGetSelectedDateTimeProperties(out var state))
@@ -4722,6 +4726,13 @@ public partial class MainWindow : Window
             return;
         }
 
+        if (ctrl && alt && shift && e.Key == Key.D)
+        {
+            await EditDateTimePropertiesAsync();
+            e.Handled = true;
+            return;
+        }
+
         if (!ctrl
             && !shift
             && !alt
@@ -5055,7 +5066,7 @@ public partial class MainWindow : Window
             return;
         }
 
-        if (ctrl && alt && e.Key == Key.D)
+        if (ctrl && alt && !shift && e.Key == Key.D)
         {
             FlushPendingPropertyHistory();
             Vm.DuplicateDocumentTab();
