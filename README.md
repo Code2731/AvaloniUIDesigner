@@ -147,7 +147,7 @@ dotnet run --project src/AvaloniaUIDesigner.App/AvaloniaUIDesigner.App.csproj
 - **Document Tab MRU Switching**: `View > Switch to Recent Document Tab`, Design Toolbar의 `Recent`, Canvas Context Menu 또는 `Ctrl+Alt+Tab`으로 가장 최근에 사용한 다른 탭으로 전환하고, `Ctrl+Alt+Shift+Tab`으로 MRU 목록의 더 오래된 탭을 순환합니다. 최근 사용 순서는 세션 JSON에 보존됩니다.
 - **Document Tab Quick Switcher**: `View > Quick Switch Document Tab...` 또는 `Ctrl+K`로 열린 탭의 별칭·파일 경로·탭 번호·저장 상태를 검색하고 Enter로 즉시 전환합니다. 결과에는 `Ctrl+1..9` 바로가기와 `Saved`·`Modified`·`Unsaved` 상태가 표시되며, 위·아래 키는 끝에서 처음/처음에서 끝으로 순환합니다.
 - **Recent AXAML Files**: `File > Open Recent Files...`, Design Toolbar의 `Recent Files`, Canvas Context Menu 또는 `Ctrl+Shift+O`에서 최근 파일을 이름·경로로 검색하고 Enter로 새 문서 탭에 엽니다. 누락된 경로는 `Missing`으로 표시하며 선택하면 최근 목록에서 제거합니다.
-- **Project Workspace Explorer**: `File > Open Project Folder...`로 작업 폴더를 선택하면 `Project Explorer... (Ctrl+Shift+P)`에서 폴더·`.axaml`·`.xaml` 파일 계층을 탐색하고 Enter로 파일을 새 문서 탭에 엽니다. 폴더는 `[+]`/`[-]`와 Enter로 접고 펼치며 검색 시 일치 파일의 조상 폴더를 유지합니다. `bin`·`obj`·`.git` 등 생성 폴더는 제외하며 선택한 프로젝트 폴더와 파일 목록은 다음 실행에도 복원됩니다.
+- **Project Workspace Explorer**: `File > Open Project Folder...`로 작업 폴더를 선택하면 `Project Explorer... (Ctrl+Shift+P)`에서 폴더·`.axaml`·`.xaml` 파일 계층을 탐색하고 Enter로 파일을 새 문서 탭에 엽니다. 폴더는 `[+]`/`[-]`와 Enter로 접고 펼치며 검색 시 일치 파일의 조상 폴더를 유지합니다. 현재 문서 파일은 다시 열 때 자동으로 reveal하고 폴더 접기 상태도 저장·복원합니다. `bin`·`obj`·`.git` 등 생성 폴더는 제외하며 선택한 프로젝트 폴더와 파일 목록은 다음 실행에도 복원됩니다.
 - **Project Workspace File Watcher**: 열린 프로젝트 폴더의 AXAML 생성·삭제·이동을 자동 감지해 Explorer 파일 목록을 갱신하고, 현재 문서가 외부에서 변경되면 `Reload Current File (Ctrl+Shift+R)`을 활성화합니다. dirty 문서는 기존 저장·폐기 확인을 거친 뒤에만 외부 내용을 적용합니다.
 - **Tab View Navigation**: `Ctrl+Tab`/`Ctrl+Shift+Tab`으로 문서 탭을 순환하고, `Ctrl+Shift+PageUp/PageDown` 또는 탭 컨텍스트 메뉴로 활성 탭을 좌우 이동하며, 탭별 캔버스 줌·스크롤 위치와 Object Tree 선택을 전환·세션 복원 때 보존합니다.
 - **Viewport 복원 우선순위**: 문서 탭을 복원하는 짧은 pending 구간에는 선택 컨트롤 자동 스크롤을 보류해 저장된 Canvas 위치가 Object Tree/Canvas 선택 추적에 의해 덮어써지지 않도록 합니다.
@@ -394,6 +394,7 @@ dotnet run --project src/AvaloniaUIDesigner.App/AvaloniaUIDesigner.App.csproj
 75ce. 열린 프로젝트 폴더의 파일 watcher는 AXAML 생성·삭제·이동을 350ms debounce 후 Explorer 목록에 반영합니다. 현재 문서 파일의 외부 변경은 파일 timestamp를 내부 저장 시점과 비교해 감지하며, `Reload Current File (Ctrl+Shift+R)`은 dirty 확인·AXAML 검증·Undo 초기화·현재 탭 유지 순서로 안전하게 다시 로드합니다.
 75cf. `View > Preview Theme`의 `System Default`·`Light`·`Dark` 선택은 Preview 창의 `RequestedThemeVariant`만 전환해 문서·Undo 상태를 변경하지 않습니다. 열린 Preview 창에 즉시 적용되고, Preview 새로고침·문서 변경·Interaction Log 재진입 후에도 선택한 변형을 유지합니다.
 75cg. `Project Explorer... (Ctrl+Shift+P)`는 상대 경로를 폴더·파일 계층으로 표시합니다. 빈 검색에서는 폴더 접기/펼치기 상태와 순환 키보드 선택을 유지하고, 검색어가 있으면 일치한 AXAML 파일과 필요한 조상 폴더만 `[+]`/`[-]` 트리로 남겨 Enter로 바로 엽니다.
+75ch. Project Explorer를 다시 열면 `CurrentDocumentPath`에 해당하는 AXAML 파일까지 조상 폴더를 자동으로 펼쳐 현재 작업 위치를 reveal합니다. 폴더 접기 상태는 `%LocalAppData%/AvaloniaUIDesigner/project-workspace.json`의 `CollapsedFolders`로 저장하며, 이전 버전의 문자열 경로 형식도 계속 읽습니다.
 76. `File > Load Component Pack...` 또는 `File > Load Toolbox Preset Pack...`으로 외부 Toolbox 팩을 추가하면 파일 경로가 세션에 등록되어 다음 실행 때 자동으로 다시 로드됩니다. 파일이 없어도 문서 탭 복원은 계속되며 상태바에 경고가 표시됩니다.
 77. 외부 프로젝트의 컨트롤은 Component Pack 항목에 `designOnly: true`, `avaloniaTypeName`, `previewText`, `defaultProperties`를 지정해 등록합니다. 디자이너에서는 타입명 플레이스홀더로 편집하고, 생성 AXAML에는 원래 커스텀 타입과 속성을 출력합니다. 예시는 [custom-component-pack.example.json](docs/custom-component-pack.example.json)을 참고하세요.
 78. `File > Load Component Pack Plugin...`에서 `IComponentPackPlugin`을 구현한 신뢰할 수 있는 DLL을 선택하면 플러그인이 제공한 Component Pack을 Toolbox에 등록합니다. DLL 경로는 세션 JSON의 `ComponentPluginPaths`에 저장되고, 앱 재시작 시 플러그인·JSON 팩·프리셋 팩 순서로 복원됩니다.
@@ -714,6 +715,7 @@ AXAML 소스 편집기의 `Validate`와 `Preview`는 현재 디자인과 Undo �
 - v2.52: Project Workspace File Watcher·외부 AXAML 변경 알림·안전한 Reload Current File·Ctrl+Shift+R 추가
 - v2.53: Live Preview System Default·Light·Dark ThemeVariant 전환과 열린 창 즉시 적용 추가
 - v2.54: Project Explorer 폴더·파일 계층·접기/펼치기·조상 유지 검색 추가
+- v2.55: Project Explorer 현재 문서 reveal·폴더 접기 상태 저장·복원·구형 workspace 형식 호환 추가
 
 ## 컴포넌트 팩
 

@@ -1048,6 +1048,153 @@ public partial class MainWindow : Window
         return SortProjectExplorerNodes(roots);
     }
 
+    private static void ApplyProjectExplorerCollapsedFolders(
+        IReadOnlyList<ProjectExplorerNode> roots,
+        IReadOnlyCollection<string> collapsedFolders)
+    {
+        foreach (var node in roots)
+        {
+            ApplyProjectExplorerCollapsedFolder(node, collapsedFolders);
+        }
+
+        static void ApplyProjectExplorerCollapsedFolder(
+            ProjectExplorerNode node,
+            IReadOnlyCollection<string> collapsedPaths)
+        {
+            if (node.IsFile)
+            {
+                return;
+            }
+
+            node.IsExpanded = !collapsedPaths.Any(path =>
+                string.Equals(path, node.RelativePath, StringComparison.OrdinalIgnoreCase));
+            foreach (var child in node.Children)
+            {
+                ApplyProjectExplorerCollapsedFolder(child, collapsedPaths);
+            }
+        }
+    }
+
+    private static void RevealProjectExplorerPath(
+        IReadOnlyList<ProjectExplorerNode> roots,
+        string? relativePath)
+    {
+        if (string.IsNullOrWhiteSpace(relativePath))
+        {
+            return;
+        }
+
+        var segments = relativePath
+            .Split('/', StringSplitOptions.RemoveEmptyEntries);
+        if (segments.Length < 2)
+        {
+            return;
+        }
+
+        var currentNodes = roots;
+        var currentPath = string.Empty;
+        for (var index = 0; index < segments.Length - 1; index++)
+        {
+            currentPath = string.IsNullOrEmpty(currentPath)
+                ? segments[index]
+                : $"{currentPath}/{segments[index]}";
+            var folder = currentNodes.FirstOrDefault(node =>
+                !node.IsFile
+                && string.Equals(node.RelativePath, currentPath, StringComparison.OrdinalIgnoreCase));
+            if (folder is null)
+            {
+                return;
+            }
+
+            folder.IsExpanded = true;
+            currentNodes = folder.Children;
+        }
+    }
+
+    private static ProjectExplorerNode? FindProjectExplorerNode(
+        IReadOnlyList<ProjectExplorerNode> roots,
+        string relativePath)
+    {
+        foreach (var node in roots)
+        {
+            if (string.Equals(node.RelativePath, relativePath, StringComparison.OrdinalIgnoreCase))
+            {
+                return node;
+            }
+
+            var descendant = FindProjectExplorerNode(node.Children, relativePath);
+            if (descendant is not null)
+            {
+                return descendant;
+            }
+        }
+
+        return null;
+    }
+
+    private static List<string> CollectProjectExplorerCollapsedFolders(
+        IReadOnlyList<ProjectExplorerNode> roots)
+    {
+        var collapsedFolders = new List<string>();
+        foreach (var node in roots)
+        {
+            CollectProjectExplorerCollapsedFolder(node, collapsedFolders);
+        }
+
+        return collapsedFolders;
+
+        static void CollectProjectExplorerCollapsedFolder(
+            ProjectExplorerNode node,
+            List<string> target)
+        {
+            if (!node.IsFile)
+            {
+                if (!node.IsExpanded)
+                {
+                    target.Add(node.RelativePath);
+                }
+
+                foreach (var child in node.Children)
+                {
+                    CollectProjectExplorerCollapsedFolder(child, target);
+                }
+            }
+        }
+    }
+
+    private static string? FindProjectExplorerRelativePath(
+        IReadOnlyList<ProjectWorkspaceFile> files,
+        string? currentDocumentPath)
+    {
+        if (string.IsNullOrWhiteSpace(currentDocumentPath))
+        {
+            return null;
+        }
+
+        foreach (var file in files)
+        {
+            try
+            {
+                if (string.Equals(
+                        System.IO.Path.GetFullPath(file.FullPath),
+                        System.IO.Path.GetFullPath(currentDocumentPath),
+                        StringComparison.OrdinalIgnoreCase))
+                {
+                    return file.RelativePath;
+                }
+            }
+            catch (ArgumentException)
+            {
+                if (string.Equals(file.FullPath, currentDocumentPath, StringComparison.OrdinalIgnoreCase))
+                {
+                    return file.RelativePath;
+                }
+            }
+        }
+
+        return null;
+    }
+
     private static List<ProjectExplorerNode> FilterProjectExplorerTree(
         IReadOnlyList<ProjectExplorerNode> roots,
         string? query)
@@ -1171,6 +1318,13 @@ public partial class MainWindow : Window
             SelectionMode = SelectionMode.Single,
         };
         var treeRoots = BuildProjectExplorerTree(paths);
+        ApplyProjectExplorerCollapsedFolders(
+            treeRoots,
+            Vm.ProjectWorkspaceCollapsedFolders);
+        var currentRelativePath = FindProjectExplorerRelativePath(
+            paths,
+            Vm.CurrentDocumentPath);
+        RevealProjectExplorerPath(treeRoots, currentRelativePath);
         var visibleNodes = new List<ProjectExplorerNode>();
 
         void RefreshResults(string? selectedRelativePath = null)
@@ -1178,10 +1332,11 @@ public partial class MainWindow : Window
             var filteredRoots = FilterProjectExplorerTree(treeRoots, search.Text);
             visibleNodes = FlattenProjectExplorerTree(filteredRoots);
             list.ItemsSource = visibleNodes;
-            var selectedIndex = string.IsNullOrWhiteSpace(selectedRelativePath)
+            var selectionPath = selectedRelativePath ?? currentRelativePath;
+            var selectedIndex = string.IsNullOrWhiteSpace(selectionPath)
                 ? -1
                 : visibleNodes.FindIndex(node =>
-                    string.Equals(node.RelativePath, selectedRelativePath, StringComparison.OrdinalIgnoreCase));
+                    string.Equals(node.RelativePath, selectionPath, StringComparison.OrdinalIgnoreCase));
             if (selectedIndex < 0)
             {
                 selectedIndex = visibleNodes.FindIndex(node => node.IsFile);
@@ -1220,7 +1375,14 @@ public partial class MainWindow : Window
                 return;
             }
 
-            node.IsExpanded = !node.IsExpanded;
+            var sourceNode = FindProjectExplorerNode(treeRoots, node.RelativePath);
+            if (sourceNode is not null)
+            {
+                sourceNode.IsExpanded = !sourceNode.IsExpanded;
+                Vm.SetProjectWorkspaceCollapsedFolders(
+                    CollectProjectExplorerCollapsedFolders(treeRoots));
+            }
+
             RefreshResults(node.RelativePath);
         }
 
@@ -1309,7 +1471,10 @@ public partial class MainWindow : Window
         };
 
         RefreshResults();
-        return await dialog.ShowDialog<string?>(this);
+        var selectedPath = await dialog.ShowDialog<string?>(this);
+        Vm.SetProjectWorkspaceCollapsedFolders(
+            CollectProjectExplorerCollapsedFolders(treeRoots));
+        return selectedPath;
     }
 
     private async void OnQuickSwitchDocumentTabMenuClicked(
