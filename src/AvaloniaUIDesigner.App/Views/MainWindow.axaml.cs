@@ -1462,11 +1462,11 @@ public partial class MainWindow : Window
         var dialog = new Window
         {
             Title = $"Project Explorer - {Vm.ProjectWorkspaceName}",
-            Width = 760,
-            Height = 560,
+            Width = Vm.GetWorkspacePanelState().ProjectExplorerWidth,
+            Height = Vm.GetWorkspacePanelState().ProjectExplorerHeight,
             MinWidth = 560,
             MinHeight = 400,
-            CanResize = false,
+            CanResize = true,
             WindowStartupLocation = WindowStartupLocation.CenterOwner,
         };
         var rootText = new TextBlock
@@ -1798,6 +1798,16 @@ public partial class MainWindow : Window
 
         RefreshProjectTree();
         var selectedPath = await dialog.ShowDialog<string?>(this);
+        var workspacePanelState = Vm.GetWorkspacePanelState();
+        Vm.SetWorkspacePanelState(workspacePanelState with
+        {
+            ProjectExplorerWidth = dialog.Bounds.Width > 0
+                ? dialog.Bounds.Width
+                : workspacePanelState.ProjectExplorerWidth,
+            ProjectExplorerHeight = dialog.Bounds.Height > 0
+                ? dialog.Bounds.Height
+                : workspacePanelState.ProjectExplorerHeight,
+        });
         StopProjectFileTracking();
         Vm.SetProjectWorkspaceCollapsedFolders(
             CollectProjectExplorerCollapsedFolders(treeRoots));

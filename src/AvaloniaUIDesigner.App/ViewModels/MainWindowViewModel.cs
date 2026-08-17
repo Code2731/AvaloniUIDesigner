@@ -58,7 +58,9 @@ public sealed record WorkspacePanelState(
     bool PropertyInspectorVisible,
     double ToolboxWidth,
     double InspectorWidth,
-    double ObjectTreeHeight)
+    double ObjectTreeHeight,
+    double ProjectExplorerWidth = 760,
+    double ProjectExplorerHeight = 560)
 {
     public static WorkspacePanelState Default { get; } = new(
         ToolboxVisible: true,
@@ -66,7 +68,9 @@ public sealed record WorkspacePanelState(
         PropertyInspectorVisible: true,
         ToolboxWidth: 220,
         InspectorWidth: 280,
-        ObjectTreeHeight: 0);
+        ObjectTreeHeight: 0,
+        ProjectExplorerWidth: 760,
+        ProjectExplorerHeight: 560);
 }
 
 public sealed record ProjectWorkspaceFile(string FullPath, string RelativePath)
@@ -9885,7 +9889,9 @@ public partial class MainWindowViewModel : ViewModelBase
                     _workspacePanelState.PropertyInspectorVisible,
                     _workspacePanelState.ToolboxWidth,
                     _workspacePanelState.InspectorWidth,
-                    _workspacePanelState.ObjectTreeHeight),
+                    _workspacePanelState.ObjectTreeHeight,
+                    _workspacePanelState.ProjectExplorerWidth,
+                    _workspacePanelState.ProjectExplorerHeight),
                 closedTabs,
                 recentTabIndexes),
             new JsonSerializerOptions { WriteIndented = true });
@@ -9966,7 +9972,9 @@ public partial class MainWindowViewModel : ViewModelBase
                 persistedWorkspace.PropertyInspectorVisible,
                 persistedWorkspace.ToolboxWidth,
                 persistedWorkspace.InspectorWidth,
-                persistedWorkspace.ObjectTreeHeight))
+                persistedWorkspace.ObjectTreeHeight,
+                persistedWorkspace.ProjectExplorerWidth,
+                persistedWorkspace.ProjectExplorerHeight))
             : WorkspacePanelState.Default;
 
         ClearDocumentTabsForSessionRestore();
@@ -10140,6 +10148,8 @@ public partial class MainWindowViewModel : ViewModelBase
             ToolboxWidth = NormalizeWorkspaceDimension(state.ToolboxWidth, 220, 160, 520),
             InspectorWidth = NormalizeWorkspaceDimension(state.InspectorWidth, 280, 220, 560),
             ObjectTreeHeight = NormalizeWorkspaceDimension(state.ObjectTreeHeight, 0, 0, 1200),
+            ProjectExplorerWidth = NormalizeWorkspaceDimension(state.ProjectExplorerWidth, 760, 560, 1600),
+            ProjectExplorerHeight = NormalizeWorkspaceDimension(state.ProjectExplorerHeight, 560, 400, 1200),
         };
 
     private static double NormalizeWorkspaceDimension(
@@ -18349,7 +18359,9 @@ public partial class MainWindowViewModel : ViewModelBase
         bool PropertyInspectorVisible = true,
         double ToolboxWidth = 220,
         double InspectorWidth = 280,
-        double ObjectTreeHeight = 0);
+        double ObjectTreeHeight = 0,
+        double ProjectExplorerWidth = 760,
+        double ProjectExplorerHeight = 560);
 
     private sealed record PersistedProjectWorkspace(
         string? RootPath,
