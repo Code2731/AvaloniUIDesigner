@@ -105,7 +105,7 @@
                 <MenuItem Header="Edit Accessibility &amp; Navigation... (Ctrl+Alt+A)" Click="OnEditAccessibilityPropertiesMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
                 <MenuItem Header="Edit Interaction &amp; Rendering... (Ctrl+Alt+E)" Click="OnEditInteractionPropertiesMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
                 <MenuItem Header="Edit Visual Effects... (Ctrl+Alt+F)" Click="OnEditEffectPropertiesMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
-                <MenuItem Header="Edit Range &amp; Value..." Click="OnEditRangePropertiesMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
+                <MenuItem Header="Edit Range &amp; Value... (Ctrl+Alt+Shift+R)" Click="OnEditRangePropertiesMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
                 <MenuItem Header="Edit Text Input..." Click="OnEditTextInputPropertiesMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
                 <MenuItem Header="Edit SelectableTextBlock..." Click="OnEditSelectableTextBlockPropertiesMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
                 <MenuItem Header="Edit MaskedTextBox..." Click="OnEditMaskedTextBoxPropertiesMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
@@ -561,6 +561,12 @@
                             Click="OnEditEffectPropertiesMenuClicked"
                             IsEnabled="{Binding Canvas.IsSelectionActive}"
                             ToolTip.Tip="Edit visual effects for the selected control (Ctrl+Alt+F)"
+                            Padding="7,3"/>
+                    <Button Name="EditRangePropertiesToolbar"
+                            Content="Range"
+                            Click="OnEditRangePropertiesMenuClicked"
+                            IsEnabled="{Binding Canvas.IsSelectionActive}"
+                            ToolTip.Tip="Edit range and value properties for the selected control (Ctrl+Alt+Shift+R)"
                             Padding="7,3"/>
                     <Border Width="1" Background="#CBD5E1" Margin="0,2"/>
                     <TextBlock Text="Order"
@@ -1265,6 +1271,10 @@
                                               Header="Edit Visual Effects... (Ctrl+Alt+F)"
                                               Click="OnEditEffectPropertiesMenuClicked"
                                               IsEnabled="{Binding Canvas.IsSelectionActive}"/>
+                                    <MenuItem Name="EditRangePropertiesContextMenu"
+                                              Header="Edit Range &amp; Value... (Ctrl+Alt+Shift+R)"
+                                              Click="OnEditRangePropertiesMenuClicked"
+                                              IsEnabled="{Binding Canvas.IsSelectionActive}"/>
                                     <MenuItem Header="Center on Artboard" IsEnabled="{Binding Canvas.IsSelectionActive}">
                                         <MenuItem Header="Horizontally" Click="OnCenterHorizontallyOnArtboardMenuClicked"/>
                                         <MenuItem Header="Vertically" Click="OnCenterVerticallyOnArtboardMenuClicked"/>
@@ -1383,7 +1393,7 @@
                                                     <MenuItem Header="Edit Accessibility &amp; Navigation..." Click="OnEditAccessibilityPropertiesMenuClicked"/>
                                                     <MenuItem Header="Edit Interaction &amp; Rendering..." Click="OnEditInteractionPropertiesMenuClicked"/>
                                                     <MenuItem Header="Edit Visual Effects... (Ctrl+Alt+F)" Click="OnEditEffectPropertiesMenuClicked"/>
-                                                    <MenuItem Header="Edit Range &amp; Value..." Click="OnEditRangePropertiesMenuClicked"/>
+                                                    <MenuItem Header="Edit Range &amp; Value... (Ctrl+Alt+Shift+R)" Click="OnEditRangePropertiesMenuClicked"/>
                                                     <MenuItem Header="Edit Text Input..." Click="OnEditTextInputPropertiesMenuClicked"/>
                                                     <MenuItem Header="Edit Selection Behavior..." Click="OnEditSelectionPropertiesMenuClicked"/>
                                                     <MenuItem Header="Edit Date &amp; Time Input..." Click="OnEditDateTimePropertiesMenuClicked"/>

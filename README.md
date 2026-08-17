@@ -54,6 +54,7 @@ dotnet run --project src/AvaloniaUIDesigner.App/AvaloniaUIDesigner.App.csproj
 - **Accessibility & Navigation 빠른 접근**: 선택 컨트롤의 스크린리더 메타데이터와 키보드 포커스 순서 편집을 Design Toolbar의 `Accessibility`, Canvas Context Menu, `Ctrl+Alt+A`에서 같은 대화상자와 Undo 흐름으로 바로 실행합니다.
 - **Interaction & Rendering 빠른 접근**: 선택 컨트롤의 표시·입력 참여·클리핑·RTL·포인터 커서 편집을 Design Toolbar의 `Interaction`, Canvas Context Menu, `Ctrl+Alt+E`에서 같은 대화상자와 Undo 흐름으로 바로 실행합니다.
 - **Visual Effects 빠른 접근**: 선택 컨트롤의 Blur·Drop Shadow 효과 편집을 Design Toolbar의 `Effects`, Canvas Context Menu, `Ctrl+Alt+F`에서 같은 대화상자와 Undo 흐름으로 바로 실행합니다.
+- **Range & Value 빠른 접근**: Slider·ProgressBar·NumericUpDown의 범위·값·눈금·증감 편집을 Design Toolbar의 `Range`, Canvas Context Menu, `Ctrl+Alt+Shift+R`에서 같은 대화상자와 Undo 흐름으로 바로 실행합니다.
 - **Arrange 키보드 단축키**: 캔버스에서 다중 선택 후 `Ctrl+Shift+Left/Right/Up/Down`으로 선택 컨트롤을 좌·우·상·하 경계에 정렬하고 `Ctrl+Shift+E/M`으로 가로 중앙·세로 중앙에 정렬하며 `Ctrl+Alt+H/V`로 가로·세로 균등 분배하고 기존 Arrange Undo/AXAML 흐름을 그대로 사용
 - **레이어 순서 키보드 단축키**: 선택 컨트롤을 `Ctrl+]`/`Ctrl+[`로 한 단계 앞·뒤로 이동하고 `Ctrl+Shift+]`/`Ctrl+Shift+[`로 맨 앞·뒤로 보내며 기존 Order Undo/AXAML 흐름과 선택 상태를 유지
 - **아트보드 중앙 정렬 단축키**: root 선택을 `Ctrl+Alt+Shift+X/Y`로 가로·세로 중앙에 배치하고 `Ctrl+Alt+Shift+C`로 양축 중앙에 배치하며 기존 Center on Artboard Undo/AXAML 흐름을 사용
@@ -206,6 +207,7 @@ dotnet run --project src/AvaloniaUIDesigner.App/AvaloniaUIDesigner.App.csproj
 12h. 컨트롤을 선택한 뒤 Design Toolbar의 `Accessibility`, Canvas Context Menu 또는 `Ctrl+Alt+A`로 스크린리더 메타데이터와 키보드 포커스 순서 편집기를 바로 엽니다.
 12i. 컨트롤을 선택한 뒤 Design Toolbar의 `Interaction`, Canvas Context Menu 또는 `Ctrl+Alt+E`로 표시·입력 참여·클리핑·RTL·포인터 커서 편집기를 바로 엽니다.
 12j. 컨트롤을 선택한 뒤 Design Toolbar의 `Effects`, Canvas Context Menu 또는 `Ctrl+Alt+F`로 Blur·Drop Shadow 효과 편집기를 바로 엽니다.
+12k. Slider·ProgressBar·NumericUpDown을 선택한 뒤 Design Toolbar의 `Range`, Canvas Context Menu 또는 `Ctrl+Alt+Shift+R`로 범위·값·눈금·증감 편집기를 바로 엽니다.
 13. `Edit > Edit Typography Properties...`에서 글꼴과 지원 컨트롤의 텍스트 정렬·줄바꿈 편집
 14. `Edit > Edit Transform Properties...`에서 선택 컨트롤의 이동·회전·크기·기울기와 변환 기준점 편집
 15. `Edit > Edit Accessibility & Navigation...`에서 스크린리더 메타데이터와 키보드 포커스 순서 편집
@@ -386,6 +388,7 @@ dotnet run --project src/AvaloniaUIDesigner.App/AvaloniaUIDesigner.App.csproj
 112. Accessibility & Navigation 편집은 Design Toolbar의 `Accessibility`, Canvas Context Menu의 `Edit Accessibility & Navigation... (Ctrl+Alt+A)`, Edit 메뉴, `Ctrl+Alt+A`에서 동일한 공용 명령으로 접근합니다. 단일 선택·잠금 검증, 스크린리더 메타데이터·접근성 뷰·Tab navigation 입력, 적용·Undo 결과는 진입 경로와 관계없이 동일하게 유지됩니다.
 113. Interaction & Rendering 편집은 Design Toolbar의 `Interaction`, Canvas Context Menu의 `Edit Interaction & Rendering... (Ctrl+Alt+E)`, Edit 메뉴, `Ctrl+Alt+E`에서 동일한 공용 명령으로 접근합니다. 단일 선택·잠금·지원 속성 검증, 표시·입력 참여·클리핑·RTL·포인터 커서 입력, 적용·Undo 결과는 진입 경로와 관계없이 동일하게 유지됩니다.
 114. Visual Effects 편집은 Design Toolbar의 `Effects`, Canvas Context Menu의 `Edit Visual Effects... (Ctrl+Alt+F)`, Edit 메뉴, `Ctrl+Alt+F`에서 동일한 공용 명령으로 접근합니다. 단일 선택·잠금·지원 속성 검증, Blur·Drop Shadow 입력, 적용·Undo 결과는 진입 경로와 관계없이 동일하게 유지됩니다.
+115. Range & Value 편집은 Design Toolbar의 `Range`, Canvas Context Menu의 `Edit Range & Value... (Ctrl+Alt+Shift+R)`, Edit 메뉴, `Ctrl+Alt+Shift+R`에서 동일한 공용 명령으로 접근합니다. Slider·ProgressBar·NumericUpDown 타입·잠금·범위 검증, 값·눈금·증감 입력, 적용·Undo 결과는 진입 경로와 관계없이 동일하게 유지됩니다.
 
 DataGrid가 포함된 생성 AXAML을 다른 프로젝트에서 사용할 때는 같은 Avalonia 버전의 `Avalonia.Controls.DataGrid` 패키지와 `avares://Avalonia.Controls.DataGrid/Themes/Fluent.xaml` 스타일 include가 필요합니다.
 
@@ -618,6 +621,7 @@ AXAML 소스 편집기의 `Validate`와 `Preview`는 현재 디자인과 Undo �
 - v2.24: Accessibility & Navigation 편집 Toolbar·Context Menu·Ctrl+Alt+A 빠른 접근 추가
 - v2.25: Interaction & Rendering 편집 Toolbar·Context Menu·Ctrl+Alt+E 빠른 접근 추가
 - v2.26: Visual Effects 편집 Toolbar·Context Menu·Ctrl+Alt+F 빠른 접근 추가
+- v2.27: Range & Value 편집 Toolbar·Context Menu·Ctrl+Alt+Shift+R 빠른 접근 추가
 
 ## 컴포넌트 팩
 
