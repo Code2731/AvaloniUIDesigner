@@ -80,6 +80,7 @@ public partial class MainWindow : Window
         Ctrl+Alt+Shift+A    Edit AutoCompleteBox completion and drop-down behavior
         Ctrl+Alt+Shift+O    Edit Toggle and Choice behavior
         Ctrl+Alt+Shift+U    Edit Expander disclosure and ScrollViewer scrolling behavior
+        Ctrl+Alt+Shift+V    Edit SplitView pane presentation and scrolling behavior
         Ctrl+Alt+G          Toggle design grid
         Ctrl+Alt+Shift+G    Toggle snap to grid
         Ctrl+Alt+1          Toggle Toolbox panel
@@ -2564,6 +2565,9 @@ public partial class MainWindow : Window
     private async void OnEditSplitViewPropertiesMenuClicked(
         object? sender,
         Avalonia.Interactivity.RoutedEventArgs e)
+        => await EditSplitViewPropertiesAsync();
+
+    private async Task EditSplitViewPropertiesAsync()
     {
         FlushPendingPropertyHistory();
         if (Vm is null || !Vm.TryGetSelectedSplitViewProperties(out var state))
@@ -4774,6 +4778,13 @@ public partial class MainWindow : Window
         if (ctrl && alt && shift && e.Key == Key.U)
         {
             await EditContainerBehaviorPropertiesAsync();
+            e.Handled = true;
+            return;
+        }
+
+        if (ctrl && alt && shift && e.Key == Key.V)
+        {
+            await EditSplitViewPropertiesAsync();
             e.Handled = true;
             return;
         }
