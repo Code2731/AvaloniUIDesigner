@@ -39,6 +39,8 @@ public partial class MainWindow : Window
         Ctrl+Shift+T        Reopen last closed document tab
         Ctrl+Tab            Next document tab
         Ctrl+Shift+Tab      Previous document tab
+        Ctrl+Alt+Tab        Switch to recent document tab
+        Ctrl+Alt+Shift+Tab  Switch to oldest recent document tab
         Ctrl+1..9           Activate document tab 1-9
         Ctrl+K              Quick switch document tab
         Ctrl+Shift+PageUp   Move active tab left
@@ -216,6 +218,8 @@ public partial class MainWindow : Window
     {
         private bool IsUnsaved => string.IsNullOrWhiteSpace(Tab.DocumentPath);
 
+        public int? RecentRank { get; init; }
+
         public string ShortcutLabel => Index is >= 1 and <= 9 ? $"Ctrl+{Index}" : $"Tab {Index}";
 
         public string StatusLabel => Tab.IsDirty
@@ -223,7 +227,8 @@ public partial class MainWindow : Window
             : IsUnsaved ? "Unsaved" : "Saved";
 
         public override string ToString()
-            => $"{ShortcutLabel} | {Tab.Header} - {Path} [{StatusLabel}]";
+            => $"{ShortcutLabel} | {Tab.Header} - {Path} [{StatusLabel}]"
+                + (RecentRank is { } rank ? $" [Recent #{rank}]" : string.Empty);
     }
 
     private const double HandlePixelSize = 10;
@@ -328,6 +333,14 @@ public partial class MainWindow : Window
         object? sender,
         Avalonia.Interactivity.RoutedEventArgs e)
         => await QuickSwitchDocumentTabAsync();
+
+    private void OnRecentDocumentTabMenuClicked(
+        object? sender,
+        Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        FlushPendingPropertyHistory();
+        Vm?.ActivateRecentDocumentTab();
+    }
 
     private async Task QuickSwitchDocumentTabAsync()
     {
@@ -488,7 +501,13 @@ public partial class MainWindow : Window
 
         void RefreshResults()
         {
-            filteredItems = FilterDocumentTabSwitcherItems(tabs, search.Text);
+            filteredItems = FilterDocumentTabSwitcherItems(tabs, search.Text)
+                .Select(item =>
+                {
+                    var recentRank = Vm.GetRecentDocumentTabRank(item.Tab);
+                    return item with { RecentRank = recentRank > 0 ? recentRank : null };
+                })
+                .ToList();
             list.ItemsSource = filteredItems;
 
             var activeIndex = filteredItems.FindIndex(
@@ -5367,6 +5386,13 @@ public partial class MainWindow : Window
                 await CloseDocumentTabAsync(tab);
             }
 
+            e.Handled = true;
+            return;
+        }
+
+        if (ctrl && alt && e.Key == Key.Tab)
+        {
+            Vm.ActivateRecentDocumentTab(reverse: shift);
             e.Handled = true;
             return;
         }

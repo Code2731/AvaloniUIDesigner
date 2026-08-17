@@ -271,6 +271,10 @@
                 <MenuItem Header="Quick Switch Document Tab..."
                           Click="OnQuickSwitchDocumentTabMenuClicked"
                           IsEnabled="{Binding HasMultipleDocumentTabs}"/>
+                <MenuItem Name="RecentDocumentTabMenu"
+                          Header="Switch to Recent Document Tab (Ctrl+Alt+Tab)"
+                          Click="OnRecentDocumentTabMenuClicked"
+                          IsEnabled="{Binding CanSwitchToRecentDocumentTab}"/>
                 <Separator/>
                 <MenuItem Header="Zoom In (Ctrl+=)" Click="OnZoomInMenuClicked"/>
                 <MenuItem Header="Zoom Out (Ctrl+-)" Click="OnZoomOutMenuClicked"/>
@@ -416,6 +420,12 @@
                             Click="OnQuickSwitchDocumentTabMenuClicked"
                             IsEnabled="{Binding HasMultipleDocumentTabs}"
                             ToolTip.Tip="Search and switch document tabs (Ctrl+K)"
+                            Padding="8,3"/>
+                    <Button Name="RecentDocumentTabToolbar"
+                            Content="Recent"
+                            Click="OnRecentDocumentTabMenuClicked"
+                            IsEnabled="{Binding CanSwitchToRecentDocumentTab}"
+                            ToolTip.Tip="Switch to the most recently used document tab (Ctrl+Alt+Tab)"
                             Padding="8,3"/>
                     <Button Name="DuplicateDocumentTabToolbar"
                             Content="Duplicate"
@@ -1382,6 +1392,10 @@
                                                   Header="Quick Switch Document Tab... (Ctrl+K)"
                                                   Click="OnQuickSwitchDocumentTabMenuClicked"
                                                   IsEnabled="{Binding HasMultipleDocumentTabs}"/>
+                                        <MenuItem Name="RecentDocumentTabContextMenu"
+                                                  Header="Switch to Recent Tab (Ctrl+Alt+Tab)"
+                                                  Click="OnRecentDocumentTabMenuClicked"
+                                                  IsEnabled="{Binding CanSwitchToRecentDocumentTab}"/>
                                         <MenuItem Name="DuplicateDocumentTabContextMenu"
                                                   Header="Duplicate Tab (Ctrl+Alt+D)"
                                                   Click="OnDuplicateDocumentTabMenuClicked"

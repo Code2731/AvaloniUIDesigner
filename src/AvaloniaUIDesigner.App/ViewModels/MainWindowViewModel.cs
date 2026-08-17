@@ -587,6 +587,7 @@ public partial class MainWindowViewModel : ViewModelBase
     private readonly Stack<HistoryEntry> _undoStack = new();
     private readonly Stack<HistoryEntry> _redoStack = new();
     private readonly Stack<DocumentTabState> _closedDocumentTabs = new();
+    private readonly List<DocumentTabViewModel> _recentDocumentTabs = new();
     private readonly Dictionary<string, string> _colorResources = new(StringComparer.Ordinal);
     private readonly List<DesignerStyleDefinition> _documentStyles = new();
     private readonly Dictionary<DocumentTabViewModel, DocumentTabState> _documentTabStates = new();
@@ -654,6 +655,7 @@ public partial class MainWindowViewModel : ViewModelBase
     public ObservableCollection<StylePreviewOption> StylePreviewOptions { get; }
     public ObservableCollection<DocumentTabViewModel> DocumentTabs { get; }
     public ObservableCollection<ComponentPackInfo> ComponentPacks { get; }
+    public IReadOnlyList<DocumentTabViewModel> RecentDocumentTabs => _recentDocumentTabs;
     public IReadOnlyList<string> ComponentPackPaths => _componentPackPaths;
     public IReadOnlyList<string> ComponentPluginPaths => _componentPluginPaths;
     public IReadOnlyList<string> ToolboxPresetPackPaths => _toolboxPresetPackPaths;
@@ -718,6 +720,7 @@ public partial class MainWindowViewModel : ViewModelBase
     public bool CanDuplicateCurrentDocumentTab => _selectedDocumentTab is not null;
     public bool CanRenameCurrentDocumentTab => _selectedDocumentTab is not null;
     public bool CanReopenClosedDocumentTab => _closedDocumentTabs.Count > 0;
+    public bool CanSwitchToRecentDocumentTab => _recentDocumentTabs.Count > 1;
     public bool HasDirtyDocumentTabs => DocumentTabs.Any(IsDocumentTabDirty);
     public bool HasStylePreviewOptions => StylePreviewOptions.Count > 1;
     public bool HasSampleData => _sampleDataRoot is not null;
@@ -9824,6 +9827,10 @@ public partial class MainWindowViewModel : ViewModelBase
         var activeTabIndex = _selectedDocumentTab is null
             ? 0
             : Math.Max(0, DocumentTabs.IndexOf(_selectedDocumentTab));
+        var recentTabIndexes = _recentDocumentTabs
+            .Select(DocumentTabs.IndexOf)
+            .Where(index => index >= 0)
+            .ToList();
         return JsonSerializer.Serialize(
             new PersistedDocumentSession(
                 tabs,
@@ -9841,7 +9848,8 @@ public partial class MainWindowViewModel : ViewModelBase
                     _workspacePanelState.ToolboxWidth,
                     _workspacePanelState.InspectorWidth,
                     _workspacePanelState.ObjectTreeHeight),
-                closedTabs),
+                closedTabs,
+                recentTabIndexes),
             new JsonSerializerOptions { WriteIndented = true });
     }
 
@@ -9966,6 +9974,10 @@ public partial class MainWindowViewModel : ViewModelBase
             _closedDocumentTabs.Push(CreateRestoredDocumentTabState(restoredClosedDocument));
         }
 
+        RestoreRecentDocumentTabs(
+            restoredTabs,
+            session.RecentDocumentTabIndexes,
+            activeIndex);
         OnPropertyChanged(nameof(CanReopenClosedDocumentTab));
         UpdateDocumentTabPresentations();
         StatusText = $"Restored {restoredTabs.Count} document tab(s) from the previous session."
@@ -10197,6 +10209,7 @@ public partial class MainWindowViewModel : ViewModelBase
         OnPropertyChanged(nameof(CanRenameCurrentDocumentTab));
         OnPropertyChanged(nameof(CanCloseCurrentDocumentTab));
         UpdateDocumentTabPresentations();
+        TouchRecentDocumentTab(tab);
         StatusText = $"Switched to {state.Tab.DisplayName}.";
         return true;
     }
@@ -10221,6 +10234,25 @@ public partial class MainWindowViewModel : ViewModelBase
             : (currentIndex + 1) % DocumentTabs.Count;
         return ActivateDocumentTab(DocumentTabs[nextIndex]);
     }
+
+    public bool ActivateRecentDocumentTab(bool reverse = false)
+    {
+        if (_recentDocumentTabs.Count < 2)
+        {
+            return false;
+        }
+
+        var candidates = reverse
+            ? _recentDocumentTabs.AsEnumerable().Reverse()
+            : _recentDocumentTabs.Skip(1);
+        var recentTab = candidates.FirstOrDefault(tab =>
+            DocumentTabs.Contains(tab)
+            && !ReferenceEquals(tab, _selectedDocumentTab));
+        return recentTab is not null && ActivateDocumentTab(recentTab);
+    }
+
+    public int GetRecentDocumentTabRank(DocumentTabViewModel tab)
+        => _recentDocumentTabs.IndexOf(tab) + 1;
 
     public bool ActivateDocumentTabAt(int index)
     {
@@ -10275,6 +10307,7 @@ public partial class MainWindowViewModel : ViewModelBase
         }
 
         RememberClosedDocumentTab(state);
+        RemoveRecentDocumentTab(tab);
         var tabIndex = DocumentTabs.IndexOf(tab);
         _documentTabStates.Remove(tab);
         DocumentTabs.Remove(tab);
@@ -14540,6 +14573,7 @@ public partial class MainWindowViewModel : ViewModelBase
     private void ClearDocumentTabsForSessionRestore()
     {
         _closedDocumentTabs.Clear();
+        _recentDocumentTabs.Clear();
         _documentTabStates.Clear();
         DocumentTabs.Clear();
         _selectedDocumentTab = null;
@@ -14552,11 +14586,63 @@ public partial class MainWindowViewModel : ViewModelBase
         OnPropertyChanged(nameof(HasMultipleDocumentTabs));
         OnPropertyChanged(nameof(CanCloseCurrentDocumentTab));
         OnPropertyChanged(nameof(CanReopenClosedDocumentTab));
+        OnPropertyChanged(nameof(RecentDocumentTabs));
+        OnPropertyChanged(nameof(CanSwitchToRecentDocumentTab));
         OnPropertyChanged(nameof(SelectedDocumentTab));
         OnPropertyChanged(nameof(CanDuplicateCurrentDocumentTab));
         OnPropertyChanged(nameof(CanRenameCurrentDocumentTab));
         OnPropertyChanged(nameof(CurrentDocumentPath));
         OnPropertyChanged(nameof(WindowTitle));
+    }
+
+    private void TouchRecentDocumentTab(DocumentTabViewModel tab)
+    {
+        _recentDocumentTabs.Remove(tab);
+        _recentDocumentTabs.Insert(0, tab);
+        OnPropertyChanged(nameof(RecentDocumentTabs));
+        OnPropertyChanged(nameof(CanSwitchToRecentDocumentTab));
+    }
+
+    private void RemoveRecentDocumentTab(DocumentTabViewModel tab)
+    {
+        if (_recentDocumentTabs.Remove(tab))
+        {
+            OnPropertyChanged(nameof(RecentDocumentTabs));
+            OnPropertyChanged(nameof(CanSwitchToRecentDocumentTab));
+        }
+    }
+
+    private void RestoreRecentDocumentTabs(
+        IReadOnlyList<DocumentTabViewModel> restoredTabs,
+        IReadOnlyList<int>? persistedIndexes,
+        int activeIndex)
+    {
+        _recentDocumentTabs.Clear();
+
+        void AddIfMissing(DocumentTabViewModel tab)
+        {
+            if (!_recentDocumentTabs.Contains(tab))
+            {
+                _recentDocumentTabs.Add(tab);
+            }
+        }
+
+        AddIfMissing(restoredTabs[activeIndex]);
+        foreach (var persistedIndex in persistedIndexes ?? [])
+        {
+            if (persistedIndex >= 0 && persistedIndex < restoredTabs.Count)
+            {
+                AddIfMissing(restoredTabs[persistedIndex]);
+            }
+        }
+
+        foreach (var tab in restoredTabs)
+        {
+            AddIfMissing(tab);
+        }
+
+        OnPropertyChanged(nameof(RecentDocumentTabs));
+        OnPropertyChanged(nameof(CanSwitchToRecentDocumentTab));
     }
 
     private void RememberClosedDocumentTab(DocumentTabState state)
@@ -17904,7 +17990,8 @@ public partial class MainWindowViewModel : ViewModelBase
         List<string>? FavoriteToolboxItems = null,
         List<string>? RecentToolboxItems = null,
         PersistedWorkspacePanelState? WorkspacePanels = null,
-        List<PersistedDocumentTab>? ClosedTabs = null);
+        List<PersistedDocumentTab>? ClosedTabs = null,
+        List<int>? RecentDocumentTabIndexes = null);
 
     private sealed record PersistedWorkspacePanelState(
         bool ToolboxVisible = true,
