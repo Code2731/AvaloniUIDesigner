@@ -114,7 +114,7 @@
                 <MenuItem Header="Edit ColorPicker... (Ctrl+Alt+Shift+P)" Click="OnEditColorPickerPropertiesMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
                 <MenuItem Header="Edit AutoCompleteBox... (Ctrl+Alt+Shift+A)" Click="OnEditAutoCompleteBoxPropertiesMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
                 <MenuItem Header="Edit Toggle &amp; Choice Behavior... (Ctrl+Alt+Shift+O)" Click="OnEditTogglePropertiesMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
-                <MenuItem Header="Edit Disclosure &amp; Scrolling..." Click="OnEditContainerBehaviorPropertiesMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
+                <MenuItem Header="Edit Disclosure &amp; Scrolling... (Ctrl+Alt+Shift+U)" Click="OnEditContainerBehaviorPropertiesMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
                 <MenuItem Header="Edit SplitView Pane Behavior..." Click="OnEditSplitViewPropertiesMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
                 <MenuItem Header="Edit TabControl Behavior..." Click="OnEditTabControlBehaviorPropertiesMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
                 <MenuItem Header="Edit Image Source &amp; Rendering..." Click="OnEditImagePropertiesMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
@@ -615,6 +615,12 @@
                             Click="OnEditTogglePropertiesMenuClicked"
                             IsEnabled="{Binding Canvas.IsSelectionActive}"
                             ToolTip.Tip="Edit CheckBox, RadioButton, ToggleSwitch, and ToggleButton behavior (Ctrl+Alt+Shift+O)"
+                            Padding="7,3"/>
+                    <Button Name="EditContainerBehaviorPropertiesToolbar"
+                            Content="Disclosure &amp; Scroll"
+                            Click="OnEditContainerBehaviorPropertiesMenuClicked"
+                            IsEnabled="{Binding Canvas.IsSelectionActive}"
+                            ToolTip.Tip="Edit Expander disclosure and ScrollViewer scrolling behavior (Ctrl+Alt+Shift+U)"
                             Padding="7,3"/>
                     <Border Width="1" Background="#CBD5E1" Margin="0,2"/>
                     <TextBlock Text="Order"
@@ -1355,6 +1361,10 @@
                                               Header="Edit Toggle &amp; Choice Behavior... (Ctrl+Alt+Shift+O)"
                                               Click="OnEditTogglePropertiesMenuClicked"
                                               IsEnabled="{Binding Canvas.IsSelectionActive}"/>
+                                    <MenuItem Name="EditContainerBehaviorPropertiesContextMenu"
+                                              Header="Edit Disclosure &amp; Scrolling... (Ctrl+Alt+Shift+U)"
+                                              Click="OnEditContainerBehaviorPropertiesMenuClicked"
+                                              IsEnabled="{Binding Canvas.IsSelectionActive}"/>
                                     <MenuItem Header="Center on Artboard" IsEnabled="{Binding Canvas.IsSelectionActive}">
                                         <MenuItem Header="Horizontally" Click="OnCenterHorizontallyOnArtboardMenuClicked"/>
                                         <MenuItem Header="Vertically" Click="OnCenterVerticallyOnArtboardMenuClicked"/>
@@ -1482,7 +1492,7 @@
                                                     <MenuItem Header="Edit ColorPicker... (Ctrl+Alt+Shift+P)" Click="OnEditColorPickerPropertiesMenuClicked"/>
                                                     <MenuItem Header="Edit AutoCompleteBox... (Ctrl+Alt+Shift+A)" Click="OnEditAutoCompleteBoxPropertiesMenuClicked"/>
                                                     <MenuItem Header="Edit Toggle &amp; Choice Behavior... (Ctrl+Alt+Shift+O)" Click="OnEditTogglePropertiesMenuClicked"/>
-                                                    <MenuItem Header="Edit Disclosure &amp; Scrolling..." Click="OnEditContainerBehaviorPropertiesMenuClicked"/>
+                                                    <MenuItem Header="Edit Disclosure &amp; Scrolling... (Ctrl+Alt+Shift+U)" Click="OnEditContainerBehaviorPropertiesMenuClicked"/>
                                                     <MenuItem Header="Edit SplitView Pane Behavior..." Click="OnEditSplitViewPropertiesMenuClicked"/>
                                                     <MenuItem Header="Edit TabControl Behavior..." Click="OnEditTabControlBehaviorPropertiesMenuClicked"/>
                                                     <MenuItem Header="Edit Image Source &amp; Rendering..." Click="OnEditImagePropertiesMenuClicked"/>

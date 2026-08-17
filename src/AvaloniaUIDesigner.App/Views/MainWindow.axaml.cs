@@ -79,6 +79,7 @@ public partial class MainWindow : Window
         Ctrl+Alt+Shift+P    Edit ColorPicker color and palette behavior
         Ctrl+Alt+Shift+A    Edit AutoCompleteBox completion and drop-down behavior
         Ctrl+Alt+Shift+O    Edit Toggle and Choice behavior
+        Ctrl+Alt+Shift+U    Edit Expander disclosure and ScrollViewer scrolling behavior
         Ctrl+Alt+G          Toggle design grid
         Ctrl+Alt+Shift+G    Toggle snap to grid
         Ctrl+Alt+1          Toggle Toolbox panel
@@ -2546,6 +2547,9 @@ public partial class MainWindow : Window
     private async void OnEditContainerBehaviorPropertiesMenuClicked(
         object? sender,
         Avalonia.Interactivity.RoutedEventArgs e)
+        => await EditContainerBehaviorPropertiesAsync();
+
+    private async Task EditContainerBehaviorPropertiesAsync()
     {
         FlushPendingPropertyHistory();
         if (Vm is null
@@ -4763,6 +4767,13 @@ public partial class MainWindow : Window
         if (ctrl && alt && shift && e.Key == Key.O)
         {
             await EditTogglePropertiesAsync();
+            e.Handled = true;
+            return;
+        }
+
+        if (ctrl && alt && shift && e.Key == Key.U)
+        {
+            await EditContainerBehaviorPropertiesAsync();
             e.Handled = true;
             return;
         }
