@@ -286,6 +286,21 @@
                 <MenuItem Header="Live Preview" Click="OnPreviewMenuClicked"/>
                 <MenuItem Header="Preview Interaction Log (Ctrl+Alt+Shift+Z)"
                           Click="OnPreviewInteractionLogMenuClicked"/>
+                <MenuItem Header="Preview Theme">
+                    <MenuItem Name="PreviewThemeDefaultMenu"
+                              Header="System Default"
+                              ToggleType="Radio"
+                              IsChecked="True"
+                              Click="OnPreviewThemeDefaultMenuClicked"/>
+                    <MenuItem Name="PreviewThemeLightMenu"
+                              Header="Light"
+                              ToggleType="Radio"
+                              Click="OnPreviewThemeLightMenuClicked"/>
+                    <MenuItem Name="PreviewThemeDarkMenu"
+                              Header="Dark"
+                              ToggleType="Radio"
+                              Click="OnPreviewThemeDarkMenuClicked"/>
+                </MenuItem>
                 <MenuItem Header="Quick Switch Document Tab..."
                           Click="OnQuickSwitchDocumentTabMenuClicked"
                           IsEnabled="{Binding HasMultipleDocumentTabs}"/>

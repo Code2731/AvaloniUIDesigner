@@ -10,6 +10,7 @@ using Avalonia.Controls.Shapes;
 using Avalonia.Layout;
 using Avalonia.Media;
 using Avalonia.Media.Imaging;
+using Avalonia.Styling;
 using AvaloniaUIDesigner.App.Designer.Core;
 using AvaloniaUIDesigner.App.Designer.Services;
 using AvaloniaUIDesigner.App.Models;
@@ -27,8 +28,11 @@ public sealed class PreviewWindow : Window
     private readonly TextBlock _interactionLog;
     private readonly List<string> _interactionEntries = new();
 
-    public PreviewWindow(DesignerCanvasDocument document)
+    public PreviewWindow(
+        DesignerCanvasDocument document,
+        ThemeVariant? requestedThemeVariant = null)
     {
+        RequestedThemeVariant = requestedThemeVariant ?? ThemeVariant.Default;
         _previewScrollViewer = new ScrollViewer
         {
             HorizontalScrollBarVisibility = Avalonia.Controls.Primitives.ScrollBarVisibility.Auto,
@@ -58,6 +62,9 @@ public sealed class PreviewWindow : Window
         Content = _previewSurface;
         RefreshDocument(document, resizeWindow: true);
     }
+
+    public void SetThemeVariant(ThemeVariant requestedThemeVariant)
+        => RequestedThemeVariant = requestedThemeVariant;
 
     public void RefreshDocument(DesignerCanvasDocument document)
         => RefreshDocument(document, resizeWindow: false);

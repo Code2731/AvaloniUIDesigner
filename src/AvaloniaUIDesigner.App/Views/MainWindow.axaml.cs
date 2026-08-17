@@ -15,6 +15,7 @@ using Avalonia.Input.Platform;
 using Avalonia.Layout;
 using Avalonia.Media;
 using Avalonia.Platform.Storage;
+using Avalonia.Styling;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
 using AvaloniaUIDesigner.App.Designer.Core;
@@ -171,6 +172,7 @@ public partial class MainWindow : Window
 
     private enum DragMode { None, Move, N, S, E, W, NE, NW, SE, SW }
     private enum UnsavedChoice { Save, Discard, Cancel }
+    private enum PreviewThemeMode { Default, Light, Dark }
     private sealed record ComponentPackExportOptions(string PackName, string DisplayName, string NamePrefix);
     private sealed record ComponentPackManagementAction(string SourceId);
     private sealed record CommonPropertiesDialogResult(
@@ -318,6 +320,7 @@ public partial class MainWindow : Window
     private Control? _boundVisual;
     private MainWindowViewModel? _boundVm;
     private PreviewWindow? _previewWindow;
+    private PreviewThemeMode _previewThemeMode = PreviewThemeMode.Default;
 
     private readonly DispatcherTimer _propertyEditTimer;
     private readonly DispatcherTimer _projectWorkspaceRefreshTimer;
@@ -4049,10 +4052,52 @@ public partial class MainWindow : Window
     private void OnPreviewMenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
         => OpenPreviewWindow(refreshDocument: true);
 
+    private void OnPreviewThemeDefaultMenuClicked(
+        object? sender,
+        Avalonia.Interactivity.RoutedEventArgs e)
+        => SetPreviewTheme(PreviewThemeMode.Default);
+
+    private void OnPreviewThemeLightMenuClicked(
+        object? sender,
+        Avalonia.Interactivity.RoutedEventArgs e)
+        => SetPreviewTheme(PreviewThemeMode.Light);
+
+    private void OnPreviewThemeDarkMenuClicked(
+        object? sender,
+        Avalonia.Interactivity.RoutedEventArgs e)
+        => SetPreviewTheme(PreviewThemeMode.Dark);
+
     private void OnPreviewInteractionLogMenuClicked(
         object? sender,
         Avalonia.Interactivity.RoutedEventArgs e)
         => OpenPreviewWindow(refreshDocument: false);
+
+    private void SetPreviewTheme(PreviewThemeMode mode)
+    {
+        _previewThemeMode = mode;
+        UpdatePreviewThemeMenuStates();
+        _previewWindow?.SetThemeVariant(GetPreviewThemeVariant(mode));
+        if (Vm is not null)
+        {
+            Vm.StatusText = $"Live preview theme: {GetPreviewThemeLabel(mode)}.";
+        }
+    }
+
+    private static ThemeVariant GetPreviewThemeVariant(PreviewThemeMode mode)
+        => mode switch
+        {
+            PreviewThemeMode.Light => ThemeVariant.Light,
+            PreviewThemeMode.Dark => ThemeVariant.Dark,
+            _ => ThemeVariant.Default,
+        };
+
+    private static string GetPreviewThemeLabel(PreviewThemeMode mode)
+        => mode switch
+        {
+            PreviewThemeMode.Light => "Light",
+            PreviewThemeMode.Dark => "Dark",
+            _ => "System Default",
+        };
 
     private void OpenPreviewWindow(bool refreshDocument)
     {
@@ -4076,7 +4121,9 @@ public partial class MainWindow : Window
             return;
         }
 
-        var preview = new PreviewWindow(Vm.CreatePreviewDocument());
+        var preview = new PreviewWindow(
+            Vm.CreatePreviewDocument(),
+            GetPreviewThemeVariant(_previewThemeMode));
         _previewWindow = preview;
         preview.Closed += (_, _) =>
         {
@@ -6568,6 +6615,13 @@ public partial class MainWindow : Window
         var canReloadCurrentFile = Vm?.CanReloadCurrentFile == true;
         ReloadCurrentFileMenu.IsEnabled = canReloadCurrentFile;
         ReloadCurrentFileContextMenu.IsEnabled = canReloadCurrentFile;
+    }
+
+    private void UpdatePreviewThemeMenuStates()
+    {
+        PreviewThemeDefaultMenu.IsChecked = _previewThemeMode == PreviewThemeMode.Default;
+        PreviewThemeLightMenu.IsChecked = _previewThemeMode == PreviewThemeMode.Light;
+        PreviewThemeDarkMenu.IsChecked = _previewThemeMode == PreviewThemeMode.Dark;
     }
 
     private static string GetDocumentBackupPath(string documentPath)

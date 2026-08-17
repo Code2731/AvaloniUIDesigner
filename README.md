@@ -136,6 +136,7 @@ dotnet run --project src/AvaloniaUIDesigner.App/AvaloniaUIDesigner.App.csproj
 - **Button Actions & Commands 속성**: Button의 Content·ClickMode·HotKey·Window 기본/취소 동작·CommandParameter·Click 핸들러를 통합 편집하고 Command Binding, Undo/Redo, 복제, Preview, Draft·Full·UserControl AXAML 왕복에 보존
 - **Event Handler Map**: `ControlName | EventName | HandlerName` 형식으로 공통 포인터·키보드·포커스·수명 이벤트와 Button·TextBox·선택 컨트롤 등의 타입별 이벤트 핸들러를 일괄 편집하고, 잠금 보호·유효성 검증·Undo/Redo·Preview·AXAML 왕복을 지원
 - **Preview Interaction Log**: Live Preview에서 연결된 Button·TextBox·선택·토글·포인터·키보드·포커스 이벤트를 발생시키고 `Control.Event -> HandlerName` 형식의 최근 로그로 디자인 타임 연결을 즉시 확인
+- **Preview Theme Variants**: `View > Preview Theme`에서 Live Preview를 System Default·Light·Dark 테마로 전환하고, 열린 Preview 창을 닫지 않은 채 현재 컨트롤 트리와 상호작용 로그를 유지하며 Avalonia Fluent 리소스 변형을 즉시 확인
 - **Style Clipboard**: `Edit > Style Clipboard`, Design Toolbar, Canvas Context Menu 또는 `Ctrl+Shift+C/V`에서 선택 컨트롤의 외형·타이포그래피·렌더링·효과·상호작용·스타일 클래스와 리소스 참조만 복사해 하나 또는 여러 대상에 붙여넣고, 콘텐츠·위치·크기·계층·바인딩·이벤트는 보존
 - **Undo History Timeline**: `Edit > History...`, Design Toolbar, Canvas Context Menu 또는 `Ctrl+Alt+Shift+F`에서 현재 문서와 Undo·Redo 작업을 한 번에 확인하고 원하는 지점으로 이동
 - **Document Tabs**: 여러 AXAML 문서를 동시에 탭으로 열고 전환하며, 문서별 캔버스·dirty 상태·Undo/Redo history를 독립적으로 보존합니다. `Ctrl+N`/`File > New`는 새 탭, `Ctrl+W`/`File > Close Tab`은 현재 탭을 닫고, `File > Open...`은 문서를 새 탭으로 엽니다. 탭 헤더를 드래그하면 원하는 순서로 재배치하고, 드롭 위치를 세션에 보존합니다. 같은 탭 명령은 Design Toolbar의 `Tabs` 그룹과 디자인 캔버스 Context Menu에서도 실행할 수 있습니다.
@@ -391,6 +392,7 @@ dotnet run --project src/AvaloniaUIDesigner.App/AvaloniaUIDesigner.App.csproj
 75cc. `File > Open Recent Files...`, Design Toolbar의 `Recent Files`, Canvas Context Menu 또는 `Ctrl+Shift+O`는 최근 8개 AXAML 경로를 파일명·전체 경로로 검색합니다. 결과에는 `Available`/`Missing` 상태가 표시되고, `Enter`는 선택 파일을 새 탭으로 열며 누락 파일은 목록에서 자동 제거합니다.
 75cd. `File > Open Project Folder...`로 선택한 작업 폴더는 `Project Explorer... (Ctrl+Shift+P)`에서 AXAML 파일을 상대 경로로 검색할 수 있습니다. `bin`·`obj`·`.git`·`.vs`·`node_modules`는 스캔에서 제외하고, `Refresh Project Files`로 새 파일을 다시 읽으며 선택 폴더는 `%LocalAppData%/AvaloniaUIDesigner/project-workspace.json`에 저장·복원됩니다.
 75ce. 열린 프로젝트 폴더의 파일 watcher는 AXAML 생성·삭제·이동을 350ms debounce 후 Explorer 목록에 반영합니다. 현재 문서 파일의 외부 변경은 파일 timestamp를 내부 저장 시점과 비교해 감지하며, `Reload Current File (Ctrl+Shift+R)`은 dirty 확인·AXAML 검증·Undo 초기화·현재 탭 유지 순서로 안전하게 다시 로드합니다.
+75cf. `View > Preview Theme`의 `System Default`·`Light`·`Dark` 선택은 Preview 창의 `RequestedThemeVariant`만 전환해 문서·Undo 상태를 변경하지 않습니다. 열린 Preview 창에 즉시 적용되고, Preview 새로고침·문서 변경·Interaction Log 재진입 후에도 선택한 변형을 유지합니다.
 76. `File > Load Component Pack...` 또는 `File > Load Toolbox Preset Pack...`으로 외부 Toolbox 팩을 추가하면 파일 경로가 세션에 등록되어 다음 실행 때 자동으로 다시 로드됩니다. 파일이 없어도 문서 탭 복원은 계속되며 상태바에 경고가 표시됩니다.
 77. 외부 프로젝트의 컨트롤은 Component Pack 항목에 `designOnly: true`, `avaloniaTypeName`, `previewText`, `defaultProperties`를 지정해 등록합니다. 디자이너에서는 타입명 플레이스홀더로 편집하고, 생성 AXAML에는 원래 커스텀 타입과 속성을 출력합니다. 예시는 [custom-component-pack.example.json](docs/custom-component-pack.example.json)을 참고하세요.
 78. `File > Load Component Pack Plugin...`에서 `IComponentPackPlugin`을 구현한 신뢰할 수 있는 DLL을 선택하면 플러그인이 제공한 Component Pack을 Toolbox에 등록합니다. DLL 경로는 세션 JSON의 `ComponentPluginPaths`에 저장되고, 앱 재시작 시 플러그인·JSON 팩·프리셋 팩 순서로 복원됩니다.
@@ -709,6 +711,7 @@ AXAML 소스 편집기의 `Validate`와 `Preview`는 현재 디자인과 Undo �
 - v2.50: Recent AXAML Files 검색 대화상자·Toolbar·Context Menu·Ctrl+Shift+O 추가
 - v2.51: Project Workspace 폴더 스캔·Explorer 검색·Refresh·Ctrl+Shift+P·설정 복원 추가
 - v2.52: Project Workspace File Watcher·외부 AXAML 변경 알림·안전한 Reload Current File·Ctrl+Shift+R 추가
+- v2.53: Live Preview System Default·Light·Dark ThemeVariant 전환과 열린 창 즉시 적용 추가
 
 ## 컴포넌트 팩
 
