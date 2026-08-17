@@ -118,7 +118,7 @@
                 <MenuItem Header="Edit SplitView Pane Behavior... (Ctrl+Alt+Shift+V)" Click="OnEditSplitViewPropertiesMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
                 <MenuItem Header="Edit TabControl Behavior... (Ctrl+Alt+Shift+K)" Click="OnEditTabControlBehaviorPropertiesMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
                 <MenuItem Header="Edit Image Source &amp; Rendering..." Click="OnEditImagePropertiesMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
-                <MenuItem Header="Edit Button Actions &amp; Commands..." Click="OnEditButtonPropertiesMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
+                <MenuItem Header="Edit Button Actions &amp; Commands... (Ctrl+Alt+Shift+N)" Click="OnEditButtonPropertiesMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
                 <MenuItem Header="Edit Grid Definitions..." Click="OnEditGridDefinitionsMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
                 <MenuItem Header="Edit GridSplitter Behavior... (Ctrl+Alt+Shift+J)" Click="OnEditGridSplitterPropertiesMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
                 <MenuItem Header="Assign to Grid Cell..." Click="OnAssignToGridCellMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
@@ -645,6 +645,12 @@
                             Click="OnEditGridSplitterPropertiesMenuClicked"
                             IsEnabled="{Binding Canvas.IsSelectionActive}"
                             ToolTip.Tip="Edit GridSplitter resize direction, behavior, and increments (Ctrl+Alt+Shift+J)"
+                            Padding="7,3"/>
+                    <Button Name="EditButtonPropertiesToolbar"
+                            Content="Button Actions"
+                            Click="OnEditButtonPropertiesMenuClicked"
+                            IsEnabled="{Binding Canvas.IsSelectionActive}"
+                            ToolTip.Tip="Edit Button actions, commands, and shortcut behavior (Ctrl+Alt+Shift+N)"
                             Padding="7,3"/>
                     <Border Width="1" Background="#CBD5E1" Margin="0,2"/>
                     <TextBlock Text="Order"
@@ -1405,6 +1411,10 @@
                                               Header="Edit GridSplitter Behavior... (Ctrl+Alt+Shift+J)"
                                               Click="OnEditGridSplitterPropertiesMenuClicked"
                                               IsEnabled="{Binding Canvas.IsSelectionActive}"/>
+                                    <MenuItem Name="EditButtonPropertiesContextMenu"
+                                              Header="Edit Button Actions &amp; Commands... (Ctrl+Alt+Shift+N)"
+                                              Click="OnEditButtonPropertiesMenuClicked"
+                                              IsEnabled="{Binding Canvas.IsSelectionActive}"/>
                                     <MenuItem Header="Center on Artboard" IsEnabled="{Binding Canvas.IsSelectionActive}">
                                         <MenuItem Header="Horizontally" Click="OnCenterHorizontallyOnArtboardMenuClicked"/>
                                         <MenuItem Header="Vertically" Click="OnCenterVerticallyOnArtboardMenuClicked"/>
@@ -1536,7 +1546,7 @@
                                                     <MenuItem Header="Edit SplitView Pane Behavior... (Ctrl+Alt+Shift+V)" Click="OnEditSplitViewPropertiesMenuClicked"/>
                                                     <MenuItem Header="Edit TabControl Behavior... (Ctrl+Alt+Shift+K)" Click="OnEditTabControlBehaviorPropertiesMenuClicked"/>
                                                     <MenuItem Header="Edit Image Source &amp; Rendering..." Click="OnEditImagePropertiesMenuClicked"/>
-                                                    <MenuItem Header="Edit Button Actions &amp; Commands..." Click="OnEditButtonPropertiesMenuClicked"/>
+                                                    <MenuItem Header="Edit Button Actions &amp; Commands... (Ctrl+Alt+Shift+N)" Click="OnEditButtonPropertiesMenuClicked"/>
                                                     <MenuItem Header="Edit Path Data..." Click="OnEditPathDataMenuClicked"/>
                                                     <MenuItem Header="Edit Grid Definitions..." Click="OnEditGridDefinitionsMenuClicked"/>
                                                     <MenuItem Header="Edit GridSplitter Behavior... (Ctrl+Alt+Shift+J)" Click="OnEditGridSplitterPropertiesMenuClicked"/>

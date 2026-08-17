@@ -2616,6 +2616,9 @@ public partial class MainWindow : Window
     private async void OnEditButtonPropertiesMenuClicked(
         object? sender,
         Avalonia.Interactivity.RoutedEventArgs e)
+        => await EditButtonPropertiesAsync();
+
+    private async Task EditButtonPropertiesAsync()
     {
         FlushPendingPropertyHistory();
         if (Vm is null || !Vm.TryGetSelectedButtonProperties(out var state))
@@ -4817,6 +4820,13 @@ public partial class MainWindow : Window
         if (ctrl && alt && shift && e.Key == Key.J)
         {
             await EditGridSplitterPropertiesAsync();
+            e.Handled = true;
+            return;
+        }
+
+        if (ctrl && alt && shift && e.Key == Key.N)
+        {
+            await EditButtonPropertiesAsync();
             e.Handled = true;
             return;
         }
