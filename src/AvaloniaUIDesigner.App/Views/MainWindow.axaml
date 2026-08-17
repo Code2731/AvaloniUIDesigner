@@ -75,7 +75,10 @@
             <MenuItem Header="Edit">
                 <MenuItem Header="{Binding UndoMenuLabel}" Click="OnUndoMenuClicked" IsEnabled="{Binding CanUndo}"/>
                 <MenuItem Header="{Binding RedoMenuLabel}" Click="OnRedoMenuClicked" IsEnabled="{Binding CanRedo}"/>
-                <MenuItem Header="History..." Click="OnHistoryMenuClicked" IsEnabled="{Binding HasHistory}"/>
+                <MenuItem Name="HistoryTimelineMenu"
+                          Header="History... (Ctrl+Alt+Shift+F)"
+                          Click="OnHistoryMenuClicked"
+                          IsEnabled="{Binding HasHistory}"/>
                 <Separator/>
                 <MenuItem Header="Select All" Click="OnSelectAllMenuClicked"/>
                 <MenuItem Header="Lock / Unlock Selection" Click="OnToggleLockMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
@@ -414,6 +417,12 @@
                             Click="OnRedoMenuClicked"
                             IsEnabled="{Binding CanRedo}"
                             ToolTip.Tip="Redo the last document change"
+                            Padding="8,3"/>
+                    <Button Name="HistoryTimelineToolbar"
+                            Content="History"
+                            Click="OnHistoryMenuClicked"
+                            IsEnabled="{Binding HasHistory}"
+                            ToolTip.Tip="Open the undo history timeline (Ctrl+Alt+Shift+F)"
                             Padding="8,3"/>
                     <Border Width="1" Background="#CBD5E1" Margin="0,2"/>
                     <Button Content="Select All"
@@ -1330,6 +1339,10 @@
                                               Click="OnPasteStyleMenuClicked"
                                               IsEnabled="{Binding CanPasteStyle}"/>
                                     <MenuItem Header="Paste AXAML from Clipboard" Click="OnPasteAxamlFromClipboardMenuClicked"/>
+                                    <MenuItem Name="HistoryTimelineContextMenu"
+                                              Header="History Timeline... (Ctrl+Alt+Shift+F)"
+                                              Click="OnHistoryMenuClicked"
+                                              IsEnabled="{Binding HasHistory}"/>
                                     <MenuItem Header="Duplicate"
                                               Click="OnDuplicateMenuClicked"
                                               IsEnabled="{Binding Canvas.IsSelectionActive}"/>

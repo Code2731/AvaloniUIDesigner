@@ -137,7 +137,7 @@ dotnet run --project src/AvaloniaUIDesigner.App/AvaloniaUIDesigner.App.csproj
 - **Event Handler Map**: `ControlName | EventName | HandlerName` 형식으로 공통 포인터·키보드·포커스·수명 이벤트와 Button·TextBox·선택 컨트롤 등의 타입별 이벤트 핸들러를 일괄 편집하고, 잠금 보호·유효성 검증·Undo/Redo·Preview·AXAML 왕복을 지원
 - **Preview Interaction Log**: Live Preview에서 연결된 Button·TextBox·선택·토글·포인터·키보드·포커스 이벤트를 발생시키고 `Control.Event -> HandlerName` 형식의 최근 로그로 디자인 타임 연결을 즉시 확인
 - **Style Clipboard**: `Edit > Style Clipboard`, Design Toolbar, Canvas Context Menu 또는 `Ctrl+Shift+C/V`에서 선택 컨트롤의 외형·타이포그래피·렌더링·효과·상호작용·스타일 클래스와 리소스 참조만 복사해 하나 또는 여러 대상에 붙여넣고, 콘텐츠·위치·크기·계층·바인딩·이벤트는 보존
-- **Undo History Timeline**: `Edit > History...`에서 현재 문서와 Undo·Redo 작업을 한 번에 확인하고 원하는 지점으로 이동
+- **Undo History Timeline**: `Edit > History...`, Design Toolbar, Canvas Context Menu 또는 `Ctrl+Alt+Shift+F`에서 현재 문서와 Undo·Redo 작업을 한 번에 확인하고 원하는 지점으로 이동
 - **Document Tabs**: 여러 AXAML 문서를 동시에 탭으로 열고 전환하며, 문서별 캔버스·dirty 상태·Undo/Redo history를 독립적으로 보존합니다. `Ctrl+N`/`File > New`는 새 탭, `Ctrl+W`/`File > Close Tab`은 현재 탭을 닫고, `File > Open...`은 문서를 새 탭으로 엽니다. 탭 헤더를 드래그하면 원하는 순서로 재배치하고, 드롭 위치를 세션에 보존합니다.
 - **Document Tab Duplication**: `File > Duplicate Tab`, 탭 컨텍스트 메뉴 또는 `Ctrl+Alt+D`로 현재 문서를 독립된 새 dirty 탭으로 복제합니다. 문서 내용·Undo/Redo·줌·선택·Property Inspector 탐색 상태를 함께 복사하고 저장 경로는 비워 새 파일로 저장하게 합니다.
 - **Document Tab Naming**: `File > Rename Tab...`, 탭 컨텍스트 메뉴 또는 `Ctrl+Alt+R`로 열린 문서 탭에 1-80자 별칭을 지정합니다. 저장 파일명과 별칭을 분리하고, 별칭은 열린 탭·닫힌 탭 기록·세션 복원·창 제목에 유지합니다.
@@ -300,7 +300,7 @@ dotnet run --project src/AvaloniaUIDesigner.App/AvaloniaUIDesigner.App.csproj
 69. Edit > `Edit Event Handler Map...`에서 `ControlName | EventName | HandlerName` 형식으로 여러 컨트롤의 이벤트 핸들러를 일괄 편집하고, 지원되지 않는 이벤트·잠긴 컨트롤·중복 항목 검증 결과를 확인
 70. View > `Live Preview`에서 컨트롤을 클릭하거나 입력·선택·토글·포인터·키보드·포커스 동작을 수행하고, 창 하단 Interaction Log에서 `Control.Event -> HandlerName` 연결 결과를 확인합니다. Toolbar·Canvas Context Menu의 `Preview Interaction Log` 또는 `Ctrl+Alt+Shift+Z`는 이미 열린 Preview의 로그를 지우지 않고 다시 활성화합니다.
 71. 한 컨트롤을 선택해 Edit > `Style Clipboard > Copy Style` 또는 `Ctrl+Shift+C`를 실행한 뒤 하나 이상의 대상 컨트롤을 선택해 Edit > `Style Clipboard > Paste Style` 또는 `Ctrl+Shift+V`를 실행하고, Design Toolbar·Canvas Context Menu에서도 같은 명령을 사용할 수 있으며 잠긴 대상은 건너뛴 결과를 확인
-72. Edit > `History...`를 열어 Current document state와 Undo·Redo 작업을 확인하고 원하는 항목을 선택해 여러 단계를 한 번에 이동
+72. Edit > `History...`, Design Toolbar의 `History`, Canvas Context Menu 또는 `Ctrl+Alt+Shift+F`를 열어 Current document state와 Undo·Redo 작업을 확인하고 원하는 항목을 선택해 여러 단계를 한 번에 이동
 73. `Ctrl+N` 또는 `File > New`로 새 문서 탭을 만들고 탭 제목을 클릭해 문서를 전환합니다. `File > Open...`은 AXAML을 새 탭으로 열며 `Ctrl+W` 또는 탭의 `x` 버튼으로 현재 탭을 닫습니다.
 74. 앱을 정상적으로 종료한 뒤 다시 실행하면 마지막 탭 구성과 dirty 편집 내용이 자동 복원됩니다. 복원 데이터는 `%LocalAppData%/AvaloniaUIDesigner/session.json`에 저장됩니다.
 75. `Ctrl+Tab`으로 다음 문서 탭, `Ctrl+Shift+Tab`으로 이전 문서 탭을 선택합니다. 각 탭은 마지막 줌 배율과 선택한 컨트롤을 독립적으로 유지합니다.
@@ -515,6 +515,8 @@ Live Preview 하단의 `Interaction Log`는 위 이벤트 메타데이터를 안
 
 `Edit > History...`는 현재 문서 상태를 기준으로 완료된 Undo 작업과 앞으로 적용할 Redo 작업을 함께 표시합니다. 항목을 선택하면 기존 snapshot 기반 Undo/Redo를 필요한 횟수만큼 수행해 해당 지점으로 이동하며, 이동 후에도 dirty 상태·Preview·AXAML·Object Tree를 기존 Undo 흐름과 동일하게 갱신합니다.
 
+`Undo History Timeline`은 Edit 메뉴, Design Toolbar, Canvas Context Menu, `Ctrl+Alt+Shift+F`에서 같은 대화상자를 엽니다. Timeline 진입점은 현재 History가 있을 때만 활성화되고, 기존 `Undo`·`Redo`·`Ctrl+Z`·`Ctrl+Y` 동작과 `Ctrl+Alt+F` 효과 편집 및 `Ctrl+Shift+F` 선택 맞춤 단축키는 유지됩니다.
+
 Workspace Session Restore는 종료 시 각 문서 탭의 현재 스냅샷과 마지막 저장 기준 스냅샷을 함께 저장하므로, 저장하지 않은 디자인 변경도 다음 실행에서 dirty 상태로 복원합니다. 세션 파일은 앱의 로컬 설정 영역에만 저장되며, 손상되거나 일부 문서가 파싱되지 않으면 세션 전체를 적용하지 않고 기본 새 문서로 시작합니다.
 
 탭 전환은 문서 내용과 Undo/Redo history뿐 아니라 탭별 줌 배율·Canvas 스크롤 오프셋·Object Tree 선택 이름·Property Inspector 필터/카테고리/확장 상태도 저장합니다. 따라서 여러 화면을 번갈아 편집할 때 작업 위치와 속성 탐색 맥락을 잃지 않으며, `Ctrl+Tab` 순환 전환과 앱 재시작 후에도 같은 편집 맥락을 유지합니다.
@@ -691,6 +693,7 @@ AXAML 소스 편집기의 `Validate`와 `Preview`는 현재 디자인과 Undo �
 - v2.43: Event Handler Map 편집 Toolbar·Context Menu·Ctrl+Alt+Shift+L 빠른 접근 추가
 - v2.44: Preview Interaction Log Toolbar·Context Menu·Ctrl+Alt+Shift+Z 빠른 접근 추가
 - v2.45: Style Clipboard Edit 하위 메뉴·Toolbar·Context Menu·공용 단축키 빠른 접근 정리
+- v2.46: Undo History Timeline Toolbar·Context Menu·Ctrl+Alt+Shift+F 빠른 접근 추가
 
 ## 컴포넌트 팩
 

@@ -1636,7 +1636,12 @@ public partial class MainWindow : Window
         Vm?.Redo();
     }
 
-    private async void OnHistoryMenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    private async void OnHistoryMenuClicked(
+        object? sender,
+        Avalonia.Interactivity.RoutedEventArgs e)
+        => await ShowHistoryTimelineAsync();
+
+    private async Task ShowHistoryTimelineAsync()
     {
         FlushPendingPropertyHistory();
         if (Vm is null)
@@ -4878,6 +4883,13 @@ public partial class MainWindow : Window
         if (ctrl && alt && shift && e.Key == Key.Z)
         {
             OpenPreviewWindow(refreshDocument: false);
+            e.Handled = true;
+            return;
+        }
+
+        if (ctrl && alt && shift && e.Key == Key.F)
+        {
+            await ShowHistoryTimelineAsync();
             e.Handled = true;
             return;
         }
