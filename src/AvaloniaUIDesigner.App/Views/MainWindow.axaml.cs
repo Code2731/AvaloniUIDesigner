@@ -162,6 +162,7 @@ public partial class MainWindow : Window
         Object Tree arrows   Navigate the hierarchy without nudging the canvas
         Project Explorer arrows  Collapse, expand, and navigate the project tree
         Project Explorer double-click  Open files or toggle folders
+        Project Explorer Ctrl+N  Create a new AXAML file in the selected folder
         Project Explorer Ctrl+C  Copy the selected full path
         Project Explorer file manager  Open the selected location in the OS file manager
         """;
@@ -174,6 +175,12 @@ public partial class MainWindow : Window
 
         Runtime: .NET 8
         UI framework: Avalonia 11.3.12
+        """;
+
+    private const string NewProjectExplorerUserControlAxaml = """
+        <UserControl xmlns="https://github.com/avaloniaui"
+                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+        </UserControl>
         """;
 
     private enum DragMode { None, Move, N, S, E, W, NE, NW, SE, SW }
@@ -1292,6 +1299,87 @@ public partial class MainWindow : Window
         }
     }
 
+    private static string? GetProjectExplorerCreationDirectory(
+        ProjectExplorerNode? node,
+        string? workspacePath)
+    {
+        if (string.IsNullOrWhiteSpace(workspacePath))
+        {
+            return null;
+        }
+
+        var path = node is null
+            ? workspacePath
+            : GetProjectExplorerFileManagerPath(node, workspacePath);
+        if (string.IsNullOrWhiteSpace(path))
+        {
+            return null;
+        }
+
+        try
+        {
+            return Directory.Exists(path)
+                ? System.IO.Path.GetFullPath(path)
+                : null;
+        }
+        catch (ArgumentException)
+        {
+            return null;
+        }
+    }
+
+    private static string? GetProjectExplorerNewFilePath(
+        string? fileName,
+        string? directory)
+    {
+        if (string.IsNullOrWhiteSpace(fileName)
+            || string.IsNullOrWhiteSpace(directory))
+        {
+            return null;
+        }
+
+        var normalizedName = fileName.Trim();
+        if (normalizedName is "." or ".."
+            || normalizedName.Length > 180
+            || normalizedName.Any(char.IsControl))
+        {
+            return null;
+        }
+
+        if (!System.IO.Path.HasExtension(normalizedName))
+        {
+            normalizedName += ".axaml";
+        }
+
+        var extension = System.IO.Path.GetExtension(normalizedName);
+        if (!string.Equals(extension, ".axaml", StringComparison.OrdinalIgnoreCase)
+            && !string.Equals(extension, ".xaml", StringComparison.OrdinalIgnoreCase)
+            || !string.Equals(
+                System.IO.Path.GetFileName(normalizedName),
+                normalizedName,
+                StringComparison.Ordinal))
+        {
+            return null;
+        }
+
+        if (normalizedName.IndexOfAny(System.IO.Path.GetInvalidFileNameChars()) >= 0)
+        {
+            return null;
+        }
+
+        try
+        {
+            var fullDirectory = System.IO.Path.GetFullPath(directory);
+            return Directory.Exists(fullDirectory)
+                ? System.IO.Path.Combine(fullDirectory, normalizedName)
+                : null;
+        }
+        catch (ArgumentException)
+        {
+            return null;
+        }
+    }
+
     private static bool TryOpenProjectExplorerFileManager(string path)
     {
         try
@@ -1616,6 +1704,126 @@ public partial class MainWindow : Window
             Vm.StatusText = $"Opened the location in the file manager: {path}";
         }
 
+        async Task<string?> ShowNewProjectExplorerFileDialogAsync(string directory)
+        {
+            var nameDialog = new Window
+            {
+                Title = "New AXAML File",
+                Width = 460,
+                Height = 240,
+                MinWidth = 380,
+                MinHeight = 210,
+                CanResize = false,
+                WindowStartupLocation = WindowStartupLocation.CenterOwner,
+            };
+            var nameEditor = new TextBox
+            {
+                Text = "NewView.axaml",
+                Watermark = "File name (.axaml or .xaml)",
+                MinWidth = 340,
+            };
+            var errorText = new TextBlock
+            {
+                Foreground = Brush.Parse("#B91C1C"),
+                TextWrapping = TextWrapping.Wrap,
+            };
+            var createButton = new Button { Content = "Create", MinWidth = 86 };
+            var cancelButton = new Button { Content = "Cancel", MinWidth = 86 };
+
+            void CreateFile()
+            {
+                var path = GetProjectExplorerNewFilePath(nameEditor.Text, directory);
+                if (path is null)
+                {
+                    errorText.Text = "Use a file name with an .axaml or .xaml extension, without folders.";
+                    return;
+                }
+
+                if (File.Exists(path))
+                {
+                    errorText.Text = $"A file named {System.IO.Path.GetFileName(path)} already exists.";
+                    return;
+                }
+
+                nameDialog.Close(path);
+            }
+
+            createButton.Click += (_, _) => CreateFile();
+            cancelButton.Click += (_, _) => nameDialog.Close(null);
+            nameEditor.KeyDown += (_, e) =>
+            {
+                if (e.Key == Key.Enter)
+                {
+                    CreateFile();
+                    e.Handled = true;
+                }
+                else if (e.Key == Key.Escape)
+                {
+                    nameDialog.Close(null);
+                    e.Handled = true;
+                }
+            };
+            nameDialog.Opened += (_, _) =>
+            {
+                nameEditor.Focus();
+                nameEditor.SelectAll();
+            };
+
+            var buttons = new StackPanel
+            {
+                Orientation = Orientation.Horizontal,
+                HorizontalAlignment = HorizontalAlignment.Right,
+                Spacing = 8,
+                Children = { cancelButton, createButton },
+            };
+            nameDialog.Content = new StackPanel
+            {
+                Margin = new Thickness(16),
+                Spacing = 10,
+                Children =
+                {
+                    new TextBlock { Text = $"Create a new AXAML file in {directory}." },
+                    nameEditor,
+                    errorText,
+                    buttons,
+                },
+            };
+
+            return await nameDialog.ShowDialog<string?>(dialog);
+        }
+
+        async Task CreateNewProjectExplorerFileAsync()
+        {
+            var directory = GetProjectExplorerCreationDirectory(
+                list.SelectedItem as ProjectExplorerNode,
+                Vm.ProjectWorkspacePath);
+            if (string.IsNullOrWhiteSpace(directory))
+            {
+                Vm.StatusText = "The selected Project Explorer folder is unavailable.";
+                return;
+            }
+
+            var path = await ShowNewProjectExplorerFileDialogAsync(directory);
+            if (string.IsNullOrWhiteSpace(path))
+            {
+                return;
+            }
+
+            try
+            {
+                await AtomicFileWriter.WriteAllTextAsync(
+                    path,
+                    NewProjectExplorerUserControlAxaml);
+            }
+            catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+            {
+                Vm.StatusText = $"Could not create {System.IO.Path.GetFileName(path)}: {exception.Message}";
+                return;
+            }
+
+            dialog.Close(path);
+        }
+
         void MoveSelection(int offset)
         {
             if (visibleNodes.Count == 0)
@@ -1676,18 +1884,36 @@ public partial class MainWindow : Window
 
         var cancelButton = new Button { Content = "Cancel", MinWidth = 86 };
         var openButton = new Button { Content = "Open", MinWidth = 86 };
+        var newFileMenu = new MenuItem { Header = "New AXAML File..." };
         var copyRelativePathMenu = new MenuItem { Header = "Copy Relative Path" };
         var copyFullPathMenu = new MenuItem { Header = "Copy Full Path" };
         var openFileManagerMenu = new MenuItem { Header = "Open in File Manager" };
         cancelButton.Click += (_, _) => dialog.Close(null);
         openButton.Click += (_, _) => SelectCurrent();
         list.DoubleTapped += (_, _) => SelectCurrent();
+        newFileMenu.Click += async (_, _) => await CreateNewProjectExplorerFileAsync();
         copyRelativePathMenu.Click += async (_, _) => await CopyProjectExplorerPathAsync(fullPath: false);
         copyFullPathMenu.Click += async (_, _) => await CopyProjectExplorerPathAsync(fullPath: true);
         openFileManagerMenu.Click += (_, _) => OpenProjectExplorerFileManager();
         list.ContextMenu = new ContextMenu
         {
-            Items = { copyRelativePathMenu, copyFullPathMenu, openFileManagerMenu },
+            Items =
+            {
+                newFileMenu,
+                new Separator(),
+                copyRelativePathMenu,
+                copyFullPathMenu,
+                openFileManagerMenu,
+            },
+        };
+        list.KeyDown += async (_, e) =>
+        {
+            if (e.Key == Key.N
+                && e.KeyModifiers.HasFlag(KeyModifiers.Control))
+            {
+                await CreateNewProjectExplorerFileAsync();
+                e.Handled = true;
+            }
         };
         list.PointerPressed += (_, e) =>
         {
@@ -1779,7 +2005,7 @@ public partial class MainWindow : Window
             {
                 new TextBlock
                 {
-                    Text = "Browse the project tree. Double-click an AXAML file to open it; press Enter on a folder or double-click a folder to expand or collapse it, use Left/Right to navigate, Ctrl+C to copy the selected full path, or the context menu to open its location in the file manager.",
+                    Text = "Browse the project tree. Double-click an AXAML file to open it; press Enter on a folder or double-click a folder to expand or collapse it, use Left/Right to navigate, Ctrl+N or the context menu to create a new AXAML file, Ctrl+C to copy the selected full path, or the context menu to open its location in the file manager.",
                     TextWrapping = TextWrapping.Wrap,
                 },
                 rootText,
