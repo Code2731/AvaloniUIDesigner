@@ -66,6 +66,7 @@ public partial class MainWindow : Window
         Ctrl+Alt+M          Edit common properties for a multi-selection
         Ctrl+Alt+L          Edit layout properties for the selected control
         Ctrl+Alt+Y          Edit typography properties for the selected control
+        Ctrl+Alt+X          Edit transform properties for the selected control
         Ctrl+Alt+G          Toggle design grid
         Ctrl+Alt+Shift+G    Toggle snap to grid
         Ctrl+Alt+1          Toggle Toolbox panel
@@ -2325,6 +2326,9 @@ public partial class MainWindow : Window
     private async void OnEditTransformPropertiesMenuClicked(
         object? sender,
         Avalonia.Interactivity.RoutedEventArgs e)
+        => await EditTransformPropertiesAsync();
+
+    private async Task EditTransformPropertiesAsync()
     {
         FlushPendingPropertyHistory();
         if (Vm is null || !Vm.TryGetSelectedTransformProperties(out var state))
@@ -4619,6 +4623,13 @@ public partial class MainWindow : Window
         if (ctrl && alt && !shift && e.Key == Key.Y)
         {
             await EditTypographyPropertiesAsync();
+            e.Handled = true;
+            return;
+        }
+
+        if (ctrl && alt && !shift && e.Key == Key.X)
+        {
+            await EditTransformPropertiesAsync();
             e.Handled = true;
             return;
         }

@@ -101,7 +101,7 @@
                 <MenuItem Header="Edit Layout Properties... (Ctrl+Alt+L)" Click="OnEditLayoutPropertiesMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
                 <MenuItem Header="Edit Selection Bounds... (Ctrl+Alt+B)" Click="OnEditSelectionBoundsMenuClicked" IsEnabled="{Binding Canvas.HasMultipleSelection}"/>
                 <MenuItem Header="Edit Typography Properties... (Ctrl+Alt+Y)" Click="OnEditTypographyPropertiesMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
-                <MenuItem Header="Edit Transform Properties..." Click="OnEditTransformPropertiesMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
+                <MenuItem Header="Edit Transform Properties... (Ctrl+Alt+X)" Click="OnEditTransformPropertiesMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
                 <MenuItem Header="Edit Accessibility &amp; Navigation..." Click="OnEditAccessibilityPropertiesMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
                 <MenuItem Header="Edit Interaction &amp; Rendering..." Click="OnEditInteractionPropertiesMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
                 <MenuItem Header="Edit Visual Effects..." Click="OnEditEffectPropertiesMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
@@ -537,6 +537,12 @@
                             Click="OnEditTypographyPropertiesMenuClicked"
                             IsEnabled="{Binding Canvas.IsSelectionActive}"
                             ToolTip.Tip="Edit typography properties for the selected control (Ctrl+Alt+Y)"
+                            Padding="7,3"/>
+                    <Button Name="EditTransformPropertiesToolbar"
+                            Content="Transform"
+                            Click="OnEditTransformPropertiesMenuClicked"
+                            IsEnabled="{Binding Canvas.IsSelectionActive}"
+                            ToolTip.Tip="Edit transform properties for the selected control (Ctrl+Alt+X)"
                             Padding="7,3"/>
                     <Border Width="1" Background="#CBD5E1" Margin="0,2"/>
                     <TextBlock Text="Order"
@@ -1224,6 +1230,10 @@
                                     <MenuItem Name="EditTypographyPropertiesContextMenu"
                                               Header="Edit Typography Properties... (Ctrl+Alt+Y)"
                                               Click="OnEditTypographyPropertiesMenuClicked"
+                                              IsEnabled="{Binding Canvas.IsSelectionActive}"/>
+                                    <MenuItem Name="EditTransformPropertiesContextMenu"
+                                              Header="Edit Transform Properties... (Ctrl+Alt+X)"
+                                              Click="OnEditTransformPropertiesMenuClicked"
                                               IsEnabled="{Binding Canvas.IsSelectionActive}"/>
                                     <MenuItem Header="Center on Artboard" IsEnabled="{Binding Canvas.IsSelectionActive}">
                                         <MenuItem Header="Horizontally" Click="OnCenterHorizontallyOnArtboardMenuClicked"/>
