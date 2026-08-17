@@ -2963,7 +2963,12 @@ public partial class MainWindow : Window
         }
     }
 
-    private async void OnEditEventHandlerMapMenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    private async void OnEditEventHandlerMapMenuClicked(
+        object? sender,
+        Avalonia.Interactivity.RoutedEventArgs e)
+        => await EditEventHandlerMapAsync();
+
+    private async Task EditEventHandlerMapAsync()
     {
         FlushPendingPropertyHistory();
         if (Vm is null)
@@ -4837,6 +4842,13 @@ public partial class MainWindow : Window
         if (ctrl && alt && shift && e.Key == Key.I)
         {
             await EditImagePropertiesAsync();
+            e.Handled = true;
+            return;
+        }
+
+        if (ctrl && alt && shift && e.Key == Key.L)
+        {
+            await EditEventHandlerMapAsync();
             e.Handled = true;
             return;
         }

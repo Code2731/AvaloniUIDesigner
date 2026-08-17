@@ -143,7 +143,7 @@
                 <MenuItem Header="Remove from Container" Click="OnRemoveFromContainerMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
                 <MenuItem Header="Edit Content..." Click="OnEditExpanderContentMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
                 <MenuItem Header="Edit Click Handler..." Click="OnEditButtonClickHandlerMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
-                <MenuItem Header="Edit Event Handler Map..." Click="OnEditEventHandlerMapMenuClicked"/>
+                <MenuItem Header="Edit Event Handler Map... (Ctrl+Alt+Shift+L)" Click="OnEditEventHandlerMapMenuClicked"/>
                 <MenuItem Header="Edit Tooltip..." Click="OnEditToolTipMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
                 <MenuItem Header="Edit Accessible Name..." Click="OnEditAccessibleNameMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
                 <MenuItem Header="Enable / Disable Selected" Click="OnToggleEnabledMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
@@ -657,6 +657,11 @@
                             Click="OnEditButtonPropertiesMenuClicked"
                             IsEnabled="{Binding Canvas.IsSelectionActive}"
                             ToolTip.Tip="Edit Button actions, commands, and shortcut behavior (Ctrl+Alt+Shift+N)"
+                            Padding="7,3"/>
+                    <Button Name="EditEventHandlerMapToolbar"
+                            Content="Event Map"
+                            Click="OnEditEventHandlerMapMenuClicked"
+                            ToolTip.Tip="Edit document-wide event handlers and bindings (Ctrl+Alt+Shift+L)"
                             Padding="7,3"/>
                     <Border Width="1" Background="#CBD5E1" Margin="0,2"/>
                     <TextBlock Text="Order"
@@ -1425,6 +1430,9 @@
                                               Header="Edit Button Actions &amp; Commands... (Ctrl+Alt+Shift+N)"
                                               Click="OnEditButtonPropertiesMenuClicked"
                                               IsEnabled="{Binding Canvas.IsSelectionActive}"/>
+                                    <MenuItem Name="EditEventHandlerMapContextMenu"
+                                              Header="Edit Event Handler Map... (Ctrl+Alt+Shift+L)"
+                                              Click="OnEditEventHandlerMapMenuClicked"/>
                                     <MenuItem Header="Center on Artboard" IsEnabled="{Binding Canvas.IsSelectionActive}">
                                         <MenuItem Header="Horizontally" Click="OnCenterHorizontallyOnArtboardMenuClicked"/>
                                         <MenuItem Header="Vertically" Click="OnCenterVerticallyOnArtboardMenuClicked"/>
@@ -1557,6 +1565,7 @@
                                                     <MenuItem Header="Edit TabControl Behavior... (Ctrl+Alt+Shift+K)" Click="OnEditTabControlBehaviorPropertiesMenuClicked"/>
                                                     <MenuItem Header="Edit Image Source &amp; Rendering... (Ctrl+Alt+Shift+I)" Click="OnEditImagePropertiesMenuClicked"/>
                                                     <MenuItem Header="Edit Button Actions &amp; Commands... (Ctrl+Alt+Shift+N)" Click="OnEditButtonPropertiesMenuClicked"/>
+                                                    <MenuItem Header="Edit Event Handler Map... (Ctrl+Alt+Shift+L)" Click="OnEditEventHandlerMapMenuClicked"/>
                                                     <MenuItem Header="Edit Path Data..." Click="OnEditPathDataMenuClicked"/>
                                                     <MenuItem Header="Edit Grid Definitions..." Click="OnEditGridDefinitionsMenuClicked"/>
                                                     <MenuItem Header="Edit GridSplitter Behavior... (Ctrl+Alt+Shift+J)" Click="OnEditGridSplitterPropertiesMenuClicked"/>
