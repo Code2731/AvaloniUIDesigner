@@ -81,11 +81,19 @@
                 <MenuItem Header="Lock / Unlock Selection" Click="OnToggleLockMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
                 <Separator/>
                 <MenuItem Header="Copy" Click="OnCopyMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
-                <MenuItem Header="Copy Style" Click="OnCopyStyleMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
                 <MenuItem Header="Cut" Click="OnCutMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
                 <MenuItem Header="Paste" Click="OnPasteMenuClicked" IsEnabled="{Binding CanPaste}"/>
                 <MenuItem Header="Paste AXAML from Clipboard (Ctrl+Alt+V)" Click="OnPasteAxamlFromClipboardMenuClicked"/>
-                <MenuItem Header="Paste Style" Click="OnPasteStyleMenuClicked" IsEnabled="{Binding CanPasteStyle}"/>
+                <MenuItem Name="StyleClipboardMenu" Header="Style Clipboard">
+                    <MenuItem Name="CopyStyleMenuItem"
+                              Header="Copy Style (Ctrl+Shift+C)"
+                              Click="OnCopyStyleMenuClicked"
+                              IsEnabled="{Binding Canvas.IsSelectionActive}"/>
+                    <MenuItem Name="PasteStyleMenuItem"
+                              Header="Paste Style (Ctrl+Shift+V)"
+                              Click="OnPasteStyleMenuClicked"
+                              IsEnabled="{Binding CanPasteStyle}"/>
+                </MenuItem>
                 <MenuItem Header="Duplicate" Click="OnDuplicateMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
                 <MenuItem Header="Rename Selected Control..." Click="OnRenameSelectedControlMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
                 <MenuItem Header="Delete" Click="OnDeleteMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
@@ -427,15 +435,22 @@
                             IsEnabled="{Binding Canvas.IsSelectionActive}"
                             ToolTip.Tip="Delete the selected controls"
                             Padding="7,3"/>
-                    <Button Content="Copy Style"
+                    <TextBlock Text="Style"
+                               VerticalAlignment="Center"
+                               FontSize="11"
+                               Foreground="#64748B"
+                               Margin="2,0,0,0"/>
+                    <Button Name="CopyStyleToolbar"
+                            Content="Copy Style"
                             Click="OnCopyStyleMenuClicked"
                             IsEnabled="{Binding Canvas.IsSelectionActive}"
-                            ToolTip.Tip="Copy the selected visual style"
+                            ToolTip.Tip="Copy the selected visual style (Ctrl+Shift+C)"
                             Padding="7,3"/>
-                    <Button Content="Paste Style"
+                    <Button Name="PasteStyleToolbar"
+                            Content="Paste Style"
                             Click="OnPasteStyleMenuClicked"
                             IsEnabled="{Binding CanPasteStyle}"
-                            ToolTip.Tip="Paste the copied visual style"
+                            ToolTip.Tip="Paste the copied visual style (Ctrl+Shift+V)"
                             Padding="7,3"/>
                     <Button Content="Preview"
                             Click="OnPreviewMenuClicked"
@@ -1302,14 +1317,16 @@
                                     <MenuItem Header="Copy"
                                               Click="OnCopyMenuClicked"
                                               IsEnabled="{Binding Canvas.IsSelectionActive}"/>
-                                    <MenuItem Header="Copy Style"
+                                    <MenuItem Name="CopyStyleContextMenu"
+                                              Header="Copy Style (Ctrl+Shift+C)"
                                               Click="OnCopyStyleMenuClicked"
                                               IsEnabled="{Binding Canvas.IsSelectionActive}"/>
                                     <MenuItem Header="Cut"
                                               Click="OnCutMenuClicked"
                                               IsEnabled="{Binding Canvas.IsSelectionActive}"/>
                                     <MenuItem Header="Paste" Click="OnPasteMenuClicked"/>
-                                    <MenuItem Header="Paste Style"
+                                    <MenuItem Name="PasteStyleContextMenu"
+                                              Header="Paste Style (Ctrl+Shift+V)"
                                               Click="OnPasteStyleMenuClicked"
                                               IsEnabled="{Binding CanPasteStyle}"/>
                                     <MenuItem Header="Paste AXAML from Clipboard" Click="OnPasteAxamlFromClipboardMenuClicked"/>
@@ -1546,10 +1563,14 @@
                                             <Border.ContextMenu>
                                                 <ContextMenu>
                                                     <MenuItem Header="Copy" Click="OnCopyMenuClicked"/>
-                                                    <MenuItem Header="Copy Style" Click="OnCopyStyleMenuClicked"/>
+                                                    <MenuItem Name="CopyStyleElementContextMenu"
+                                                              Header="Copy Style (Ctrl+Shift+C)"
+                                                              Click="OnCopyStyleMenuClicked"/>
                                                     <MenuItem Header="Copy Selected AXAML" Click="OnCopySelectedAxamlMenuClicked"/>
                                                     <MenuItem Header="Cut" Click="OnCutMenuClicked"/>
-                                                    <MenuItem Header="Paste Style" Click="OnPasteStyleMenuClicked"/>
+                                                    <MenuItem Name="PasteStyleElementContextMenu"
+                                                              Header="Paste Style (Ctrl+Shift+V)"
+                                                              Click="OnPasteStyleMenuClicked"/>
                                                     <MenuItem Header="Duplicate" Click="OnDuplicateMenuClicked"/>
                                                     <MenuItem Header="Rename..." Click="OnRenameSelectedControlMenuClicked"/>
                                                     <MenuItem Header="Edit Appearance..." Click="OnEditAppearanceMenuClicked"/>

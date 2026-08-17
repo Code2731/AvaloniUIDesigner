@@ -2151,6 +2151,9 @@ public partial class MainWindow : Window
     }
 
     private void OnCopyStyleMenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+        => CopySelectedStyle();
+
+    private void CopySelectedStyle()
     {
         FlushPendingPropertyHistory();
         Vm?.CopySelectedStyle();
@@ -2174,6 +2177,9 @@ public partial class MainWindow : Window
         => await PasteAxamlFromClipboardAsync();
 
     private void OnPasteStyleMenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+        => PasteSelectedStyle();
+
+    private void PasteSelectedStyle()
     {
         FlushPendingPropertyHistory();
         Vm?.PasteSelectedStyle();
@@ -5365,8 +5371,7 @@ public partial class MainWindow : Window
 
         if (ctrl && shift && e.Key == Key.C)
         {
-            FlushPendingPropertyHistory();
-            Vm.CopySelectedStyle();
+            CopySelectedStyle();
             e.Handled = true;
             return;
         }
@@ -5396,8 +5401,7 @@ public partial class MainWindow : Window
 
         if (ctrl && shift && e.Key == Key.V)
         {
-            FlushPendingPropertyHistory();
-            Vm.PasteSelectedStyle();
+            PasteSelectedStyle();
             e.Handled = true;
             return;
         }

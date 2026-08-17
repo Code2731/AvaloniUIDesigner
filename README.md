@@ -136,7 +136,7 @@ dotnet run --project src/AvaloniaUIDesigner.App/AvaloniaUIDesigner.App.csproj
 - **Button Actions & Commands 속성**: Button의 Content·ClickMode·HotKey·Window 기본/취소 동작·CommandParameter·Click 핸들러를 통합 편집하고 Command Binding, Undo/Redo, 복제, Preview, Draft·Full·UserControl AXAML 왕복에 보존
 - **Event Handler Map**: `ControlName | EventName | HandlerName` 형식으로 공통 포인터·키보드·포커스·수명 이벤트와 Button·TextBox·선택 컨트롤 등의 타입별 이벤트 핸들러를 일괄 편집하고, 잠금 보호·유효성 검증·Undo/Redo·Preview·AXAML 왕복을 지원
 - **Preview Interaction Log**: Live Preview에서 연결된 Button·TextBox·선택·토글·포인터·키보드·포커스 이벤트를 발생시키고 `Control.Event -> HandlerName` 형식의 최근 로그로 디자인 타임 연결을 즉시 확인
-- **Style Clipboard**: 선택 컨트롤의 외형·타이포그래피·렌더링·효과·상호작용·스타일 클래스와 리소스 참조만 복사해 하나 또는 여러 대상에 붙여넣고, 콘텐츠·위치·크기·계층·바인딩·이벤트는 보존
+- **Style Clipboard**: `Edit > Style Clipboard`, Design Toolbar, Canvas Context Menu 또는 `Ctrl+Shift+C/V`에서 선택 컨트롤의 외형·타이포그래피·렌더링·효과·상호작용·스타일 클래스와 리소스 참조만 복사해 하나 또는 여러 대상에 붙여넣고, 콘텐츠·위치·크기·계층·바인딩·이벤트는 보존
 - **Undo History Timeline**: `Edit > History...`에서 현재 문서와 Undo·Redo 작업을 한 번에 확인하고 원하는 지점으로 이동
 - **Document Tabs**: 여러 AXAML 문서를 동시에 탭으로 열고 전환하며, 문서별 캔버스·dirty 상태·Undo/Redo history를 독립적으로 보존합니다. `Ctrl+N`/`File > New`는 새 탭, `Ctrl+W`/`File > Close Tab`은 현재 탭을 닫고, `File > Open...`은 문서를 새 탭으로 엽니다. 탭 헤더를 드래그하면 원하는 순서로 재배치하고, 드롭 위치를 세션에 보존합니다.
 - **Document Tab Duplication**: `File > Duplicate Tab`, 탭 컨텍스트 메뉴 또는 `Ctrl+Alt+D`로 현재 문서를 독립된 새 dirty 탭으로 복제합니다. 문서 내용·Undo/Redo·줌·선택·Property Inspector 탐색 상태를 함께 복사하고 저장 경로는 비워 새 파일로 저장하게 합니다.
@@ -299,7 +299,7 @@ dotnet run --project src/AvaloniaUIDesigner.App/AvaloniaUIDesigner.App.csproj
 68. Edit > `Edit Tab Order Map...`에서 `TabIndex | ControlName` 형식으로 전체 포커스 순서를 편집하고, `auto`/`-1`로 자동 순서를 복원하며 캔버스의 `TAB #` 배지를 확인
 69. Edit > `Edit Event Handler Map...`에서 `ControlName | EventName | HandlerName` 형식으로 여러 컨트롤의 이벤트 핸들러를 일괄 편집하고, 지원되지 않는 이벤트·잠긴 컨트롤·중복 항목 검증 결과를 확인
 70. View > `Live Preview`에서 컨트롤을 클릭하거나 입력·선택·토글·포인터·키보드·포커스 동작을 수행하고, 창 하단 Interaction Log에서 `Control.Event -> HandlerName` 연결 결과를 확인합니다. Toolbar·Canvas Context Menu의 `Preview Interaction Log` 또는 `Ctrl+Alt+Shift+Z`는 이미 열린 Preview의 로그를 지우지 않고 다시 활성화합니다.
-71. 한 컨트롤을 선택해 Edit > `Copy Style` 또는 `Ctrl+Shift+C`를 실행한 뒤 하나 이상의 대상 컨트롤을 선택해 Edit > `Paste Style` 또는 `Ctrl+Shift+V`를 실행하고, 잠긴 대상은 건너뛴 결과를 확인
+71. 한 컨트롤을 선택해 Edit > `Style Clipboard > Copy Style` 또는 `Ctrl+Shift+C`를 실행한 뒤 하나 이상의 대상 컨트롤을 선택해 Edit > `Style Clipboard > Paste Style` 또는 `Ctrl+Shift+V`를 실행하고, Design Toolbar·Canvas Context Menu에서도 같은 명령을 사용할 수 있으며 잠긴 대상은 건너뛴 결과를 확인
 72. Edit > `History...`를 열어 Current document state와 Undo·Redo 작업을 확인하고 원하는 항목을 선택해 여러 단계를 한 번에 이동
 73. `Ctrl+N` 또는 `File > New`로 새 문서 탭을 만들고 탭 제목을 클릭해 문서를 전환합니다. `File > Open...`은 AXAML을 새 탭으로 열며 `Ctrl+W` 또는 탭의 `x` 버튼으로 현재 탭을 닫습니다.
 74. 앱을 정상적으로 종료한 뒤 다시 실행하면 마지막 탭 구성과 dirty 편집 내용이 자동 복원됩니다. 복원 데이터는 `%LocalAppData%/AvaloniaUIDesigner/session.json`에 저장됩니다.
@@ -511,7 +511,7 @@ Live Preview 하단의 `Interaction Log`는 위 이벤트 메타데이터를 안
 
 `Preview Interaction Log`는 이미 열린 Preview 창을 다시 렌더링하지 않고 활성화하므로, 사용자가 남긴 최근 상호작용 기록을 보존한 채 로그로 돌아갈 수 있습니다. Preview가 아직 열리지 않았다면 동일한 Preview 창을 열고, 일반 `Live Preview` 또는 `Ctrl+R`은 기존처럼 현재 문서를 새로고침합니다.
 
-`Copy Style`은 하나의 잠금 해제 컨트롤에서 외형·타이포그래피·렌더링·효과·상호작용 속성, 스타일 클래스와 DynamicResource 참조만 캡처합니다. `Paste Style`은 선택된 잠금 해제 대상에 해당 값을 한 번의 Undo 작업으로 적용하며 Text/Content, 위치·크기, 부모 계층, 바인딩, 이벤트 핸들러, 항목 정의는 변경하지 않습니다. 서로 다른 컨트롤 타입에 붙여넣으면 해당 타입이 지원하는 스타일 속성만 적용하고 나머지는 안전하게 무시합니다.
+`Style Clipboard`는 Edit 메뉴의 하위 메뉴, Design Toolbar, Canvas 빈 영역·선택 요소 Context Menu에서 같은 `Copy Style`·`Paste Style` 명령을 노출합니다. `Copy Style`은 하나의 잠금 해제 컨트롤에서 외형·타이포그래피·렌더링·효과·상호작용 속성, 스타일 클래스와 DynamicResource 참조만 캡처합니다. `Paste Style`은 선택된 잠금 해제 대상에 해당 값을 한 번의 Undo 작업으로 적용하며 Text/Content, 위치·크기, 부모 계층, 바인딩, 이벤트 핸들러, 항목 정의는 변경하지 않습니다. 서로 다른 컨트롤 타입에 붙여넣으면 해당 타입이 지원하는 스타일 속성만 적용하고 나머지는 안전하게 무시합니다.
 
 `Edit > History...`는 현재 문서 상태를 기준으로 완료된 Undo 작업과 앞으로 적용할 Redo 작업을 함께 표시합니다. 항목을 선택하면 기존 snapshot 기반 Undo/Redo를 필요한 횟수만큼 수행해 해당 지점으로 이동하며, 이동 후에도 dirty 상태·Preview·AXAML·Object Tree를 기존 Undo 흐름과 동일하게 갱신합니다.
 
@@ -690,6 +690,7 @@ AXAML 소스 편집기의 `Validate`와 `Preview`는 현재 디자인과 Undo �
 - v2.42: Image Source & Rendering 편집 Toolbar·Context Menu·Ctrl+Alt+Shift+I 빠른 접근 추가
 - v2.43: Event Handler Map 편집 Toolbar·Context Menu·Ctrl+Alt+Shift+L 빠른 접근 추가
 - v2.44: Preview Interaction Log Toolbar·Context Menu·Ctrl+Alt+Shift+Z 빠른 접근 추가
+- v2.45: Style Clipboard Edit 하위 메뉴·Toolbar·Context Menu·공용 단축키 빠른 접근 정리
 
 ## 컴포넌트 팩
 
