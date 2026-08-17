@@ -1442,6 +1442,16 @@ public partial class MainWindow : Window
             };
         }, supportsRecycling: true);
 
+    private static ProjectExplorerNode? FindProjectExplorerContextMenuNode(object? source)
+    {
+        if (source is ListBoxItem { Content: ProjectExplorerNode directNode })
+        {
+            return directNode;
+        }
+
+        return (source as Visual)?.FindAncestorOfType<ListBoxItem>()?.Content as ProjectExplorerNode;
+    }
+
     private async Task<string?> ShowProjectExplorerAsync()
     {
         if (Vm is null || !Vm.HasProjectWorkspace)
@@ -1678,6 +1688,20 @@ public partial class MainWindow : Window
         list.ContextMenu = new ContextMenu
         {
             Items = { copyRelativePathMenu, copyFullPathMenu, openFileManagerMenu },
+        };
+        list.PointerPressed += (_, e) =>
+        {
+            if (e.GetCurrentPoint(list).Properties.PointerUpdateKind
+                != PointerUpdateKind.RightButtonPressed)
+            {
+                return;
+            }
+
+            var node = FindProjectExplorerContextMenuNode(e.Source);
+            if (node is not null)
+            {
+                list.SelectedItem = node;
+            }
         };
         search.TextChanged += (_, _) => RefreshResults();
         search.KeyDown += (_, e) =>
