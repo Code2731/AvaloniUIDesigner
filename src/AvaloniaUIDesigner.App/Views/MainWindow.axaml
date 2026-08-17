@@ -95,7 +95,7 @@
                 <MenuItem Header="Edit Sample Data..." Click="OnEditSampleDataMenuClicked"/>
                 <Separator/>
                 <MenuItem Header="Edit Items / Columns..." Click="OnEditItemsMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
-                <MenuItem Header="Edit DataGrid Behavior..." Click="OnEditDataGridBehaviorPropertiesMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
+                <MenuItem Header="Edit DataGrid Behavior... (Ctrl+Alt+Shift+E)" Click="OnEditDataGridBehaviorPropertiesMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
                 <MenuItem Header="Edit Bindings..." Click="OnEditBindingsMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
                 <MenuItem Header="Edit Common Properties... (Ctrl+Alt+M)" Click="OnEditCommonPropertiesMenuClicked" IsEnabled="{Binding Canvas.HasMultipleSelection}"/>
                 <MenuItem Header="Edit Layout Properties... (Ctrl+Alt+L)" Click="OnEditLayoutPropertiesMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
@@ -633,6 +633,12 @@
                             Click="OnEditTabControlBehaviorPropertiesMenuClicked"
                             IsEnabled="{Binding Canvas.IsSelectionActive}"
                             ToolTip.Tip="Edit TabControl tab strip and content alignment behavior (Ctrl+Alt+Shift+K)"
+                            Padding="7,3"/>
+                    <Button Name="EditDataGridBehaviorPropertiesToolbar"
+                            Content="DataGrid"
+                            Click="OnEditDataGridBehaviorPropertiesMenuClicked"
+                            IsEnabled="{Binding Canvas.IsSelectionActive}"
+                            ToolTip.Tip="Edit DataGrid table behavior and sizing policy (Ctrl+Alt+Shift+E)"
                             Padding="7,3"/>
                     <Border Width="1" Background="#CBD5E1" Margin="0,2"/>
                     <TextBlock Text="Order"
@@ -1385,6 +1391,10 @@
                                               Header="Edit TabControl Behavior... (Ctrl+Alt+Shift+K)"
                                               Click="OnEditTabControlBehaviorPropertiesMenuClicked"
                                               IsEnabled="{Binding Canvas.IsSelectionActive}"/>
+                                    <MenuItem Name="EditDataGridBehaviorPropertiesContextMenu"
+                                              Header="Edit DataGrid Behavior... (Ctrl+Alt+Shift+E)"
+                                              Click="OnEditDataGridBehaviorPropertiesMenuClicked"
+                                              IsEnabled="{Binding Canvas.IsSelectionActive}"/>
                                     <MenuItem Header="Center on Artboard" IsEnabled="{Binding Canvas.IsSelectionActive}">
                                         <MenuItem Header="Horizontally" Click="OnCenterHorizontallyOnArtboardMenuClicked"/>
                                         <MenuItem Header="Vertically" Click="OnCenterVerticallyOnArtboardMenuClicked"/>
@@ -1495,7 +1505,7 @@
                                                     <MenuItem Header="Duplicate" Click="OnDuplicateMenuClicked"/>
                                                     <MenuItem Header="Rename..." Click="OnRenameSelectedControlMenuClicked"/>
                                                     <MenuItem Header="Edit Appearance..." Click="OnEditAppearanceMenuClicked"/>
-                                                    <MenuItem Header="Edit DataGrid Behavior..." Click="OnEditDataGridBehaviorPropertiesMenuClicked"/>
+                                                    <MenuItem Header="Edit DataGrid Behavior... (Ctrl+Alt+Shift+E)" Click="OnEditDataGridBehaviorPropertiesMenuClicked"/>
                                                     <MenuItem Header="Edit Bindings..." Click="OnEditBindingsMenuClicked"/>
                                                     <MenuItem Header="Edit Layout Properties..." Click="OnEditLayoutPropertiesMenuClicked"/>
                                                     <MenuItem Header="Edit Typography Properties..." Click="OnEditTypographyPropertiesMenuClicked"/>
