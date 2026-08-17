@@ -234,6 +234,42 @@ public partial class MainWindow : Window
             => $"{Index}. {DisplayName} - {RelativePath}";
     }
 
+    private sealed class ProjectExplorerNode
+    {
+        public ProjectExplorerNode(
+            string displayName,
+            string relativePath,
+            string? fullPath,
+            int depth,
+            IReadOnlyList<ProjectExplorerNode>? children = null,
+            bool isExpanded = true)
+        {
+            DisplayName = displayName;
+            RelativePath = relativePath;
+            FullPath = fullPath;
+            Depth = depth;
+            Children = children ?? Array.Empty<ProjectExplorerNode>();
+            IsExpanded = isExpanded;
+        }
+
+        public string DisplayName { get; }
+        public string RelativePath { get; }
+        public string? FullPath { get; }
+        public int Depth { get; }
+        public IReadOnlyList<ProjectExplorerNode> Children { get; }
+        public bool IsFile => FullPath is not null;
+        public bool IsExpanded { get; set; }
+
+        public override string ToString()
+        {
+            var indentation = new string(' ', Depth * 2);
+            var marker = IsFile ? "[F]" : IsExpanded ? "[-]" : "[+]";
+            return IsFile
+                ? $"{indentation}{marker} {DisplayName} - {RelativePath}"
+                : $"{indentation}{marker} {DisplayName}/";
+        }
+    }
+
     private sealed record DocumentTabSwitcherItem(
         DocumentTabViewModel Tab,
         int Index,
@@ -965,6 +1001,136 @@ public partial class MainWindow : Window
         return currentIndex;
     }
 
+    private static List<ProjectExplorerNode> BuildProjectExplorerTree(
+        IReadOnlyList<ProjectWorkspaceFile> files)
+    {
+        var roots = new List<ProjectExplorerNode>();
+        foreach (var file in files)
+        {
+            var segments = file.RelativePath
+                .Split('/', StringSplitOptions.RemoveEmptyEntries);
+            if (segments.Length == 0)
+            {
+                continue;
+            }
+
+            var siblings = roots;
+            var relativePath = string.Empty;
+            for (var index = 0; index < segments.Length; index++)
+            {
+                var segment = segments[index];
+                relativePath = string.IsNullOrEmpty(relativePath)
+                    ? segment
+                    : $"{relativePath}/{segment}";
+                var isFile = index == segments.Length - 1;
+                var node = siblings.FirstOrDefault(candidate =>
+                    candidate.IsFile == isFile
+                    && string.Equals(candidate.DisplayName, segment, StringComparison.OrdinalIgnoreCase));
+                if (node is null)
+                {
+                    var children = new List<ProjectExplorerNode>();
+                    node = new ProjectExplorerNode(
+                        segment,
+                        relativePath,
+                        isFile ? file.FullPath : null,
+                        index,
+                        children);
+                    siblings.Add(node);
+                }
+
+                if (!isFile)
+                {
+                    siblings = (List<ProjectExplorerNode>)node.Children;
+                }
+            }
+        }
+
+        return SortProjectExplorerNodes(roots);
+    }
+
+    private static List<ProjectExplorerNode> FilterProjectExplorerTree(
+        IReadOnlyList<ProjectExplorerNode> roots,
+        string? query)
+    {
+        var normalizedQuery = query?.Trim() ?? string.Empty;
+        if (string.IsNullOrWhiteSpace(normalizedQuery))
+        {
+            return roots.ToList();
+        }
+
+        return roots
+            .Select(node => FilterProjectExplorerNode(node, normalizedQuery))
+            .OfType<ProjectExplorerNode>()
+            .ToList();
+    }
+
+    private static ProjectExplorerNode? FilterProjectExplorerNode(
+        ProjectExplorerNode node,
+        string query)
+    {
+        if (node.IsFile)
+        {
+            return node.DisplayName.Contains(query, StringComparison.OrdinalIgnoreCase)
+                || node.RelativePath.Contains(query, StringComparison.OrdinalIgnoreCase)
+                ? node
+                : null;
+        }
+
+        var children = node.Children
+            .Select(child => FilterProjectExplorerNode(child, query))
+            .OfType<ProjectExplorerNode>()
+            .ToList();
+        return children.Count == 0
+            ? null
+            : new ProjectExplorerNode(
+                node.DisplayName,
+                node.RelativePath,
+                null,
+                node.Depth,
+                children,
+                isExpanded: true);
+    }
+
+    private static List<ProjectExplorerNode> SortProjectExplorerNodes(
+        IReadOnlyList<ProjectExplorerNode> nodes)
+        => nodes
+            .OrderBy(node => node.IsFile)
+            .ThenBy(node => node.DisplayName, StringComparer.OrdinalIgnoreCase)
+            .Select(node => new ProjectExplorerNode(
+                node.DisplayName,
+                node.RelativePath,
+                node.FullPath,
+                node.Depth,
+                SortProjectExplorerNodes(node.Children),
+                node.IsExpanded))
+            .ToList();
+
+    private static List<ProjectExplorerNode> FlattenProjectExplorerTree(
+        IReadOnlyList<ProjectExplorerNode> roots)
+    {
+        var visibleNodes = new List<ProjectExplorerNode>();
+        foreach (var root in roots)
+        {
+            AddVisibleProjectExplorerNode(root, visibleNodes);
+        }
+
+        return visibleNodes;
+
+        static void AddVisibleProjectExplorerNode(
+            ProjectExplorerNode node,
+            List<ProjectExplorerNode> target)
+        {
+            target.Add(node);
+            if (!node.IsFile && node.IsExpanded)
+            {
+                foreach (var child in node.Children)
+                {
+                    AddVisibleProjectExplorerNode(child, target);
+                }
+            }
+        }
+    }
+
     private async Task<string?> ShowProjectExplorerAsync()
     {
         if (Vm is null || !Vm.HasProjectWorkspace)
@@ -1004,21 +1170,33 @@ public partial class MainWindow : Window
             MaxHeight = 390,
             SelectionMode = SelectionMode.Single,
         };
-        var filteredItems = new List<ProjectFileSwitcherItem>();
+        var treeRoots = BuildProjectExplorerTree(paths);
+        var visibleNodes = new List<ProjectExplorerNode>();
 
-        void RefreshResults()
+        void RefreshResults(string? selectedRelativePath = null)
         {
-            filteredItems = FilterProjectFileSwitcherItems(paths, search.Text);
-            list.ItemsSource = filteredItems;
-            list.SelectedIndex = filteredItems.Count > 0 ? 0 : -1;
-            matchSummary.Text = filteredItems.Count == 0
+            var filteredRoots = FilterProjectExplorerTree(treeRoots, search.Text);
+            visibleNodes = FlattenProjectExplorerTree(filteredRoots);
+            list.ItemsSource = visibleNodes;
+            var selectedIndex = string.IsNullOrWhiteSpace(selectedRelativePath)
+                ? -1
+                : visibleNodes.FindIndex(node =>
+                    string.Equals(node.RelativePath, selectedRelativePath, StringComparison.OrdinalIgnoreCase));
+            if (selectedIndex < 0)
+            {
+                selectedIndex = visibleNodes.FindIndex(node => node.IsFile);
+            }
+
+            list.SelectedIndex = selectedIndex;
+            var fileCount = visibleNodes.Count(node => node.IsFile);
+            matchSummary.Text = fileCount == 0
                 ? "No AXAML files found."
-                : $"{filteredItems.Count} matching AXAML file(s)";
+                : $"{fileCount} matching AXAML file(s) in the project tree";
         }
 
         void MoveSelection(int offset)
         {
-            if (filteredItems.Count == 0)
+            if (visibleNodes.Count == 0)
             {
                 return;
             }
@@ -1026,15 +1204,24 @@ public partial class MainWindow : Window
             list.SelectedIndex = MoveProjectFileSwitcherSelection(
                 list.SelectedIndex,
                 offset,
-                filteredItems.Count);
+                visibleNodes.Count);
         }
 
         void SelectCurrent()
         {
-            if (list.SelectedItem is ProjectFileSwitcherItem item)
+            if (list.SelectedItem is not ProjectExplorerNode node)
             {
-                dialog.Close(item.File.FullPath);
+                return;
             }
+
+            if (node.IsFile && node.FullPath is not null)
+            {
+                dialog.Close(node.FullPath);
+                return;
+            }
+
+            node.IsExpanded = !node.IsExpanded;
+            RefreshResults(node.RelativePath);
         }
 
         var cancelButton = new Button { Content = "Cancel", MinWidth = 86 };
@@ -1104,7 +1291,7 @@ public partial class MainWindow : Window
             {
                 new TextBlock
                 {
-                    Text = "Browse AXAML files from the selected project folder.",
+                    Text = "Browse the project tree. Select an AXAML file to open it; press Enter on a folder to expand or collapse it.",
                     TextWrapping = TextWrapping.Wrap,
                 },
                 rootText,
