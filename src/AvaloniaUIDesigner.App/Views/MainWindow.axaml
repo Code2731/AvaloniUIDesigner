@@ -112,7 +112,7 @@
                 <MenuItem Header="Edit Selection Behavior... (Ctrl+Alt+Shift+Q)" Click="OnEditSelectionPropertiesMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
                 <MenuItem Header="Edit Date &amp; Time Input... (Ctrl+Alt+Shift+D)" Click="OnEditDateTimePropertiesMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
                 <MenuItem Header="Edit ColorPicker... (Ctrl+Alt+Shift+P)" Click="OnEditColorPickerPropertiesMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
-                <MenuItem Header="Edit AutoCompleteBox..." Click="OnEditAutoCompleteBoxPropertiesMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
+                <MenuItem Header="Edit AutoCompleteBox... (Ctrl+Alt+Shift+A)" Click="OnEditAutoCompleteBoxPropertiesMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
                 <MenuItem Header="Edit Toggle &amp; Choice Behavior..." Click="OnEditTogglePropertiesMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
                 <MenuItem Header="Edit Disclosure &amp; Scrolling..." Click="OnEditContainerBehaviorPropertiesMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
                 <MenuItem Header="Edit SplitView Pane Behavior..." Click="OnEditSplitViewPropertiesMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
@@ -603,6 +603,12 @@
                             Click="OnEditColorPickerPropertiesMenuClicked"
                             IsEnabled="{Binding Canvas.IsSelectionActive}"
                             ToolTip.Tip="Edit ColorPicker color and palette behavior (Ctrl+Alt+Shift+P)"
+                            Padding="7,3"/>
+                    <Button Name="EditAutoCompleteBoxPropertiesToolbar"
+                            Content="AutoComplete"
+                            Click="OnEditAutoCompleteBoxPropertiesMenuClicked"
+                            IsEnabled="{Binding Canvas.IsSelectionActive}"
+                            ToolTip.Tip="Edit AutoCompleteBox completion and drop-down behavior (Ctrl+Alt+Shift+A)"
                             Padding="7,3"/>
                     <Border Width="1" Background="#CBD5E1" Margin="0,2"/>
                     <TextBlock Text="Order"
@@ -1335,6 +1341,10 @@
                                               Header="Edit ColorPicker... (Ctrl+Alt+Shift+P)"
                                               Click="OnEditColorPickerPropertiesMenuClicked"
                                               IsEnabled="{Binding Canvas.IsSelectionActive}"/>
+                                    <MenuItem Name="EditAutoCompleteBoxPropertiesContextMenu"
+                                              Header="Edit AutoCompleteBox... (Ctrl+Alt+Shift+A)"
+                                              Click="OnEditAutoCompleteBoxPropertiesMenuClicked"
+                                              IsEnabled="{Binding Canvas.IsSelectionActive}"/>
                                     <MenuItem Header="Center on Artboard" IsEnabled="{Binding Canvas.IsSelectionActive}">
                                         <MenuItem Header="Horizontally" Click="OnCenterHorizontallyOnArtboardMenuClicked"/>
                                         <MenuItem Header="Vertically" Click="OnCenterVerticallyOnArtboardMenuClicked"/>
@@ -1460,6 +1470,7 @@
                                                     <MenuItem Header="Edit Selection Behavior... (Ctrl+Alt+Shift+Q)" Click="OnEditSelectionPropertiesMenuClicked"/>
                                                     <MenuItem Header="Edit Date &amp; Time Input... (Ctrl+Alt+Shift+D)" Click="OnEditDateTimePropertiesMenuClicked"/>
                                                     <MenuItem Header="Edit ColorPicker... (Ctrl+Alt+Shift+P)" Click="OnEditColorPickerPropertiesMenuClicked"/>
+                                                    <MenuItem Header="Edit AutoCompleteBox... (Ctrl+Alt+Shift+A)" Click="OnEditAutoCompleteBoxPropertiesMenuClicked"/>
                                                     <MenuItem Header="Edit Toggle &amp; Choice Behavior..." Click="OnEditTogglePropertiesMenuClicked"/>
                                                     <MenuItem Header="Edit Disclosure &amp; Scrolling..." Click="OnEditContainerBehaviorPropertiesMenuClicked"/>
                                                     <MenuItem Header="Edit SplitView Pane Behavior..." Click="OnEditSplitViewPropertiesMenuClicked"/>
