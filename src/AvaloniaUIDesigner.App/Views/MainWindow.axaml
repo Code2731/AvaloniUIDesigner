@@ -57,6 +57,16 @@
                           Header="Open Recent Files... (Ctrl+Shift+O)"
                           Click="OnOpenRecentFilesMenuClicked"
                           IsEnabled="{Binding HasRecentFiles}"/>
+                <MenuItem Header="Open Project Folder..."
+                          Click="OnOpenProjectFolderMenuClicked"/>
+                <MenuItem Name="ProjectExplorerMenu"
+                          Header="Project Explorer... (Ctrl+Shift+P)"
+                          Click="OnProjectExplorerMenuClicked"
+                          IsEnabled="{Binding HasProjectWorkspace}"/>
+                <MenuItem Name="RefreshProjectFilesMenu"
+                          Header="Refresh Project Files"
+                          Click="OnRefreshProjectFilesMenuClicked"
+                          IsEnabled="{Binding HasProjectWorkspace}"/>
                 <Separator/>
                 <MenuItem Header="Save" Click="OnSaveMenuClicked"/>
                 <MenuItem Header="Save As..." Click="OnSaveAsMenuClicked"/>
@@ -466,6 +476,23 @@
                             Click="OnOpenRecentFilesMenuClicked"
                             IsEnabled="{Binding HasRecentFiles}"
                             ToolTip.Tip="Search recently opened AXAML files (Ctrl+Shift+O)"
+                            Padding="8,3"/>
+                    <Button Name="OpenProjectFolderToolbar"
+                            Content="Project"
+                            Click="OnOpenProjectFolderMenuClicked"
+                            ToolTip.Tip="Open an Avalonia project folder"
+                            Padding="8,3"/>
+                    <Button Name="ProjectExplorerToolbar"
+                            Content="Explorer"
+                            Click="OnProjectExplorerMenuClicked"
+                            IsEnabled="{Binding HasProjectWorkspace}"
+                            ToolTip.Tip="Browse AXAML files in the project workspace (Ctrl+Shift+P)"
+                            Padding="8,3"/>
+                    <Button Name="RefreshProjectFilesToolbar"
+                            Content="Refresh"
+                            Click="OnRefreshProjectFilesMenuClicked"
+                            IsEnabled="{Binding HasProjectWorkspace}"
+                            ToolTip.Tip="Refresh project AXAML files"
                             Padding="8,3"/>
                     <Button Content="Save"
                             Click="OnSaveMenuClicked"
@@ -1435,6 +1462,14 @@
                                               Header="Open Recent Files... (Ctrl+Shift+O)"
                                               Click="OnOpenRecentFilesMenuClicked"
                                               IsEnabled="{Binding HasRecentFiles}"/>
+                                    <MenuItem Name="ProjectExplorerContextMenu"
+                                              Header="Project Explorer... (Ctrl+Shift+P)"
+                                              Click="OnProjectExplorerMenuClicked"
+                                              IsEnabled="{Binding HasProjectWorkspace}"/>
+                                    <MenuItem Name="RefreshProjectFilesContextMenu"
+                                              Header="Refresh Project Files"
+                                              Click="OnRefreshProjectFilesMenuClicked"
+                                              IsEnabled="{Binding HasProjectWorkspace}"/>
                                     <MenuItem Header="Duplicate"
                                               Click="OnDuplicateMenuClicked"
                                               IsEnabled="{Binding Canvas.IsSelectionActive}"/>

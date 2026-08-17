@@ -30,6 +30,7 @@ public partial class MainWindow : Window
         Ctrl+N              New document
         Ctrl+O              Open AXAML document
         Ctrl+Shift+O        Open recent AXAML files
+        Ctrl+Shift+P        Open project explorer
         Ctrl+S              Save document
         Ctrl+Alt+S          Save all dirty document tabs
         Ctrl+Alt+D          Duplicate active document tab
@@ -219,6 +220,15 @@ public partial class MainWindow : Window
 
         public override string ToString()
             => $"{Index}. {DisplayName} - {Path} [{StatusLabel}]";
+    }
+
+    private sealed record ProjectFileSwitcherItem(ProjectWorkspaceFile File, int Index)
+    {
+        public string DisplayName => File.DisplayName;
+        public string RelativePath => File.RelativePath;
+
+        public override string ToString()
+            => $"{Index}. {DisplayName} - {RelativePath}";
     }
 
     private sealed record DocumentTabSwitcherItem(
@@ -586,6 +596,285 @@ public partial class MainWindow : Window
         {
             Vm.StatusText = $"Could not open recent file: {exception.Message}";
         }
+    }
+
+    private async void OnOpenProjectFolderMenuClicked(
+        object? sender,
+        Avalonia.Interactivity.RoutedEventArgs e)
+        => await OpenProjectFolderAsync();
+
+    private async void OnProjectExplorerMenuClicked(
+        object? sender,
+        Avalonia.Interactivity.RoutedEventArgs e)
+        => await OpenProjectExplorerAsync();
+
+    private void OnRefreshProjectFilesMenuClicked(
+        object? sender,
+        Avalonia.Interactivity.RoutedEventArgs e)
+        => RefreshProjectFiles();
+
+    private async Task OpenProjectFolderAsync()
+    {
+        if (Vm is null)
+        {
+            return;
+        }
+
+        var folders = await StorageProvider.OpenFolderPickerAsync(new FolderPickerOpenOptions
+        {
+            Title = "Open Avalonia Project Folder",
+            AllowMultiple = false,
+        });
+        if (folders.Count == 0)
+        {
+            return;
+        }
+
+        var path = folders[0].TryGetLocalPath();
+        if (string.IsNullOrWhiteSpace(path))
+        {
+            Vm.StatusText = "The selected project folder is not available as a local path.";
+            return;
+        }
+
+        if (!Vm.TryOpenProjectWorkspace(path, out var error))
+        {
+            Vm.StatusText = $"Could not open project folder: {error}";
+            return;
+        }
+
+        Vm.StatusText = $"Opened project {Vm.ProjectWorkspaceName} ({Vm.ProjectFiles.Count} AXAML file(s)).";
+    }
+
+    private async Task OpenProjectExplorerAsync()
+    {
+        if (Vm is null)
+        {
+            return;
+        }
+
+        if (!Vm.HasProjectWorkspace)
+        {
+            await OpenProjectFolderAsync();
+            return;
+        }
+
+        FlushPendingPropertyHistory();
+        var selectedPath = await ShowProjectExplorerAsync();
+        if (selectedPath is not null)
+        {
+            await OpenRecentFileAsync(selectedPath);
+        }
+    }
+
+    private void RefreshProjectFiles()
+    {
+        if (Vm is null)
+        {
+            return;
+        }
+
+        if (!Vm.RefreshProjectWorkspace(out var error))
+        {
+            Vm.StatusText = $"Could not refresh project files: {error}";
+            return;
+        }
+
+        Vm.StatusText = $"Refreshed {Vm.ProjectFiles.Count} AXAML file(s) in {Vm.ProjectWorkspaceName}.";
+    }
+
+    private static List<ProjectFileSwitcherItem> FilterProjectFileSwitcherItems(
+        IReadOnlyList<ProjectWorkspaceFile> files,
+        string? query)
+    {
+        var normalizedQuery = query?.Trim() ?? string.Empty;
+        return files
+            .Select((file, index) => new ProjectFileSwitcherItem(file, index + 1))
+            .Where(item => string.IsNullOrWhiteSpace(normalizedQuery)
+                || item.DisplayName.Contains(normalizedQuery, StringComparison.OrdinalIgnoreCase)
+                || item.RelativePath.Contains(normalizedQuery, StringComparison.OrdinalIgnoreCase))
+            .ToList();
+    }
+
+    private static int MoveProjectFileSwitcherSelection(
+        int selectedIndex,
+        int offset,
+        int itemCount)
+    {
+        if (itemCount <= 0)
+        {
+            return -1;
+        }
+
+        var currentIndex = selectedIndex < 0
+            ? offset > 0 ? 0 : itemCount - 1
+            : (selectedIndex + offset) % itemCount;
+        if (currentIndex < 0)
+        {
+            currentIndex += itemCount;
+        }
+
+        return currentIndex;
+    }
+
+    private async Task<string?> ShowProjectExplorerAsync()
+    {
+        if (Vm is null || !Vm.HasProjectWorkspace)
+        {
+            return null;
+        }
+
+        var paths = Vm.ProjectFiles.ToList();
+        var dialog = new Window
+        {
+            Title = $"Project Explorer - {Vm.ProjectWorkspaceName}",
+            Width = 760,
+            Height = 560,
+            MinWidth = 560,
+            MinHeight = 400,
+            CanResize = false,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner,
+        };
+        var rootText = new TextBlock
+        {
+            Text = Vm.ProjectWorkspacePath,
+            Foreground = Brush.Parse("#94A3B8"),
+            TextTrimming = TextTrimming.CharacterEllipsis,
+        };
+        var search = new TextBox
+        {
+            Watermark = "Search AXAML file name or relative path",
+            MinWidth = 520,
+        };
+        var matchSummary = new TextBlock
+        {
+            Foreground = Brush.Parse("#64748B"),
+        };
+        var list = new ListBox
+        {
+            MinHeight = 330,
+            MaxHeight = 390,
+            SelectionMode = SelectionMode.Single,
+        };
+        var filteredItems = new List<ProjectFileSwitcherItem>();
+
+        void RefreshResults()
+        {
+            filteredItems = FilterProjectFileSwitcherItems(paths, search.Text);
+            list.ItemsSource = filteredItems;
+            list.SelectedIndex = filteredItems.Count > 0 ? 0 : -1;
+            matchSummary.Text = filteredItems.Count == 0
+                ? "No AXAML files found."
+                : $"{filteredItems.Count} matching AXAML file(s)";
+        }
+
+        void MoveSelection(int offset)
+        {
+            if (filteredItems.Count == 0)
+            {
+                return;
+            }
+
+            list.SelectedIndex = MoveProjectFileSwitcherSelection(
+                list.SelectedIndex,
+                offset,
+                filteredItems.Count);
+        }
+
+        void SelectCurrent()
+        {
+            if (list.SelectedItem is ProjectFileSwitcherItem item)
+            {
+                dialog.Close(item.File.FullPath);
+            }
+        }
+
+        var cancelButton = new Button { Content = "Cancel", MinWidth = 86 };
+        var openButton = new Button { Content = "Open", MinWidth = 86 };
+        cancelButton.Click += (_, _) => dialog.Close(null);
+        openButton.Click += (_, _) => SelectCurrent();
+        search.TextChanged += (_, _) => RefreshResults();
+        search.KeyDown += (_, e) =>
+        {
+            if (e.Key == Key.Enter)
+            {
+                SelectCurrent();
+                e.Handled = true;
+            }
+            else if (e.Key == Key.Escape)
+            {
+                dialog.Close(null);
+                e.Handled = true;
+            }
+            else if (e.Key == Key.Down)
+            {
+                MoveSelection(1);
+                list.Focus();
+                e.Handled = true;
+            }
+            else if (e.Key == Key.Up)
+            {
+                MoveSelection(-1);
+                list.Focus();
+                e.Handled = true;
+            }
+        };
+        list.KeyDown += (_, e) =>
+        {
+            if (e.Key == Key.Enter)
+            {
+                SelectCurrent();
+                e.Handled = true;
+            }
+            else if (e.Key == Key.Escape)
+            {
+                dialog.Close(null);
+                e.Handled = true;
+            }
+            else if (e.Key == Key.Down)
+            {
+                MoveSelection(1);
+                e.Handled = true;
+            }
+            else if (e.Key == Key.Up)
+            {
+                MoveSelection(-1);
+                e.Handled = true;
+            }
+        };
+        dialog.Opened += (_, _) =>
+        {
+            search.Focus();
+            search.SelectAll();
+        };
+
+        dialog.Content = new StackPanel
+        {
+            Margin = new Thickness(16),
+            Spacing = 10,
+            Children =
+            {
+                new TextBlock
+                {
+                    Text = "Browse AXAML files from the selected project folder.",
+                    TextWrapping = TextWrapping.Wrap,
+                },
+                rootText,
+                search,
+                matchSummary,
+                list,
+                new StackPanel
+                {
+                    Orientation = Orientation.Horizontal,
+                    HorizontalAlignment = HorizontalAlignment.Right,
+                    Spacing = 8,
+                    Children = { cancelButton, openButton },
+                },
+            },
+        };
+
+        RefreshResults();
+        return await dialog.ShowDialog<string?>(this);
     }
 
     private async void OnQuickSwitchDocumentTabMenuClicked(
@@ -5699,6 +5988,13 @@ public partial class MainWindow : Window
         if (ctrl && shift && !alt && e.Key == Key.O)
         {
             await OpenRecentFilesAsync();
+            e.Handled = true;
+            return;
+        }
+
+        if (ctrl && shift && !alt && e.Key == Key.P)
+        {
+            await OpenProjectExplorerAsync();
             e.Handled = true;
             return;
         }

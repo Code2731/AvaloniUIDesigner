@@ -69,6 +69,16 @@ public sealed record WorkspacePanelState(
         ObjectTreeHeight: 0);
 }
 
+public sealed record ProjectWorkspaceFile(string FullPath, string RelativePath)
+{
+    public string DisplayName => Path.GetFileName(FullPath);
+
+    public string Extension => Path.GetExtension(FullPath);
+
+    public override string ToString()
+        => $"{DisplayName} - {RelativePath}";
+}
+
 public enum ItemsEditorMode
 {
     Flat,
@@ -611,8 +621,17 @@ public partial class MainWindowViewModel : ViewModelBase
     private double _standaloneAxamlOriginY;
     private DocumentTabViewModel? _selectedDocumentTab;
     private WorkspacePanelState _workspacePanelState = WorkspacePanelState.Default;
+    private string? _projectWorkspacePath;
 
     private const int MaxClosedDocumentTabs = 20;
+    private static readonly HashSet<string> ProjectDirectoryExclusions = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ".git",
+        ".vs",
+        "bin",
+        "obj",
+        "node_modules",
+    };
 
     public MainWindowViewModel()
         : this(new BuiltInComponentCatalog(), new DefaultControlRenderer(), new AxamlDocumentSerializer())
@@ -632,6 +651,7 @@ public partial class MainWindowViewModel : ViewModelBase
         ObjectTree = new ObjectTreeViewModel();
         PropertyInspector = new PropertyInspectorViewModel();
         RecentFiles = new ObservableCollection<string>();
+        ProjectFiles = new ObservableCollection<ProjectWorkspaceFile>();
         StylePreviewOptions = new ObservableCollection<StylePreviewOption>();
         DocumentTabs = new ObservableCollection<DocumentTabViewModel>();
         ComponentPacks = new ObservableCollection<ComponentPackInfo>();
@@ -639,6 +659,7 @@ public partial class MainWindowViewModel : ViewModelBase
         ObjectTree.PropertyChanged += OnObjectTreePropertyChanged;
         Canvas.PropertyChanged += OnDesignerCanvasPropertyChanged;
         LoadRecentFilesFromDisk();
+        LoadProjectWorkspaceFromDisk();
         AddDocumentTab(
             new DesignerCanvasDocument(Array.Empty<DesignerElementSnapshot>()),
             documentPath: null,
@@ -652,6 +673,7 @@ public partial class MainWindowViewModel : ViewModelBase
     public ObjectTreeViewModel ObjectTree { get; }
     public PropertyInspectorViewModel PropertyInspector { get; }
     public ObservableCollection<string> RecentFiles { get; }
+    public ObservableCollection<ProjectWorkspaceFile> ProjectFiles { get; }
     public ObservableCollection<StylePreviewOption> StylePreviewOptions { get; }
     public ObservableCollection<DocumentTabViewModel> DocumentTabs { get; }
     public ObservableCollection<ComponentPackInfo> ComponentPacks { get; }
@@ -679,6 +701,11 @@ public partial class MainWindowViewModel : ViewModelBase
     public string WindowTitle => $"Avalonia UI Designer - {GetDisplayDocumentName()}{(IsDirty ? "*" : string.Empty)}";
     public DocumentTabViewModel? SelectedDocumentTab => _selectedDocumentTab;
     public bool HasRecentFiles => RecentFiles.Count > 0;
+    public string? ProjectWorkspacePath => _projectWorkspacePath;
+    public string ProjectWorkspaceName => string.IsNullOrWhiteSpace(_projectWorkspacePath)
+        ? "No project folder"
+        : GetProjectWorkspaceName(_projectWorkspacePath);
+    public bool HasProjectWorkspace => !string.IsNullOrWhiteSpace(_projectWorkspacePath);
 
     public PropertyInspectorState GetPropertyInspectorState()
     {
@@ -15111,6 +15138,195 @@ public partial class MainWindowViewModel : ViewModelBase
             _ => "Selected controls cannot change layer order.",
         };
 
+    public bool TryOpenProjectWorkspace(string path, out string error)
+    {
+        error = string.Empty;
+        if (string.IsNullOrWhiteSpace(path))
+        {
+            error = "Project folder path is empty.";
+            return false;
+        }
+
+        string normalizedPath;
+        try
+        {
+            normalizedPath = Path.GetFullPath(path.Trim());
+        }
+        catch (Exception exception) when (exception is ArgumentException or IOException or NotSupportedException)
+        {
+            error = $"Project folder path is invalid: {exception.Message}";
+            return false;
+        }
+
+        if (!Directory.Exists(normalizedPath))
+        {
+            error = $"Project folder not found: {normalizedPath}";
+            return false;
+        }
+
+        _projectWorkspacePath = normalizedPath;
+        LoadProjectWorkspaceFiles(normalizedPath);
+        OnPropertyChanged(nameof(ProjectWorkspacePath));
+        OnPropertyChanged(nameof(ProjectWorkspaceName));
+        OnPropertyChanged(nameof(HasProjectWorkspace));
+        SaveProjectWorkspaceToDisk();
+        return true;
+    }
+
+    public bool RefreshProjectWorkspace(out string error)
+    {
+        error = string.Empty;
+        if (string.IsNullOrWhiteSpace(_projectWorkspacePath))
+        {
+            error = "No project folder is open.";
+            return false;
+        }
+
+        if (!Directory.Exists(_projectWorkspacePath))
+        {
+            error = $"Project folder not found: {_projectWorkspacePath}";
+            return false;
+        }
+
+        LoadProjectWorkspaceFiles(_projectWorkspacePath);
+        return true;
+    }
+
+    public void ClearProjectWorkspace()
+    {
+        if (string.IsNullOrWhiteSpace(_projectWorkspacePath)
+            && ProjectFiles.Count == 0)
+        {
+            return;
+        }
+
+        _projectWorkspacePath = null;
+        ProjectFiles.Clear();
+        OnPropertyChanged(nameof(ProjectWorkspacePath));
+        OnPropertyChanged(nameof(ProjectWorkspaceName));
+        OnPropertyChanged(nameof(HasProjectWorkspace));
+        SaveProjectWorkspaceToDisk();
+    }
+
+    private void LoadProjectWorkspaceFiles(string rootPath)
+    {
+        ProjectFiles.Clear();
+        foreach (var file in EnumerateProjectWorkspaceFiles(rootPath))
+        {
+            ProjectFiles.Add(file);
+        }
+    }
+
+    private static IReadOnlyList<ProjectWorkspaceFile> EnumerateProjectWorkspaceFiles(string rootPath)
+    {
+        var files = new List<ProjectWorkspaceFile>();
+        var pendingDirectories = new Stack<string>();
+        pendingDirectories.Push(rootPath);
+
+        while (pendingDirectories.Count > 0)
+        {
+            var currentPath = pendingDirectories.Pop();
+            IEnumerable<string> filePaths;
+            try
+            {
+                filePaths = Directory.EnumerateFiles(currentPath);
+            }
+            catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+            {
+                filePaths = Array.Empty<string>();
+            }
+
+            foreach (var filePath in filePaths)
+            {
+                var extension = Path.GetExtension(filePath);
+                if (!string.Equals(extension, ".axaml", StringComparison.OrdinalIgnoreCase)
+                    && !string.Equals(extension, ".xaml", StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
+                var relativePath = Path.GetRelativePath(rootPath, filePath)
+                    .Replace(Path.DirectorySeparatorChar, '/');
+                files.Add(new ProjectWorkspaceFile(filePath, relativePath));
+            }
+
+            IEnumerable<DirectoryInfo> directories;
+            try
+            {
+                directories = new DirectoryInfo(currentPath)
+                    .EnumerateDirectories()
+                    .Where(directory => !ProjectDirectoryExclusions.Contains(directory.Name)
+                        && (directory.Attributes & FileAttributes.ReparsePoint) == 0)
+                    .ToList();
+            }
+            catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+            {
+                directories = Array.Empty<DirectoryInfo>();
+            }
+
+            foreach (var directory in directories)
+            {
+                pendingDirectories.Push(directory.FullName);
+            }
+        }
+
+        return files
+            .OrderBy(file => file.RelativePath, StringComparer.OrdinalIgnoreCase)
+            .ThenBy(file => file.RelativePath, StringComparer.Ordinal)
+            .ToList();
+    }
+
+    private void LoadProjectWorkspaceFromDisk()
+    {
+        try
+        {
+            var path = GetProjectWorkspaceStorePath();
+            if (!File.Exists(path))
+            {
+                return;
+            }
+
+            var json = File.ReadAllText(path);
+            var rootPath = JsonSerializer.Deserialize<string>(json);
+            if (!string.IsNullOrWhiteSpace(rootPath)
+                && Directory.Exists(rootPath)
+                && Path.IsPathFullyQualified(rootPath))
+            {
+                _projectWorkspacePath = Path.GetFullPath(rootPath);
+                LoadProjectWorkspaceFiles(_projectWorkspacePath);
+            }
+        }
+        catch
+        {
+            // Ignore workspace persistence failures and start without a project folder.
+        }
+    }
+
+    private void SaveProjectWorkspaceToDisk()
+    {
+        try
+        {
+            var path = GetProjectWorkspaceStorePath();
+            var dir = Path.GetDirectoryName(path);
+            if (!string.IsNullOrWhiteSpace(dir))
+            {
+                Directory.CreateDirectory(dir);
+            }
+
+            File.WriteAllText(path, JsonSerializer.Serialize(_projectWorkspacePath));
+        }
+        catch
+        {
+            // Ignore workspace persistence failures.
+        }
+    }
+
+    private static string GetProjectWorkspaceName(string path)
+    {
+        var trimmedPath = path.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+        return Path.GetFileName(trimmedPath) ?? trimmedPath;
+    }
+
     private void RegisterRecentFile(string path)
     {
         if (string.IsNullOrWhiteSpace(path))
@@ -15204,6 +15420,12 @@ public partial class MainWindowViewModel : ViewModelBase
     {
         var baseDir = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
         return Path.Combine(baseDir, "AvaloniaUIDesigner", "recent-files.json");
+    }
+
+    private static string GetProjectWorkspaceStorePath()
+    {
+        var baseDir = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+        return Path.Combine(baseDir, "AvaloniaUIDesigner", "project-workspace.json");
     }
 
     private static string GetSessionStorePath()

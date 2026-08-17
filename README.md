@@ -146,6 +146,7 @@ dotnet run --project src/AvaloniaUIDesigner.App/AvaloniaUIDesigner.App.csproj
 - **Document Tab MRU Switching**: `View > Switch to Recent Document Tab`, Design Toolbar의 `Recent`, Canvas Context Menu 또는 `Ctrl+Alt+Tab`으로 가장 최근에 사용한 다른 탭으로 전환하고, `Ctrl+Alt+Shift+Tab`으로 MRU 목록의 더 오래된 탭을 순환합니다. 최근 사용 순서는 세션 JSON에 보존됩니다.
 - **Document Tab Quick Switcher**: `View > Quick Switch Document Tab...` 또는 `Ctrl+K`로 열린 탭의 별칭·파일 경로·탭 번호·저장 상태를 검색하고 Enter로 즉시 전환합니다. 결과에는 `Ctrl+1..9` 바로가기와 `Saved`·`Modified`·`Unsaved` 상태가 표시되며, 위·아래 키는 끝에서 처음/처음에서 끝으로 순환합니다.
 - **Recent AXAML Files**: `File > Open Recent Files...`, Design Toolbar의 `Recent Files`, Canvas Context Menu 또는 `Ctrl+Shift+O`에서 최근 파일을 이름·경로로 검색하고 Enter로 새 문서 탭에 엽니다. 누락된 경로는 `Missing`으로 표시하며 선택하면 최근 목록에서 제거합니다.
+- **Project Workspace Explorer**: `File > Open Project Folder...`로 작업 폴더를 선택하면 `Project Explorer... (Ctrl+Shift+P)`에서 `.axaml`·`.xaml` 파일을 상대 경로로 검색하고 Enter로 새 문서 탭에 엽니다. `bin`·`obj`·`.git` 등 생성 폴더는 제외하며 선택한 프로젝트 폴더와 파일 목록은 다음 실행에도 복원됩니다.
 - **Tab View Navigation**: `Ctrl+Tab`/`Ctrl+Shift+Tab`으로 문서 탭을 순환하고, `Ctrl+Shift+PageUp/PageDown` 또는 탭 컨텍스트 메뉴로 활성 탭을 좌우 이동하며, 탭별 캔버스 줌·스크롤 위치와 Object Tree 선택을 전환·세션 복원 때 보존합니다.
 - **Viewport 복원 우선순위**: 문서 탭을 복원하는 짧은 pending 구간에는 선택 컨트롤 자동 스크롤을 보류해 저장된 Canvas 위치가 Object Tree/Canvas 선택 추적에 의해 덮어써지지 않도록 합니다.
 - **Workspace Panels**: `View > Panels`에서 Toolbox·Object Tree·Property Inspector를 독립적으로 숨기거나 다시 표시하고, 패널 크기와 가시성·Object Tree 분할 위치를 세션에 저장합니다. `Reset Panel Layout`으로 기본 작업 공간을 복원합니다.
@@ -387,6 +388,7 @@ dotnet run --project src/AvaloniaUIDesigner.App/AvaloniaUIDesigner.App.csproj
 75ca. Design Toolbar의 `Tabs` 그룹 또는 디자인 캔버스 Context Menu에서 `New Tab`, `Quick Switch`, `Duplicate`, `Close`, `Reopen Closed Tab`을 실행할 수 있으며, 기존 `Ctrl+N`·`Ctrl+K`·`Ctrl+Alt+D`·`Ctrl+W`·`Ctrl+Shift+T` 단축키와 동일한 명령을 공유합니다.
 75cb. `View > Switch to Recent Document Tab`, Design Toolbar의 `Recent`, Canvas Context Menu 또는 `Ctrl+Alt+Tab`은 현재 탭을 제외한 가장 최근 사용 탭으로 전환합니다. `Ctrl+Alt+Shift+Tab`은 MRU 목록의 더 오래된 방향으로 이동하며, 최근 사용 순서는 탭 세션의 `RecentDocumentTabIndexes`로 저장·복원됩니다.
 75cc. `File > Open Recent Files...`, Design Toolbar의 `Recent Files`, Canvas Context Menu 또는 `Ctrl+Shift+O`는 최근 8개 AXAML 경로를 파일명·전체 경로로 검색합니다. 결과에는 `Available`/`Missing` 상태가 표시되고, `Enter`는 선택 파일을 새 탭으로 열며 누락 파일은 목록에서 자동 제거합니다.
+75cd. `File > Open Project Folder...`로 선택한 작업 폴더는 `Project Explorer... (Ctrl+Shift+P)`에서 AXAML 파일을 상대 경로로 검색할 수 있습니다. `bin`·`obj`·`.git`·`.vs`·`node_modules`는 스캔에서 제외하고, `Refresh Project Files`로 새 파일을 다시 읽으며 선택 폴더는 `%LocalAppData%/AvaloniaUIDesigner/project-workspace.json`에 저장·복원됩니다.
 76. `File > Load Component Pack...` 또는 `File > Load Toolbox Preset Pack...`으로 외부 Toolbox 팩을 추가하면 파일 경로가 세션에 등록되어 다음 실행 때 자동으로 다시 로드됩니다. 파일이 없어도 문서 탭 복원은 계속되며 상태바에 경고가 표시됩니다.
 77. 외부 프로젝트의 컨트롤은 Component Pack 항목에 `designOnly: true`, `avaloniaTypeName`, `previewText`, `defaultProperties`를 지정해 등록합니다. 디자이너에서는 타입명 플레이스홀더로 편집하고, 생성 AXAML에는 원래 커스텀 타입과 속성을 출력합니다. 예시는 [custom-component-pack.example.json](docs/custom-component-pack.example.json)을 참고하세요.
 78. `File > Load Component Pack Plugin...`에서 `IComponentPackPlugin`을 구현한 신뢰할 수 있는 DLL을 선택하면 플러그인이 제공한 Component Pack을 Toolbox에 등록합니다. DLL 경로는 세션 JSON의 `ComponentPluginPaths`에 저장되고, 앱 재시작 시 플러그인·JSON 팩·프리셋 팩 순서로 복원됩니다.
@@ -703,6 +705,7 @@ AXAML 소스 편집기의 `Validate`와 `Preview`는 현재 디자인과 Undo �
 - v2.48: Document Tab Quick Switcher 번호·저장 상태 검색·순환 키보드 탐색 추가
 - v2.49: Document Tab MRU 전환 Toolbar·Context Menu·Ctrl+Alt+Tab·세션 복원 추가
 - v2.50: Recent AXAML Files 검색 대화상자·Toolbar·Context Menu·Ctrl+Shift+O 추가
+- v2.51: Project Workspace 폴더 스캔·Explorer 검색·Refresh·Ctrl+Shift+P·설정 복원 추가
 
 ## 컴포넌트 팩
 
