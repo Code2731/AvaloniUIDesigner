@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Collections.Specialized;
 using System.ComponentModel;
 using System.Globalization;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
@@ -161,6 +162,7 @@ public partial class MainWindow : Window
         Project Explorer arrows  Collapse, expand, and navigate the project tree
         Project Explorer double-click  Open files or toggle folders
         Project Explorer Ctrl+C  Copy the selected full path
+        Project Explorer file manager  Open the selected location in the OS file manager
         """;
 
     private const string AboutHelpText = """
@@ -1261,6 +1263,55 @@ public partial class MainWindow : Window
                     System.IO.Path.DirectorySeparatorChar));
     }
 
+    private static string? GetProjectExplorerFileManagerPath(
+        ProjectExplorerNode node,
+        string? workspacePath)
+    {
+        var fullPath = GetProjectExplorerClipboardPath(
+            node,
+            workspacePath,
+            fullPath: true);
+        if (string.IsNullOrWhiteSpace(fullPath))
+        {
+            return null;
+        }
+
+        if (!node.IsFile)
+        {
+            return fullPath;
+        }
+
+        try
+        {
+            return System.IO.Path.GetDirectoryName(fullPath);
+        }
+        catch (ArgumentException)
+        {
+            return null;
+        }
+    }
+
+    private static bool TryOpenProjectExplorerFileManager(string path)
+    {
+        try
+        {
+            return Process.Start(new ProcessStartInfo
+            {
+                FileName = path,
+                UseShellExecute = true,
+            }) is not null;
+        }
+        catch (Exception exception) when (exception is ArgumentException
+            or InvalidOperationException
+            or IOException
+            or NotSupportedException
+            or UnauthorizedAccessException
+            or System.ComponentModel.Win32Exception)
+        {
+            return false;
+        }
+    }
+
     private static List<ProjectExplorerNode> FilterProjectExplorerTree(
         IReadOnlyList<ProjectExplorerNode> roots,
         string? query)
@@ -1482,6 +1533,31 @@ public partial class MainWindow : Window
                 fullPath ? "Copied full path to clipboard." : "Copied relative path to clipboard.");
         }
 
+        void OpenProjectExplorerFileManager()
+        {
+            if (list.SelectedItem is not ProjectExplorerNode node)
+            {
+                return;
+            }
+
+            var path = GetProjectExplorerFileManagerPath(
+                node,
+                Vm.ProjectWorkspacePath);
+            if (string.IsNullOrWhiteSpace(path))
+            {
+                Vm.StatusText = "The selected Project Explorer location is unavailable.";
+                return;
+            }
+
+            if (!TryOpenProjectExplorerFileManager(path))
+            {
+                Vm.StatusText = $"Could not open the location in the file manager: {path}";
+                return;
+            }
+
+            Vm.StatusText = $"Opened the location in the file manager: {path}";
+        }
+
         void MoveSelection(int offset)
         {
             if (visibleNodes.Count == 0)
@@ -1544,14 +1620,16 @@ public partial class MainWindow : Window
         var openButton = new Button { Content = "Open", MinWidth = 86 };
         var copyRelativePathMenu = new MenuItem { Header = "Copy Relative Path" };
         var copyFullPathMenu = new MenuItem { Header = "Copy Full Path" };
+        var openFileManagerMenu = new MenuItem { Header = "Open in File Manager" };
         cancelButton.Click += (_, _) => dialog.Close(null);
         openButton.Click += (_, _) => SelectCurrent();
         list.DoubleTapped += (_, _) => SelectCurrent();
         copyRelativePathMenu.Click += async (_, _) => await CopyProjectExplorerPathAsync(fullPath: false);
         copyFullPathMenu.Click += async (_, _) => await CopyProjectExplorerPathAsync(fullPath: true);
+        openFileManagerMenu.Click += (_, _) => OpenProjectExplorerFileManager();
         list.ContextMenu = new ContextMenu
         {
-            Items = { copyRelativePathMenu, copyFullPathMenu },
+            Items = { copyRelativePathMenu, copyFullPathMenu, openFileManagerMenu },
         };
         search.TextChanged += (_, _) => RefreshResults();
         search.KeyDown += (_, e) =>
@@ -1629,7 +1707,7 @@ public partial class MainWindow : Window
             {
                 new TextBlock
                 {
-                    Text = "Browse the project tree. Double-click an AXAML file to open it; press Enter on a folder or double-click a folder to expand or collapse it, use Left/Right to navigate, or Ctrl+C to copy the selected full path.",
+                    Text = "Browse the project tree. Double-click an AXAML file to open it; press Enter on a folder or double-click a folder to expand or collapse it, use Left/Right to navigate, Ctrl+C to copy the selected full path, or the context menu to open its location in the file manager.",
                     TextWrapping = TextWrapping.Wrap,
                 },
                 rootText,
