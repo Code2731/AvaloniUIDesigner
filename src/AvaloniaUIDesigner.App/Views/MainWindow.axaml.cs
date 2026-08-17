@@ -1326,7 +1326,6 @@ public partial class MainWindow : Window
             return null;
         }
 
-        var paths = Vm.ProjectFiles.ToList();
         var dialog = new Window
         {
             Title = $"Project Explorer - {Vm.ProjectWorkspaceName}",
@@ -1358,15 +1357,13 @@ public partial class MainWindow : Window
             MaxHeight = 390,
             SelectionMode = SelectionMode.Single,
         };
-        var treeRoots = BuildProjectExplorerTree(paths);
-        ApplyProjectExplorerCollapsedFolders(
-            treeRoots,
-            Vm.ProjectWorkspaceCollapsedFolders);
-        var currentRelativePath = FindProjectExplorerRelativePath(
-            paths,
-            Vm.CurrentDocumentPath);
-        RevealProjectExplorerPath(treeRoots, currentRelativePath);
+        var paths = new List<ProjectWorkspaceFile>();
+        var treeRoots = new List<ProjectExplorerNode>();
+        string? currentRelativePath = null;
         var visibleNodes = new List<ProjectExplorerNode>();
+        var projectFilesRefreshPending = false;
+        var isDialogOpen = true;
+        var shouldRevealCurrentDocument = true;
 
         void RefreshResults(string? selectedRelativePath = null)
         {
@@ -1388,6 +1385,55 @@ public partial class MainWindow : Window
             matchSummary.Text = fileCount == 0
                 ? "No AXAML files found."
                 : $"{fileCount} matching AXAML file(s) in the project tree";
+        }
+
+        void RefreshProjectTree()
+        {
+            var selectedRelativePath = (list.SelectedItem as ProjectExplorerNode)?.RelativePath;
+            paths = Vm.ProjectFiles.ToList();
+            treeRoots = BuildProjectExplorerTree(paths);
+            ApplyProjectExplorerCollapsedFolders(
+                treeRoots,
+                Vm.ProjectWorkspaceCollapsedFolders);
+            currentRelativePath = FindProjectExplorerRelativePath(
+                paths,
+                Vm.CurrentDocumentPath);
+            if (shouldRevealCurrentDocument)
+            {
+                RevealProjectExplorerPath(treeRoots, currentRelativePath);
+                shouldRevealCurrentDocument = false;
+            }
+
+            RefreshResults(selectedRelativePath);
+        }
+
+        void OnProjectFilesChanged(object? sender, NotifyCollectionChangedEventArgs e)
+        {
+            if (!isDialogOpen || projectFilesRefreshPending)
+            {
+                return;
+            }
+
+            projectFilesRefreshPending = true;
+            Dispatcher.UIThread.Post(() =>
+            {
+                projectFilesRefreshPending = false;
+                if (isDialogOpen)
+                {
+                    RefreshProjectTree();
+                }
+            });
+        }
+
+        void StopProjectFileTracking()
+        {
+            if (!isDialogOpen)
+            {
+                return;
+            }
+
+            isDialogOpen = false;
+            Vm.ProjectFiles.CollectionChanged -= OnProjectFilesChanged;
         }
 
         void MoveSelection(int offset)
@@ -1512,6 +1558,8 @@ public partial class MainWindow : Window
             search.Focus();
             search.SelectAll();
         };
+        dialog.Closed += (_, _) => StopProjectFileTracking();
+        Vm.ProjectFiles.CollectionChanged += OnProjectFilesChanged;
 
         dialog.Content = new StackPanel
         {
@@ -1538,8 +1586,9 @@ public partial class MainWindow : Window
             },
         };
 
-        RefreshResults();
+        RefreshProjectTree();
         var selectedPath = await dialog.ShowDialog<string?>(this);
+        StopProjectFileTracking();
         Vm.SetProjectWorkspaceCollapsedFolders(
             CollectProjectExplorerCollapsedFolders(treeRoots));
         return selectedPath;
