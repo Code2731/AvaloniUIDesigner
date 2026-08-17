@@ -158,6 +158,7 @@ public partial class MainWindow : Window
         Object Tree Shift+click Select a visible row range
         Object Tree Ctrl+Shift+click Add a visible row range
         Object Tree arrows   Navigate the hierarchy without nudging the canvas
+        Project Explorer arrows  Collapse, expand, and navigate the project tree
         """;
 
     private const string AboutHelpText = """
@@ -1132,6 +1133,45 @@ public partial class MainWindow : Window
         return null;
     }
 
+    private static string? NavigateProjectExplorerTree(
+        IReadOnlyList<ProjectExplorerNode> roots,
+        string relativePath,
+        Key key)
+    {
+        var node = FindProjectExplorerNode(roots, relativePath);
+        if (node is null)
+        {
+            return null;
+        }
+
+        if (key == Key.Right && !node.IsFile)
+        {
+            if (!node.IsExpanded)
+            {
+                node.IsExpanded = true;
+                return node.RelativePath;
+            }
+
+            return node.Children.FirstOrDefault()?.RelativePath;
+        }
+
+        if (key == Key.Left)
+        {
+            if (!node.IsFile && node.IsExpanded)
+            {
+                node.IsExpanded = false;
+                return node.RelativePath;
+            }
+
+            var separatorIndex = node.RelativePath.LastIndexOf('/');
+            return separatorIndex < 0
+                ? null
+                : node.RelativePath[..separatorIndex];
+        }
+
+        return null;
+    }
+
     private static List<string> CollectProjectExplorerCollapsedFolders(
         IReadOnlyList<ProjectExplorerNode> roots)
     {
@@ -1386,6 +1426,27 @@ public partial class MainWindow : Window
             RefreshResults(node.RelativePath);
         }
 
+        void NavigateTree(Key key)
+        {
+            if (list.SelectedItem is not ProjectExplorerNode node)
+            {
+                return;
+            }
+
+            var targetPath = NavigateProjectExplorerTree(
+                treeRoots,
+                node.RelativePath,
+                key);
+            if (targetPath is null)
+            {
+                return;
+            }
+
+            Vm.SetProjectWorkspaceCollapsedFolders(
+                CollectProjectExplorerCollapsedFolders(treeRoots));
+            RefreshResults(targetPath);
+        }
+
         var cancelButton = new Button { Content = "Cancel", MinWidth = 86 };
         var openButton = new Button { Content = "Open", MinWidth = 86 };
         cancelButton.Click += (_, _) => dialog.Close(null);
@@ -1438,6 +1499,11 @@ public partial class MainWindow : Window
                 MoveSelection(-1);
                 e.Handled = true;
             }
+            else if (e.Key == Key.Left || e.Key == Key.Right)
+            {
+                NavigateTree(e.Key);
+                e.Handled = true;
+            }
         };
         dialog.Opened += (_, _) =>
         {
@@ -1453,7 +1519,7 @@ public partial class MainWindow : Window
             {
                 new TextBlock
                 {
-                    Text = "Browse the project tree. Select an AXAML file to open it; press Enter on a folder to expand or collapse it.",
+                    Text = "Browse the project tree. Select an AXAML file to open it; press Enter on a folder to expand or collapse it, or use Left/Right to navigate.",
                     TextWrapping = TextWrapping.Wrap,
                 },
                 rootText,
