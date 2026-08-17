@@ -11,6 +11,7 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
 using Avalonia.Controls.Shapes;
+using Avalonia.Controls.Templates;
 using Avalonia.Input;
 using Avalonia.Input.Platform;
 using Avalonia.Layout;
@@ -1395,6 +1396,52 @@ public partial class MainWindow : Window
         }
     }
 
+    private static IDataTemplate CreateProjectExplorerItemTemplate()
+        => new FuncDataTemplate<ProjectExplorerNode>((node, _) =>
+        {
+            if (node is null)
+            {
+                return new TextBlock();
+            }
+
+            var marker = node.IsFile
+                ? "[F]"
+                : node.IsExpanded ? "[-]" : "[+]";
+            var pathText = node.IsFile
+                ? node.RelativePath
+                : $"{node.RelativePath}/";
+            return new Border
+            {
+                HorizontalAlignment = HorizontalAlignment.Stretch,
+                Padding = new Thickness(8 + node.Depth * 16, 4, 8, 4),
+                Child = new StackPanel
+                {
+                    Orientation = Orientation.Horizontal,
+                    Spacing = 8,
+                    Children =
+                    {
+                        new TextBlock
+                        {
+                            Width = 28,
+                            Text = marker,
+                            Foreground = Brush.Parse("#64748B"),
+                        },
+                        new TextBlock
+                        {
+                            Text = node.DisplayName,
+                            FontWeight = node.IsFile ? FontWeight.Normal : FontWeight.SemiBold,
+                        },
+                        new TextBlock
+                        {
+                            Text = pathText,
+                            Foreground = Brush.Parse("#94A3B8"),
+                            TextTrimming = TextTrimming.CharacterEllipsis,
+                        },
+                    },
+                },
+            };
+        }, supportsRecycling: true);
+
     private async Task<string?> ShowProjectExplorerAsync()
     {
         if (Vm is null || !Vm.HasProjectWorkspace)
@@ -1432,6 +1479,7 @@ public partial class MainWindow : Window
             MinHeight = 330,
             MaxHeight = 390,
             SelectionMode = SelectionMode.Single,
+            ItemTemplate = CreateProjectExplorerItemTemplate(),
         };
         var paths = new List<ProjectWorkspaceFile>();
         var treeRoots = new List<ProjectExplorerNode>();
