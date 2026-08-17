@@ -622,6 +622,7 @@ public partial class MainWindowViewModel : ViewModelBase
     private DocumentTabViewModel? _selectedDocumentTab;
     private WorkspacePanelState _workspacePanelState = WorkspacePanelState.Default;
     private string? _projectWorkspacePath;
+    private string? _externalDocumentChangePath;
 
     private const int MaxClosedDocumentTabs = 20;
     private static readonly HashSet<string> ProjectDirectoryExclusions = new(StringComparer.OrdinalIgnoreCase)
@@ -706,6 +707,12 @@ public partial class MainWindowViewModel : ViewModelBase
         ? "No project folder"
         : GetProjectWorkspaceName(_projectWorkspacePath);
     public bool HasProjectWorkspace => !string.IsNullOrWhiteSpace(_projectWorkspacePath);
+    public bool CanReloadCurrentFile
+        => !string.IsNullOrWhiteSpace(_externalDocumentChangePath)
+            && string.Equals(
+                _externalDocumentChangePath,
+                CurrentDocumentPath,
+                StringComparison.OrdinalIgnoreCase);
 
     public PropertyInspectorState GetPropertyInspectorState()
     {
@@ -10222,6 +10229,7 @@ public partial class MainWindowViewModel : ViewModelBase
         SyncActiveDocumentTabState();
         _selectedDocumentTab = tab;
         _currentDocumentPath = state.DocumentPath;
+        ClearExternalDocumentChange();
         _lastSavedSnapshot = state.LastSavedSnapshot;
         _pendingMutation = state.PendingMutation;
         RestoreHistoryStack(_undoStack, state.UndoStack);
@@ -10382,7 +10390,9 @@ public partial class MainWindowViewModel : ViewModelBase
         _pendingMutation = null;
         ClearHistory();
         AcceptCurrentAsSaved();
+        ClearExternalDocumentChange();
         OnPropertyChanged(nameof(CurrentDocumentPath));
+        OnPropertyChanged(nameof(CanReloadCurrentFile));
         OnPropertyChanged(nameof(WindowTitle));
         SyncActiveDocumentTabState();
         StatusText = "Created a new document.";
@@ -10397,7 +10407,9 @@ public partial class MainWindowViewModel : ViewModelBase
         _pendingMutation = null;
         ClearHistory();
         IsDirty = true;
+        ClearExternalDocumentChange();
         OnPropertyChanged(nameof(CurrentDocumentPath));
+        OnPropertyChanged(nameof(CanReloadCurrentFile));
         OnPropertyChanged(nameof(WindowTitle));
         SyncActiveDocumentTabState();
         StatusText = $"Created {templateName} template. Save it to choose a file name.";
@@ -10417,7 +10429,9 @@ public partial class MainWindowViewModel : ViewModelBase
         _currentDocumentPath = path;
         RegisterRecentFile(path);
         AcceptCurrentAsSaved();
+        ClearExternalDocumentChange();
         OnPropertyChanged(nameof(CurrentDocumentPath));
+        OnPropertyChanged(nameof(CanReloadCurrentFile));
         OnPropertyChanged(nameof(WindowTitle));
         SyncActiveDocumentTabState();
     }
@@ -10427,7 +10441,9 @@ public partial class MainWindowViewModel : ViewModelBase
         _currentDocumentPath = path;
         RegisterRecentFile(path);
         AcceptCurrentAsSaved();
+        ClearExternalDocumentChange();
         OnPropertyChanged(nameof(CurrentDocumentPath));
+        OnPropertyChanged(nameof(CanReloadCurrentFile));
         OnPropertyChanged(nameof(WindowTitle));
         SyncActiveDocumentTabState();
     }
@@ -10443,7 +10459,9 @@ public partial class MainWindowViewModel : ViewModelBase
     {
         _currentDocumentPath = null;
         AcceptCurrentAsSaved();
+        ClearExternalDocumentChange();
         OnPropertyChanged(nameof(CurrentDocumentPath));
+        OnPropertyChanged(nameof(CanReloadCurrentFile));
         OnPropertyChanged(nameof(WindowTitle));
         SyncActiveDocumentTabState();
     }
@@ -15208,13 +15226,47 @@ public partial class MainWindowViewModel : ViewModelBase
         SaveProjectWorkspaceToDisk();
     }
 
-    private void LoadProjectWorkspaceFiles(string rootPath)
+    public void MarkExternalDocumentChanged(string path)
     {
+        if (string.IsNullOrWhiteSpace(path)
+            || !string.Equals(path, CurrentDocumentPath, StringComparison.OrdinalIgnoreCase))
+        {
+            return;
+        }
+
+        _externalDocumentChangePath = path;
+        OnPropertyChanged(nameof(CanReloadCurrentFile));
+        StatusText = $"File changed outside the designer: {Path.GetFileName(path)}. Reload Current File to update.";
+    }
+
+    public void ClearExternalDocumentChange()
+    {
+        if (_externalDocumentChangePath is null)
+        {
+            return;
+        }
+
+        _externalDocumentChangePath = null;
+        OnPropertyChanged(nameof(CanReloadCurrentFile));
+    }
+
+    private bool LoadProjectWorkspaceFiles(string rootPath)
+    {
+        var files = EnumerateProjectWorkspaceFiles(rootPath);
+        if (ProjectFiles.Select(file => file.FullPath).SequenceEqual(
+                files.Select(file => file.FullPath),
+                StringComparer.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
         ProjectFiles.Clear();
-        foreach (var file in EnumerateProjectWorkspaceFiles(rootPath))
+        foreach (var file in files)
         {
             ProjectFiles.Add(file);
         }
+
+        return true;
     }
 
     private static IReadOnlyList<ProjectWorkspaceFile> EnumerateProjectWorkspaceFiles(string rootPath)

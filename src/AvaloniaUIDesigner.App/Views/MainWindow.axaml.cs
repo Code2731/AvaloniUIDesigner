@@ -31,6 +31,7 @@ public partial class MainWindow : Window
         Ctrl+O              Open AXAML document
         Ctrl+Shift+O        Open recent AXAML files
         Ctrl+Shift+P        Open project explorer
+        Ctrl+Shift+R        Reload current file after an external change
         Ctrl+S              Save document
         Ctrl+Alt+S          Save all dirty document tabs
         Ctrl+Alt+D          Duplicate active document tab
@@ -319,6 +320,9 @@ public partial class MainWindow : Window
     private PreviewWindow? _previewWindow;
 
     private readonly DispatcherTimer _propertyEditTimer;
+    private readonly DispatcherTimer _projectWorkspaceRefreshTimer;
+    private readonly Dictionary<string, DateTime> _knownProjectFileWriteTimes = new(StringComparer.OrdinalIgnoreCase);
+    private FileSystemWatcher? _projectWorkspaceWatcher;
     private bool _hasPendingPropertyEdit;
     private bool _hasPendingLayoutEdit;
     private bool _allowCloseWithoutPrompt;
@@ -337,6 +341,11 @@ public partial class MainWindow : Window
             Interval = TimeSpan.FromMilliseconds(450)
         };
         _propertyEditTimer.Tick += OnPropertyEditTimerTick;
+        _projectWorkspaceRefreshTimer = new DispatcherTimer
+        {
+            Interval = TimeSpan.FromMilliseconds(350),
+        };
+        _projectWorkspaceRefreshTimer.Tick += OnProjectWorkspaceRefreshTimerTick;
 
         DataContextChanged += OnDataContextChanged;
         OnDataContextChanged(this, EventArgs.Empty);
@@ -681,6 +690,242 @@ public partial class MainWindow : Window
         }
 
         Vm.StatusText = $"Refreshed {Vm.ProjectFiles.Count} AXAML file(s) in {Vm.ProjectWorkspaceName}.";
+    }
+
+    private async void OnReloadCurrentFileMenuClicked(
+        object? sender,
+        Avalonia.Interactivity.RoutedEventArgs e)
+        => await ReloadCurrentFileAsync();
+
+    private async Task ReloadCurrentFileAsync()
+    {
+        if (Vm is null || string.IsNullOrWhiteSpace(Vm.CurrentDocumentPath))
+        {
+            return;
+        }
+
+        var path = Vm.CurrentDocumentPath;
+        FlushPendingPropertyHistory();
+        if (!await EnsureCanContinueWithUnsavedChangesAsync())
+        {
+            return;
+        }
+
+        try
+        {
+            var content = await File.ReadAllTextAsync(path);
+            if (!Vm.TryImportDraftAxaml(content, out var error, out var warning))
+            {
+                Vm.StatusText = $"Reload failed: {error}";
+                return;
+            }
+
+            Vm.ClearExternalDocumentChange();
+            RememberKnownDocumentWriteTime(path);
+            ClearDesignGuides();
+            Vm.StatusText = BuildOpenStatus(System.IO.Path.GetFileName(path), warning);
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        {
+            Vm.StatusText = $"Could not reload {System.IO.Path.GetFileName(path)}: {exception.Message}";
+        }
+    }
+
+    private void ConfigureProjectWorkspaceWatcher()
+    {
+        DisposeProjectWorkspaceWatcher();
+        _knownProjectFileWriteTimes.Clear();
+
+        var rootPath = _boundVm?.ProjectWorkspacePath;
+        if (string.IsNullOrWhiteSpace(rootPath) || !Directory.Exists(rootPath))
+        {
+            return;
+        }
+
+        RememberKnownDocumentWriteTime(_boundVm?.CurrentDocumentPath);
+        try
+        {
+            _projectWorkspaceWatcher = new FileSystemWatcher(rootPath)
+            {
+                IncludeSubdirectories = true,
+                NotifyFilter = NotifyFilters.FileName
+                    | NotifyFilters.DirectoryName
+                    | NotifyFilters.LastWrite
+                    | NotifyFilters.Size,
+                Filter = "*",
+            };
+            _projectWorkspaceWatcher.Changed += OnProjectWorkspaceFileSystemChanged;
+            _projectWorkspaceWatcher.Created += OnProjectWorkspaceFileSystemChanged;
+            _projectWorkspaceWatcher.Deleted += OnProjectWorkspaceFileSystemChanged;
+            _projectWorkspaceWatcher.Renamed += OnProjectWorkspaceRenamed;
+            _projectWorkspaceWatcher.Error += OnProjectWorkspaceWatcherError;
+            _projectWorkspaceWatcher.EnableRaisingEvents = true;
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        {
+            _boundVm?.StatusText = $"Project file watching is unavailable: {exception.Message}";
+            DisposeProjectWorkspaceWatcher();
+        }
+    }
+
+    private void DisposeProjectWorkspaceWatcher()
+    {
+        _projectWorkspaceRefreshTimer.Stop();
+        if (_projectWorkspaceWatcher is null)
+        {
+            return;
+        }
+
+        _projectWorkspaceWatcher.Changed -= OnProjectWorkspaceFileSystemChanged;
+        _projectWorkspaceWatcher.Created -= OnProjectWorkspaceFileSystemChanged;
+        _projectWorkspaceWatcher.Deleted -= OnProjectWorkspaceFileSystemChanged;
+        _projectWorkspaceWatcher.Renamed -= OnProjectWorkspaceRenamed;
+        _projectWorkspaceWatcher.Error -= OnProjectWorkspaceWatcherError;
+        _projectWorkspaceWatcher.Dispose();
+        _projectWorkspaceWatcher = null;
+    }
+
+    private void OnProjectWorkspaceFileSystemChanged(object? sender, FileSystemEventArgs e)
+    {
+        if (!IsRelevantProjectWorkspacePath(e.FullPath))
+        {
+            return;
+        }
+
+        var path = e.FullPath;
+        Dispatcher.UIThread.Post(() =>
+        {
+            if (Vm is not null
+                && string.Equals(Vm.CurrentDocumentPath, path, StringComparison.OrdinalIgnoreCase)
+                && HasKnownDocumentFileChanged(path))
+            {
+                Vm.MarkExternalDocumentChanged(path);
+            }
+
+            QueueProjectWorkspaceRefresh();
+        });
+    }
+
+    private void OnProjectWorkspaceRenamed(object? sender, RenamedEventArgs e)
+    {
+        if (!IsRelevantProjectWorkspacePath(e.FullPath)
+            && !IsRelevantProjectWorkspacePath(e.OldFullPath))
+        {
+            return;
+        }
+
+        Dispatcher.UIThread.Post(QueueProjectWorkspaceRefresh);
+    }
+
+    private void OnProjectWorkspaceWatcherError(object? sender, ErrorEventArgs e)
+        => Dispatcher.UIThread.Post(QueueProjectWorkspaceRefresh);
+
+    private void QueueProjectWorkspaceRefresh()
+    {
+        if (!Dispatcher.UIThread.CheckAccess())
+        {
+            Dispatcher.UIThread.Post(QueueProjectWorkspaceRefresh);
+            return;
+        }
+
+        _projectWorkspaceRefreshTimer.Stop();
+        _projectWorkspaceRefreshTimer.Start();
+    }
+
+    private void OnProjectWorkspaceRefreshTimerTick(object? sender, EventArgs e)
+    {
+        _projectWorkspaceRefreshTimer.Stop();
+        if (Vm is null)
+        {
+            return;
+        }
+
+        var before = Vm.ProjectFiles.Select(file => file.FullPath).ToArray();
+        if (!Vm.RefreshProjectWorkspace(out var error))
+        {
+            Vm.StatusText = $"Could not refresh project files: {error}";
+            return;
+        }
+
+        var after = Vm.ProjectFiles.Select(file => file.FullPath).ToArray();
+        if (!before.SequenceEqual(after, StringComparer.OrdinalIgnoreCase))
+        {
+            Vm.StatusText = $"Project files updated ({after.Length} AXAML file(s)).";
+        }
+    }
+
+    private bool IsRelevantProjectWorkspacePath(string path)
+    {
+        var rootPath = _boundVm?.ProjectWorkspacePath;
+        if (string.IsNullOrWhiteSpace(rootPath))
+        {
+            return false;
+        }
+
+        try
+        {
+            var relativePath = System.IO.Path.GetRelativePath(rootPath, path);
+            if (relativePath == ".")
+            {
+                return true;
+            }
+
+            var extension = System.IO.Path.GetExtension(path);
+            return string.IsNullOrEmpty(extension)
+                || string.Equals(extension, ".axaml", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(extension, ".xaml", StringComparison.OrdinalIgnoreCase);
+        }
+        catch (ArgumentException)
+        {
+            return false;
+        }
+    }
+
+    private void RememberKnownDocumentWriteTime(string? path)
+    {
+        if (string.IsNullOrWhiteSpace(path) || !File.Exists(path))
+        {
+            return;
+        }
+
+        try
+        {
+            _knownProjectFileWriteTimes[path] = File.GetLastWriteTimeUtc(path);
+        }
+        catch (IOException)
+        {
+            // A transient file access failure will be retried on the next watcher event.
+        }
+    }
+
+    private bool HasKnownDocumentFileChanged(string path)
+    {
+        if (!File.Exists(path))
+        {
+            return true;
+        }
+
+        try
+        {
+            var currentWriteTime = File.GetLastWriteTimeUtc(path);
+            if (!_knownProjectFileWriteTimes.TryGetValue(path, out var knownWriteTime))
+            {
+                _knownProjectFileWriteTimes[path] = currentWriteTime;
+                return false;
+            }
+
+            if (currentWriteTime == knownWriteTime)
+            {
+                return false;
+            }
+
+            _knownProjectFileWriteTimes[path] = currentWriteTime;
+            return true;
+        }
+        catch (IOException)
+        {
+            return false;
+        }
     }
 
     private static List<ProjectFileSwitcherItem> FilterProjectFileSwitcherItems(
@@ -5999,6 +6244,17 @@ public partial class MainWindow : Window
             return;
         }
 
+        if (ctrl && shift && !alt && e.Key == Key.R)
+        {
+            if (Vm?.CanReloadCurrentFile == true)
+            {
+                await ReloadCurrentFileAsync();
+            }
+
+            e.Handled = true;
+            return;
+        }
+
         if (ctrl && e.Key == Key.O)
         {
             await HandleOpenCommandAsync();
@@ -6198,6 +6454,8 @@ public partial class MainWindow : Window
             _boundVm.DocumentChanged -= OnDocumentChanged;
         }
 
+        DisposeProjectWorkspaceWatcher();
+
         _previewWindow?.Close();
         _previewWindow = null;
 
@@ -6220,7 +6478,9 @@ public partial class MainWindow : Window
             _boundVm.DocumentChanged += OnDocumentChanged;
         }
 
+        ConfigureProjectWorkspaceWatcher();
         RebuildRecentFilesMenu();
+        UpdateProjectWorkspaceMenuStates();
         UpdateDocumentBackupMenu();
         ApplyWorkspacePanelState();
         ApplyPropertyInspectorState();
@@ -6254,7 +6514,19 @@ public partial class MainWindow : Window
 
         if (e.PropertyName == nameof(MainWindowViewModel.CurrentDocumentPath))
         {
+            RememberKnownDocumentWriteTime(Vm?.CurrentDocumentPath);
             UpdateDocumentBackupMenu();
+        }
+
+        if (e.PropertyName == nameof(MainWindowViewModel.ProjectWorkspacePath))
+        {
+            ConfigureProjectWorkspaceWatcher();
+        }
+
+        if (e.PropertyName is nameof(MainWindowViewModel.ProjectWorkspacePath)
+            or nameof(MainWindowViewModel.CanReloadCurrentFile))
+        {
+            UpdateProjectWorkspaceMenuStates();
         }
     }
 
@@ -6283,6 +6555,19 @@ public partial class MainWindow : Window
         {
             RecoverBackupMenu.IsEnabled = false;
         }
+    }
+
+    private void UpdateProjectWorkspaceMenuStates()
+    {
+        var hasProjectWorkspace = Vm?.HasProjectWorkspace == true;
+        ProjectExplorerMenu.IsEnabled = hasProjectWorkspace;
+        RefreshProjectFilesMenu.IsEnabled = hasProjectWorkspace;
+        ProjectExplorerContextMenu.IsEnabled = hasProjectWorkspace;
+        RefreshProjectFilesContextMenu.IsEnabled = hasProjectWorkspace;
+
+        var canReloadCurrentFile = Vm?.CanReloadCurrentFile == true;
+        ReloadCurrentFileMenu.IsEnabled = canReloadCurrentFile;
+        ReloadCurrentFileContextMenu.IsEnabled = canReloadCurrentFile;
     }
 
     private static string GetDocumentBackupPath(string documentPath)
@@ -15418,6 +15703,7 @@ public partial class MainWindow : Window
     {
         if (_allowCloseWithoutPrompt)
         {
+            DisposeProjectWorkspaceWatcher();
             return;
         }
 

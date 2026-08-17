@@ -67,6 +67,10 @@
                           Header="Refresh Project Files"
                           Click="OnRefreshProjectFilesMenuClicked"
                           IsEnabled="{Binding HasProjectWorkspace}"/>
+                <MenuItem Name="ReloadCurrentFileMenu"
+                          Header="Reload Current File (Ctrl+Shift+R)"
+                          Click="OnReloadCurrentFileMenuClicked"
+                          IsEnabled="{Binding CanReloadCurrentFile}"/>
                 <Separator/>
                 <MenuItem Header="Save" Click="OnSaveMenuClicked"/>
                 <MenuItem Header="Save As..." Click="OnSaveAsMenuClicked"/>
@@ -493,6 +497,12 @@
                             Click="OnRefreshProjectFilesMenuClicked"
                             IsEnabled="{Binding HasProjectWorkspace}"
                             ToolTip.Tip="Refresh project AXAML files"
+                            Padding="8,3"/>
+                    <Button Name="ReloadCurrentFileToolbar"
+                            Content="Reload"
+                            Click="OnReloadCurrentFileMenuClicked"
+                            IsEnabled="{Binding CanReloadCurrentFile}"
+                            ToolTip.Tip="Reload the current file after an external change (Ctrl+Shift+R)"
                             Padding="8,3"/>
                     <Button Content="Save"
                             Click="OnSaveMenuClicked"
@@ -1470,6 +1480,10 @@
                                               Header="Refresh Project Files"
                                               Click="OnRefreshProjectFilesMenuClicked"
                                               IsEnabled="{Binding HasProjectWorkspace}"/>
+                                    <MenuItem Name="ReloadCurrentFileContextMenu"
+                                              Header="Reload Current File (Ctrl+Shift+R)"
+                                              Click="OnReloadCurrentFileMenuClicked"
+                                              IsEnabled="{Binding CanReloadCurrentFile}"/>
                                     <MenuItem Header="Duplicate"
                                               Click="OnDuplicateMenuClicked"
                                               IsEnabled="{Binding Canvas.IsSelectionActive}"/>
