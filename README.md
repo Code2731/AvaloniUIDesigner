@@ -138,7 +138,7 @@ dotnet run --project src/AvaloniaUIDesigner.App/AvaloniaUIDesigner.App.csproj
 - **Preview Interaction Log**: Live Preview에서 연결된 Button·TextBox·선택·토글·포인터·키보드·포커스 이벤트를 발생시키고 `Control.Event -> HandlerName` 형식의 최근 로그로 디자인 타임 연결을 즉시 확인
 - **Style Clipboard**: `Edit > Style Clipboard`, Design Toolbar, Canvas Context Menu 또는 `Ctrl+Shift+C/V`에서 선택 컨트롤의 외형·타이포그래피·렌더링·효과·상호작용·스타일 클래스와 리소스 참조만 복사해 하나 또는 여러 대상에 붙여넣고, 콘텐츠·위치·크기·계층·바인딩·이벤트는 보존
 - **Undo History Timeline**: `Edit > History...`, Design Toolbar, Canvas Context Menu 또는 `Ctrl+Alt+Shift+F`에서 현재 문서와 Undo·Redo 작업을 한 번에 확인하고 원하는 지점으로 이동
-- **Document Tabs**: 여러 AXAML 문서를 동시에 탭으로 열고 전환하며, 문서별 캔버스·dirty 상태·Undo/Redo history를 독립적으로 보존합니다. `Ctrl+N`/`File > New`는 새 탭, `Ctrl+W`/`File > Close Tab`은 현재 탭을 닫고, `File > Open...`은 문서를 새 탭으로 엽니다. 탭 헤더를 드래그하면 원하는 순서로 재배치하고, 드롭 위치를 세션에 보존합니다.
+- **Document Tabs**: 여러 AXAML 문서를 동시에 탭으로 열고 전환하며, 문서별 캔버스·dirty 상태·Undo/Redo history를 독립적으로 보존합니다. `Ctrl+N`/`File > New`는 새 탭, `Ctrl+W`/`File > Close Tab`은 현재 탭을 닫고, `File > Open...`은 문서를 새 탭으로 엽니다. 탭 헤더를 드래그하면 원하는 순서로 재배치하고, 드롭 위치를 세션에 보존합니다. 같은 탭 명령은 Design Toolbar의 `Tabs` 그룹과 디자인 캔버스 Context Menu에서도 실행할 수 있습니다.
 - **Document Tab Duplication**: `File > Duplicate Tab`, 탭 컨텍스트 메뉴 또는 `Ctrl+Alt+D`로 현재 문서를 독립된 새 dirty 탭으로 복제합니다. 문서 내용·Undo/Redo·줌·선택·Property Inspector 탐색 상태를 함께 복사하고 저장 경로는 비워 새 파일로 저장하게 합니다.
 - **Document Tab Naming**: `File > Rename Tab...`, 탭 컨텍스트 메뉴 또는 `Ctrl+Alt+R`로 열린 문서 탭에 1-80자 별칭을 지정합니다. 저장 파일명과 별칭을 분리하고, 별칭은 열린 탭·닫힌 탭 기록·세션 복원·창 제목에 유지합니다.
 - **Document Tab Middle-Click Close**: 탭 헤더를 중간 클릭하면 기존 dirty 확인을 거쳐 해당 문서 탭을 닫습니다. 취소하거나 저장에 실패하면 원래 활성 탭과 편집 상태를 유지합니다.
@@ -382,6 +382,7 @@ dotnet run --project src/AvaloniaUIDesigner.App/AvaloniaUIDesigner.App.csproj
 75bx. 문서 탭의 Canvas ScrollViewer 가로·세로 오프셋도 탭 상태와 세션 JSON에 저장됩니다. 탭 전환·앱 재시작·닫힌 탭 복원 후 새 문서의 실제 viewport/extent 범위에 맞춰 안전하게 clamp하므로 확대된 아트보드에서 작업하던 위치를 잃지 않으며, 기존 세션에는 `(0, 0)`을 적용합니다.
 75by. viewport 복원에는 pending 세대가 부여되며, 이전 탭의 늦은 `LayoutUpdated`/dispatcher callback은 무시됩니다. 복원 pending 동안에는 선택 요소의 자동 `ScrollIntoView`도 보류하고, 저장 오프셋을 적용한 뒤 idle 시점에만 정상 선택 추적을 재개해 빠른 탭 순환에서도 작업 위치가 흔들리지 않습니다.
 75bz. `Edit Tab Order...`의 초기값은 자동 순서일 때 `2147483647` 대신 `auto`로 표시하며, `auto`/`-1`은 Avalonia 자동 순서로 정규화합니다. 단일 편집기와 `Edit Tab Order Map...`은 `0~10000` 범위·중복 검증·Undo/Redo 규칙을 같은 parser로 공유해 입력 결과가 달라지지 않습니다.
+75ca. Design Toolbar의 `Tabs` 그룹 또는 디자인 캔버스 Context Menu에서 `New Tab`, `Quick Switch`, `Duplicate`, `Close`, `Reopen Closed Tab`을 실행할 수 있으며, 기존 `Ctrl+N`·`Ctrl+K`·`Ctrl+Alt+D`·`Ctrl+W`·`Ctrl+Shift+T` 단축키와 동일한 명령을 공유합니다.
 76. `File > Load Component Pack...` 또는 `File > Load Toolbox Preset Pack...`으로 외부 Toolbox 팩을 추가하면 파일 경로가 세션에 등록되어 다음 실행 때 자동으로 다시 로드됩니다. 파일이 없어도 문서 탭 복원은 계속되며 상태바에 경고가 표시됩니다.
 77. 외부 프로젝트의 컨트롤은 Component Pack 항목에 `designOnly: true`, `avaloniaTypeName`, `previewText`, `defaultProperties`를 지정해 등록합니다. 디자이너에서는 타입명 플레이스홀더로 편집하고, 생성 AXAML에는 원래 커스텀 타입과 속성을 출력합니다. 예시는 [custom-component-pack.example.json](docs/custom-component-pack.example.json)을 참고하세요.
 78. `File > Load Component Pack Plugin...`에서 `IComponentPackPlugin`을 구현한 신뢰할 수 있는 DLL을 선택하면 플러그인이 제공한 Component Pack을 Toolbox에 등록합니다. DLL 경로는 세션 JSON의 `ComponentPluginPaths`에 저장되고, 앱 재시작 시 플러그인·JSON 팩·프리셋 팩 순서로 복원됩니다.
@@ -694,6 +695,7 @@ AXAML 소스 편집기의 `Validate`와 `Preview`는 현재 디자인과 Undo �
 - v2.44: Preview Interaction Log Toolbar·Context Menu·Ctrl+Alt+Shift+Z 빠른 접근 추가
 - v2.45: Style Clipboard Edit 하위 메뉴·Toolbar·Context Menu·공용 단축키 빠른 접근 정리
 - v2.46: Undo History Timeline Toolbar·Context Menu·Ctrl+Alt+Shift+F 빠른 접근 추가
+- v2.47: Document Tabs Toolbar·Context Menu·기존 탭 단축키 빠른 접근 추가
 
 ## 컴포넌트 팩
 
