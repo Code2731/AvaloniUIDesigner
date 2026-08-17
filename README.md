@@ -143,7 +143,7 @@ dotnet run --project src/AvaloniaUIDesigner.App/AvaloniaUIDesigner.App.csproj
 - **Document Tab Naming**: `File > Rename Tab...`, 탭 컨텍스트 메뉴 또는 `Ctrl+Alt+R`로 열린 문서 탭에 1-80자 별칭을 지정합니다. 저장 파일명과 별칭을 분리하고, 별칭은 열린 탭·닫힌 탭 기록·세션 복원·창 제목에 유지합니다.
 - **Document Tab Middle-Click Close**: 탭 헤더를 중간 클릭하면 기존 dirty 확인을 거쳐 해당 문서 탭을 닫습니다. 취소하거나 저장에 실패하면 원래 활성 탭과 편집 상태를 유지합니다.
 - **Document Tab Direct Shortcuts**: `Ctrl+1`~`Ctrl+9`로 1-9번째 문서 탭을 즉시 활성화하고, `Ctrl+Tab` 순환이나 탭 드래그/이동과 함께 사용할 수 있습니다.
-- **Document Tab Quick Switcher**: `View > Quick Switch Document Tab...` 또는 `Ctrl+K`로 열린 탭의 별칭·파일 경로를 검색하고 Enter로 즉시 전환합니다.
+- **Document Tab Quick Switcher**: `View > Quick Switch Document Tab...` 또는 `Ctrl+K`로 열린 탭의 별칭·파일 경로·탭 번호·저장 상태를 검색하고 Enter로 즉시 전환합니다. 결과에는 `Ctrl+1..9` 바로가기와 `Saved`·`Modified`·`Unsaved` 상태가 표시되며, 위·아래 키는 끝에서 처음/처음에서 끝으로 순환합니다.
 - **Tab View Navigation**: `Ctrl+Tab`/`Ctrl+Shift+Tab`으로 문서 탭을 순환하고, `Ctrl+Shift+PageUp/PageDown` 또는 탭 컨텍스트 메뉴로 활성 탭을 좌우 이동하며, 탭별 캔버스 줌·스크롤 위치와 Object Tree 선택을 전환·세션 복원 때 보존합니다.
 - **Viewport 복원 우선순위**: 문서 탭을 복원하는 짧은 pending 구간에는 선택 컨트롤 자동 스크롤을 보류해 저장된 Canvas 위치가 Object Tree/Canvas 선택 추적에 의해 덮어써지지 않도록 합니다.
 - **Workspace Panels**: `View > Panels`에서 Toolbox·Object Tree·Property Inspector를 독립적으로 숨기거나 다시 표시하고, 패널 크기와 가시성·Object Tree 분할 위치를 세션에 저장합니다. `Reset Panel Layout`으로 기본 작업 공간을 복원합니다.
@@ -316,7 +316,7 @@ dotnet run --project src/AvaloniaUIDesigner.App/AvaloniaUIDesigner.App.csproj
 75j. `File > Rename Tab...`, 탭 컨텍스트 메뉴 또는 `Ctrl+Alt+R`로 문서 탭 별칭을 지정할 수 있습니다. 별칭은 1-80자의 한 줄 이름으로 검증되며 파일 경로와 독립적으로 열린 탭·닫힌 탭 복원·세션 JSON·창 제목에 반영됩니다.
 75k. 문서 탭 헤더를 중간 클릭하면 `Close Tab`과 동일한 dirty 확인을 거쳐 해당 탭을 닫습니다. 마지막 탭은 닫히지 않으며, 취소 시 원래 활성 탭으로 복원됩니다.
 75l. `Ctrl+1`~`Ctrl+9`는 현재 탭 순서의 1-9번째 문서 탭을 즉시 선택합니다. 존재하지 않는 번호도 입력을 소비해 캔버스나 텍스트 편집기에 잘못 전달되지 않습니다.
-75m. `View > Quick Switch Document Tab...` 또는 `Ctrl+K`는 열린 문서 탭의 별칭과 저장 경로를 검색합니다. 검색창에서 `Enter`는 선택 탭으로 전환하고, `Escape`는 취소하며, 위/아래 방향키는 결과를 이동합니다.
+75m. `View > Quick Switch Document Tab...` 또는 `Ctrl+K`는 열린 문서 탭의 별칭·저장 경로·1-based 탭 번호(`2`, `#2`, `Tab 2`)·`dirty`/`modified`/`saved`/`unsaved` 상태를 검색합니다. 결과 행에는 `Ctrl+1..9` 또는 `Tab N` 힌트와 저장 상태가 표시되며, 검색창과 결과 목록의 위/아래 방향키는 끝에서 반대쪽으로 순환합니다. `Enter`는 선택 탭으로 전환하고 `Escape`는 취소합니다.
 75n. 캔버스가 포커스를 가진 상태에서 `Ctrl+=`/`Ctrl+Plus`는 10% 확대, `Ctrl+-`/`Ctrl+Minus`는 10% 축소, `Ctrl+0`은 100% 실제 크기, `F`는 현재 뷰포트에 맞춤을 실행합니다. 확대·축소는 활성 문서 탭별 Zoom 상태에 보존되며 텍스트 입력 중인 TextBox에는 전달되지 않습니다.
 75o. `View > Zoom Presets`에서 25%·50%·75%·100%·125%·150%·200%를 즉시 선택하거나 `Custom...`에서 25~200%의 소수점 배율을 입력할 수 있습니다. 잘못된 값은 적용하지 않고 현재 배율을 유지합니다.
 75p. 캔버스에서 두 개 이상의 컨트롤을 선택한 뒤 `Ctrl+Shift+Left/Right/Up/Down`을 누르면 각각 선택 영역의 좌·우·상·하 경계에 맞춰 정렬하고, `Ctrl+Shift+E/M`은 가로 중앙·세로 중앙에 맞춥니다. 세 개 이상 선택하면 `Ctrl+Alt+H/V`로 가로·세로 간격을 균등 분배할 수 있고, `Ctrl+Alt+Shift+W/H/S`로 선택된 컨트롤의 너비·높이·전체 크기를 맞출 수 있습니다. 크기 맞춤은 현재 주 선택 컨트롤을 기준으로 하며, Object Tree에 포커스가 있으면 방향키 탐색을 우선합니다. 모든 작업 결과는 하나의 Undo 작업과 AXAML에 반영됩니다.
@@ -696,6 +696,7 @@ AXAML 소스 편집기의 `Validate`와 `Preview`는 현재 디자인과 Undo �
 - v2.45: Style Clipboard Edit 하위 메뉴·Toolbar·Context Menu·공용 단축키 빠른 접근 정리
 - v2.46: Undo History Timeline Toolbar·Context Menu·Ctrl+Alt+Shift+F 빠른 접근 추가
 - v2.47: Document Tabs Toolbar·Context Menu·기존 탭 단축키 빠른 접근 추가
+- v2.48: Document Tab Quick Switcher 번호·저장 상태 검색·순환 키보드 탐색 추가
 
 ## 컴포넌트 팩
 

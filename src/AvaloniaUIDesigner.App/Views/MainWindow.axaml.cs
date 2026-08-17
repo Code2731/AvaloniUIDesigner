@@ -209,9 +209,21 @@ public partial class MainWindow : Window
             => string.IsNullOrWhiteSpace(ChildName) ? Slot.ToString() : $"{Slot} ({ChildName})";
     }
     private sealed record ContentAssignmentOptions(string ParentName);
-    private sealed record DocumentTabSwitcherItem(DocumentTabViewModel Tab, string Path)
+    private sealed record DocumentTabSwitcherItem(
+        DocumentTabViewModel Tab,
+        int Index,
+        string Path)
     {
-        public override string ToString() => $"{Tab.Header} - {Path}";
+        private bool IsUnsaved => string.IsNullOrWhiteSpace(Tab.DocumentPath);
+
+        public string ShortcutLabel => Index is >= 1 and <= 9 ? $"Ctrl+{Index}" : $"Tab {Index}";
+
+        public string StatusLabel => Tab.IsDirty
+            ? IsUnsaved ? "Modified (unsaved)" : "Modified"
+            : IsUnsaved ? "Unsaved" : "Saved";
+
+        public override string ToString()
+            => $"{ShortcutLabel} | {Tab.Header} - {Path} [{StatusLabel}]";
     }
 
     private const double HandlePixelSize = 10;
@@ -344,16 +356,99 @@ public partial class MainWindow : Window
     {
         var normalizedQuery = query?.Trim() ?? string.Empty;
         return tabs
-            .Where(tab => string.IsNullOrWhiteSpace(normalizedQuery)
-                || tab.DisplayName.Contains(normalizedQuery, StringComparison.OrdinalIgnoreCase)
-                || (!string.IsNullOrWhiteSpace(tab.DocumentPath)
-                    && tab.DocumentPath.Contains(normalizedQuery, StringComparison.OrdinalIgnoreCase)))
-            .Select(tab => new DocumentTabSwitcherItem(
-                tab,
-                string.IsNullOrWhiteSpace(tab.DocumentPath)
+            .Select((tab, index) => new { Tab = tab, Index = index + 1 })
+            .Where(entry => MatchesDocumentTabSwitcherQuery(entry.Tab, entry.Index, normalizedQuery))
+            .Select(entry => new DocumentTabSwitcherItem(
+                entry.Tab,
+                entry.Index,
+                string.IsNullOrWhiteSpace(entry.Tab.DocumentPath)
                     ? "Unsaved document"
-                    : tab.DocumentPath!))
+                    : entry.Tab.DocumentPath!))
             .ToList();
+    }
+
+    private static bool MatchesDocumentTabSwitcherQuery(
+        DocumentTabViewModel tab,
+        int index,
+        string normalizedQuery)
+    {
+        if (string.IsNullOrWhiteSpace(normalizedQuery))
+        {
+            return true;
+        }
+
+        if (MatchesDocumentTabSwitcherIndex(normalizedQuery, index))
+        {
+            return true;
+        }
+
+        if (MatchesDocumentTabSwitcherStatus(tab, normalizedQuery) is { } statusMatch)
+        {
+            return statusMatch;
+        }
+
+        var statusTerms = tab.IsDirty ? "dirty modified changed" : "clean";
+        statusTerms += string.IsNullOrWhiteSpace(tab.DocumentPath)
+            ? " unsaved new untitled"
+            : " saved";
+
+        var searchableText = $"{tab.DisplayName} {tab.DocumentPath} {statusTerms}";
+        return searchableText.Contains(normalizedQuery, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool? MatchesDocumentTabSwitcherStatus(
+        DocumentTabViewModel tab,
+        string query)
+    {
+        return query.ToLowerInvariant() switch
+        {
+            "dirty" or "modified" or "changed" => tab.IsDirty,
+            "clean" => !tab.IsDirty,
+            "saved" => !tab.IsDirty && !string.IsNullOrWhiteSpace(tab.DocumentPath),
+            "unsaved" or "new" or "untitled" => string.IsNullOrWhiteSpace(tab.DocumentPath),
+            _ => null,
+        };
+    }
+
+    private static bool MatchesDocumentTabSwitcherIndex(string query, int index)
+    {
+        var indexQuery = query;
+        if (indexQuery.StartsWith('#'))
+        {
+            indexQuery = indexQuery[1..].Trim();
+        }
+        else if (indexQuery.StartsWith("tab ", StringComparison.OrdinalIgnoreCase))
+        {
+            indexQuery = indexQuery[4..].Trim();
+        }
+
+        return int.TryParse(
+                indexQuery,
+                NumberStyles.None,
+                CultureInfo.InvariantCulture,
+                out var requestedIndex)
+            && requestedIndex == index;
+    }
+
+    private static int MoveDocumentTabSwitcherSelection(
+        int selectedIndex,
+        int offset,
+        int itemCount)
+    {
+        if (itemCount <= 0)
+        {
+            return -1;
+        }
+
+        var currentIndex = selectedIndex < 0
+            ? offset > 0 ? 0 : itemCount - 1
+            : (selectedIndex + offset) % itemCount;
+        if (currentIndex < 0)
+        {
+            currentIndex += itemCount;
+        }
+
+        return currentIndex;
     }
 
     private async Task<DocumentTabViewModel?> ShowDocumentTabSwitcherAsync()
@@ -413,20 +508,10 @@ public partial class MainWindow : Window
                 return;
             }
 
-            var currentIndex = list.SelectedIndex;
-            if (currentIndex < 0)
-            {
-                currentIndex = offset > 0 ? 0 : filteredItems.Count - 1;
-            }
-            else
-            {
-                currentIndex = Math.Clamp(
-                    currentIndex + offset,
-                    0,
-                    filteredItems.Count - 1);
-            }
-
-            list.SelectedIndex = currentIndex;
+            list.SelectedIndex = MoveDocumentTabSwitcherSelection(
+                list.SelectedIndex,
+                offset,
+                filteredItems.Count);
         }
 
         void SelectCurrent()
@@ -477,6 +562,16 @@ public partial class MainWindow : Window
             else if (e.Key == Key.Escape)
             {
                 dialog.Close(null);
+                e.Handled = true;
+            }
+            else if (e.Key == Key.Down)
+            {
+                MoveSelection(1);
+                e.Handled = true;
+            }
+            else if (e.Key == Key.Up)
+            {
+                MoveSelection(-1);
                 e.Handled = true;
             }
         };
