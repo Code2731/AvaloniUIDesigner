@@ -29,6 +29,7 @@ public partial class MainWindow : Window
     private const string KeyboardShortcutsHelpText = """
         Ctrl+N              New document
         Ctrl+O              Open AXAML document
+        Ctrl+Shift+O        Open recent AXAML files
         Ctrl+S              Save document
         Ctrl+Alt+S          Save all dirty document tabs
         Ctrl+Alt+D          Duplicate active document tab
@@ -211,6 +212,15 @@ public partial class MainWindow : Window
             => string.IsNullOrWhiteSpace(ChildName) ? Slot.ToString() : $"{Slot} ({ChildName})";
     }
     private sealed record ContentAssignmentOptions(string ParentName);
+    private sealed record RecentFileSwitcherItem(string Path, int Index, bool Exists)
+    {
+        public string DisplayName => System.IO.Path.GetFileName(Path);
+        public string StatusLabel => Exists ? "Available" : "Missing";
+
+        public override string ToString()
+            => $"{Index}. {DisplayName} - {Path} [{StatusLabel}]";
+    }
+
     private sealed record DocumentTabSwitcherItem(
         DocumentTabViewModel Tab,
         int Index,
@@ -327,6 +337,255 @@ public partial class MainWindow : Window
     private async void OnOpenMenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
         await HandleOpenCommandAsync();
+    }
+
+    private async void OnOpenRecentFilesMenuClicked(
+        object? sender,
+        Avalonia.Interactivity.RoutedEventArgs e)
+        => await OpenRecentFilesAsync();
+
+    private async Task OpenRecentFilesAsync()
+    {
+        if (Vm is null)
+        {
+            return;
+        }
+
+        if (Vm.RecentFiles.Count == 0)
+        {
+            Vm.StatusText = "No recent AXAML files are available.";
+            return;
+        }
+
+        FlushPendingPropertyHistory();
+        var selectedPath = await ShowRecentFilesAsync();
+        if (selectedPath is not null)
+        {
+            await OpenRecentFileAsync(selectedPath);
+        }
+    }
+
+    private static List<RecentFileSwitcherItem> FilterRecentFileSwitcherItems(
+        IReadOnlyList<string> paths,
+        string? query)
+    {
+        var normalizedQuery = query?.Trim() ?? string.Empty;
+        return paths
+            .Select((path, index) => new RecentFileSwitcherItem(
+                path,
+                index + 1,
+                File.Exists(path)))
+            .Where(item => string.IsNullOrWhiteSpace(normalizedQuery)
+                || item.DisplayName.Contains(normalizedQuery, StringComparison.OrdinalIgnoreCase)
+                || item.Path.Contains(normalizedQuery, StringComparison.OrdinalIgnoreCase))
+            .ToList();
+    }
+
+    private static int MoveRecentFileSwitcherSelection(
+        int selectedIndex,
+        int offset,
+        int itemCount)
+    {
+        if (itemCount <= 0)
+        {
+            return -1;
+        }
+
+        var currentIndex = selectedIndex < 0
+            ? offset > 0 ? 0 : itemCount - 1
+            : (selectedIndex + offset) % itemCount;
+        if (currentIndex < 0)
+        {
+            currentIndex += itemCount;
+        }
+
+        return currentIndex;
+    }
+
+    private async Task<string?> ShowRecentFilesAsync()
+    {
+        if (Vm is null)
+        {
+            return null;
+        }
+
+        var paths = Vm.RecentFiles.ToList();
+        var dialog = new Window
+        {
+            Title = "Open Recent AXAML Files",
+            Width = 680,
+            Height = 470,
+            MinWidth = 500,
+            MinHeight = 360,
+            CanResize = false,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner,
+        };
+        var search = new TextBox
+        {
+            Watermark = "Search recent file name or path",
+            MinWidth = 440,
+        };
+        var matchSummary = new TextBlock
+        {
+            Foreground = Brush.Parse("#64748B"),
+        };
+        var list = new ListBox
+        {
+            MinHeight = 280,
+            MaxHeight = 330,
+            SelectionMode = SelectionMode.Single,
+        };
+        var filteredItems = new List<RecentFileSwitcherItem>();
+
+        void RefreshResults()
+        {
+            filteredItems = FilterRecentFileSwitcherItems(paths, search.Text);
+            list.ItemsSource = filteredItems;
+            list.SelectedIndex = filteredItems.Count > 0 ? 0 : -1;
+            matchSummary.Text = filteredItems.Count == 0
+                ? "No matching recent files."
+                : $"{filteredItems.Count} recent file(s)";
+        }
+
+        void MoveSelection(int offset)
+        {
+            if (filteredItems.Count == 0)
+            {
+                return;
+            }
+
+            list.SelectedIndex = MoveRecentFileSwitcherSelection(
+                list.SelectedIndex,
+                offset,
+                filteredItems.Count);
+        }
+
+        void SelectCurrent()
+        {
+            if (list.SelectedItem is RecentFileSwitcherItem item)
+            {
+                dialog.Close(item.Path);
+            }
+        }
+
+        var cancelButton = new Button { Content = "Cancel", MinWidth = 86 };
+        var openButton = new Button { Content = "Open", MinWidth = 86 };
+        cancelButton.Click += (_, _) => dialog.Close(null);
+        openButton.Click += (_, _) => SelectCurrent();
+        search.TextChanged += (_, _) => RefreshResults();
+        search.KeyDown += (_, e) =>
+        {
+            if (e.Key == Key.Enter)
+            {
+                SelectCurrent();
+                e.Handled = true;
+            }
+            else if (e.Key == Key.Escape)
+            {
+                dialog.Close(null);
+                e.Handled = true;
+            }
+            else if (e.Key == Key.Down)
+            {
+                MoveSelection(1);
+                list.Focus();
+                e.Handled = true;
+            }
+            else if (e.Key == Key.Up)
+            {
+                MoveSelection(-1);
+                list.Focus();
+                e.Handled = true;
+            }
+        };
+        list.KeyDown += (_, e) =>
+        {
+            if (e.Key == Key.Enter)
+            {
+                SelectCurrent();
+                e.Handled = true;
+            }
+            else if (e.Key == Key.Escape)
+            {
+                dialog.Close(null);
+                e.Handled = true;
+            }
+            else if (e.Key == Key.Down)
+            {
+                MoveSelection(1);
+                e.Handled = true;
+            }
+            else if (e.Key == Key.Up)
+            {
+                MoveSelection(-1);
+                e.Handled = true;
+            }
+        };
+        dialog.Opened += (_, _) =>
+        {
+            search.Focus();
+            search.SelectAll();
+        };
+
+        dialog.Content = new StackPanel
+        {
+            Margin = new Thickness(16),
+            Spacing = 10,
+            Children =
+            {
+                new TextBlock
+                {
+                    Text = "Search recently opened AXAML files by name or path.",
+                    TextWrapping = TextWrapping.Wrap,
+                },
+                search,
+                matchSummary,
+                list,
+                new StackPanel
+                {
+                    Orientation = Orientation.Horizontal,
+                    HorizontalAlignment = HorizontalAlignment.Right,
+                    Spacing = 8,
+                    Children = { cancelButton, openButton },
+                },
+            },
+        };
+
+        RefreshResults();
+        return await dialog.ShowDialog<string?>(this);
+    }
+
+    private async Task OpenRecentFileAsync(string path)
+    {
+        if (Vm is null)
+        {
+            return;
+        }
+
+        FlushPendingPropertyHistory();
+        if (!File.Exists(path))
+        {
+            Vm.RemoveRecentFile(path);
+            Vm.StatusText = $"Recent file not found: {path}";
+            return;
+        }
+
+        try
+        {
+            var content = await File.ReadAllTextAsync(path);
+            if (!Vm.TryOpenDocumentTab(content, path, out var error, out var warning))
+            {
+                Vm.StatusText = $"Open failed: {error}";
+                return;
+            }
+
+            ClearDesignGuides();
+            Vm.StatusText = BuildOpenStatus(System.IO.Path.GetFileName(path), warning);
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        {
+            Vm.StatusText = $"Could not open recent file: {exception.Message}";
+        }
     }
 
     private async void OnQuickSwitchDocumentTabMenuClicked(
@@ -5437,6 +5696,13 @@ public partial class MainWindow : Window
             return;
         }
 
+        if (ctrl && shift && !alt && e.Key == Key.O)
+        {
+            await OpenRecentFilesAsync();
+            e.Handled = true;
+            return;
+        }
+
         if (ctrl && e.Key == Key.O)
         {
             await HandleOpenCommandAsync();
@@ -5760,23 +6026,7 @@ public partial class MainWindow : Window
             return;
         }
 
-        FlushPendingPropertyHistory();
-        if (!File.Exists(path))
-        {
-            Vm.RemoveRecentFile(path);
-            Vm.StatusText = $"Recent file not found: {path}";
-            return;
-        }
-
-        var content = await File.ReadAllTextAsync(path);
-        if (!Vm.TryOpenDocumentTab(content, path, out var error, out var warning))
-        {
-            Vm.StatusText = $"Open failed: {error}";
-            return;
-        }
-
-        ClearDesignGuides();
-        Vm.StatusText = BuildOpenStatus(System.IO.Path.GetFileName(path), warning);
+        await OpenRecentFileAsync(path);
     }
 
     private void OnCanvasPropertyChanged(object? sender, PropertyChangedEventArgs e)

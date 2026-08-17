@@ -53,6 +53,10 @@
                 <MenuItem Header="Add Selection to Toolbox..." Click="OnAddSelectionToToolboxMenuClicked" IsEnabled="{Binding Canvas.HasMultipleSelection}"/>
                 <MenuItem Header="Open..." Click="OnOpenMenuClicked"/>
                 <MenuItem Header="Open Recent" x:Name="OpenRecentMenu"/>
+                <MenuItem Name="OpenRecentFilesMenu"
+                          Header="Open Recent Files... (Ctrl+Shift+O)"
+                          Click="OnOpenRecentFilesMenuClicked"
+                          IsEnabled="{Binding HasRecentFiles}"/>
                 <Separator/>
                 <MenuItem Header="Save" Click="OnSaveMenuClicked"/>
                 <MenuItem Header="Save As..." Click="OnSaveAsMenuClicked"/>
@@ -444,6 +448,24 @@
                             Click="OnReopenClosedTabMenuClicked"
                             IsEnabled="{Binding CanReopenClosedDocumentTab}"
                             ToolTip.Tip="Reopen the last closed document tab (Ctrl+Shift+T)"
+                            Padding="8,3"/>
+                    <Border Width="1" Background="#CBD5E1" Margin="0,2"/>
+                    <TextBlock Text="Files"
+                               VerticalAlignment="Center"
+                               FontSize="11"
+                               FontWeight="Bold"
+                               Foreground="#334155"
+                               Margin="2,0,0,0"/>
+                    <Button Name="OpenDocumentToolbar"
+                            Content="Open"
+                            Click="OnOpenMenuClicked"
+                            ToolTip.Tip="Open an AXAML document (Ctrl+O)"
+                            Padding="8,3"/>
+                    <Button Name="OpenRecentFilesToolbar"
+                            Content="Recent Files"
+                            Click="OnOpenRecentFilesMenuClicked"
+                            IsEnabled="{Binding HasRecentFiles}"
+                            ToolTip.Tip="Search recently opened AXAML files (Ctrl+Shift+O)"
                             Padding="8,3"/>
                     <Button Content="Save"
                             Click="OnSaveMenuClicked"
@@ -1409,6 +1431,10 @@
                                                   Click="OnReopenClosedTabMenuClicked"
                                                   IsEnabled="{Binding CanReopenClosedDocumentTab}"/>
                                     </MenuItem>
+                                    <MenuItem Name="OpenRecentFilesContextMenu"
+                                              Header="Open Recent Files... (Ctrl+Shift+O)"
+                                              Click="OnOpenRecentFilesMenuClicked"
+                                              IsEnabled="{Binding HasRecentFiles}"/>
                                     <MenuItem Header="Duplicate"
                                               Click="OnDuplicateMenuClicked"
                                               IsEnabled="{Binding Canvas.IsSelectionActive}"/>

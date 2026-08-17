@@ -678,6 +678,7 @@ public partial class MainWindowViewModel : ViewModelBase
     public string? CurrentDocumentPath => _currentDocumentPath;
     public string WindowTitle => $"Avalonia UI Designer - {GetDisplayDocumentName()}{(IsDirty ? "*" : string.Empty)}";
     public DocumentTabViewModel? SelectedDocumentTab => _selectedDocumentTab;
+    public bool HasRecentFiles => RecentFiles.Count > 0;
 
     public PropertyInspectorState GetPropertyInspectorState()
     {
@@ -15131,6 +15132,7 @@ public partial class MainWindowViewModel : ViewModelBase
             RecentFiles.RemoveAt(RecentFiles.Count - 1);
         }
 
+        OnPropertyChanged(nameof(HasRecentFiles));
         SaveRecentFilesToDisk();
     }
 
@@ -15149,6 +15151,7 @@ public partial class MainWindowViewModel : ViewModelBase
             }
         }
 
+        OnPropertyChanged(nameof(HasRecentFiles));
         SaveRecentFilesToDisk();
     }
 
@@ -15168,6 +15171,8 @@ public partial class MainWindowViewModel : ViewModelBase
             {
                 RecentFiles.Add(entry);
             }
+
+            OnPropertyChanged(nameof(HasRecentFiles));
         }
         catch
         {
