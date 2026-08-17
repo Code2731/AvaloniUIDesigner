@@ -117,7 +117,7 @@
                 <MenuItem Header="Edit Disclosure &amp; Scrolling... (Ctrl+Alt+Shift+U)" Click="OnEditContainerBehaviorPropertiesMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
                 <MenuItem Header="Edit SplitView Pane Behavior... (Ctrl+Alt+Shift+V)" Click="OnEditSplitViewPropertiesMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
                 <MenuItem Header="Edit TabControl Behavior... (Ctrl+Alt+Shift+K)" Click="OnEditTabControlBehaviorPropertiesMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
-                <MenuItem Header="Edit Image Source &amp; Rendering..." Click="OnEditImagePropertiesMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
+                <MenuItem Header="Edit Image Source &amp; Rendering... (Ctrl+Alt+Shift+I)" Click="OnEditImagePropertiesMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
                 <MenuItem Header="Edit Button Actions &amp; Commands... (Ctrl+Alt+Shift+N)" Click="OnEditButtonPropertiesMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
                 <MenuItem Header="Edit Grid Definitions..." Click="OnEditGridDefinitionsMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
                 <MenuItem Header="Edit GridSplitter Behavior... (Ctrl+Alt+Shift+J)" Click="OnEditGridSplitterPropertiesMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
@@ -633,6 +633,12 @@
                             Click="OnEditTabControlBehaviorPropertiesMenuClicked"
                             IsEnabled="{Binding Canvas.IsSelectionActive}"
                             ToolTip.Tip="Edit TabControl tab strip and content alignment behavior (Ctrl+Alt+Shift+K)"
+                            Padding="7,3"/>
+                    <Button Name="EditImagePropertiesToolbar"
+                            Content="Image Source"
+                            Click="OnEditImagePropertiesMenuClicked"
+                            IsEnabled="{Binding Canvas.IsSelectionActive}"
+                            ToolTip.Tip="Edit Image source and rendering behavior (Ctrl+Alt+Shift+I)"
                             Padding="7,3"/>
                     <Button Name="EditDataGridBehaviorPropertiesToolbar"
                             Content="DataGrid"
@@ -1403,6 +1409,10 @@
                                               Header="Edit TabControl Behavior... (Ctrl+Alt+Shift+K)"
                                               Click="OnEditTabControlBehaviorPropertiesMenuClicked"
                                               IsEnabled="{Binding Canvas.IsSelectionActive}"/>
+                                    <MenuItem Name="EditImagePropertiesContextMenu"
+                                              Header="Edit Image Source &amp; Rendering... (Ctrl+Alt+Shift+I)"
+                                              Click="OnEditImagePropertiesMenuClicked"
+                                              IsEnabled="{Binding Canvas.IsSelectionActive}"/>
                                     <MenuItem Name="EditDataGridBehaviorPropertiesContextMenu"
                                               Header="Edit DataGrid Behavior... (Ctrl+Alt+Shift+E)"
                                               Click="OnEditDataGridBehaviorPropertiesMenuClicked"
@@ -1545,7 +1555,7 @@
                                                     <MenuItem Header="Edit Disclosure &amp; Scrolling... (Ctrl+Alt+Shift+U)" Click="OnEditContainerBehaviorPropertiesMenuClicked"/>
                                                     <MenuItem Header="Edit SplitView Pane Behavior... (Ctrl+Alt+Shift+V)" Click="OnEditSplitViewPropertiesMenuClicked"/>
                                                     <MenuItem Header="Edit TabControl Behavior... (Ctrl+Alt+Shift+K)" Click="OnEditTabControlBehaviorPropertiesMenuClicked"/>
-                                                    <MenuItem Header="Edit Image Source &amp; Rendering..." Click="OnEditImagePropertiesMenuClicked"/>
+                                                    <MenuItem Header="Edit Image Source &amp; Rendering... (Ctrl+Alt+Shift+I)" Click="OnEditImagePropertiesMenuClicked"/>
                                                     <MenuItem Header="Edit Button Actions &amp; Commands... (Ctrl+Alt+Shift+N)" Click="OnEditButtonPropertiesMenuClicked"/>
                                                     <MenuItem Header="Edit Path Data..." Click="OnEditPathDataMenuClicked"/>
                                                     <MenuItem Header="Edit Grid Definitions..." Click="OnEditGridDefinitionsMenuClicked"/>

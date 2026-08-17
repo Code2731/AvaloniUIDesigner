@@ -68,6 +68,7 @@ dotnet run --project src/AvaloniaUIDesigner.App/AvaloniaUIDesigner.App.csproj
 - **TabControl 빠른 접근**: TabControl의 탭 스트립 위치와 선택 탭 콘텐츠 정렬 편집을 Design Toolbar의 `TabControl`, Canvas Context Menu, `Ctrl+Alt+Shift+K`에서 같은 대화상자와 Undo 흐름으로 바로 실행합니다.
 - **DataGrid Behavior 빠른 접근**: DataGrid의 표 동작·열 조작·고정 열·행·열 크기·스크롤 정책 편집을 Design Toolbar의 `DataGrid`, Canvas Context Menu, `Ctrl+Alt+Shift+E`에서 같은 대화상자와 Undo 흐름으로 바로 실행합니다.
 - **GridSplitter Behavior 빠른 접근**: GridSplitter의 방향·resize behavior·preview·keyboard/drag 증분 편집을 Design Toolbar의 `GridSplitter`, Canvas Context Menu, `Ctrl+Alt+Shift+J`에서 같은 대화상자와 Undo 흐름으로 바로 실행합니다.
+- **Image Source & Rendering 빠른 접근**: Image의 Source·Stretch·StretchDirection·bitmap interpolation·edge·blending 편집을 Design Toolbar의 `Image Source`, Canvas Context Menu, `Ctrl+Alt+Shift+I`에서 같은 대화상자와 Undo 흐름으로 바로 실행합니다.
 - **Button Actions & Commands 빠른 접근**: Button의 Content·ClickMode·HotKey·기본/취소·CommandParameter·Click handler 편집을 Design Toolbar의 `Button Actions`, Canvas Context Menu, `Ctrl+Alt+Shift+N`에서 같은 대화상자와 Undo 흐름으로 바로 실행합니다.
 - **Arrange 키보드 단축키**: 캔버스에서 다중 선택 후 `Ctrl+Shift+Left/Right/Up/Down`으로 선택 컨트롤을 좌·우·상·하 경계에 정렬하고 `Ctrl+Shift+E/M`으로 가로 중앙·세로 중앙에 정렬하며 `Ctrl+Alt+H/V`로 가로·세로 균등 분배하고 기존 Arrange Undo/AXAML 흐름을 그대로 사용
 - **레이어 순서 키보드 단축키**: 선택 컨트롤을 `Ctrl+]`/`Ctrl+[`로 한 단계 앞·뒤로 이동하고 `Ctrl+Shift+]`/`Ctrl+Shift+[`로 맨 앞·뒤로 보내며 기존 Order Undo/AXAML 흐름과 선택 상태를 유지
@@ -236,6 +237,7 @@ dotnet run --project src/AvaloniaUIDesigner.App/AvaloniaUIDesigner.App.csproj
 12w. DataGrid를 선택한 뒤 Design Toolbar의 `DataGrid`, Canvas Context Menu 또는 `Ctrl+Alt+Shift+E`로 표 동작·열 조작·고정 열·행·열 크기·스크롤 정책 편집기를 바로 엽니다.
 12x. GridSplitter를 선택한 뒤 Design Toolbar의 `GridSplitter`, Canvas Context Menu 또는 `Ctrl+Alt+Shift+J`로 방향·resize behavior·preview·keyboard/drag 증분 편집기를 바로 엽니다.
 12y. Button을 선택한 뒤 Design Toolbar의 `Button Actions`, Canvas Context Menu 또는 `Ctrl+Alt+Shift+N`으로 Content·ClickMode·HotKey·기본/취소·CommandParameter·Click handler 편집기를 바로 엽니다.
+12z. Image를 선택한 뒤 Design Toolbar의 `Image Source`, Canvas Context Menu 또는 `Ctrl+Alt+Shift+I`로 Source·Stretch·StretchDirection·bitmap interpolation·edge·blending 편집기를 바로 엽니다.
 13. `Edit > Edit Typography Properties...`에서 글꼴과 지원 컨트롤의 텍스트 정렬·줄바꿈 편집
 14. `Edit > Edit Transform Properties...`에서 선택 컨트롤의 이동·회전·크기·기울기와 변환 기준점 편집
 15. `Edit > Edit Accessibility & Navigation...`에서 스크린리더 메타데이터와 키보드 포커스 순서 편집
@@ -430,7 +432,8 @@ dotnet run --project src/AvaloniaUIDesigner.App/AvaloniaUIDesigner.App.csproj
 126. TabControl Behavior 편집은 Design Toolbar의 `TabControl`, Canvas Context Menu의 `Edit TabControl Behavior... (Ctrl+Alt+Shift+K)`, Edit 메뉴, `Ctrl+Alt+Shift+K`에서 동일한 공용 명령으로 접근합니다. TabControl 타입·잠금·탭 동작 검증, TabStripPlacement·HorizontalContentAlignment·VerticalContentAlignment 입력, 적용·Undo 결과는 진입 경로와 관계없이 동일하게 유지됩니다.
 127. DataGrid Behavior 편집은 Design Toolbar의 `DataGrid`, Canvas Context Menu의 `Edit DataGrid Behavior... (Ctrl+Alt+Shift+E)`, Edit 메뉴, `Ctrl+Alt+Shift+E`에서 동일한 공용 명령으로 접근합니다. DataGrid 타입·잠금·표 동작 검증, AutoGenerateColumns·IsReadOnly·HeadersVisibility·GridLinesVisibility·SelectionMode·ClipboardCopyMode·열 조작·FrozenColumnCount·행·열 크기·축별 scrollbar 입력, 적용·Undo 결과는 진입 경로와 관계없이 동일하게 유지됩니다.
 128. GridSplitter Behavior 편집은 Design Toolbar의 `GridSplitter`, Canvas Context Menu의 `Edit GridSplitter Behavior... (Ctrl+Alt+Shift+J)`, Edit 메뉴, `Ctrl+Alt+Shift+J`에서 동일한 공용 명령으로 접근합니다. GridSplitter 타입·잠금·동작 검증, ResizeDirection·ResizeBehavior·ShowsPreview·KeyboardIncrement·DragIncrement 입력, 적용·Undo 결과는 진입 경로와 관계없이 동일하게 유지됩니다.
-129. Button Actions & Commands 편집은 Design Toolbar의 `Button Actions`, Canvas Context Menu의 `Edit Button Actions & Commands... (Ctrl+Alt+Shift+N)`, Edit 메뉴, `Ctrl+Alt+Shift+N`에서 동일한 공용 명령으로 접근합니다. Button 타입·잠금·동작 검증, Content·ClickMode·HotKey·IsDefault·IsCancel·CommandParameter·Click handler 입력, 적용·Undo 결과는 진입 경로와 관계없이 동일하게 유지됩니다.
+129. Image Source & Rendering 편집은 Design Toolbar의 `Image Source`, Canvas Context Menu의 `Edit Image Source & Rendering... (Ctrl+Alt+Shift+I)`, Edit 메뉴, `Ctrl+Alt+Shift+I`에서 동일한 공용 명령으로 접근합니다. Image 타입·잠금·Source 검증, Source·Stretch·StretchDirection·RenderOptions.BitmapInterpolationMode·RenderOptions.EdgeMode·RenderOptions.BitmapBlendingMode 입력, 적용·Undo 결과는 진입 경로와 관계없이 동일하게 유지됩니다.
+130. Button Actions & Commands 편집은 Design Toolbar의 `Button Actions`, Canvas Context Menu의 `Edit Button Actions & Commands... (Ctrl+Alt+Shift+N)`, Edit 메뉴, `Ctrl+Alt+Shift+N`에서 동일한 공용 명령으로 접근합니다. Button 타입·잠금·동작 검증, Content·ClickMode·HotKey·IsDefault·IsCancel·CommandParameter·Click handler 입력, 적용·Undo 결과는 진입 경로와 관계없이 동일하게 유지됩니다.
 
 DataGrid가 포함된 생성 AXAML을 다른 프로젝트에서 사용할 때는 같은 Avalonia 버전의 `Avalonia.Controls.DataGrid` 패키지와 `avares://Avalonia.Controls.DataGrid/Themes/Fluent.xaml` 스타일 include가 필요합니다.
 
@@ -678,6 +681,7 @@ AXAML 소스 편집기의 `Validate`와 `Preview`는 현재 디자인과 Undo �
 - v2.39: DataGrid Behavior 편집 Toolbar·Context Menu·Ctrl+Alt+Shift+E 빠른 접근 추가
 - v2.40: GridSplitter Behavior 편집 Toolbar·Context Menu·Ctrl+Alt+Shift+J 빠른 접근 추가
 - v2.41: Button Actions & Commands 편집 Toolbar·Context Menu·Ctrl+Alt+Shift+N 빠른 접근 추가
+- v2.42: Image Source & Rendering 편집 Toolbar·Context Menu·Ctrl+Alt+Shift+I 빠른 접근 추가
 
 ## 컴포넌트 팩
 

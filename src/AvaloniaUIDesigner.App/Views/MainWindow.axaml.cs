@@ -2603,6 +2603,9 @@ public partial class MainWindow : Window
     private async void OnEditImagePropertiesMenuClicked(
         object? sender,
         Avalonia.Interactivity.RoutedEventArgs e)
+        => await EditImagePropertiesAsync();
+
+    private async Task EditImagePropertiesAsync()
     {
         FlushPendingPropertyHistory();
         if (Vm is null || !Vm.TryGetSelectedImageProperties(out var state))
@@ -4623,7 +4626,7 @@ public partial class MainWindow : Window
             return;
         }
 
-        if (ctrl && alt && e.Key == Key.I)
+        if (ctrl && alt && !shift && e.Key == Key.I)
         {
             if (!PropertyInspectorPane.IsVisible)
             {
@@ -4827,6 +4830,13 @@ public partial class MainWindow : Window
         if (ctrl && alt && shift && e.Key == Key.N)
         {
             await EditButtonPropertiesAsync();
+            e.Handled = true;
+            return;
+        }
+
+        if (ctrl && alt && shift && e.Key == Key.I)
+        {
+            await EditImagePropertiesAsync();
             e.Handled = true;
             return;
         }
