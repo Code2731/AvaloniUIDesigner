@@ -160,6 +160,7 @@ public partial class MainWindow : Window
         Object Tree arrows   Navigate the hierarchy without nudging the canvas
         Project Explorer arrows  Collapse, expand, and navigate the project tree
         Project Explorer double-click  Open files or toggle folders
+        Project Explorer Ctrl+C  Copy the selected full path
         """;
 
     private const string AboutHelpText = """
@@ -1236,6 +1237,30 @@ public partial class MainWindow : Window
         return null;
     }
 
+    private static string? GetProjectExplorerClipboardPath(
+        ProjectExplorerNode node,
+        string? workspacePath,
+        bool fullPath)
+    {
+        if (!fullPath)
+        {
+            return node.RelativePath;
+        }
+
+        if (!string.IsNullOrWhiteSpace(node.FullPath))
+        {
+            return node.FullPath;
+        }
+
+        return string.IsNullOrWhiteSpace(workspacePath)
+            ? null
+            : System.IO.Path.Combine(
+                workspacePath,
+                node.RelativePath.Replace(
+                    '/',
+                    System.IO.Path.DirectorySeparatorChar));
+    }
+
     private static List<ProjectExplorerNode> FilterProjectExplorerTree(
         IReadOnlyList<ProjectExplorerNode> roots,
         string? query)
@@ -1436,6 +1461,27 @@ public partial class MainWindow : Window
             Vm.ProjectFiles.CollectionChanged -= OnProjectFilesChanged;
         }
 
+        async Task CopyProjectExplorerPathAsync(bool fullPath)
+        {
+            if (list.SelectedItem is not ProjectExplorerNode node)
+            {
+                return;
+            }
+
+            var path = GetProjectExplorerClipboardPath(
+                node,
+                Vm.ProjectWorkspacePath,
+                fullPath);
+            if (string.IsNullOrWhiteSpace(path))
+            {
+                return;
+            }
+
+            await CopyAxamlToClipboardAsync(
+                path,
+                fullPath ? "Copied full path to clipboard." : "Copied relative path to clipboard.");
+        }
+
         void MoveSelection(int offset)
         {
             if (visibleNodes.Count == 0)
@@ -1496,9 +1542,17 @@ public partial class MainWindow : Window
 
         var cancelButton = new Button { Content = "Cancel", MinWidth = 86 };
         var openButton = new Button { Content = "Open", MinWidth = 86 };
+        var copyRelativePathMenu = new MenuItem { Header = "Copy Relative Path" };
+        var copyFullPathMenu = new MenuItem { Header = "Copy Full Path" };
         cancelButton.Click += (_, _) => dialog.Close(null);
         openButton.Click += (_, _) => SelectCurrent();
         list.DoubleTapped += (_, _) => SelectCurrent();
+        copyRelativePathMenu.Click += async (_, _) => await CopyProjectExplorerPathAsync(fullPath: false);
+        copyFullPathMenu.Click += async (_, _) => await CopyProjectExplorerPathAsync(fullPath: true);
+        list.ContextMenu = new ContextMenu
+        {
+            Items = { copyRelativePathMenu, copyFullPathMenu },
+        };
         search.TextChanged += (_, _) => RefreshResults();
         search.KeyDown += (_, e) =>
         {
@@ -1525,9 +1579,15 @@ public partial class MainWindow : Window
                 e.Handled = true;
             }
         };
-        list.KeyDown += (_, e) =>
+        list.KeyDown += async (_, e) =>
         {
-            if (e.Key == Key.Enter)
+            if (e.Key == Key.C
+                && e.KeyModifiers.HasFlag(KeyModifiers.Control))
+            {
+                await CopyProjectExplorerPathAsync(fullPath: true);
+                e.Handled = true;
+            }
+            else if (e.Key == Key.Enter)
             {
                 SelectCurrent();
                 e.Handled = true;
@@ -1569,7 +1629,7 @@ public partial class MainWindow : Window
             {
                 new TextBlock
                 {
-                    Text = "Browse the project tree. Double-click an AXAML file to open it; press Enter on a folder or double-click a folder to expand or collapse it, or use Left/Right to navigate.",
+                    Text = "Browse the project tree. Double-click an AXAML file to open it; press Enter on a folder or double-click a folder to expand or collapse it, use Left/Right to navigate, or Ctrl+C to copy the selected full path.",
                     TextWrapping = TextWrapping.Wrap,
                 },
                 rootText,
