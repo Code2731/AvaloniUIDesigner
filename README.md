@@ -71,6 +71,7 @@ dotnet run --project src/AvaloniaUIDesigner.App/AvaloniaUIDesigner.App.csproj
 - **Image Source & Rendering 빠른 접근**: Image의 Source·Stretch·StretchDirection·bitmap interpolation·edge·blending 편집을 Design Toolbar의 `Image Source`, Canvas Context Menu, `Ctrl+Alt+Shift+I`에서 같은 대화상자와 Undo 흐름으로 바로 실행합니다.
 - **Button Actions & Commands 빠른 접근**: Button의 Content·ClickMode·HotKey·기본/취소·CommandParameter·Click handler 편집을 Design Toolbar의 `Button Actions`, Canvas Context Menu, `Ctrl+Alt+Shift+N`에서 같은 대화상자와 Undo 흐름으로 바로 실행합니다.
 - **Event Handler Map 빠른 접근**: 문서 전체의 `ControlName | EventName | HandlerName` 이벤트 매핑 편집을 Design Toolbar의 `Event Map`, Canvas Context Menu, `Ctrl+Alt+Shift+L`에서 같은 대화상자와 Undo 흐름으로 바로 실행합니다.
+- **Preview Interaction Log 빠른 접근**: 이미 열린 Live Preview의 `Interaction Log`를 기록을 지우지 않고 다시 활성화하거나 새 Preview를 열어 Design Toolbar의 `Interaction Log`, Canvas Context Menu, `Ctrl+Alt+Shift+Z`에서 즉시 확인합니다. 기존 `Preview`·`Ctrl+R` 새로고침 경로는 그대로 유지합니다.
 - **Arrange 키보드 단축키**: 캔버스에서 다중 선택 후 `Ctrl+Shift+Left/Right/Up/Down`으로 선택 컨트롤을 좌·우·상·하 경계에 정렬하고 `Ctrl+Shift+E/M`으로 가로 중앙·세로 중앙에 정렬하며 `Ctrl+Alt+H/V`로 가로·세로 균등 분배하고 기존 Arrange Undo/AXAML 흐름을 그대로 사용
 - **레이어 순서 키보드 단축키**: 선택 컨트롤을 `Ctrl+]`/`Ctrl+[`로 한 단계 앞·뒤로 이동하고 `Ctrl+Shift+]`/`Ctrl+Shift+[`로 맨 앞·뒤로 보내며 기존 Order Undo/AXAML 흐름과 선택 상태를 유지
 - **아트보드 중앙 정렬 단축키**: root 선택을 `Ctrl+Alt+Shift+X/Y`로 가로·세로 중앙에 배치하고 `Ctrl+Alt+Shift+C`로 양축 중앙에 배치하며 기존 Center on Artboard Undo/AXAML 흐름을 사용
@@ -297,7 +298,7 @@ dotnet run --project src/AvaloniaUIDesigner.App/AvaloniaUIDesigner.App.csproj
 67. 같은 선택 상태에서 `DockPanel (Horizontal/Vertical)` 또는 `WrapPanel (Horizontal/Vertical)`을 선택하면 선택 순서 기반 자동 레이아웃을 만들고 도킹 방향·행/열·간격을 AXAML과 Preview에서 확인
 68. Edit > `Edit Tab Order Map...`에서 `TabIndex | ControlName` 형식으로 전체 포커스 순서를 편집하고, `auto`/`-1`로 자동 순서를 복원하며 캔버스의 `TAB #` 배지를 확인
 69. Edit > `Edit Event Handler Map...`에서 `ControlName | EventName | HandlerName` 형식으로 여러 컨트롤의 이벤트 핸들러를 일괄 편집하고, 지원되지 않는 이벤트·잠긴 컨트롤·중복 항목 검증 결과를 확인
-70. View > `Live Preview`에서 컨트롤을 클릭하거나 입력·선택·토글·포인터·키보드·포커스 동작을 수행하고, 창 하단 Interaction Log에서 `Control.Event -> HandlerName` 연결 결과를 확인
+70. View > `Live Preview`에서 컨트롤을 클릭하거나 입력·선택·토글·포인터·키보드·포커스 동작을 수행하고, 창 하단 Interaction Log에서 `Control.Event -> HandlerName` 연결 결과를 확인합니다. Toolbar·Canvas Context Menu의 `Preview Interaction Log` 또는 `Ctrl+Alt+Shift+Z`는 이미 열린 Preview의 로그를 지우지 않고 다시 활성화합니다.
 71. 한 컨트롤을 선택해 Edit > `Copy Style` 또는 `Ctrl+Shift+C`를 실행한 뒤 하나 이상의 대상 컨트롤을 선택해 Edit > `Paste Style` 또는 `Ctrl+Shift+V`를 실행하고, 잠긴 대상은 건너뛴 결과를 확인
 72. Edit > `History...`를 열어 Current document state와 Undo·Redo 작업을 확인하고 원하는 항목을 선택해 여러 단계를 한 번에 이동
 73. `Ctrl+N` 또는 `File > New`로 새 문서 탭을 만들고 탭 제목을 클릭해 문서를 전환합니다. `File > Open...`은 AXAML을 새 탭으로 열며 `Ctrl+W` 또는 탭의 `x` 버튼으로 현재 탭을 닫습니다.
@@ -508,6 +509,8 @@ Canvas 그룹화는 같은 부모를 공유하는 형제 컨트롤만 대상으�
 
 Live Preview 하단의 `Interaction Log`는 위 이벤트 메타데이터를 안전한 디자인 타임 방식으로 확인합니다. Preview에서 발생한 이벤트는 최대 최근 8개까지 기록하며 컨트롤 이름·이벤트 이름·핸들러 이름을 보여주지만, 호스트 프로젝트의 실제 핸들러 메서드나 ViewModel 명령을 실행하지 않습니다. 따라서 AXAML을 호스트 프로젝트에 연결하기 전에 이벤트 선언과 대상 컨트롤이 올바른지 빠르게 검증할 수 있습니다.
 
+`Preview Interaction Log`는 이미 열린 Preview 창을 다시 렌더링하지 않고 활성화하므로, 사용자가 남긴 최근 상호작용 기록을 보존한 채 로그로 돌아갈 수 있습니다. Preview가 아직 열리지 않았다면 동일한 Preview 창을 열고, 일반 `Live Preview` 또는 `Ctrl+R`은 기존처럼 현재 문서를 새로고침합니다.
+
 `Copy Style`은 하나의 잠금 해제 컨트롤에서 외형·타이포그래피·렌더링·효과·상호작용 속성, 스타일 클래스와 DynamicResource 참조만 캡처합니다. `Paste Style`은 선택된 잠금 해제 대상에 해당 값을 한 번의 Undo 작업으로 적용하며 Text/Content, 위치·크기, 부모 계층, 바인딩, 이벤트 핸들러, 항목 정의는 변경하지 않습니다. 서로 다른 컨트롤 타입에 붙여넣으면 해당 타입이 지원하는 스타일 속성만 적용하고 나머지는 안전하게 무시합니다.
 
 `Edit > History...`는 현재 문서 상태를 기준으로 완료된 Undo 작업과 앞으로 적용할 Redo 작업을 함께 표시합니다. 항목을 선택하면 기존 snapshot 기반 Undo/Redo를 필요한 횟수만큼 수행해 해당 지점으로 이동하며, 이동 후에도 dirty 상태·Preview·AXAML·Object Tree를 기존 Undo 흐름과 동일하게 갱신합니다.
@@ -686,6 +689,7 @@ AXAML 소스 편집기의 `Validate`와 `Preview`는 현재 디자인과 Undo �
 - v2.41: Button Actions & Commands 편집 Toolbar·Context Menu·Ctrl+Alt+Shift+N 빠른 접근 추가
 - v2.42: Image Source & Rendering 편집 Toolbar·Context Menu·Ctrl+Alt+Shift+I 빠른 접근 추가
 - v2.43: Event Handler Map 편집 Toolbar·Context Menu·Ctrl+Alt+Shift+L 빠른 접근 추가
+- v2.44: Preview Interaction Log Toolbar·Context Menu·Ctrl+Alt+Shift+Z 빠른 접근 추가
 
 ## 컴포넌트 팩
 

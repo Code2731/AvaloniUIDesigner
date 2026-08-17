@@ -3129,6 +3129,14 @@ public partial class MainWindow : Window
     }
 
     private void OnPreviewMenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+        => OpenPreviewWindow(refreshDocument: true);
+
+    private void OnPreviewInteractionLogMenuClicked(
+        object? sender,
+        Avalonia.Interactivity.RoutedEventArgs e)
+        => OpenPreviewWindow(refreshDocument: false);
+
+    private void OpenPreviewWindow(bool refreshDocument)
     {
         if (Vm is null)
         {
@@ -3138,9 +3146,15 @@ public partial class MainWindow : Window
         FlushPendingPropertyHistory();
         if (_previewWindow is not null)
         {
-            _previewWindow.RefreshDocument(Vm.CreatePreviewDocument());
+            if (refreshDocument)
+            {
+                _previewWindow.RefreshDocument(Vm.CreatePreviewDocument());
+            }
+
             _previewWindow.Activate();
-            Vm.StatusText = "Refreshed live preview.";
+            Vm.StatusText = refreshDocument
+                ? "Refreshed live preview."
+                : "Activated live preview Interaction Log.";
             return;
         }
 
@@ -3154,7 +3168,9 @@ public partial class MainWindow : Window
             }
         };
         preview.Show(this);
-        Vm.StatusText = "Opened live preview. Changes update automatically.";
+        Vm.StatusText = refreshDocument
+            ? "Opened live preview. Changes update automatically."
+            : "Opened live preview with Interaction Log.";
     }
 
     private void OnSelectionParentButtonClicked(
@@ -4849,6 +4865,13 @@ public partial class MainWindow : Window
         if (ctrl && alt && shift && e.Key == Key.L)
         {
             await EditEventHandlerMapAsync();
+            e.Handled = true;
+            return;
+        }
+
+        if (ctrl && alt && shift && e.Key == Key.Z)
+        {
+            OpenPreviewWindow(refreshDocument: false);
             e.Handled = true;
             return;
         }

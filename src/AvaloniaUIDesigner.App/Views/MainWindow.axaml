@@ -255,6 +255,8 @@
             </MenuItem>
             <MenuItem Header="View">
                 <MenuItem Header="Live Preview" Click="OnPreviewMenuClicked"/>
+                <MenuItem Header="Preview Interaction Log (Ctrl+Alt+Shift+Z)"
+                          Click="OnPreviewInteractionLogMenuClicked"/>
                 <MenuItem Header="Quick Switch Document Tab..."
                           Click="OnQuickSwitchDocumentTabMenuClicked"
                           IsEnabled="{Binding HasMultipleDocumentTabs}"/>
@@ -438,6 +440,11 @@
                     <Button Content="Preview"
                             Click="OnPreviewMenuClicked"
                             ToolTip.Tip="Open or refresh the live preview"
+                            Padding="8,3"/>
+                    <Button Name="PreviewInteractionLogToolbar"
+                            Content="Interaction Log"
+                            Click="OnPreviewInteractionLogMenuClicked"
+                            ToolTip.Tip="Open the live preview interaction log without clearing existing entries"
                             Padding="8,3"/>
                     <Border Width="1" Background="#CBD5E1" Margin="0,2"/>
                     <TextBlock Text="Align"
@@ -1455,6 +1462,9 @@
                                               IsEnabled="{Binding Canvas.IsSelectionActive}"/>
                                     <Separator/>
                                     <MenuItem Header="Live Preview" Click="OnPreviewMenuClicked"/>
+                                    <MenuItem Name="PreviewInteractionLogContextMenu"
+                                              Header="Preview Interaction Log (Ctrl+Alt+Shift+Z)"
+                                              Click="OnPreviewInteractionLogMenuClicked"/>
                                     <MenuItem Header="Fit to View" Click="OnFitToViewMenuClicked"/>
                                     <MenuItem Header="Fit Selected to View (Ctrl+Shift+F)"
                                               Click="OnFitSelectedToViewMenuClicked"
