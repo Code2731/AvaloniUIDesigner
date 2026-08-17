@@ -159,6 +159,7 @@ public partial class MainWindow : Window
         Object Tree Ctrl+Shift+click Add a visible row range
         Object Tree arrows   Navigate the hierarchy without nudging the canvas
         Project Explorer arrows  Collapse, expand, and navigate the project tree
+        Project Explorer double-click  Open files or toggle folders
         """;
 
     private const string AboutHelpText = """
@@ -1451,6 +1452,7 @@ public partial class MainWindow : Window
         var openButton = new Button { Content = "Open", MinWidth = 86 };
         cancelButton.Click += (_, _) => dialog.Close(null);
         openButton.Click += (_, _) => SelectCurrent();
+        list.DoubleTapped += (_, _) => SelectCurrent();
         search.TextChanged += (_, _) => RefreshResults();
         search.KeyDown += (_, e) =>
         {
@@ -1519,7 +1521,7 @@ public partial class MainWindow : Window
             {
                 new TextBlock
                 {
-                    Text = "Browse the project tree. Select an AXAML file to open it; press Enter on a folder to expand or collapse it, or use Left/Right to navigate.",
+                    Text = "Browse the project tree. Double-click an AXAML file to open it; press Enter on a folder or double-click a folder to expand or collapse it, or use Left/Right to navigate.",
                     TextWrapping = TextWrapping.Wrap,
                 },
                 rootText,
