@@ -60,6 +60,7 @@ dotnet run --project src/AvaloniaUIDesigner.App/AvaloniaUIDesigner.App.csproj
 - **MaskedTextBox 빠른 접근**: MaskedTextBox의 Mask·PromptChar·prompt 숨김 정책 편집을 Design Toolbar의 `Masked Text`, Canvas Context Menu, `Ctrl+Alt+Shift+M`에서 같은 대화상자와 Undo 흐름으로 바로 실행합니다.
 - **Selection Behavior 빠른 접근**: ComboBox·ListBox·TreeView의 선택·검색·자동 스크롤 정책 편집을 Design Toolbar의 `Selection`, Canvas Context Menu, `Ctrl+Alt+Shift+Q`에서 같은 대화상자와 Undo 흐름으로 바로 실행합니다.
 - **Date & Time 빠른 접근**: DatePicker·CalendarDatePicker·Calendar·TimePicker의 날짜·시간·범위·표시 정책 편집을 Design Toolbar의 `Date & Time`, Canvas Context Menu, `Ctrl+Alt+Shift+D`에서 같은 대화상자와 Undo 흐름으로 바로 실행합니다.
+- **ColorPicker 빠른 접근**: ColorPicker의 색상·스펙트럼·알파·팔레트·입력 표시 정책 편집을 Design Toolbar의 `Color Picker`, Canvas Context Menu, `Ctrl+Alt+Shift+P`에서 같은 대화상자와 Undo 흐름으로 바로 실행합니다.
 - **Arrange 키보드 단축키**: 캔버스에서 다중 선택 후 `Ctrl+Shift+Left/Right/Up/Down`으로 선택 컨트롤을 좌·우·상·하 경계에 정렬하고 `Ctrl+Shift+E/M`으로 가로 중앙·세로 중앙에 정렬하며 `Ctrl+Alt+H/V`로 가로·세로 균등 분배하고 기존 Arrange Undo/AXAML 흐름을 그대로 사용
 - **레이어 순서 키보드 단축키**: 선택 컨트롤을 `Ctrl+]`/`Ctrl+[`로 한 단계 앞·뒤로 이동하고 `Ctrl+Shift+]`/`Ctrl+Shift+[`로 맨 앞·뒤로 보내며 기존 Order Undo/AXAML 흐름과 선택 상태를 유지
 - **아트보드 중앙 정렬 단축키**: root 선택을 `Ctrl+Alt+Shift+X/Y`로 가로·세로 중앙에 배치하고 `Ctrl+Alt+Shift+C`로 양축 중앙에 배치하며 기존 Center on Artboard Undo/AXAML 흐름을 사용
@@ -218,6 +219,7 @@ dotnet run --project src/AvaloniaUIDesigner.App/AvaloniaUIDesigner.App.csproj
 12n. MaskedTextBox를 선택한 뒤 Design Toolbar의 `Masked Text`, Canvas Context Menu 또는 `Ctrl+Alt+Shift+M`으로 Mask·PromptChar·prompt 숨김 정책 편집기를 바로 엽니다.
 12o. ComboBox·ListBox·TreeView를 선택한 뒤 Design Toolbar의 `Selection`, Canvas Context Menu 또는 `Ctrl+Alt+Shift+Q`로 선택·검색·자동 스크롤 정책 편집기를 바로 엽니다.
 12p. DatePicker·CalendarDatePicker·Calendar·TimePicker를 선택한 뒤 Design Toolbar의 `Date & Time`, Canvas Context Menu 또는 `Ctrl+Alt+Shift+D`로 날짜·시간·범위·표시 정책 편집기를 바로 엽니다.
+12q. ColorPicker를 선택한 뒤 Design Toolbar의 `Color Picker`, Canvas Context Menu 또는 `Ctrl+Alt+Shift+P`로 색상·스펙트럼·알파·팔레트·입력 표시 정책 편집기를 바로 엽니다.
 13. `Edit > Edit Typography Properties...`에서 글꼴과 지원 컨트롤의 텍스트 정렬·줄바꿈 편집
 14. `Edit > Edit Transform Properties...`에서 선택 컨트롤의 이동·회전·크기·기울기와 변환 기준점 편집
 15. `Edit > Edit Accessibility & Navigation...`에서 스크린리더 메타데이터와 키보드 포커스 순서 편집
@@ -404,6 +406,7 @@ dotnet run --project src/AvaloniaUIDesigner.App/AvaloniaUIDesigner.App.csproj
 118. MaskedTextBox 편집은 Design Toolbar의 `Masked Text`, Canvas Context Menu의 `Edit MaskedTextBox... (Ctrl+Alt+Shift+M)`, Edit 메뉴, `Ctrl+Alt+Shift+M`에서 동일한 공용 명령으로 접근합니다. MaskedTextBox 타입·잠금·mask 검증, Mask·PromptChar·prompt 숨김 정책 입력, 적용·Undo 결과는 진입 경로와 관계없이 동일하게 유지됩니다.
 119. Selection Behavior 편집은 Design Toolbar의 `Selection`, Canvas Context Menu의 `Edit Selection Behavior... (Ctrl+Alt+Shift+Q)`, Edit 메뉴, `Ctrl+Alt+Shift+Q`에서 동일한 공용 명령으로 접근합니다. ComboBox·ListBox·TreeView 타입·잠금·선택 정책 검증, 선택 인덱스·검색·자동 스크롤·다중 선택·ComboBox 입력 정책, 적용·Undo 결과는 진입 경로와 관계없이 동일하게 유지됩니다.
 120. Date & Time 편집은 Design Toolbar의 `Date & Time`, Canvas Context Menu의 `Edit Date & Time Input... (Ctrl+Alt+Shift+D)`, Edit 메뉴, `Ctrl+Alt+Shift+D`에서 동일한 공용 명령으로 접근합니다. DatePicker·CalendarDatePicker·Calendar·TimePicker 타입·잠금·날짜 범위 검증, 날짜·시간·표시 형식·선택 모드 입력, 적용·Undo 결과는 진입 경로와 관계없이 동일하게 유지됩니다.
+121. ColorPicker 편집은 Design Toolbar의 `Color Picker`, Canvas Context Menu의 `Edit ColorPicker... (Ctrl+Alt+Shift+P)`, Edit 메뉴, `Ctrl+Alt+Shift+P`에서 동일한 공용 명령으로 접근합니다. ColorPicker 타입·잠금·색상 입력 검증, 색상 모델·스펙트럼·알파·팔레트·입력 표시 정책, 적용·Undo 결과는 진입 경로와 관계없이 동일하게 유지됩니다.
 
 DataGrid가 포함된 생성 AXAML을 다른 프로젝트에서 사용할 때는 같은 Avalonia 버전의 `Avalonia.Controls.DataGrid` 패키지와 `avares://Avalonia.Controls.DataGrid/Themes/Fluent.xaml` 스타일 include가 필요합니다.
 
@@ -642,6 +645,7 @@ AXAML 소스 편집기의 `Validate`와 `Preview`는 현재 디자인과 Undo �
 - v2.30: MaskedTextBox 편집 Toolbar·Context Menu·Ctrl+Alt+Shift+M 빠른 접근 추가
 - v2.31: Selection Behavior 편집 Toolbar·Context Menu·Ctrl+Alt+Shift+Q 빠른 접근 추가
 - v2.32: Date & Time 편집 Toolbar·Context Menu·Ctrl+Alt+Shift+D 빠른 접근 추가
+- v2.33: ColorPicker 편집 Toolbar·Context Menu·Ctrl+Alt+Shift+P 빠른 접근 추가
 
 ## 컴포넌트 팩
 

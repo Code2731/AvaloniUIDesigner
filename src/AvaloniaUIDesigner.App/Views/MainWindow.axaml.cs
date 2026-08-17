@@ -76,6 +76,7 @@ public partial class MainWindow : Window
         Ctrl+Alt+Shift+M    Edit MaskedTextBox mask behavior
         Ctrl+Alt+Shift+Q    Edit selection behavior for ComboBox/ListBox/TreeView
         Ctrl+Alt+Shift+D    Edit DatePicker/Calendar/TimePicker date and time input
+        Ctrl+Alt+Shift+P    Edit ColorPicker color and palette behavior
         Ctrl+Alt+G          Toggle design grid
         Ctrl+Alt+Shift+G    Toggle snap to grid
         Ctrl+Alt+1          Toggle Toolbox panel
@@ -2495,7 +2496,11 @@ public partial class MainWindow : Window
     private async void OnEditColorPickerPropertiesMenuClicked(
         object? sender,
         Avalonia.Interactivity.RoutedEventArgs e)
+        => await EditColorPickerPropertiesAsync();
+
+    private async Task EditColorPickerPropertiesAsync()
     {
+        FlushPendingPropertyHistory();
         if (Vm is null || !Vm.TryGetSelectedColorPickerProperties(out var state))
         {
             return;
@@ -4581,7 +4586,7 @@ public partial class MainWindow : Window
             return;
         }
 
-        if (ctrl && alt && e.Key == Key.P)
+        if (ctrl && alt && !shift && e.Key == Key.P)
         {
             ToggleToolboxPlacementMode();
             e.Handled = true;
@@ -4729,6 +4734,13 @@ public partial class MainWindow : Window
         if (ctrl && alt && shift && e.Key == Key.D)
         {
             await EditDateTimePropertiesAsync();
+            e.Handled = true;
+            return;
+        }
+
+        if (ctrl && alt && shift && e.Key == Key.P)
+        {
+            await EditColorPickerPropertiesAsync();
             e.Handled = true;
             return;
         }
