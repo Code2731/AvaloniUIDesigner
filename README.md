@@ -49,6 +49,7 @@ dotnet run --project src/AvaloniaUIDesigner.App/AvaloniaUIDesigner.App.csproj
 - **다중 선택 공통 속성**: `Edit > Edit Common Properties...`에서 선택된 여러 컨트롤의 공통 Margin·정렬·Opacity·입력/표시 상태를 한 번에 적용하고, 서로 다른 값은 비워 둔 채 개별 값을 유지하며 하나의 Undo 작업으로 기록
 - **Common Properties 빠른 접근**: 다중 선택 공통 속성 편집을 Design Toolbar의 `Common`, Canvas Context Menu, `Ctrl+Alt+M`에서 같은 대화상자와 Undo 흐름으로 바로 실행합니다.
 - **Layout Properties 빠른 접근**: 선택 컨트롤의 Margin·Padding·Alignment·Min/Max 크기 편집을 Design Toolbar의 `Layout`, Canvas Context Menu, `Ctrl+Alt+L`에서 같은 대화상자와 Undo 흐름으로 바로 실행합니다.
+- **Typography Properties 빠른 접근**: 글꼴 인식 컨트롤의 Font·Size·Style·Weight·정렬·줄바꿈 편집을 Design Toolbar의 `Typography`, Canvas Context Menu, `Ctrl+Alt+Y`에서 같은 대화상자와 Undo 흐름으로 바로 실행합니다.
 - **Arrange 키보드 단축키**: 캔버스에서 다중 선택 후 `Ctrl+Shift+Left/Right/Up/Down`으로 선택 컨트롤을 좌·우·상·하 경계에 정렬하고 `Ctrl+Shift+E/M`으로 가로 중앙·세로 중앙에 정렬하며 `Ctrl+Alt+H/V`로 가로·세로 균등 분배하고 기존 Arrange Undo/AXAML 흐름을 그대로 사용
 - **레이어 순서 키보드 단축키**: 선택 컨트롤을 `Ctrl+]`/`Ctrl+[`로 한 단계 앞·뒤로 이동하고 `Ctrl+Shift+]`/`Ctrl+Shift+[`로 맨 앞·뒤로 보내며 기존 Order Undo/AXAML 흐름과 선택 상태를 유지
 - **아트보드 중앙 정렬 단축키**: root 선택을 `Ctrl+Alt+Shift+X/Y`로 가로·세로 중앙에 배치하고 `Ctrl+Alt+Shift+C`로 양축 중앙에 배치하며 기존 Center on Artboard Undo/AXAML 흐름을 사용
@@ -196,6 +197,7 @@ dotnet run --project src/AvaloniaUIDesigner.App/AvaloniaUIDesigner.App.csproj
 12c. 두 개 이상의 호환 컨트롤을 선택한 뒤 Design Toolbar의 `Bounds`, Canvas Context Menu 또는 `Ctrl+Alt+B`로 같은 Selection Bounds 편집기를 바로 엽니다.
 12d. 두 개 이상의 컨트롤을 선택한 뒤 Design Toolbar의 `Common`, Canvas Context Menu 또는 `Ctrl+Alt+M`으로 공통 Margin·정렬·Opacity·상태 편집기를 바로 엽니다.
 12e. 컨트롤을 선택한 뒤 Design Toolbar의 `Layout`, Canvas Context Menu 또는 `Ctrl+Alt+L`로 Margin·Padding·Alignment·Min/Max 크기 편집기를 바로 엽니다.
+12f. 글꼴 인식 컨트롤을 선택한 뒤 Design Toolbar의 `Typography`, Canvas Context Menu 또는 `Ctrl+Alt+Y`로 Font·Size·Style·Weight·정렬·줄바꿈 편집기를 바로 엽니다.
 13. `Edit > Edit Typography Properties...`에서 글꼴과 지원 컨트롤의 텍스트 정렬·줄바꿈 편집
 14. `Edit > Edit Transform Properties...`에서 선택 컨트롤의 이동·회전·크기·기울기와 변환 기준점 편집
 15. `Edit > Edit Accessibility & Navigation...`에서 스크린리더 메타데이터와 키보드 포커스 순서 편집
@@ -371,6 +373,7 @@ dotnet run --project src/AvaloniaUIDesigner.App/AvaloniaUIDesigner.App.csproj
 107. Selection Bounds 편집은 Design Toolbar의 `Bounds`, Canvas Context Menu의 `Edit Selection Bounds... (Ctrl+Alt+B)`, Edit 메뉴, `Ctrl+Alt+B`에서 동일한 공용 명령으로 접근합니다. 다중 선택 조건·잠금·부모 레이아웃 검증, 숫자 입력, 비율 변환, Transform Undo 결과는 진입 경로와 관계없이 동일하게 유지됩니다.
 108. Common Properties 편집은 Design Toolbar의 `Common`, Canvas Context Menu의 `Edit Common Properties... (Ctrl+Alt+M)`, Edit 메뉴, `Ctrl+Alt+M`에서 동일한 공용 명령으로 접근합니다. 혼합값 표시, 빈 값 유지, 3상태 체크박스, 다중 선택 적용·Undo 결과는 진입 경로와 관계없이 동일하게 유지됩니다.
 109. Layout Properties 편집은 Design Toolbar의 `Layout`, Canvas Context Menu의 `Edit Layout Properties... (Ctrl+Alt+L)`, Edit 메뉴, `Ctrl+Alt+L`에서 동일한 공용 명령으로 접근합니다. 단일 선택·잠금 검증, Margin·Padding·Alignment·Min/Max 입력, 적용·Undo 결과는 진입 경로와 관계없이 동일하게 유지됩니다.
+110. Typography Properties 편집은 Design Toolbar의 `Typography`, Canvas Context Menu의 `Edit Typography Properties... (Ctrl+Alt+Y)`, Edit 메뉴, `Ctrl+Alt+Y`에서 동일한 공용 명령으로 접근합니다. 지원 타입·잠금 검증, Font·Size·Style·Weight·정렬·줄바꿈 입력, 적용·Undo 결과는 진입 경로와 관계없이 동일하게 유지됩니다.
 
 DataGrid가 포함된 생성 AXAML을 다른 프로젝트에서 사용할 때는 같은 Avalonia 버전의 `Avalonia.Controls.DataGrid` 패키지와 `avares://Avalonia.Controls.DataGrid/Themes/Fluent.xaml` 스타일 include가 필요합니다.
 
@@ -598,6 +601,7 @@ AXAML 소스 편집기의 `Validate`와 `Preview`는 현재 디자인과 Undo �
 - v2.19: Selection Bounds 편집 Toolbar·Context Menu·Ctrl+Alt+B 빠른 접근 추가
 - v2.20: Common Properties 편집 Toolbar·Context Menu·Ctrl+Alt+M 빠른 접근 추가
 - v2.21: Layout Properties 편집 Toolbar·Context Menu·Ctrl+Alt+L 빠른 접근 추가
+- v2.22: Typography Properties 편집 Toolbar·Context Menu·Ctrl+Alt+Y 빠른 접근 추가
 
 ## 컴포넌트 팩
 
