@@ -65,6 +65,7 @@ dotnet run --project src/AvaloniaUIDesigner.App/AvaloniaUIDesigner.App.csproj
 - **Toggle & Choice 빠른 접근**: CheckBox·RadioButton·ToggleSwitch·ToggleButton의 상태·three-state·ClickMode·콘텐츠·그룹·On/Off 문구 편집을 Design Toolbar의 `Toggle & Choice`, Canvas Context Menu, `Ctrl+Alt+Shift+O`에서 같은 대화상자와 Undo 흐름으로 바로 실행합니다.
 - **Disclosure & Scrolling 빠른 접근**: Expander의 header·expanded·전개 방향과 ScrollViewer의 scrollbar·auto-hide·chaining·deferred/focus scrolling·snap 정책 편집을 Design Toolbar의 `Disclosure & Scroll`, Canvas Context Menu, `Ctrl+Alt+Shift+U`에서 같은 대화상자와 Undo 흐름으로 바로 실행합니다.
 - **SplitView Pane 빠른 접근**: SplitView의 DisplayMode·pane 열림·pane 길이·배치 방향·light-dismiss·pane 배경 편집을 Design Toolbar의 `SplitView Pane`, Canvas Context Menu, `Ctrl+Alt+Shift+V`에서 같은 대화상자와 Undo 흐름으로 바로 실행합니다.
+- **TabControl 빠른 접근**: TabControl의 탭 스트립 위치와 선택 탭 콘텐츠 정렬 편집을 Design Toolbar의 `TabControl`, Canvas Context Menu, `Ctrl+Alt+Shift+K`에서 같은 대화상자와 Undo 흐름으로 바로 실행합니다.
 - **Arrange 키보드 단축키**: 캔버스에서 다중 선택 후 `Ctrl+Shift+Left/Right/Up/Down`으로 선택 컨트롤을 좌·우·상·하 경계에 정렬하고 `Ctrl+Shift+E/M`으로 가로 중앙·세로 중앙에 정렬하며 `Ctrl+Alt+H/V`로 가로·세로 균등 분배하고 기존 Arrange Undo/AXAML 흐름을 그대로 사용
 - **레이어 순서 키보드 단축키**: 선택 컨트롤을 `Ctrl+]`/`Ctrl+[`로 한 단계 앞·뒤로 이동하고 `Ctrl+Shift+]`/`Ctrl+Shift+[`로 맨 앞·뒤로 보내며 기존 Order Undo/AXAML 흐름과 선택 상태를 유지
 - **아트보드 중앙 정렬 단축키**: root 선택을 `Ctrl+Alt+Shift+X/Y`로 가로·세로 중앙에 배치하고 `Ctrl+Alt+Shift+C`로 양축 중앙에 배치하며 기존 Center on Artboard Undo/AXAML 흐름을 사용
@@ -228,6 +229,7 @@ dotnet run --project src/AvaloniaUIDesigner.App/AvaloniaUIDesigner.App.csproj
 12s. CheckBox·RadioButton·ToggleSwitch·ToggleButton을 선택한 뒤 Design Toolbar의 `Toggle & Choice`, Canvas Context Menu 또는 `Ctrl+Alt+Shift+O`로 상태·three-state·ClickMode·콘텐츠·그룹·On/Off 문구 편집기를 바로 엽니다.
 12t. Expander 또는 ScrollViewer를 선택한 뒤 Design Toolbar의 `Disclosure & Scroll`, Canvas Context Menu 또는 `Ctrl+Alt+Shift+U`로 전개·헤더·스크롤·snap 정책 편집기를 바로 엽니다.
 12u. SplitView를 선택한 뒤 Design Toolbar의 `SplitView Pane`, Canvas Context Menu 또는 `Ctrl+Alt+Shift+V`로 pane 표시·열림·길이·배치·light-dismiss·배경 정책 편집기를 바로 엽니다.
+12v. TabControl을 선택한 뒤 Design Toolbar의 `TabControl`, Canvas Context Menu 또는 `Ctrl+Alt+Shift+K`로 탭 스트립 위치와 선택 탭 콘텐츠 정렬 편집기를 바로 엽니다.
 13. `Edit > Edit Typography Properties...`에서 글꼴과 지원 컨트롤의 텍스트 정렬·줄바꿈 편집
 14. `Edit > Edit Transform Properties...`에서 선택 컨트롤의 이동·회전·크기·기울기와 변환 기준점 편집
 15. `Edit > Edit Accessibility & Navigation...`에서 스크린리더 메타데이터와 키보드 포커스 순서 편집
@@ -419,6 +421,7 @@ dotnet run --project src/AvaloniaUIDesigner.App/AvaloniaUIDesigner.App.csproj
 123. Toggle & Choice 편집은 Design Toolbar의 `Toggle & Choice`, Canvas Context Menu의 `Edit Toggle & Choice Behavior... (Ctrl+Alt+Shift+O)`, Edit 메뉴, `Ctrl+Alt+Shift+O`에서 동일한 공용 명령으로 접근합니다. CheckBox·RadioButton·ToggleSwitch·ToggleButton 타입·잠금·상태 검증, checked/unchecked/indeterminate·three-state·ClickMode·콘텐츠 정렬·Radio 그룹·Switch On/Off 문구 입력, 적용·Undo 결과는 진입 경로와 관계없이 동일하게 유지됩니다.
 124. Disclosure & Scrolling 편집은 Design Toolbar의 `Disclosure & Scroll`, Canvas Context Menu의 `Edit Disclosure & Scrolling... (Ctrl+Alt+Shift+U)`, Edit 메뉴, `Ctrl+Alt+Shift+U`에서 동일한 공용 명령으로 접근합니다. Expander·ScrollViewer 타입·잠금·중첩 Content 검증, header·expanded·전개 방향·콘텐츠 정렬과 양축 scrollbar·auto-hide·chaining·deferred/focus scrolling·snap 정책, 적용·Undo 결과는 진입 경로와 관계없이 동일하게 유지됩니다.
 125. SplitView Pane 편집은 Design Toolbar의 `SplitView Pane`, Canvas Context Menu의 `Edit SplitView Pane Behavior... (Ctrl+Alt+Shift+V)`, Edit 메뉴, `Ctrl+Alt+Shift+V`에서 동일한 공용 명령으로 접근합니다. SplitView 타입·잠금·pane 입력 검증, DisplayMode·IsPaneOpen·OpenPaneLength·CompactPaneLength·PanePlacement·UseLightDismissOverlayMode·PaneBackground 입력, 적용·Undo 결과는 진입 경로와 관계없이 동일하게 유지됩니다.
+126. TabControl Behavior 편집은 Design Toolbar의 `TabControl`, Canvas Context Menu의 `Edit TabControl Behavior... (Ctrl+Alt+Shift+K)`, Edit 메뉴, `Ctrl+Alt+Shift+K`에서 동일한 공용 명령으로 접근합니다. TabControl 타입·잠금·탭 동작 검증, TabStripPlacement·HorizontalContentAlignment·VerticalContentAlignment 입력, 적용·Undo 결과는 진입 경로와 관계없이 동일하게 유지됩니다.
 
 DataGrid가 포함된 생성 AXAML을 다른 프로젝트에서 사용할 때는 같은 Avalonia 버전의 `Avalonia.Controls.DataGrid` 패키지와 `avares://Avalonia.Controls.DataGrid/Themes/Fluent.xaml` 스타일 include가 필요합니다.
 
@@ -662,6 +665,7 @@ AXAML 소스 편집기의 `Validate`와 `Preview`는 현재 디자인과 Undo �
 - v2.35: Toggle & Choice 편집 Toolbar·Context Menu·Ctrl+Alt+Shift+O 빠른 접근 추가
 - v2.36: Disclosure & Scrolling 편집 Toolbar·Context Menu·Ctrl+Alt+Shift+U 빠른 접근 추가
 - v2.37: SplitView Pane 편집 Toolbar·Context Menu·Ctrl+Alt+Shift+V 빠른 접근 추가
+- v2.38: TabControl Behavior 편집 Toolbar·Context Menu·Ctrl+Alt+Shift+K 빠른 접근 추가
 
 ## 컴포넌트 팩
 

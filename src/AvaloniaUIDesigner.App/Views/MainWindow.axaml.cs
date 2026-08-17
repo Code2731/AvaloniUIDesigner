@@ -81,6 +81,7 @@ public partial class MainWindow : Window
         Ctrl+Alt+Shift+O    Edit Toggle and Choice behavior
         Ctrl+Alt+Shift+U    Edit Expander disclosure and ScrollViewer scrolling behavior
         Ctrl+Alt+Shift+V    Edit SplitView pane presentation and scrolling behavior
+        Ctrl+Alt+Shift+K    Edit TabControl tab strip and content alignment behavior
         Ctrl+Alt+G          Toggle design grid
         Ctrl+Alt+Shift+G    Toggle snap to grid
         Ctrl+Alt+1          Toggle Toolbox panel
@@ -2581,6 +2582,9 @@ public partial class MainWindow : Window
     private async void OnEditTabControlBehaviorPropertiesMenuClicked(
         object? sender,
         Avalonia.Interactivity.RoutedEventArgs e)
+        => await EditTabControlBehaviorPropertiesAsync();
+
+    private async Task EditTabControlBehaviorPropertiesAsync()
     {
         FlushPendingPropertyHistory();
         if (Vm is null
@@ -4785,6 +4789,13 @@ public partial class MainWindow : Window
         if (ctrl && alt && shift && e.Key == Key.V)
         {
             await EditSplitViewPropertiesAsync();
+            e.Handled = true;
+            return;
+        }
+
+        if (ctrl && alt && shift && e.Key == Key.K)
+        {
+            await EditTabControlBehaviorPropertiesAsync();
             e.Handled = true;
             return;
         }
