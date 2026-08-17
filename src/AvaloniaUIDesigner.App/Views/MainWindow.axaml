@@ -120,7 +120,7 @@
                 <MenuItem Header="Edit Image Source &amp; Rendering..." Click="OnEditImagePropertiesMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
                 <MenuItem Header="Edit Button Actions &amp; Commands..." Click="OnEditButtonPropertiesMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
                 <MenuItem Header="Edit Grid Definitions..." Click="OnEditGridDefinitionsMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
-                <MenuItem Header="Edit GridSplitter Behavior..." Click="OnEditGridSplitterPropertiesMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
+                <MenuItem Header="Edit GridSplitter Behavior... (Ctrl+Alt+Shift+J)" Click="OnEditGridSplitterPropertiesMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
                 <MenuItem Header="Assign to Grid Cell..." Click="OnAssignToGridCellMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
                 <MenuItem Header="Assign to StackPanel..." Click="OnAssignToStackPanelMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
                 <MenuItem Header="Assign to DockPanel..." Click="OnAssignToDockPanelMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
@@ -639,6 +639,12 @@
                             Click="OnEditDataGridBehaviorPropertiesMenuClicked"
                             IsEnabled="{Binding Canvas.IsSelectionActive}"
                             ToolTip.Tip="Edit DataGrid table behavior and sizing policy (Ctrl+Alt+Shift+E)"
+                            Padding="7,3"/>
+                    <Button Name="EditGridSplitterPropertiesToolbar"
+                            Content="GridSplitter"
+                            Click="OnEditGridSplitterPropertiesMenuClicked"
+                            IsEnabled="{Binding Canvas.IsSelectionActive}"
+                            ToolTip.Tip="Edit GridSplitter resize direction, behavior, and increments (Ctrl+Alt+Shift+J)"
                             Padding="7,3"/>
                     <Border Width="1" Background="#CBD5E1" Margin="0,2"/>
                     <TextBlock Text="Order"
@@ -1395,6 +1401,10 @@
                                               Header="Edit DataGrid Behavior... (Ctrl+Alt+Shift+E)"
                                               Click="OnEditDataGridBehaviorPropertiesMenuClicked"
                                               IsEnabled="{Binding Canvas.IsSelectionActive}"/>
+                                    <MenuItem Name="EditGridSplitterPropertiesContextMenu"
+                                              Header="Edit GridSplitter Behavior... (Ctrl+Alt+Shift+J)"
+                                              Click="OnEditGridSplitterPropertiesMenuClicked"
+                                              IsEnabled="{Binding Canvas.IsSelectionActive}"/>
                                     <MenuItem Header="Center on Artboard" IsEnabled="{Binding Canvas.IsSelectionActive}">
                                         <MenuItem Header="Horizontally" Click="OnCenterHorizontallyOnArtboardMenuClicked"/>
                                         <MenuItem Header="Vertically" Click="OnCenterVerticallyOnArtboardMenuClicked"/>
@@ -1529,7 +1539,7 @@
                                                     <MenuItem Header="Edit Button Actions &amp; Commands..." Click="OnEditButtonPropertiesMenuClicked"/>
                                                     <MenuItem Header="Edit Path Data..." Click="OnEditPathDataMenuClicked"/>
                                                     <MenuItem Header="Edit Grid Definitions..." Click="OnEditGridDefinitionsMenuClicked"/>
-                                                    <MenuItem Header="Edit GridSplitter Behavior..." Click="OnEditGridSplitterPropertiesMenuClicked"/>
+                                                    <MenuItem Header="Edit GridSplitter Behavior... (Ctrl+Alt+Shift+J)" Click="OnEditGridSplitterPropertiesMenuClicked"/>
                                                     <MenuItem Header="Assign to Grid Cell..." Click="OnAssignToGridCellMenuClicked"/>
                                                     <MenuItem Header="Assign to StackPanel..." Click="OnAssignToStackPanelMenuClicked"/>
                                                     <MenuItem Header="Assign to DockPanel..." Click="OnAssignToDockPanelMenuClicked"/>

@@ -2647,6 +2647,9 @@ public partial class MainWindow : Window
     private async void OnEditGridSplitterPropertiesMenuClicked(
         object? sender,
         Avalonia.Interactivity.RoutedEventArgs e)
+        => await EditGridSplitterPropertiesAsync();
+
+    private async Task EditGridSplitterPropertiesAsync()
     {
         FlushPendingPropertyHistory();
         if (Vm is null || !Vm.TryGetSelectedGridSplitterProperties(out var state))
@@ -4807,6 +4810,13 @@ public partial class MainWindow : Window
         if (ctrl && alt && shift && e.Key == Key.E)
         {
             await EditDataGridBehaviorPropertiesAsync();
+            e.Handled = true;
+            return;
+        }
+
+        if (ctrl && alt && shift && e.Key == Key.J)
+        {
+            await EditGridSplitterPropertiesAsync();
             e.Handled = true;
             return;
         }
