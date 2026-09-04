@@ -173,6 +173,7 @@ public partial class MainWindow : Window
         Project Explorer pair status  Distinguish matching and mismatched AXAML/code-behind identities
         Project Explorer attach code-behind  Add a matching x:Class and .axaml.cs to an existing AXAML file
         Project Explorer create paired file  Generate code-behind for an existing Window or UserControl AXAML
+        Project Explorer repair pair  Restore AXAML x:Class from an existing code-behind identity
         Project Explorer Ctrl+Shift+N  Create a new folder
         Project Explorer Ctrl+Shift+D  Duplicate the selected AXAML file
         Project Explorer Ctrl+Shift+M  Move the selected AXAML file to another project folder
@@ -2292,6 +2293,95 @@ public partial class MainWindow : Window
             out error);
     }
 
+    private static bool TryGetProjectExplorerCodeBehindIdentity(
+        string sourceCodeBehind,
+        out string className,
+        out string error)
+    {
+        className = string.Empty;
+        error = string.Empty;
+        var namespaceMatch = Regex.Match(
+            sourceCodeBehind,
+            @"\bnamespace\s+(?<namespace>[\p{L}_][\p{L}\p{N}_]*(?:\.[\p{L}_][\p{L}\p{N}_]*)*)\s*(?:;|\{)",
+            RegexOptions.Singleline);
+        var classMatch = Regex.Match(
+            sourceCodeBehind,
+            @"\bpartial\s+class\s+(?<type>[\p{L}_][\p{L}\p{N}_]*)\b",
+            RegexOptions.Singleline);
+        if (!classMatch.Success)
+        {
+            error = "The code-behind does not contain a partial class declaration.";
+            return false;
+        }
+
+        var namespaceName = namespaceMatch.Success
+            ? namespaceMatch.Groups["namespace"].Value
+            : string.Empty;
+        var typeName = classMatch.Groups["type"].Value;
+        var rawClassName = namespaceName.Length == 0
+            ? typeName
+            : $"{namespaceName}.{typeName}";
+        if (!MainWindowViewModel.TryNormalizeRootClassName(rawClassName, out className)
+            || className.Length == 0)
+        {
+            className = string.Empty;
+            error = "The code-behind identity is not a valid dotted .NET type name.";
+            return false;
+        }
+
+        return true;
+    }
+
+    private static bool TryPrepareProjectExplorerPairRepair(
+        string sourceAxaml,
+        string sourceCodeBehind,
+        out string targetAxaml,
+        out string className,
+        out string error)
+    {
+        targetAxaml = string.Empty;
+        className = string.Empty;
+        error = string.Empty;
+        if (!TryGetProjectExplorerRootInfo(sourceAxaml, out _, out _, out error)
+            || !TryGetProjectExplorerCodeBehindIdentity(
+                sourceCodeBehind,
+                out className,
+                out error))
+        {
+            return false;
+        }
+
+        return TrySetProjectExplorerClassAttribute(
+            sourceAxaml,
+            className,
+            out targetAxaml,
+            out error);
+    }
+
+    private static bool CanCreateProjectExplorerCodeBehind(string? axamlPath)
+    {
+        if (string.IsNullOrWhiteSpace(axamlPath) || !File.Exists(axamlPath))
+        {
+            return false;
+        }
+
+        try
+        {
+            return TryGetProjectExplorerRootInfo(
+                    File.ReadAllText(axamlPath),
+                    out _,
+                    out _,
+                    out _);
+        }
+        catch (Exception exception) when (exception is IOException
+            or UnauthorizedAccessException
+            or ArgumentException
+            or NotSupportedException)
+        {
+            return false;
+        }
+    }
+
     private static bool TrySetProjectExplorerClassAttribute(
         string sourceAxaml,
         string className,
@@ -3554,6 +3644,296 @@ public partial class MainWindow : Window
             if (!string.Equals(Vm.CurrentDocumentPath, currentPath, StringComparison.OrdinalIgnoreCase))
             {
                 Vm.StatusText = $"Created paired code-behind for {System.IO.Path.GetFileName(currentPath)}.";
+            }
+        }
+
+        async Task<bool> ShowRepairProjectExplorerPairDialogAsync(
+            string currentPath,
+            string className,
+            string? currentAxamlClassName)
+        {
+            var dialog = new Window
+            {
+                Title = "Repair Paired Identity",
+                Width = 520,
+                Height = 300,
+                MinWidth = 440,
+                MinHeight = 260,
+                CanResize = false,
+                WindowStartupLocation = WindowStartupLocation.CenterOwner,
+            };
+            var repairButton = new Button { Content = "Repair", MinWidth = 86 };
+            var cancelButton = new Button { Content = "Cancel", MinWidth = 86 };
+            repairButton.Click += (_, _) => dialog.Close(true);
+            cancelButton.Click += (_, _) => dialog.Close(false);
+            dialog.KeyDown += (_, e) =>
+            {
+                if (e.Key == Key.Enter)
+                {
+                    dialog.Close(true);
+                    e.Handled = true;
+                }
+                else if (e.Key == Key.Escape)
+                {
+                    dialog.Close(false);
+                    e.Handled = true;
+                }
+            };
+            dialog.Content = new StackPanel
+            {
+                Margin = new Thickness(16),
+                Spacing = 10,
+                Children =
+                {
+                    new TextBlock
+                    {
+                        Text = $"Repair the paired identity for {System.IO.Path.GetFileName(currentPath)}?",
+                        TextWrapping = TextWrapping.Wrap,
+                    },
+                    new TextBlock
+                    {
+                        Text = $"Current AXAML x:Class: {currentAxamlClassName ?? "(missing or invalid)"}",
+                        Foreground = Brush.Parse("#64748B"),
+                        TextWrapping = TextWrapping.Wrap,
+                    },
+                    new TextBlock
+                    {
+                        Text = $"Code-behind identity: {className}",
+                        Foreground = Brush.Parse("#0F766E"),
+                        TextWrapping = TextWrapping.Wrap,
+                    },
+                    new TextBlock
+                    {
+                        Text = "Only AXAML x:Class will change. The existing .axaml.cs content will be preserved.",
+                        Foreground = Brush.Parse("#64748B"),
+                        TextWrapping = TextWrapping.Wrap,
+                    },
+                    new StackPanel
+                    {
+                        Orientation = Orientation.Horizontal,
+                        HorizontalAlignment = HorizontalAlignment.Right,
+                        Spacing = 8,
+                        Children = { cancelButton, repairButton },
+                    },
+                },
+            };
+
+            return await dialog.ShowDialog<bool>(this);
+        }
+
+        async Task RepairProjectExplorerPairAsync()
+        {
+            if (list.SelectedItem is not ProjectExplorerNode { IsFile: true } node)
+            {
+                Vm.StatusText = "Select an AXAML file with a pair mismatch to repair.";
+                return;
+            }
+
+            var currentPath = GetProjectExplorerClipboardPath(
+                node,
+                Vm.ProjectWorkspacePath,
+                fullPath: true);
+            if (string.IsNullOrWhiteSpace(currentPath) || !File.Exists(currentPath))
+            {
+                Vm.StatusText = "The selected Project Explorer file is unavailable.";
+                return;
+            }
+
+            var codeBehindPath = GetProjectExplorerCodeBehindPath(currentPath);
+            if (!File.Exists(codeBehindPath))
+            {
+                Vm.StatusText = $"No paired code-behind exists for {System.IO.Path.GetFileName(currentPath)}.";
+                return;
+            }
+
+            if (GetProjectExplorerCodeBehindStatus(currentPath) != ProjectExplorerCodeBehindStatus.Mismatch)
+            {
+                Vm.StatusText = "The selected AXAML and code-behind are already paired.";
+                return;
+            }
+
+            if (!await EnsureMoveProjectExplorerSourceReadyAsync(currentPath))
+            {
+                return;
+            }
+
+            string sourceAxaml;
+            string sourceCodeBehind;
+            try
+            {
+                sourceAxaml = await File.ReadAllTextAsync(currentPath);
+                sourceCodeBehind = await File.ReadAllTextAsync(codeBehindPath);
+            }
+            catch (Exception exception) when (exception is IOException
+                or UnauthorizedAccessException
+                or ArgumentException
+                or NotSupportedException)
+            {
+                Vm.StatusText = $"Could not read the paired files: {exception.Message}";
+                return;
+            }
+
+            if (!TryGetProjectExplorerRootInfo(
+                    sourceAxaml,
+                    out _,
+                    out var currentAxamlClassName,
+                    out var rootError))
+            {
+                Vm.StatusText = $"Could not repair the paired identity: {rootError}";
+                return;
+            }
+
+            if (!TryGetProjectExplorerCodeBehindIdentity(
+                    sourceCodeBehind,
+                    out var className,
+                    out var identityError))
+            {
+                Vm.StatusText = $"Could not repair the paired identity: {identityError}";
+                return;
+            }
+
+            if (!await ShowRepairProjectExplorerPairDialogAsync(
+                    currentPath,
+                    className,
+                    currentAxamlClassName))
+            {
+                return;
+            }
+
+            if (!File.Exists(currentPath) || !File.Exists(codeBehindPath))
+            {
+                Vm.StatusText = "The paired files changed before repair could be applied.";
+                return;
+            }
+
+            try
+            {
+                sourceAxaml = await File.ReadAllTextAsync(currentPath);
+                sourceCodeBehind = await File.ReadAllTextAsync(codeBehindPath);
+            }
+            catch (Exception exception) when (exception is IOException
+                or UnauthorizedAccessException
+                or ArgumentException
+                or NotSupportedException)
+            {
+                Vm.StatusText = $"Could not re-read the paired files: {exception.Message}";
+                return;
+            }
+
+            if (!TryPrepareProjectExplorerPairRepair(
+                    sourceAxaml,
+                    sourceCodeBehind,
+                    out var targetAxaml,
+                    out var refreshedClassName,
+                    out var prepareError))
+            {
+                Vm.StatusText = $"Could not repair the paired identity: {prepareError}";
+                return;
+            }
+
+            if (!string.Equals(className, refreshedClassName, StringComparison.Ordinal))
+            {
+                Vm.StatusText = "The code-behind identity changed before repair could be applied. Review the mismatch and try again.";
+                return;
+            }
+
+            var backupPath = GetDocumentBackupPath(currentPath);
+            var backupCreated = false;
+            var axamlWritten = false;
+            try
+            {
+                if (!File.Exists(backupPath))
+                {
+                    await AtomicFileWriter.WriteAllTextAsync(backupPath, sourceAxaml);
+                    backupCreated = true;
+                }
+
+                await AtomicFileWriter.WriteAllTextAsync(currentPath, targetAxaml);
+                axamlWritten = true;
+            }
+            catch (Exception exception) when (exception is IOException
+                or UnauthorizedAccessException
+                or ArgumentException
+                or NotSupportedException)
+            {
+                try
+                {
+                    if (axamlWritten)
+                    {
+                        await AtomicFileWriter.WriteAllTextAsync(currentPath, sourceAxaml);
+                    }
+
+                    if (backupCreated && File.Exists(backupPath))
+                    {
+                        File.Delete(backupPath);
+                    }
+                }
+                catch (Exception rollbackException) when (rollbackException is IOException
+                    or UnauthorizedAccessException
+                    or ArgumentException
+                    or NotSupportedException)
+                {
+                    // Preserve the original repair failure if rollback is also blocked.
+                }
+
+                Vm.StatusText = $"Could not repair the paired identity: {exception.Message}";
+                return;
+            }
+
+            var isCurrentDocument = string.Equals(
+                Vm.CurrentDocumentPath,
+                currentPath,
+                StringComparison.OrdinalIgnoreCase);
+            if (isCurrentDocument)
+            {
+                if (!Vm.TryImportDraftAxaml(targetAxaml, out var importError, out var warning))
+                {
+                    Vm.MarkExternalDocumentChanged(currentPath);
+                    Vm.StatusText = $"Repaired AXAML x:Class, but could not refresh the open document: {importError}";
+                }
+                else
+                {
+                    RememberKnownDocumentWriteTime(currentPath);
+                    Vm.ClearExternalDocumentChange();
+                    ClearDesignGuides();
+                    Vm.StatusText = string.IsNullOrWhiteSpace(warning)
+                        ? $"Repaired AXAML x:Class from code-behind for {System.IO.Path.GetFileName(currentPath)}."
+                        : $"Repaired AXAML x:Class from code-behind for {System.IO.Path.GetFileName(currentPath)}. {warning}";
+                }
+            }
+            else if (Vm.DocumentTabs.Any(tab => string.Equals(
+                         tab.DocumentPath,
+                         currentPath,
+                         StringComparison.OrdinalIgnoreCase)))
+            {
+                Vm.MarkExternalDocumentChanged(currentPath);
+            }
+
+            if (!Vm.RefreshProjectWorkspace(out var refreshError))
+            {
+                RefreshProjectTree();
+                Vm.StatusText = $"Repaired AXAML x:Class, but could not refresh Project Explorer: {refreshError}";
+                return;
+            }
+
+            string relativePath;
+            try
+            {
+                relativePath = System.IO.Path.GetRelativePath(
+                        Vm.ProjectWorkspacePath!,
+                        currentPath)
+                    .Replace(System.IO.Path.DirectorySeparatorChar, '/');
+            }
+            catch (ArgumentException)
+            {
+                RefreshProjectTree();
+                return;
+            }
+
+            RefreshProjectTree(relativePath);
+            if (!isCurrentDocument)
+            {
+                Vm.StatusText = $"Repaired AXAML x:Class from code-behind for {System.IO.Path.GetFileName(currentPath)}.";
             }
         }
 
@@ -5555,6 +5935,11 @@ public partial class MainWindow : Window
             Header = "Create Paired Code-behind...",
             IsEnabled = false,
         };
+        var repairPairMenu = new MenuItem
+        {
+            Header = "Repair AXAML x:Class from Code-behind...",
+            IsEnabled = false,
+        };
         var openCodeBehindMenu = new MenuItem
         {
             Header = "Open Paired Code-behind",
@@ -5575,6 +5960,7 @@ public partial class MainWindow : Window
         copyRelativePathMenu.Click += async (_, _) => await CopyProjectExplorerPathAsync(fullPath: false);
         copyFullPathMenu.Click += async (_, _) => await CopyProjectExplorerPathAsync(fullPath: true);
         createCodeBehindMenu.Click += async (_, _) => await CreateProjectExplorerCodeBehindAsync();
+        repairPairMenu.Click += async (_, _) => await RepairProjectExplorerPairAsync();
         openCodeBehindMenu.Click += (_, _) => OpenProjectExplorerCodeBehind();
         openFileManagerMenu.Click += (_, _) => OpenProjectExplorerFileManager();
         var projectExplorerContextMenu = new ContextMenu
@@ -5593,6 +5979,7 @@ public partial class MainWindow : Window
                 copyRelativePathMenu,
                 copyFullPathMenu,
                 createCodeBehindMenu,
+                repairPairMenu,
                 openCodeBehindMenu,
                 openFileManagerMenu,
             },
@@ -5612,9 +5999,17 @@ public partial class MainWindow : Window
                     IsFile: true,
                     FullPath: { } axamlPath,
                 }
-                && File.Exists(axamlPath)
+                && CanCreateProjectExplorerCodeBehind(axamlPath)
                 && !File.Exists(GetProjectExplorerCodeBehindPath(axamlPath))
                 && !Directory.Exists(GetProjectExplorerCodeBehindPath(axamlPath));
+            repairPairMenu.IsEnabled = list.SelectedItem is ProjectExplorerNode
+                {
+                    IsFile: true,
+                    FullPath: { } repairAxamlPath,
+                }
+                && File.Exists(GetProjectExplorerCodeBehindPath(repairAxamlPath))
+                && GetProjectExplorerCodeBehindStatus(repairAxamlPath)
+                    == ProjectExplorerCodeBehindStatus.Mismatch;
             openCodeBehindMenu.IsEnabled = list.SelectedItem is ProjectExplorerNode
                 {
                     IsFile: true,
