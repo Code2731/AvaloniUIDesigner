@@ -178,6 +178,7 @@ public partial class MainWindow : Window
         Project Workspace build  Run dotnet build and inspect compiler output for a project or solution
         Project build configuration  Choose Debug or Release before running a workspace build; the selection is session-persisted
         Project build diagnostics  Filter compiler diagnostics and double-click to open its AXAML or source file
+        Layout diagnostics    Validate artboard bounds, parent relationships, and hierarchy before preview or build
         Project build dirty choice  Choose Save All & Build or build saved files when designer changes are pending
         Project Explorer Ctrl+Shift+N  Create a new folder
         Project Explorer Ctrl+Shift+D  Duplicate the selected AXAML file
@@ -221,6 +222,7 @@ public partial class MainWindow : Window
     private enum UnsavedChoice { Save, Discard, Cancel }
     private enum BuildDirtyDocumentChoice { Cancel, SaveAllAndBuild, BuildSavedFiles }
     private enum ProjectBuildDiagnosticFilter { All, Errors, Warnings }
+    private enum DesignerLayoutDiagnosticFilter { All, Errors, Warnings }
     private enum ExternalChangeResolution
     {
         OpenTab,
@@ -1628,6 +1630,18 @@ public partial class MainWindow : Window
                 diagnostic.Severity,
                 "WARNING",
                 StringComparison.OrdinalIgnoreCase),
+            _ => true,
+        };
+
+    private static bool MatchesDesignerLayoutDiagnosticFilter(
+        DesignerLayoutDiagnostic diagnostic,
+        DesignerLayoutDiagnosticFilter filter)
+        => filter switch
+        {
+            DesignerLayoutDiagnosticFilter.Errors
+                => diagnostic.Severity == DesignerLayoutDiagnosticSeverity.Error,
+            DesignerLayoutDiagnosticFilter.Warnings
+                => diagnostic.Severity == DesignerLayoutDiagnosticSeverity.Warning,
             _ => true,
         };
 
@@ -8436,6 +8450,265 @@ public partial class MainWindow : Window
             Vm.TryValidateCurrentAxaml(out var result);
             Vm.StatusText = result;
         }
+    }
+
+    private async void OnValidateLayoutMenuClicked(
+        object? sender,
+        Avalonia.Interactivity.RoutedEventArgs e)
+        => await ShowLayoutDiagnosticsAsync();
+
+    private async Task ShowLayoutDiagnosticsAsync()
+    {
+        if (Vm is null)
+        {
+            return;
+        }
+
+        FlushPendingPropertyHistory();
+        var allDiagnostics = DesignerLayoutValidator.Validate(Vm.CreatePreviewDocument());
+        var visibleDiagnostics = new ObservableCollection<DesignerLayoutDiagnostic>();
+        var diagnosticFilter = DesignerLayoutDiagnosticFilter.All;
+        var errorCount = allDiagnostics.Count(diagnostic =>
+            diagnostic.Severity == DesignerLayoutDiagnosticSeverity.Error);
+        var warningCount = allDiagnostics.Count(diagnostic =>
+            diagnostic.Severity == DesignerLayoutDiagnosticSeverity.Warning);
+        var summary = new TextBlock
+        {
+            TextWrapping = TextWrapping.Wrap,
+            Foreground = Brush.Parse("#475569"),
+        };
+        var diagnosticFilterCombo = new ComboBox
+        {
+            Width = 120,
+            ItemsSource = Enum.GetNames<DesignerLayoutDiagnosticFilter>(),
+            SelectedIndex = 0,
+        };
+        var diagnosticsList = new ListBox
+        {
+            Height = 250,
+            SelectionMode = SelectionMode.Single,
+            ItemsSource = visibleDiagnostics,
+        };
+        var detail = new TextBlock
+        {
+            TextWrapping = TextWrapping.Wrap,
+            Foreground = Brush.Parse("#334155"),
+        };
+        var selectButton = new Button
+        {
+            Content = "Select in Canvas",
+            MinWidth = 132,
+            IsEnabled = false,
+        };
+        var copyButton = new Button
+        {
+            Content = "Copy Selected",
+            MinWidth = 118,
+            IsEnabled = false,
+        };
+        var dialog = new Window
+        {
+            Title = "Layout Diagnostics",
+            Width = 820,
+            Height = 560,
+            MinWidth = 620,
+            MinHeight = 440,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner,
+        };
+
+        void RefreshDiagnosticList()
+        {
+            var selected = diagnosticsList.SelectedItem as DesignerLayoutDiagnostic;
+            visibleDiagnostics.Clear();
+            foreach (var diagnostic in allDiagnostics.Where(item =>
+                         MatchesDesignerLayoutDiagnosticFilter(item, diagnosticFilter)))
+            {
+                visibleDiagnostics.Add(diagnostic);
+            }
+
+            if (selected is not null && visibleDiagnostics.Contains(selected))
+            {
+                diagnosticsList.SelectedItem = selected;
+            }
+
+            summary.Text = allDiagnostics.Count == 0
+                ? "No layout diagnostics found. The current document passes the design-time checks."
+                : $"{allDiagnostics.Count} diagnostic(s): {errorCount} error(s), {warningCount} warning(s). Showing {visibleDiagnostics.Count} ({diagnosticFilter}). Select an item to inspect it.";
+        }
+
+        void RefreshSelection()
+        {
+            var selected = diagnosticsList.SelectedItem as DesignerLayoutDiagnostic;
+            var hasSelection = selected is not null;
+            selectButton.IsEnabled = hasSelection && selected!.ElementName is not null;
+            copyButton.IsEnabled = hasSelection;
+            detail.Text = selected is null
+                ? "Select a layout diagnostic. Control diagnostics can be focused on the Canvas."
+                : selected.ElementName is null
+                    ? selected.ToString()
+                    : $"{selected}\n\nDouble-click or choose Select in Canvas to focus '{selected.ElementName}'.";
+        }
+
+        void SelectCurrent()
+        {
+            if (diagnosticsList.SelectedItem is not DesignerLayoutDiagnostic diagnostic)
+            {
+                return;
+            }
+
+            if (diagnostic.ElementName is null)
+            {
+                Vm.StatusText = "This layout diagnostic does not target a control.";
+                return;
+            }
+
+            var element = Vm.Canvas.Elements.FirstOrDefault(candidate =>
+                string.Equals(
+                    candidate.DisplayName,
+                    diagnostic.ElementName,
+                    StringComparison.OrdinalIgnoreCase));
+            if (element is null)
+            {
+                Vm.StatusText = $"Layout diagnostic target is no longer available: {diagnostic.ElementName}.";
+                return;
+            }
+
+            Vm.SelectElement(element);
+            Vm.StatusText = $"Selected {element.DisplayName} from layout diagnostics.";
+            dialog.Close();
+        }
+
+        async Task CopySelectedAsync()
+        {
+            if (diagnosticsList.SelectedItem is not DesignerLayoutDiagnostic diagnostic)
+            {
+                return;
+            }
+
+            var clipboard = TopLevel.GetTopLevel(this)?.Clipboard;
+            if (clipboard is null)
+            {
+                Vm.StatusText = "Clipboard is unavailable.";
+                return;
+            }
+
+            try
+            {
+                await clipboard.SetTextAsync(diagnostic.ToString());
+                Vm.StatusText = "Copied layout diagnostic.";
+            }
+            catch (Exception exception) when (exception is InvalidOperationException
+                or NotSupportedException)
+            {
+                Vm.StatusText = $"Could not copy layout diagnostic: {exception.Message}";
+            }
+        }
+
+        diagnosticFilterCombo.SelectionChanged += (_, _) =>
+        {
+            if (diagnosticFilterCombo.SelectedItem is string value
+                && Enum.TryParse<DesignerLayoutDiagnosticFilter>(value, out var parsedFilter))
+            {
+                diagnosticFilter = parsedFilter;
+                RefreshDiagnosticList();
+            }
+        };
+        diagnosticsList.SelectionChanged += (_, _) => RefreshSelection();
+        diagnosticsList.DoubleTapped += (_, _) => SelectCurrent();
+        diagnosticsList.KeyDown += async (_, e) =>
+        {
+            if (e.Key == Key.Enter)
+            {
+                SelectCurrent();
+                e.Handled = true;
+            }
+            else if (e.Key == Key.C
+                && e.KeyModifiers.HasFlag(KeyModifiers.Control))
+            {
+                await CopySelectedAsync();
+                e.Handled = true;
+            }
+            else if (e.Key == Key.Escape)
+            {
+                dialog.Close();
+                e.Handled = true;
+            }
+        };
+        selectButton.Click += (_, _) => SelectCurrent();
+        copyButton.Click += async (_, _) => await CopySelectedAsync();
+        var closeButton = new Button
+        {
+            Content = "Close",
+            MinWidth = 86,
+            IsCancel = true,
+        };
+        closeButton.Click += (_, _) => dialog.Close();
+        var buttons = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            HorizontalAlignment = HorizontalAlignment.Right,
+            Spacing = 8,
+            Children =
+            {
+                copyButton,
+                selectButton,
+                closeButton,
+            },
+        };
+        var content = new Grid
+        {
+            Margin = new Thickness(16),
+            RowDefinitions = new RowDefinitions("Auto,Auto,*,Auto,Auto"),
+            RowSpacing = 10,
+            Children =
+            {
+                new TextBlock
+                {
+                    Text = "Review design-time layout issues before previewing or building the project.",
+                    TextWrapping = TextWrapping.Wrap,
+                    FontWeight = FontWeight.SemiBold,
+                },
+                new Grid
+                {
+                    ColumnDefinitions = new ColumnDefinitions("*,Auto"),
+                    Children =
+                    {
+                        summary,
+                        new StackPanel
+                        {
+                            [Grid.ColumnProperty] = 1,
+                            Orientation = Orientation.Horizontal,
+                            Spacing = 8,
+                            Children =
+                            {
+                                new TextBlock
+                                {
+                                    Text = "Filter:",
+                                    VerticalAlignment = VerticalAlignment.Center,
+                                },
+                                diagnosticFilterCombo,
+                            },
+                        },
+                    },
+                },
+                diagnosticsList,
+                detail,
+                buttons,
+            },
+        };
+        Grid.SetRow(content.Children[1], 1);
+        Grid.SetRow(diagnosticsList, 2);
+        Grid.SetRow(detail, 3);
+        Grid.SetRow(buttons, 4);
+        dialog.Content = content;
+        RefreshDiagnosticList();
+        if (visibleDiagnostics.Count > 0)
+        {
+            diagnosticsList.SelectedIndex = 0;
+        }
+
+        RefreshSelection();
+        await dialog.ShowDialog(this);
     }
 
     private async void OnNewMenuClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)

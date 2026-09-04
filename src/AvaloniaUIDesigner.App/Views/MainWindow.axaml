@@ -115,6 +115,7 @@
                 <MenuItem Header="Copy UserControl AXAML" Click="OnCopyUserControlAxamlMenuClicked"/>
                 <MenuItem Header="Export UserControl AXAML..." Click="OnExportUserControlAxamlMenuClicked"/>
                 <MenuItem Header="Validate AXAML" Click="OnValidateAxamlMenuClicked"/>
+                <MenuItem Header="Validate Layout..." Click="OnValidateLayoutMenuClicked"/>
                 <Separator/>
                 <MenuItem Header="Exit" Click="OnExitMenuClicked"/>
             </MenuItem>
@@ -635,6 +636,11 @@
                             Content="Interaction Log"
                             Click="OnPreviewInteractionLogMenuClicked"
                             ToolTip.Tip="Open the live preview interaction log without clearing existing entries"
+                            Padding="8,3"/>
+                    <Button Name="ValidateLayoutToolbar"
+                            Content="Layout Check"
+                            Click="OnValidateLayoutMenuClicked"
+                            ToolTip.Tip="Validate artboard bounds, parent relationships, and hierarchy"
                             Padding="8,3"/>
                     <Border Width="1" Background="#CBD5E1" Margin="0,2"/>
                     <TextBlock Text="Align"
