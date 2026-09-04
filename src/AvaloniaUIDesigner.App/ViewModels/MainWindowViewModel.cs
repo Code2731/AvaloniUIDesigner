@@ -15640,6 +15640,36 @@ public partial class MainWindowViewModel : ViewModelBase
         return true;
     }
 
+    public bool ForgetProjectWorkspaceCollapsedFoldersUnderPath(string relativePath)
+    {
+        var normalizedPath = relativePath
+            .Trim()
+            .Replace('\\', '/')
+            .Trim('/');
+        if (string.IsNullOrWhiteSpace(normalizedPath))
+        {
+            return false;
+        }
+
+        var prefix = normalizedPath + "/";
+        var retainedPaths = _projectWorkspaceCollapsedFolders
+            .Where(path => !string.Equals(
+                    path,
+                    normalizedPath,
+                    StringComparison.OrdinalIgnoreCase)
+                && !path.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        if (retainedPaths.Count == _projectWorkspaceCollapsedFolders.Count)
+        {
+            return false;
+        }
+
+        _projectWorkspaceCollapsedFolders.Clear();
+        _projectWorkspaceCollapsedFolders.UnionWith(retainedPaths);
+        SaveProjectWorkspaceToDisk();
+        return true;
+    }
+
     public void SetProjectWorkspaceCollapsedFolders(IEnumerable<string> relativePaths)
     {
         var normalizedPaths = NormalizeProjectWorkspaceFolders(relativePaths);

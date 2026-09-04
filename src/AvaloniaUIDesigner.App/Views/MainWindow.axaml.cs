@@ -167,6 +167,7 @@ public partial class MainWindow : Window
         Project Explorer F2  Rename the selected AXAML file and keep open tabs linked
         Project Explorer folder F2  Rename the selected folder and keep open tabs linked
         Project Explorer Delete  Delete the selected AXAML file after dirty protection
+        Project Explorer folder Delete  Delete an empty folder after confirmation
         Project Explorer Ctrl+C  Copy the selected full path
         Project Explorer file manager  Open the selected location in the OS file manager
         """;
@@ -1532,6 +1533,36 @@ public partial class MainWindow : Window
         }
     }
 
+    private static string? GetProjectExplorerDeleteFolderPath(
+        ProjectExplorerNode? node,
+        string? workspacePath)
+    {
+        if (node is null || node.IsFile)
+        {
+            return null;
+        }
+
+        var path = GetProjectExplorerClipboardPath(
+            node,
+            workspacePath,
+            fullPath: true);
+        if (string.IsNullOrWhiteSpace(path))
+        {
+            return null;
+        }
+
+        try
+        {
+            return Directory.Exists(path)
+                ? System.IO.Path.GetFullPath(path)
+                : null;
+        }
+        catch (ArgumentException)
+        {
+            return null;
+        }
+    }
+
     private static string? GetProjectExplorerNewFileContent(string? rootKind)
         => rootKind switch
         {
@@ -2490,6 +2521,131 @@ public partial class MainWindow : Window
             Vm.StatusText = $"Renamed folder {System.IO.Path.GetFileName(currentPath)} to {System.IO.Path.GetFileName(newPath)}.";
         }
 
+        async Task<bool> ShowDeleteProjectExplorerFolderDialogAsync(
+            string currentPath)
+        {
+            var deleteDialog = new Window
+            {
+                Title = "Delete Empty Folder",
+                Width = 440,
+                Height = 220,
+                MinWidth = 380,
+                MinHeight = 200,
+                CanResize = false,
+                WindowStartupLocation = WindowStartupLocation.CenterOwner,
+            };
+            var deleteButton = new Button { Content = "Delete", MinWidth = 86 };
+            var cancelButton = new Button { Content = "Cancel", MinWidth = 86 };
+            deleteButton.Click += (_, _) => deleteDialog.Close(true);
+            cancelButton.Click += (_, _) => deleteDialog.Close(false);
+            deleteDialog.Content = new StackPanel
+            {
+                Margin = new Thickness(16),
+                Spacing = 12,
+                Children =
+                {
+                    new TextBlock
+                    {
+                        Text = $"Delete empty folder {System.IO.Path.GetFileName(currentPath)}?",
+                        TextWrapping = TextWrapping.Wrap,
+                    },
+                    new TextBlock
+                    {
+                        Text = "Only an empty folder can be removed. Files and child folders are never deleted by this command.",
+                        Foreground = Brush.Parse("#64748B"),
+                        TextWrapping = TextWrapping.Wrap,
+                    },
+                    new StackPanel
+                    {
+                        Orientation = Orientation.Horizontal,
+                        HorizontalAlignment = HorizontalAlignment.Right,
+                        Spacing = 8,
+                        Children = { cancelButton, deleteButton },
+                    },
+                },
+            };
+
+            return await deleteDialog.ShowDialog<bool>(dialog);
+        }
+
+        async Task DeleteProjectExplorerFolderAsync()
+        {
+            if (list.SelectedItem is not ProjectExplorerNode { IsFile: false } node)
+            {
+                Vm.StatusText = "Select a Project Explorer folder to delete.";
+                return;
+            }
+
+            var currentPath = GetProjectExplorerDeleteFolderPath(
+                node,
+                Vm.ProjectWorkspacePath);
+            if (string.IsNullOrWhiteSpace(currentPath))
+            {
+                Vm.StatusText = "The selected Project Explorer folder is unavailable.";
+                return;
+            }
+
+            bool hasEntries;
+            try
+            {
+                hasEntries = Directory.EnumerateFileSystemEntries(currentPath).Any();
+            }
+            catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+            {
+                Vm.StatusText = $"Could not inspect folder {System.IO.Path.GetFileName(currentPath)}: {exception.Message}";
+                return;
+            }
+
+            if (hasEntries)
+            {
+                Vm.StatusText = "Only empty Project Explorer folders can be deleted.";
+                return;
+            }
+
+            if (!await ShowDeleteProjectExplorerFolderDialogAsync(currentPath))
+            {
+                return;
+            }
+
+            string relativePath;
+            try
+            {
+                relativePath = System.IO.Path.GetRelativePath(
+                        Vm.ProjectWorkspacePath!,
+                        currentPath)
+                    .Replace(System.IO.Path.DirectorySeparatorChar, '/');
+            }
+            catch (ArgumentException)
+            {
+                Vm.StatusText = "The selected Project Explorer folder path is invalid.";
+                return;
+            }
+
+            try
+            {
+                Directory.Delete(currentPath);
+            }
+            catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+            {
+                Vm.StatusText = $"Could not delete folder {System.IO.Path.GetFileName(currentPath)}: {exception.Message}";
+                return;
+            }
+
+            Vm.ForgetProjectWorkspaceCollapsedFoldersUnderPath(relativePath);
+            if (!Vm.RefreshProjectWorkspace(out var refreshError))
+            {
+                RefreshProjectTree();
+                Vm.StatusText = $"Deleted the folder, but could not refresh Project Explorer: {refreshError}";
+                return;
+            }
+
+            var parentRelativePath = System.IO.Path.GetDirectoryName(
+                    relativePath.Replace('/', System.IO.Path.DirectorySeparatorChar))
+                ?.Replace(System.IO.Path.DirectorySeparatorChar, '/');
+            RefreshProjectTree(parentRelativePath);
+            Vm.StatusText = $"Deleted empty folder {System.IO.Path.GetFileName(currentPath)}.";
+        }
+
         async Task<bool> ShowDeleteProjectExplorerFileDialogAsync(
             string currentPath,
             int openTabCount)
@@ -2713,6 +2869,11 @@ public partial class MainWindow : Window
             Header = "Delete AXAML File...",
             IsEnabled = false,
         };
+        var deleteFolderMenu = new MenuItem
+        {
+            Header = "Delete Empty Folder...",
+            IsEnabled = false,
+        };
         var copyRelativePathMenu = new MenuItem { Header = "Copy Relative Path" };
         var copyFullPathMenu = new MenuItem { Header = "Copy Full Path" };
         var openFileManagerMenu = new MenuItem { Header = "Open in File Manager" };
@@ -2724,6 +2885,7 @@ public partial class MainWindow : Window
         renameFileMenu.Click += async (_, _) => await RenameProjectExplorerFileAsync();
         renameFolderMenu.Click += async (_, _) => await RenameProjectExplorerFolderAsync();
         deleteFileMenu.Click += async (_, _) => await DeleteProjectExplorerFileAsync();
+        deleteFolderMenu.Click += async (_, _) => await DeleteProjectExplorerFolderAsync();
         copyRelativePathMenu.Click += async (_, _) => await CopyProjectExplorerPathAsync(fullPath: false);
         copyFullPathMenu.Click += async (_, _) => await CopyProjectExplorerPathAsync(fullPath: true);
         openFileManagerMenu.Click += (_, _) => OpenProjectExplorerFileManager();
@@ -2736,6 +2898,7 @@ public partial class MainWindow : Window
                 renameFileMenu,
                 renameFolderMenu,
                 deleteFileMenu,
+                deleteFolderMenu,
                 new Separator(),
                 copyRelativePathMenu,
                 copyFullPathMenu,
@@ -2749,6 +2912,7 @@ public partial class MainWindow : Window
             renameFileMenu.IsEnabled = hasSelectedFile;
             renameFolderMenu.IsEnabled = hasSelectedFolder;
             deleteFileMenu.IsEnabled = hasSelectedFile;
+            deleteFolderMenu.IsEnabled = hasSelectedFolder;
         };
         list.ContextMenu = projectExplorerContextMenu;
         list.KeyDown += async (_, e) =>
@@ -2834,7 +2998,14 @@ public partial class MainWindow : Window
             }
             else if (e.Key is Key.Delete or Key.Back)
             {
-                await DeleteProjectExplorerFileAsync();
+                if (list.SelectedItem is ProjectExplorerNode { IsFile: true })
+                {
+                    await DeleteProjectExplorerFileAsync();
+                }
+                else
+                {
+                    await DeleteProjectExplorerFolderAsync();
+                }
                 e.Handled = true;
             }
             else if (e.Key == Key.Escape)
@@ -2875,7 +3046,7 @@ public partial class MainWindow : Window
             {
                 new TextBlock
                 {
-                    Text = "Browse the project tree. Double-click an AXAML file to open it; press Enter on a folder or double-click a folder to expand or collapse it, use Ctrl+N or the context menu to create a new AXAML file from a UserControl or Window template, Ctrl+Shift+N or the context menu to create a new folder, F2 or the context menu to rename the selected AXAML file or folder, Delete or Backspace to remove it after dirty protection, Ctrl+C to copy the selected full path, or the context menu to open its location in the file manager.",
+                    Text = "Browse the project tree. Double-click an AXAML file to open it; press Enter on a folder or double-click a folder to expand or collapse it, use Ctrl+N or the context menu to create a new AXAML file from a UserControl or Window template, Ctrl+Shift+N or the context menu to create a new folder, F2 or the context menu to rename the selected AXAML file or folder, Delete or Backspace to remove a file after dirty protection or an empty folder after confirmation, Ctrl+C to copy the selected full path, or the context menu to open its location in the file manager.",
                     TextWrapping = TextWrapping.Wrap,
                 },
                 rootText,
