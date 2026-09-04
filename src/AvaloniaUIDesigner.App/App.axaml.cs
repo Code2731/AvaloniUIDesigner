@@ -3,6 +3,7 @@ using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Data.Core;
 using Avalonia.Data.Core.Plugins;
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using Avalonia.Markup.Xaml;
@@ -128,13 +129,36 @@ public partial class App : Application
                 viewModel.StatusText = "Previous session could not be restored. Started a new document.";
             }
 
-            var startupPath = desktop.Args?
-                .FirstOrDefault(argument => !string.IsNullOrWhiteSpace(argument)
-                    && !argument.StartsWith("-", StringComparison.Ordinal));
-            if (!string.IsNullOrWhiteSpace(startupPath))
+            var startupPaths = desktop.Args?
+                .Where(argument => !string.IsNullOrWhiteSpace(argument)
+                    && !argument.StartsWith("-", StringComparison.Ordinal))
+                .ToArray()
+                ?? Array.Empty<string>();
+            if (startupPaths.Length > 0)
             {
-                TryOpenStartupPath(viewModel, startupPath, out var startupStatus);
-                viewModel.StatusText = startupStatus;
+                if (startupPaths.Length == 1)
+                {
+                    TryOpenStartupPath(viewModel, startupPaths[0], out var startupStatus);
+                    viewModel.StatusText = startupStatus;
+                }
+                else
+                {
+                    var failures = new List<string>();
+                    var openedCount = 0;
+                    foreach (var startupPath in startupPaths)
+                    {
+                        if (TryOpenStartupPath(viewModel, startupPath, out var startupStatus))
+                        {
+                            openedCount++;
+                        }
+                        else
+                        {
+                            failures.Add(startupStatus);
+                        }
+                    }
+
+                    viewModel.StatusText = BuildStartupPathsStatus(openedCount, failures);
+                }
             }
 
             desktop.MainWindow = new MainWindow
@@ -145,4 +169,17 @@ public partial class App : Application
 
         base.OnFrameworkInitializationCompleted();
     }
+
+    private static string BuildStartupPathsStatus(
+        int openedCount,
+        IReadOnlyList<string> failures)
+    {
+        var summary = openedCount == 0
+            ? "No startup paths were opened."
+            : $"Opened {openedCount} startup path(s).";
+        return failures.Count == 0
+            ? summary
+            : $"{summary} {string.Join(" ", failures)}";
+    }
+
 }
