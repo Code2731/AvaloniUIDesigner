@@ -1366,9 +1366,19 @@ public partial class MainWindow : Window
             Text = $"{dirtyDocumentCount} open document(s) have unsaved designer changes.\n\nBuild target: {target.RelativePath}\nChoose whether to save those changes before building.",
             TextWrapping = TextWrapping.Wrap,
         };
-        var saveButton = new Button { Content = "Save All & Build", MinWidth = 132 };
+        var saveButton = new Button
+        {
+            Content = "Save All & Build",
+            MinWidth = 132,
+            IsDefault = true,
+        };
         var savedFilesButton = new Button { Content = "Build Saved Files", MinWidth = 132 };
-        var cancelButton = new Button { Content = "Cancel", MinWidth = 90 };
+        var cancelButton = new Button
+        {
+            Content = "Cancel",
+            MinWidth = 90,
+            IsCancel = true,
+        };
         saveButton.Click += (_, _) => dialog.Close(BuildDirtyDocumentChoice.SaveAllAndBuild);
         savedFilesButton.Click += (_, _) => dialog.Close(BuildDirtyDocumentChoice.BuildSavedFiles);
         cancelButton.Click += (_, _) => dialog.Close(BuildDirtyDocumentChoice.Cancel);
