@@ -66,6 +66,10 @@
                           Click="OnOpenProjectFolderMenuClicked"/>
                 <MenuItem Header="Open Project or Solution... (Ctrl+Shift+J)"
                           Click="OnOpenProjectFileMenuClicked"/>
+                <MenuItem Name="CloseProjectWorkspaceMenu"
+                          Header="Close Project Workspace (Ctrl+Shift+X)"
+                          Click="OnCloseProjectWorkspaceMenuClicked"
+                          IsEnabled="{Binding HasProjectWorkspace}"/>
                 <MenuItem Name="ProjectExplorerMenu"
                           Header="Project Explorer... (Ctrl+Shift+P)"
                           Click="OnProjectExplorerMenuClicked"
@@ -530,6 +534,12 @@
                             Click="OnRefreshProjectFilesMenuClicked"
                             IsEnabled="{Binding HasProjectWorkspace}"
                             ToolTip.Tip="Refresh project AXAML files"
+                            Padding="8,3"/>
+                    <Button Name="CloseProjectWorkspaceToolbar"
+                            Content="Close Workspace"
+                            Click="OnCloseProjectWorkspaceMenuClicked"
+                            IsEnabled="{Binding HasProjectWorkspace}"
+                            ToolTip.Tip="Close the current project workspace (Ctrl+Shift+X)"
                             Padding="8,3"/>
                     <Button Name="ReloadCurrentFileToolbar"
                             Content="Reload"

@@ -35,6 +35,7 @@ public partial class MainWindow : Window
         Ctrl+Shift+O        Open recent AXAML files
         Ctrl+Shift+J        Open an Avalonia project or solution file
         Ctrl+Shift+L        Open recent project workspaces
+        Ctrl+Shift+X        Close the current project workspace
         Ctrl+Shift+P        Open project explorer
         Ctrl+Shift+R        Reload current file after an external change
         Ctrl+S              Save document
@@ -934,6 +935,11 @@ public partial class MainWindow : Window
         Avalonia.Interactivity.RoutedEventArgs e)
         => await OpenProjectFileAsync();
 
+    private void OnCloseProjectWorkspaceMenuClicked(
+        object? sender,
+        Avalonia.Interactivity.RoutedEventArgs e)
+        => CloseProjectWorkspace();
+
     private async void OnProjectExplorerMenuClicked(
         object? sender,
         Avalonia.Interactivity.RoutedEventArgs e)
@@ -1043,6 +1049,17 @@ public partial class MainWindow : Window
         }
 
         Vm.StatusText = $"Opened project {Vm.ProjectWorkspaceName} from {System.IO.Path.GetFileName(projectFilePath)} ({Vm.ProjectFiles.Count} AXAML file(s)).";
+    }
+
+    private void CloseProjectWorkspace()
+    {
+        if (Vm is null || !Vm.HasProjectWorkspace)
+        {
+            return;
+        }
+
+        Vm.ClearProjectWorkspace();
+        Vm.StatusText = "Closed the project workspace. Open document tabs remain available.";
     }
 
     private async Task OpenProjectExplorerAsync()
@@ -9634,6 +9651,13 @@ public partial class MainWindow : Window
             return;
         }
 
+        if (ctrl && shift && !alt && e.Key == Key.X)
+        {
+            CloseProjectWorkspace();
+            e.Handled = true;
+            return;
+        }
+
         if (ctrl && shift && !alt && e.Key == Key.R)
         {
             if (Vm?.CanReloadCurrentFile == true)
@@ -9966,6 +9990,7 @@ public partial class MainWindow : Window
         RefreshProjectFilesMenu.IsEnabled = hasProjectWorkspace;
         ProjectExplorerContextMenu.IsEnabled = hasProjectWorkspace;
         RefreshProjectFilesContextMenu.IsEnabled = hasProjectWorkspace;
+        CloseProjectWorkspaceMenu.IsEnabled = hasProjectWorkspace;
         OpenRecentProjectsDialogMenu.IsEnabled = Vm?.HasRecentProjectWorkspaces == true;
 
         var canReloadCurrentFile = Vm?.CanReloadCurrentFile == true;
