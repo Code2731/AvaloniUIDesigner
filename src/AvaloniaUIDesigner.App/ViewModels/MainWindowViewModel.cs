@@ -73,14 +73,29 @@ public sealed record WorkspacePanelState(
         ProjectExplorerHeight: 560);
 }
 
-public sealed record ProjectWorkspaceFile(string FullPath, string RelativePath)
+public sealed record ProjectWorkspaceFile(
+    string FullPath,
+    string RelativePath,
+    bool IsDirectory = false)
 {
-    public string DisplayName => Path.GetFileName(FullPath);
+    public string DisplayName => Path.GetFileName(FullPath.TrimEnd(
+        Path.DirectorySeparatorChar,
+        Path.AltDirectorySeparatorChar));
 
-    public string Extension => Path.GetExtension(FullPath);
+    public string Extension => IsDirectory ? string.Empty : Path.GetExtension(FullPath);
 
     public override string ToString()
         => $"{DisplayName} - {RelativePath}";
+}
+
+public sealed record ProjectWorkspaceFolder(string FullPath, string RelativePath)
+{
+    public string DisplayName => Path.GetFileName(FullPath.TrimEnd(
+        Path.DirectorySeparatorChar,
+        Path.AltDirectorySeparatorChar));
+
+    public override string ToString()
+        => $"{DisplayName}/ - {RelativePath}";
 }
 
 public enum ItemsEditorMode
@@ -658,6 +673,7 @@ public partial class MainWindowViewModel : ViewModelBase
         PropertyInspector = new PropertyInspectorViewModel();
         RecentFiles = new ObservableCollection<string>();
         ProjectFiles = new ObservableCollection<ProjectWorkspaceFile>();
+        ProjectWorkspaceFolders = new ObservableCollection<ProjectWorkspaceFolder>();
         StylePreviewOptions = new ObservableCollection<StylePreviewOption>();
         DocumentTabs = new ObservableCollection<DocumentTabViewModel>();
         ComponentPacks = new ObservableCollection<ComponentPackInfo>();
@@ -680,6 +696,7 @@ public partial class MainWindowViewModel : ViewModelBase
     public PropertyInspectorViewModel PropertyInspector { get; }
     public ObservableCollection<string> RecentFiles { get; }
     public ObservableCollection<ProjectWorkspaceFile> ProjectFiles { get; }
+    public ObservableCollection<ProjectWorkspaceFolder> ProjectWorkspaceFolders { get; }
     public ObservableCollection<StylePreviewOption> StylePreviewOptions { get; }
     public ObservableCollection<DocumentTabViewModel> DocumentTabs { get; }
     public ObservableCollection<ComponentPackInfo> ComponentPacks { get; }
@@ -15235,7 +15252,8 @@ public partial class MainWindowViewModel : ViewModelBase
     public void ClearProjectWorkspace()
     {
         if (string.IsNullOrWhiteSpace(_projectWorkspacePath)
-            && ProjectFiles.Count == 0)
+            && ProjectFiles.Count == 0
+            && ProjectWorkspaceFolders.Count == 0)
         {
             return;
         }
@@ -15243,6 +15261,7 @@ public partial class MainWindowViewModel : ViewModelBase
         _projectWorkspacePath = null;
         _projectWorkspaceCollapsedFolders.Clear();
         ProjectFiles.Clear();
+        ProjectWorkspaceFolders.Clear();
         OnPropertyChanged(nameof(ProjectWorkspacePath));
         OnPropertyChanged(nameof(ProjectWorkspaceName));
         OnPropertyChanged(nameof(HasProjectWorkspace));
@@ -15489,9 +15508,14 @@ public partial class MainWindowViewModel : ViewModelBase
     private bool LoadProjectWorkspaceFiles(string rootPath)
     {
         var files = EnumerateProjectWorkspaceFiles(rootPath);
-        if (ProjectFiles.Select(file => file.FullPath).SequenceEqual(
-                files.Select(file => file.FullPath),
-                StringComparer.OrdinalIgnoreCase))
+        var folders = EnumerateProjectWorkspaceFolders(rootPath);
+        var filesUnchanged = ProjectFiles.Select(file => file.FullPath).SequenceEqual(
+            files.Select(file => file.FullPath),
+            StringComparer.OrdinalIgnoreCase);
+        var foldersUnchanged = ProjectWorkspaceFolders.Select(folder => folder.FullPath).SequenceEqual(
+            folders.Select(folder => folder.FullPath),
+            StringComparer.OrdinalIgnoreCase);
+        if (filesUnchanged && foldersUnchanged)
         {
             return false;
         }
@@ -15500,6 +15524,12 @@ public partial class MainWindowViewModel : ViewModelBase
         foreach (var file in files)
         {
             ProjectFiles.Add(file);
+        }
+
+        ProjectWorkspaceFolders.Clear();
+        foreach (var folder in folders)
+        {
+            ProjectWorkspaceFolders.Add(folder);
         }
 
         return true;
@@ -15561,6 +15591,44 @@ public partial class MainWindowViewModel : ViewModelBase
         return files
             .OrderBy(file => file.RelativePath, StringComparer.OrdinalIgnoreCase)
             .ThenBy(file => file.RelativePath, StringComparer.Ordinal)
+            .ToList();
+    }
+
+    private static IReadOnlyList<ProjectWorkspaceFolder> EnumerateProjectWorkspaceFolders(string rootPath)
+    {
+        var folders = new List<ProjectWorkspaceFolder>();
+        var pendingDirectories = new Stack<string>();
+        pendingDirectories.Push(rootPath);
+
+        while (pendingDirectories.Count > 0)
+        {
+            var currentPath = pendingDirectories.Pop();
+            IEnumerable<DirectoryInfo> directories;
+            try
+            {
+                directories = new DirectoryInfo(currentPath)
+                    .EnumerateDirectories()
+                    .Where(directory => !ProjectDirectoryExclusions.Contains(directory.Name)
+                        && (directory.Attributes & FileAttributes.ReparsePoint) == 0)
+                    .ToList();
+            }
+            catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+            {
+                directories = Array.Empty<DirectoryInfo>();
+            }
+
+            foreach (var directory in directories)
+            {
+                var relativePath = Path.GetRelativePath(rootPath, directory.FullName)
+                    .Replace(Path.DirectorySeparatorChar, '/');
+                folders.Add(new ProjectWorkspaceFolder(directory.FullName, relativePath));
+                pendingDirectories.Push(directory.FullName);
+            }
+        }
+
+        return folders
+            .OrderBy(folder => folder.RelativePath, StringComparer.OrdinalIgnoreCase)
+            .ThenBy(folder => folder.RelativePath, StringComparer.Ordinal)
             .ToList();
     }
 

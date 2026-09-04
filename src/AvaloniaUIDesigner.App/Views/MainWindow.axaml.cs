@@ -163,6 +163,7 @@ public partial class MainWindow : Window
         Project Explorer arrows  Collapse, expand, and navigate the project tree
         Project Explorer double-click  Open files or toggle folders
         Project Explorer Ctrl+N  Create a new AXAML file from a UserControl or Window template
+        Project Explorer Ctrl+Shift+N  Create a new folder
         Project Explorer F2  Rename the selected AXAML file and keep open tabs linked
         Project Explorer Delete  Delete the selected AXAML file after dirty protection
         Project Explorer Ctrl+C  Copy the selected full path
@@ -902,6 +903,9 @@ public partial class MainWindow : Window
         }
 
         var before = Vm.ProjectFiles.Select(file => file.FullPath).ToArray();
+        var beforeFolders = Vm.ProjectWorkspaceFolders
+            .Select(folder => folder.FullPath)
+            .ToArray();
         if (!Vm.RefreshProjectWorkspace(out var error))
         {
             Vm.StatusText = $"Could not refresh project files: {error}";
@@ -909,9 +913,13 @@ public partial class MainWindow : Window
         }
 
         var after = Vm.ProjectFiles.Select(file => file.FullPath).ToArray();
-        if (!before.SequenceEqual(after, StringComparer.OrdinalIgnoreCase))
+        var afterFolders = Vm.ProjectWorkspaceFolders
+            .Select(folder => folder.FullPath)
+            .ToArray();
+        if (!before.SequenceEqual(after, StringComparer.OrdinalIgnoreCase)
+            || !beforeFolders.SequenceEqual(afterFolders, StringComparer.OrdinalIgnoreCase))
         {
-            Vm.StatusText = $"Project files updated ({after.Length} AXAML file(s)).";
+            Vm.StatusText = $"Project workspace updated ({after.Length} AXAML file(s), {afterFolders.Length} folder(s)).";
         }
     }
 
@@ -1044,7 +1052,7 @@ public partial class MainWindow : Window
                 relativePath = string.IsNullOrEmpty(relativePath)
                     ? segment
                     : $"{relativePath}/{segment}";
-                var isFile = index == segments.Length - 1;
+                var isFile = index == segments.Length - 1 && !file.IsDirectory;
                 var node = siblings.FirstOrDefault(candidate =>
                     candidate.IsFile == isFile
                     && string.Equals(candidate.DisplayName, segment, StringComparison.OrdinalIgnoreCase));
@@ -1329,6 +1337,46 @@ public partial class MainWindow : Window
         {
             return Directory.Exists(path)
                 ? System.IO.Path.GetFullPath(path)
+                : null;
+        }
+        catch (ArgumentException)
+        {
+            return null;
+        }
+    }
+
+    private static string? GetProjectExplorerNewFolderPath(
+        string? folderName,
+        string? directory)
+    {
+        if (string.IsNullOrWhiteSpace(folderName)
+            || string.IsNullOrWhiteSpace(directory))
+        {
+            return null;
+        }
+
+        var normalizedName = folderName.Trim();
+        if (normalizedName is "." or ".."
+            || normalizedName.Length > 180
+            || normalizedName.Any(char.IsControl)
+            || !string.Equals(
+                System.IO.Path.GetFileName(normalizedName),
+                normalizedName,
+                StringComparison.Ordinal))
+        {
+            return null;
+        }
+
+        if (normalizedName.IndexOfAny(System.IO.Path.GetInvalidFileNameChars()) >= 0)
+        {
+            return null;
+        }
+
+        try
+        {
+            var fullDirectory = System.IO.Path.GetFullPath(directory);
+            return Directory.Exists(fullDirectory)
+                ? System.IO.Path.Combine(fullDirectory, normalizedName)
                 : null;
         }
         catch (ArgumentException)
@@ -1691,7 +1739,13 @@ public partial class MainWindow : Window
         {
             var selectedRelativePath = selectedRelativePathOverride
                 ?? (list.SelectedItem as ProjectExplorerNode)?.RelativePath;
-            paths = Vm.ProjectFiles.ToList();
+            paths = Vm.ProjectWorkspaceFolders
+                .Select(folder => new ProjectWorkspaceFile(
+                    folder.FullPath,
+                    folder.RelativePath,
+                    IsDirectory: true))
+                .Concat(Vm.ProjectFiles)
+                .ToList();
             treeRoots = BuildProjectExplorerTree(paths);
             ApplyProjectExplorerCollapsedFolders(
                 treeRoots,
@@ -1726,6 +1780,9 @@ public partial class MainWindow : Window
             });
         }
 
+        void OnProjectFoldersChanged(object? sender, NotifyCollectionChangedEventArgs e)
+            => OnProjectFilesChanged(sender, e);
+
         void StopProjectFileTracking()
         {
             if (!isDialogOpen)
@@ -1735,6 +1792,7 @@ public partial class MainWindow : Window
 
             isDialogOpen = false;
             Vm.ProjectFiles.CollectionChanged -= OnProjectFilesChanged;
+            Vm.ProjectWorkspaceFolders.CollectionChanged -= OnProjectFoldersChanged;
         }
 
         async Task CopyProjectExplorerPathAsync(bool fullPath)
@@ -1918,6 +1976,153 @@ public partial class MainWindow : Window
             }
 
             dialog.Close(file.FilePath);
+        }
+
+        async Task<string?> ShowNewProjectExplorerFolderDialogAsync(
+            string directory)
+        {
+            var folderDialog = new Window
+            {
+                Title = "New Folder",
+                Width = 420,
+                Height = 200,
+                MinWidth = 360,
+                MinHeight = 180,
+                CanResize = false,
+                WindowStartupLocation = WindowStartupLocation.CenterOwner,
+            };
+            var nameEditor = new TextBox
+            {
+                Text = "NewFolder",
+                Watermark = "Folder name",
+                MinWidth = 300,
+            };
+            var errorText = new TextBlock
+            {
+                Foreground = Brush.Parse("#B91C1C"),
+                TextWrapping = TextWrapping.Wrap,
+            };
+            var createButton = new Button { Content = "Create", MinWidth = 86 };
+            var cancelButton = new Button { Content = "Cancel", MinWidth = 86 };
+
+            void CreateFolder()
+            {
+                var path = GetProjectExplorerNewFolderPath(
+                    nameEditor.Text,
+                    directory);
+                if (path is null)
+                {
+                    errorText.Text = "Use a folder name without path separators or invalid characters.";
+                    return;
+                }
+
+                if (Directory.Exists(path) || File.Exists(path))
+                {
+                    errorText.Text = $"A folder or file named {System.IO.Path.GetFileName(path)} already exists.";
+                    return;
+                }
+
+                folderDialog.Close(path);
+            }
+
+            createButton.Click += (_, _) => CreateFolder();
+            cancelButton.Click += (_, _) => folderDialog.Close(null);
+            nameEditor.KeyDown += (_, e) =>
+            {
+                if (e.Key == Key.Enter)
+                {
+                    CreateFolder();
+                    e.Handled = true;
+                }
+                else if (e.Key == Key.Escape)
+                {
+                    folderDialog.Close(null);
+                    e.Handled = true;
+                }
+            };
+            folderDialog.Opened += (_, _) =>
+            {
+                nameEditor.Focus();
+                nameEditor.SelectAll();
+            };
+
+            folderDialog.Content = new StackPanel
+            {
+                Margin = new Thickness(16),
+                Spacing = 10,
+                Children =
+                {
+                    new TextBlock { Text = $"Create a new folder in {directory}." },
+                    nameEditor,
+                    errorText,
+                    new StackPanel
+                    {
+                        Orientation = Orientation.Horizontal,
+                        HorizontalAlignment = HorizontalAlignment.Right,
+                        Spacing = 8,
+                        Children = { cancelButton, createButton },
+                    },
+                },
+            };
+
+            return await folderDialog.ShowDialog<string?>(dialog);
+        }
+
+        async Task CreateNewProjectExplorerFolderAsync()
+        {
+            var directory = GetProjectExplorerCreationDirectory(
+                list.SelectedItem as ProjectExplorerNode,
+                Vm.ProjectWorkspacePath);
+            if (string.IsNullOrWhiteSpace(directory))
+            {
+                Vm.StatusText = "The selected Project Explorer folder is unavailable.";
+                return;
+            }
+
+            var path = await ShowNewProjectExplorerFolderDialogAsync(directory);
+            if (string.IsNullOrWhiteSpace(path))
+            {
+                return;
+            }
+
+            try
+            {
+                Directory.CreateDirectory(path);
+            }
+            catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+            {
+                Vm.StatusText = $"Could not create folder {System.IO.Path.GetFileName(path)}: {exception.Message}";
+                return;
+            }
+
+            if (!Vm.RefreshProjectWorkspace(out var refreshError))
+            {
+                RefreshProjectTree();
+                Vm.StatusText = $"Created the folder, but could not refresh Project Explorer: {refreshError}";
+                return;
+            }
+
+            string relativePath;
+            try
+            {
+                relativePath = System.IO.Path.GetRelativePath(
+                        Vm.ProjectWorkspacePath!,
+                        path)
+                    .Replace(System.IO.Path.DirectorySeparatorChar, '/');
+            }
+            catch (ArgumentException)
+            {
+                RefreshProjectTree();
+                Vm.StatusText = $"Created folder {System.IO.Path.GetFileName(path)}.";
+                return;
+            }
+
+            RefreshProjectTree(relativePath);
+            RevealProjectExplorerPath(treeRoots, relativePath);
+            Vm.SetProjectWorkspaceCollapsedFolders(
+                CollectProjectExplorerCollapsedFolders(treeRoots));
+            RefreshResults(relativePath);
+            Vm.StatusText = $"Created folder {System.IO.Path.GetFileName(path)}.";
         }
 
         async Task<string?> ShowRenameProjectExplorerFileDialogAsync(
@@ -2288,6 +2493,7 @@ public partial class MainWindow : Window
         var cancelButton = new Button { Content = "Cancel", MinWidth = 86 };
         var openButton = new Button { Content = "Open", MinWidth = 86 };
         var newFileMenu = new MenuItem { Header = "New AXAML File..." };
+        var newFolderMenu = new MenuItem { Header = "New Folder..." };
         var renameFileMenu = new MenuItem
         {
             Header = "Rename AXAML File...",
@@ -2305,6 +2511,7 @@ public partial class MainWindow : Window
         openButton.Click += (_, _) => SelectCurrent();
         list.DoubleTapped += (_, _) => SelectCurrent();
         newFileMenu.Click += async (_, _) => await CreateNewProjectExplorerFileAsync();
+        newFolderMenu.Click += async (_, _) => await CreateNewProjectExplorerFolderAsync();
         renameFileMenu.Click += async (_, _) => await RenameProjectExplorerFileAsync();
         deleteFileMenu.Click += async (_, _) => await DeleteProjectExplorerFileAsync();
         copyRelativePathMenu.Click += async (_, _) => await CopyProjectExplorerPathAsync(fullPath: false);
@@ -2315,6 +2522,7 @@ public partial class MainWindow : Window
             Items =
             {
                 newFileMenu,
+                newFolderMenu,
                 renameFileMenu,
                 deleteFileMenu,
                 new Separator(),
@@ -2333,6 +2541,13 @@ public partial class MainWindow : Window
         list.KeyDown += async (_, e) =>
         {
             if (e.Key == Key.N
+                && e.KeyModifiers.HasFlag(KeyModifiers.Control)
+                && e.KeyModifiers.HasFlag(KeyModifiers.Shift))
+            {
+                await CreateNewProjectExplorerFolderAsync();
+                e.Handled = true;
+            }
+            else if (e.Key == Key.N
                 && e.KeyModifiers.HasFlag(KeyModifiers.Control))
             {
                 await CreateNewProjectExplorerFileAsync();
@@ -2430,6 +2645,7 @@ public partial class MainWindow : Window
         };
         dialog.Closed += (_, _) => StopProjectFileTracking();
         Vm.ProjectFiles.CollectionChanged += OnProjectFilesChanged;
+        Vm.ProjectWorkspaceFolders.CollectionChanged += OnProjectFoldersChanged;
 
         dialog.Content = new StackPanel
         {
@@ -2439,7 +2655,7 @@ public partial class MainWindow : Window
             {
                 new TextBlock
                 {
-                    Text = "Browse the project tree. Double-click an AXAML file to open it; press Enter on a folder or double-click a folder to expand or collapse it, use Left/Right to navigate, Ctrl+N or the context menu to create a new AXAML file from a UserControl or Window template, F2 or the context menu to rename the selected AXAML file, Delete or Backspace to remove it after dirty protection, Ctrl+C to copy the selected full path, or the context menu to open its location in the file manager.",
+                    Text = "Browse the project tree. Double-click an AXAML file to open it; press Enter on a folder or double-click a folder to expand or collapse it, use Ctrl+N or the context menu to create a new AXAML file from a UserControl or Window template, Ctrl+Shift+N or the context menu to create a new folder, F2 or the context menu to rename the selected AXAML file, Delete or Backspace to remove it after dirty protection, Ctrl+C to copy the selected full path, or the context menu to open its location in the file manager.",
                     TextWrapping = TextWrapping.Wrap,
                 },
                 rootText,
