@@ -177,7 +177,7 @@ public partial class MainWindow : Window
         Project Explorer repair pair  Restore AXAML x:Class from an existing code-behind identity
         Project Workspace build  Run dotnet build and inspect compiler output for a project or solution
         Project build configuration  Choose Debug or Release before running a workspace build; the selection is session-persisted
-        Project build diagnostics  Double-click a compiler diagnostic to open its AXAML or source file
+        Project build diagnostics  Filter compiler diagnostics and double-click to open its AXAML or source file
         Project build dirty choice  Choose Save All & Build or build saved files when designer changes are pending
         Project Explorer Ctrl+Shift+N  Create a new folder
         Project Explorer Ctrl+Shift+D  Duplicate the selected AXAML file
@@ -220,6 +220,7 @@ public partial class MainWindow : Window
     private enum DragMode { None, Move, N, S, E, W, NE, NW, SE, SW }
     private enum UnsavedChoice { Save, Discard, Cancel }
     private enum BuildDirtyDocumentChoice { Cancel, SaveAllAndBuild, BuildSavedFiles }
+    private enum ProjectBuildDiagnosticFilter { All, Errors, Warnings }
     private enum ExternalChangeResolution
     {
         OpenTab,
@@ -1108,23 +1109,66 @@ public partial class MainWindow : Window
             ?? Vm?.ProjectWorkspacePath
             ?? Environment.CurrentDirectory;
         var diagnostics = new ObservableCollection<ProjectBuildDiagnostic>();
+        var visibleDiagnostics = new ObservableCollection<ProjectBuildDiagnostic>();
+        var diagnosticFilter = ProjectBuildDiagnosticFilter.All;
         var diagnosticsSummary = new TextBlock
         {
             Text = "No compiler diagnostics captured.",
             Foreground = Brush.Parse("#64748B"),
         };
+        var diagnosticFilterCombo = new ComboBox
+        {
+            Width = 120,
+            ItemsSource = Enum.GetNames<ProjectBuildDiagnosticFilter>(),
+            SelectedIndex = 0,
+        };
         var diagnosticsList = new ListBox
         {
             Height = 132,
             SelectionMode = SelectionMode.Single,
-            ItemsSource = diagnostics,
+            ItemsSource = visibleDiagnostics,
         };
-        diagnostics.CollectionChanged += (_, _) =>
+        var copyDiagnosticButton = new Button
         {
+            Content = "Copy Selected",
+            MinWidth = 118,
+            IsEnabled = false,
+        };
+        void RefreshDiagnosticList()
+        {
+            var selectedDiagnostic = diagnosticsList.SelectedItem as ProjectBuildDiagnostic;
+            visibleDiagnostics.Clear();
+            foreach (var diagnostic in diagnostics.Where(item =>
+                         MatchesProjectBuildDiagnosticFilter(item, diagnosticFilter)))
+            {
+                visibleDiagnostics.Add(diagnostic);
+            }
+
+            if (selectedDiagnostic is not null
+                && visibleDiagnostics.Contains(selectedDiagnostic))
+            {
+                diagnosticsList.SelectedItem = selectedDiagnostic;
+            }
+
+            var errorCount = diagnostics.Count(item =>
+                MatchesProjectBuildDiagnosticFilter(item, ProjectBuildDiagnosticFilter.Errors));
+            var warningCount = diagnostics.Count(item =>
+                MatchesProjectBuildDiagnosticFilter(item, ProjectBuildDiagnosticFilter.Warnings));
             diagnosticsSummary.Text = diagnostics.Count == 0
                 ? "No compiler diagnostics captured."
-                : $"{diagnostics.Count} compiler diagnostic(s). Double-click to open the file.";
+                : $"{diagnostics.Count} diagnostic(s): {errorCount} error(s), {warningCount} warning(s). Showing {visibleDiagnostics.Count} ({diagnosticFilter}). Double-click to open; Copy Selected copies the current item.";
+        }
+        diagnosticFilterCombo.SelectionChanged += (_, _) =>
+        {
+            if (diagnosticFilterCombo.SelectedItem is string value
+                && Enum.TryParse<ProjectBuildDiagnosticFilter>(value, out var parsedFilter))
+            {
+                diagnosticFilter = parsedFilter;
+                RefreshDiagnosticList();
+            }
         };
+        diagnostics.CollectionChanged += (_, _) => RefreshDiagnosticList();
+        RefreshDiagnosticList();
         var result = new ProjectBuildResult(
             Succeeded: false,
             Canceled: false,
@@ -1236,6 +1280,17 @@ public partial class MainWindow : Window
                 output.Text += $"Could not stop dotnet: {exception.Message}{Environment.NewLine}";
             }
         };
+        diagnosticsList.SelectionChanged += (_, _) =>
+        {
+            copyDiagnosticButton.IsEnabled = diagnosticsList.SelectedItem is ProjectBuildDiagnostic;
+        };
+        copyDiagnosticButton.Click += async (_, _) =>
+        {
+            if (diagnosticsList.SelectedItem is ProjectBuildDiagnostic diagnostic)
+            {
+                await CopyProjectBuildDiagnosticAsync(diagnostic);
+            }
+        };
         diagnosticsList.DoubleTapped += async (_, _) =>
         {
             if (diagnosticsList.SelectedItem is ProjectBuildDiagnostic diagnostic)
@@ -1245,7 +1300,14 @@ public partial class MainWindow : Window
         };
         diagnosticsList.KeyDown += async (_, e) =>
         {
-            if (e.Key == Key.Enter
+            if (e.Key == Key.C
+                && e.KeyModifiers.HasFlag(KeyModifiers.Control)
+                && diagnosticsList.SelectedItem is ProjectBuildDiagnostic copyDiagnostic)
+            {
+                await CopyProjectBuildDiagnosticAsync(copyDiagnostic);
+                e.Handled = true;
+            }
+            else if (e.Key == Key.Enter
                 && diagnosticsList.SelectedItem is ProjectBuildDiagnostic diagnostic)
             {
                 await OpenProjectBuildDiagnosticAsync(diagnostic);
@@ -1281,7 +1343,25 @@ public partial class MainWindow : Window
                 {
                     [DockPanel.DockProperty] = Dock.Top,
                     Spacing = 6,
-                    Children = { diagnosticsSummary, diagnosticsList },
+                    Children =
+                    {
+                        new StackPanel
+                        {
+                            Orientation = Orientation.Horizontal,
+                            Spacing = 8,
+                            Children =
+                            {
+                                new TextBlock
+                                {
+                                    Text = "Filter:",
+                                    VerticalAlignment = VerticalAlignment.Center,
+                                },
+                                diagnosticFilterCombo,
+                            },
+                        },
+                        diagnosticsSummary,
+                        diagnosticsList,
+                    },
                 },
                 new ScrollViewer
                 {
@@ -1296,7 +1376,7 @@ public partial class MainWindow : Window
                     Orientation = Orientation.Horizontal,
                     HorizontalAlignment = HorizontalAlignment.Right,
                     Spacing = 8,
-                    Children = { stopButton },
+                    Children = { copyDiagnosticButton, stopButton },
                 },
             },
         };
@@ -1431,6 +1511,19 @@ public partial class MainWindow : Window
         return await dialog.ShowDialog<BuildDirtyDocumentChoice>(this);
     }
 
+    private async Task CopyProjectBuildDiagnosticAsync(ProjectBuildDiagnostic diagnostic)
+    {
+        var clipboard = TopLevel.GetTopLevel(this)?.Clipboard;
+        if (clipboard is null)
+        {
+            Vm?.StatusText = "Clipboard is unavailable.";
+            return;
+        }
+
+        await clipboard.SetTextAsync(diagnostic.ToString());
+        Vm?.StatusText = $"Copied build diagnostic for {diagnostic.RelativePath}.";
+    }
+
     private async Task OpenProjectBuildDiagnosticAsync(ProjectBuildDiagnostic diagnostic)
     {
         if (Vm is null || !File.Exists(diagnostic.FilePath))
@@ -1521,6 +1614,22 @@ public partial class MainWindow : Window
             return false;
         }
     }
+
+    private static bool MatchesProjectBuildDiagnosticFilter(
+        ProjectBuildDiagnostic diagnostic,
+        ProjectBuildDiagnosticFilter filter)
+        => filter switch
+        {
+            ProjectBuildDiagnosticFilter.Errors => string.Equals(
+                diagnostic.Severity,
+                "ERROR",
+                StringComparison.OrdinalIgnoreCase),
+            ProjectBuildDiagnosticFilter.Warnings => string.Equals(
+                diagnostic.Severity,
+                "WARNING",
+                StringComparison.OrdinalIgnoreCase),
+            _ => true,
+        };
 
     private static IReadOnlyList<ProjectBuildTarget> FindProjectBuildTargets(string? workspacePath)
     {

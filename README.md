@@ -162,6 +162,7 @@ dotnet run --project src/AvaloniaUIDesigner.App/AvaloniaUIDesigner.App.csproj
 - **Project Build Save Preflight**: 저장되지 않은 디자이너 문서가 있을 때 `Save All & Build`·`Build Saved Files`·`Cancel` 중 하나를 명시적으로 선택하게 해, 저장 파일만 빌드되는 상황을 실수로 놓치지 않도록 합니다. `Enter`는 기본 저장 후 build, `Escape`는 취소로 동작합니다.
 - **Project Build Configuration**: `File > Build Configuration`에서 `Debug` 또는 `Release`를 선택하면 다음 workspace build의 `--configuration`, 로그 제목, status bar가 동일한 구성으로 유지됩니다. 선택값은 Workspace Session에 저장되어 앱 재시작 후에도 복원됩니다.
 - **Project Build Diagnostics**: build 로그에서 표준 MSBuild `error`·`warning`을 파일·줄·열 단위 진단 목록으로 분리하고, 항목을 더블클릭하면 AXAML은 새 디자이너 탭으로, C# 등 소스는 OS 기본 편집기로 엽니다. 현재 build target 기준 상대 경로와 원본 severity/code/message를 함께 표시합니다.
+- **Project Build Diagnostic Filters**: build 결과 창에서 `All`·`Errors`·`Warnings`로 진단 목록을 즉시 좁히고 전체 error/warning 개수를 유지하며, 선택 항목을 `Copy Selected` 또는 `Ctrl+C`로 클립보드에 복사합니다.
 - **Command-line Startup Paths**: 파일 탐색기나 터미널에서 하나 이상의 `.axaml`·`.xaml` 문서, 폴더, `.csproj`·`.sln`·`.slnx` 경로를 인수로 전달해 실행하면 세션 복원 후 해당 문서 탭과 Project Workspace를 바로 엽니다. 지원하지 않는 경로와 읽기 실패는 성공한 경로와 기존 세션을 유지한 채 상태바에 안내합니다.
 - **Tab View Navigation**: `Ctrl+Tab`/`Ctrl+Shift+Tab`으로 문서 탭을 순환하고, `Ctrl+Shift+PageUp/PageDown` 또는 탭 컨텍스트 메뉴로 활성 탭을 좌우 이동하며, 탭별 캔버스 줌·스크롤 위치와 Object Tree 선택을 전환·세션 복원 때 보존합니다.
 - **Viewport 복원 우선순위**: 문서 탭을 복원하는 짧은 pending 구간에는 선택 컨트롤 자동 스크롤을 보류해 저장된 Canvas 위치가 Object Tree/Canvas 선택 추적에 의해 덮어써지지 않도록 합니다.
@@ -274,6 +275,7 @@ dotnet run --project src/AvaloniaUIDesigner.App/AvaloniaUIDesigner.App.csproj
 12b6. build 대상 선택 후 저장되지 않은 문서가 있으면 `Save All & Build`는 모든 dirty 탭을 저장한 뒤 build하고, `Build Saved Files`는 기존처럼 디스크의 저장본만 build하며, `Cancel`은 build를 시작하지 않습니다. `Enter`는 `Save All & Build`, `Escape`는 `Cancel`을 실행합니다. 저장 후 build가 취소되거나 완료되면 저장한 문서 수를 status bar에 남깁니다.
 12b7. `File > Build Configuration > Debug/Release`에서 다음 `Build Project Workspace...`의 구성을 정합니다. build output의 target header와 실행 명령, 완료 status가 선택한 configuration을 함께 표시합니다.
 12b8. 선택한 build configuration은 Workspace Session JSON에 저장되며, 다음 실행에서 유효한 `Debug`/`Release` 값으로 복원됩니다. 구형 session이나 알 수 없는 값은 기본값 `Debug`를 사용합니다.
+12b9. build output의 진단 영역에서 `All`·`Errors`·`Warnings` 필터를 선택하면 표시 목록만 바뀌고 전체 요약은 유지됩니다. 선택 진단은 더블클릭/Enter로 파일을 열 수 있으며 `Copy Selected` 또는 `Ctrl+C`로 상대 경로·줄·열·severity·code·message를 복사합니다.
 13. `Edit > Edit Typography Properties...`에서 글꼴과 지원 컨트롤의 텍스트 정렬·줄바꿈 편집
 14. `Edit > Edit Transform Properties...`에서 선택 컨트롤의 이동·회전·크기·기울기와 변환 기준점 편집
 15. `Edit > Edit Accessibility & Navigation...`에서 스크린리더 메타데이터와 키보드 포커스 순서 편집
@@ -463,6 +465,7 @@ dotnet run --project src/AvaloniaUIDesigner.App/AvaloniaUIDesigner.App.csproj
 75dt. build 전에 dirty 문서가 있으면 저장 preflight가 `Save All & Build`·`Build Saved Files`·`Cancel`을 제공합니다. 전자는 기본 버튼이어서 `Enter`로 실행되고, `Escape`는 build를 시작하지 않고 닫습니다. 기존 일괄 저장 루틴의 원자적 AXAML 저장·dirty 보호·활성 탭 복원을 재사용하며, `Build Saved Files`는 저장하지 않은 디자이너 상태를 보존한 채 디스크 파일만 build하고 최종 선택을 status bar에 구분해 표시합니다.
 75du. `Build Configuration`은 프로세스 시작 전에 선택한 `Debug`/`Release` enum을 snapshot해 `dotnet build --configuration`, output dialog 제목·target header·status bar에 동일하게 적용합니다. workspace나 문서 세션을 바꾸어도 현재 창에서 선택한 구성은 유지되며 기본값은 `Debug`입니다.
 75dv. build configuration은 `PersistedDocumentSession`의 optional 문자열로 저장되어 기존 session JSON과 호환됩니다. 선택 변경은 기존 2초 debounce session checkpoint를 예약하고, 복원 시 `Debug`·`Release`만 허용하며 누락·오탈자·미지원 값은 Debug로 정규화합니다. 복원된 값은 File 메뉴 check 상태와 다음 build에 함께 반영합니다.
+75dw. build diagnostics는 수집된 전체 error/warning을 보존한 채 `All`·`Errors`·`Warnings` filter로 visible list만 재구성합니다. 선택 항목은 OS clipboard에 표시용 진단 문자열을 복사할 수 있고, filter helper는 severity 대소문자를 무시해 표준 parser 결과와 일관되게 동작합니다.
 76. `File > Load Component Pack...` 또는 `File > Load Toolbox Preset Pack...`으로 외부 Toolbox 팩을 추가하면 파일 경로가 세션에 등록되어 다음 실행 때 자동으로 다시 로드됩니다. 파일이 없어도 문서 탭 복원은 계속되며 상태바에 경고가 표시됩니다.
 77. 외부 프로젝트의 컨트롤은 Component Pack 항목에 `designOnly: true`, `avaloniaTypeName`, `previewText`, `defaultProperties`를 지정해 등록합니다. 디자이너에서는 타입명 플레이스홀더로 편집하고, 생성 AXAML에는 원래 커스텀 타입과 속성을 출력합니다. 예시는 [custom-component-pack.example.json](docs/custom-component-pack.example.json)을 참고하세요.
 78. `File > Load Component Pack Plugin...`에서 `IComponentPackPlugin`을 구현한 신뢰할 수 있는 DLL을 선택하면 플러그인이 제공한 Component Pack을 Toolbox에 등록합니다. DLL 경로는 세션 JSON의 `ComponentPluginPaths`에 저장되고, 앱 재시작 시 플러그인·JSON 팩·프리셋 팩 순서로 복원됩니다.
@@ -827,6 +830,7 @@ AXAML 소스 편집기의 `Validate`와 `Preview`는 현재 디자인과 Undo �
 - v2.96: Project build preflight 키보드 기본/취소 동작 추가
 - v2.97: Project build Debug/Release configuration 선택 추가
 - v2.98: Project build configuration session 저장·복원 추가
+- v2.99: Project build diagnostic filter·copy workflow 추가
 
 ## 컴포넌트 팩
 
