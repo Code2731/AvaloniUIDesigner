@@ -166,6 +166,7 @@ public partial class MainWindow : Window
         Project Explorer arrows  Collapse, expand, and navigate the project tree
         Project Explorer double-click  Open files or toggle folders
         Project Explorer Ctrl+N  Create a new AXAML file from a UserControl or Window template
+        Project Explorer paired file  Create a matching x:Class and .axaml.cs with a new AXAML file
         Project Explorer Ctrl+Shift+N  Create a new folder
         Project Explorer Ctrl+Shift+D  Duplicate the selected AXAML file
         Project Explorer Ctrl+Shift+M  Move the selected AXAML file to another project folder
@@ -216,7 +217,11 @@ public partial class MainWindow : Window
     }
     private enum PreviewThemeMode { Default, Light, Dark }
     private sealed record ComponentPackExportOptions(string PackName, string DisplayName, string NamePrefix);
-    private sealed record ProjectExplorerNewFileResult(string FilePath, string Content);
+    private sealed record ProjectExplorerNewFileResult(
+        string FilePath,
+        string Content,
+        string? CodeBehindPath,
+        string? CodeBehindContent);
     private sealed record ComponentPackManagementAction(string SourceId);
     private sealed record ExternalChangeDialogResult(
         ExternalDocumentChangeInfo Change,
@@ -2446,13 +2451,62 @@ public partial class MainWindow : Window
         }
     }
 
-    private static string? GetProjectExplorerNewFileContent(string? rootKind)
-        => rootKind switch
+    private static string? GetProjectExplorerNewFileContent(
+        string? rootKind,
+        string? className)
+    {
+        var content = rootKind switch
         {
             nameof(DesignerRootKind.Window) => NewProjectExplorerWindowAxaml,
             nameof(DesignerRootKind.UserControl) => NewProjectExplorerUserControlAxaml,
             _ => null,
         };
+        if (content is null || string.IsNullOrWhiteSpace(className))
+        {
+            return content;
+        }
+
+        return content.Replace(
+            "xmlns:x=\"http://schemas.microsoft.com/winfx/2006/xaml\"",
+            $"xmlns:x=\"http://schemas.microsoft.com/winfx/2006/xaml\" x:Class=\"{className}\"",
+            StringComparison.Ordinal);
+    }
+
+    private static string? GetProjectExplorerCodeBehindContent(
+        string? rootKind,
+        string? className)
+    {
+        if (rootKind is not (nameof(DesignerRootKind.Window) or nameof(DesignerRootKind.UserControl))
+            || !MainWindowViewModel.TryNormalizeRootClassName(className, out var normalizedClassName)
+            || normalizedClassName.Length == 0)
+        {
+            return null;
+        }
+
+        var separator = normalizedClassName.LastIndexOf('.');
+        var namespaceName = separator > 0
+            ? normalizedClassName[..separator]
+            : string.Empty;
+        var typeName = separator > 0
+            ? normalizedClassName[(separator + 1)..]
+            : normalizedClassName;
+        var baseType = rootKind == nameof(DesignerRootKind.Window)
+            ? nameof(Window)
+            : nameof(UserControl);
+        var namespaceDeclaration = string.IsNullOrWhiteSpace(namespaceName)
+            ? string.Empty
+            : $"namespace {namespaceName};{Environment.NewLine}{Environment.NewLine}";
+
+        return $"using Avalonia.Controls;{Environment.NewLine}{Environment.NewLine}"
+            + namespaceDeclaration
+            + $"public partial class {typeName} : {baseType}{Environment.NewLine}"
+            + $"{{{Environment.NewLine}"
+            + $"    public {typeName}(){Environment.NewLine}"
+            + $"    {{{Environment.NewLine}"
+            + $"        InitializeComponent();{Environment.NewLine}"
+            + $"    }}{Environment.NewLine}"
+            + $"}}{Environment.NewLine}";
+    }
 
     private static bool TryOpenProjectExplorerFileManager(string path)
     {
@@ -2798,9 +2852,9 @@ public partial class MainWindow : Window
             {
                 Title = "New AXAML File",
                 Width = 460,
-                Height = 240,
+                Height = 340,
                 MinWidth = 380,
-                MinHeight = 210,
+                MinHeight = 300,
                 CanResize = false,
                 WindowStartupLocation = WindowStartupLocation.CenterOwner,
             };
@@ -2815,6 +2869,17 @@ public partial class MainWindow : Window
                 ItemsSource = Enum.GetNames<DesignerRootKind>(),
                 SelectedItem = nameof(DesignerRootKind.UserControl),
                 MinWidth = 340,
+            };
+            var classNameEditor = new TextBox
+            {
+                Text = "NewView",
+                Watermark = "Views.NewView (optional)",
+                MinWidth = 340,
+            };
+            var createCodeBehindEditor = new CheckBox
+            {
+                Content = "Create paired code-behind (.axaml.cs)",
+                IsChecked = true,
             };
             var errorText = new TextBlock
             {
@@ -2833,21 +2898,60 @@ public partial class MainWindow : Window
                     return;
                 }
 
-                var content = GetProjectExplorerNewFileContent(
-                    templateEditor.SelectedItem?.ToString());
+                var rootKind = templateEditor.SelectedItem?.ToString();
+                var createCodeBehind = createCodeBehindEditor.IsChecked == true;
+                string? className = null;
+                string? codeBehindPath = null;
+                string? codeBehindContent = null;
+                if (createCodeBehind)
+                {
+                    if (!MainWindowViewModel.TryNormalizeRootClassName(
+                            classNameEditor.Text,
+                            out var normalizedClassName)
+                        || normalizedClassName.Length == 0)
+                    {
+                        errorText.Text = "Use a dotted .NET type name such as Views.NewView for the code-behind class.";
+                        return;
+                    }
+
+                    className = normalizedClassName;
+                }
+
+                var content = GetProjectExplorerNewFileContent(rootKind, className);
                 if (content is null)
                 {
                     errorText.Text = "Choose a UserControl or Window template.";
                     return;
                 }
 
-                if (File.Exists(path))
+                if (File.Exists(path) || Directory.Exists(path))
                 {
                     errorText.Text = $"A file named {System.IO.Path.GetFileName(path)} already exists.";
                     return;
                 }
 
-                nameDialog.Close(new ProjectExplorerNewFileResult(path, content));
+                if (className is not null)
+                {
+                    codeBehindPath = path + ".cs";
+                    codeBehindContent = GetProjectExplorerCodeBehindContent(rootKind, className);
+                    if (codeBehindContent is null)
+                    {
+                        errorText.Text = "Choose a UserControl or Window template and a valid code-behind type.";
+                        return;
+                    }
+
+                    if (File.Exists(codeBehindPath) || Directory.Exists(codeBehindPath))
+                    {
+                        errorText.Text = $"The paired file {System.IO.Path.GetFileName(codeBehindPath)} already exists.";
+                        return;
+                    }
+                }
+
+                nameDialog.Close(new ProjectExplorerNewFileResult(
+                    path,
+                    content,
+                    codeBehindPath,
+                    codeBehindContent));
             }
 
             createButton.Click += (_, _) => CreateFile();
@@ -2870,6 +2974,11 @@ public partial class MainWindow : Window
                 nameEditor.Focus();
                 nameEditor.SelectAll();
             };
+            createCodeBehindEditor.IsCheckedChanged += (_, _) =>
+            {
+                classNameEditor.IsEnabled = createCodeBehindEditor.IsChecked == true;
+            };
+            classNameEditor.IsEnabled = createCodeBehindEditor.IsChecked == true;
 
             var buttons = new StackPanel
             {
@@ -2888,6 +2997,9 @@ public partial class MainWindow : Window
                     nameEditor,
                     new TextBlock { Text = "Root template" },
                     templateEditor,
+                    new TextBlock { Text = "Code-behind type" },
+                    classNameEditor,
+                    createCodeBehindEditor,
                     errorText,
                     buttons,
                 },
@@ -2913,14 +3025,41 @@ public partial class MainWindow : Window
                 return;
             }
 
+            var createdPaths = new List<string>();
             try
             {
                 await AtomicFileWriter.WriteAllTextAsync(
                     file.FilePath,
                     file.Content);
+                createdPaths.Add(file.FilePath);
+                if (file.CodeBehindPath is not null && file.CodeBehindContent is not null)
+                {
+                    await AtomicFileWriter.WriteAllTextAsync(
+                        file.CodeBehindPath,
+                        file.CodeBehindContent);
+                    createdPaths.Add(file.CodeBehindPath);
+                }
             }
-            catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+            catch (Exception exception) when (exception is IOException
+                or UnauthorizedAccessException
+                or ArgumentException
+                or NotSupportedException)
             {
+                foreach (var createdPath in createdPaths)
+                {
+                    try
+                    {
+                        File.Delete(createdPath);
+                    }
+                    catch (Exception rollbackException) when (rollbackException is IOException
+                        or UnauthorizedAccessException
+                        or ArgumentException
+                        or NotSupportedException)
+                    {
+                        // Preserve the original creation failure if rollback is also blocked.
+                    }
+                }
+
                 Vm.StatusText = $"Could not create {System.IO.Path.GetFileName(file.FilePath)}: {exception.Message}";
                 return;
             }

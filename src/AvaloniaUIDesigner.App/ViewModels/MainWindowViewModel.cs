@@ -5621,7 +5621,7 @@ public partial class MainWindowViewModel : ViewModelBase
             && result >= 0;
     }
 
-    private static bool TryNormalizeRootClassName(string? value, out string className)
+    internal static bool TryNormalizeRootClassName(string? value, out string className)
     {
         className = value?.Trim() ?? string.Empty;
         if (className.Length == 0)
