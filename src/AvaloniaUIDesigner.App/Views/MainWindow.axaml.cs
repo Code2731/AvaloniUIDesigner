@@ -17612,6 +17612,11 @@ public partial class MainWindow : Window
             Text = state.Title,
             Watermark = "Application window title",
         };
+        var classNameEditor = new TextBox
+        {
+            Text = state.ClassName,
+            Watermark = "Views.MainWindow (optional)",
+        };
         var canResizeEditor = new CheckBox
         {
             Content = "Allow the user to resize the window",
@@ -17644,9 +17649,9 @@ public partial class MainWindow : Window
         {
             Title = "Edit Document Root Properties",
             Width = 620,
-            Height = 520,
+            Height = 560,
             MinWidth = 520,
-            MinHeight = 460,
+            MinHeight = 500,
             WindowStartupLocation = WindowStartupLocation.CenterOwner,
         };
         var applyButton = new Button { Content = "Apply", MinWidth = 84 };
@@ -17660,7 +17665,8 @@ public partial class MainWindow : Window
                     minWidthEditor.Text ?? string.Empty,
                     minHeightEditor.Text ?? string.Empty,
                     maxWidthEditor.Text ?? string.Empty,
-                    maxHeightEditor.Text ?? string.Empty))
+                    maxHeightEditor.Text ?? string.Empty,
+                    classNameEditor.Text ?? string.Empty))
             {
                 errorText.Text = Vm.StatusText;
                 return;
@@ -17681,17 +17687,18 @@ public partial class MainWindow : Window
         var fields = new Grid
         {
             ColumnDefinitions = new ColumnDefinitions("*,*"),
-            RowDefinitions = new RowDefinitions("Auto,Auto,Auto,Auto"),
+            RowDefinitions = new RowDefinitions("Auto,Auto,Auto,Auto,Auto"),
             ColumnSpacing = 12,
             RowSpacing = 10,
         };
         AddField("Root type", rootKindEditor, 0, 0);
         AddField("Window startup location", startupEditor, 0, 1);
         AddField("Window title", titleEditor, 1, 0, 2);
-        AddField("Minimum width", minWidthEditor, 2, 0);
-        AddField("Minimum height", minHeightEditor, 2, 1);
-        AddField("Maximum width", maxWidthEditor, 3, 0);
-        AddField("Maximum height", maxHeightEditor, 3, 1);
+        AddField("x:Class (optional)", classNameEditor, 2, 0, 2);
+        AddField("Minimum width", minWidthEditor, 3, 0);
+        AddField("Minimum height", minHeightEditor, 3, 1);
+        AddField("Maximum width", maxWidthEditor, 4, 0);
+        AddField("Maximum height", maxHeightEditor, 4, 1);
 
         var content = new Grid
         {
@@ -17702,7 +17709,7 @@ public partial class MainWindow : Window
             {
                 new TextBlock
                 {
-                    Text = "Full AXAML saves with the selected root type. Window-only settings are disabled for UserControl.",
+                    Text = "Full AXAML saves with the selected root type. Optional x:Class keeps the code-behind type. Window-only settings are disabled for UserControl.",
                     TextWrapping = Avalonia.Media.TextWrapping.Wrap,
                 },
                 canResizeEditor,

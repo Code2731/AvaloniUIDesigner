@@ -59,7 +59,8 @@ public sealed record DesignerRootSettings(
     double MinWidth = 0,
     double MinHeight = 0,
     double MaxWidth = double.PositiveInfinity,
-    double MaxHeight = double.PositiveInfinity);
+    double MaxHeight = double.PositiveInfinity,
+    string ClassName = "");
 
 public sealed record DesignerStyleDefinition(
     string TargetType,

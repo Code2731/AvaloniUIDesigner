@@ -102,6 +102,11 @@ public sealed class AxamlDocumentSerializer : IDesignerSerializer
             values.Add($"WindowTitleBase64={Convert.ToBase64String(Encoding.UTF8.GetBytes(settings.Title))}");
         }
 
+        if (!string.IsNullOrEmpty(settings.ClassName))
+        {
+            values.Add($"RootClassBase64={Convert.ToBase64String(Encoding.UTF8.GetBytes(settings.ClassName))}");
+        }
+
         if (!settings.CanResize)
         {
             values.Add("CanResize=False");

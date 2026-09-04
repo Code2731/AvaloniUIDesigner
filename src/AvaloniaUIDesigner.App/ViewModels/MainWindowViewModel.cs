@@ -187,7 +187,8 @@ public sealed record RootEditorState(
     string MinWidth,
     string MinHeight,
     string MaxWidth,
-    string MaxHeight);
+    string MaxHeight,
+    string ClassName);
 
 public sealed record TypographyEditorState(
     string ControlName,
@@ -5512,7 +5513,8 @@ public partial class MainWindowViewModel : ViewModelBase
             FormatRootNumber(_rootSettings.MinWidth),
             FormatRootNumber(_rootSettings.MinHeight),
             FormatRootMaximum(_rootSettings.MaxWidth),
-            FormatRootMaximum(_rootSettings.MaxHeight));
+            FormatRootMaximum(_rootSettings.MaxHeight),
+            _rootSettings.ClassName);
 
     public bool SetRootProperties(
         string rootKind,
@@ -5522,7 +5524,8 @@ public partial class MainWindowViewModel : ViewModelBase
         string minWidth,
         string minHeight,
         string maxWidth,
-        string maxHeight)
+        string maxHeight,
+        string className)
     {
         if (!Enum.TryParse<DesignerRootKind>(rootKind, true, out var parsedKind)
             || !Enum.IsDefined(parsedKind))
@@ -5547,6 +5550,12 @@ public partial class MainWindowViewModel : ViewModelBase
             return false;
         }
 
+        if (!TryNormalizeRootClassName(className, out var parsedClassName))
+        {
+            StatusText = "Root properties were not changed. x:Class must be a dotted .NET type name, such as Views.MainWindow.";
+            return false;
+        }
+
         if (!TryParseRootConstraint(minWidth, false, out var parsedMinWidth)
             || !TryParseRootConstraint(minHeight, false, out var parsedMinHeight)
             || !TryParseRootConstraint(maxWidth, true, out var parsedMaxWidth)
@@ -5568,7 +5577,8 @@ public partial class MainWindowViewModel : ViewModelBase
                 MinWidth: parsedMinWidth,
                 MinHeight: parsedMinHeight,
                 MaxWidth: parsedMaxWidth,
-                MaxHeight: parsedMaxHeight)
+                MaxHeight: parsedMaxHeight,
+                ClassName: parsedClassName)
             : new DesignerRootSettings(
                 parsedKind,
                 title,
@@ -5577,7 +5587,8 @@ public partial class MainWindowViewModel : ViewModelBase
                 parsedMinWidth,
                 parsedMinHeight,
                 parsedMaxWidth,
-                parsedMaxHeight);
+                parsedMaxHeight,
+                parsedClassName);
         if (updated == _rootSettings)
         {
             StatusText = "Root properties are unchanged.";
@@ -5608,6 +5619,36 @@ public partial class MainWindowViewModel : ViewModelBase
                 out result)
             && double.IsFinite(result)
             && result >= 0;
+    }
+
+    private static bool TryNormalizeRootClassName(string? value, out string className)
+    {
+        className = value?.Trim() ?? string.Empty;
+        if (className.Length == 0)
+        {
+            return true;
+        }
+
+        var parts = className.Split('.', StringSplitOptions.None);
+        if (parts.Any(part => !IsValidRootClassIdentifier(part)))
+        {
+            className = string.Empty;
+            return false;
+        }
+
+        return true;
+    }
+
+    private static bool IsValidRootClassIdentifier(string value)
+    {
+        if (value.Length == 0
+            || (!char.IsLetter(value[0]) && value[0] != '_'))
+        {
+            return false;
+        }
+
+        return value.Skip(1).All(character =>
+            char.IsLetterOrDigit(character) || character == '_');
     }
 
     private static string FormatRootNumber(double value)
@@ -10832,6 +10873,11 @@ public partial class MainWindowViewModel : ViewModelBase
         sb.AppendLine("        xmlns:x=\"http://schemas.microsoft.com/winfx/2006/xaml\"");
         sb.AppendLine("        xmlns:collections=\"clr-namespace:Avalonia.Collections;assembly=Avalonia.Base\"");
         sb.Append($"        Width=\"{FormatRootNumber(settings.Width)}\" Height=\"{FormatRootNumber(settings.Height)}\"");
+        if (rootKind == _rootSettings.Kind && !string.IsNullOrEmpty(_rootSettings.ClassName))
+        {
+            sb.Append($" x:Class=\"{EscapeXmlAttribute(_rootSettings.ClassName)}\"");
+        }
+
         if (rootKind == DesignerRootKind.Window)
         {
             if (!string.IsNullOrEmpty(_rootSettings.Title))
@@ -10855,7 +10901,8 @@ public partial class MainWindowViewModel : ViewModelBase
         AppendRootConstraintAttribute(sb, "MaxWidth", _rootSettings.MaxWidth, double.PositiveInfinity);
         AppendRootConstraintAttribute(sb, "MaxHeight", _rootSettings.MaxHeight, double.PositiveInfinity);
         sb.AppendLine(">");
-        if (rootKind == DesignerRootKind.UserControl)
+        if (rootKind == DesignerRootKind.UserControl
+            && (rootKind != _rootSettings.Kind || string.IsNullOrEmpty(_rootSettings.ClassName)))
         {
             sb.AppendLine("  <!-- Add x:Class when pairing this layout with a code-behind file. -->");
         }
@@ -11069,7 +11116,10 @@ public partial class MainWindowViewModel : ViewModelBase
                 MinWidth: _rootSettings.MinWidth,
                 MinHeight: _rootSettings.MinHeight,
                 MaxWidth: _rootSettings.MaxWidth,
-                MaxHeight: _rootSettings.MaxHeight);
+                MaxHeight: _rootSettings.MaxHeight,
+                ClassName: _rootSettings.Kind == DesignerRootKind.UserControl
+                    ? _rootSettings.ClassName
+                    : string.Empty);
             if ((userControl.RootSettings ?? new DesignerRootSettings()) != expectedUserControlRoot)
             {
                 result = "Validation failed: UserControl export does not preserve root layout constraints.";
@@ -13226,6 +13276,7 @@ public partial class MainWindowViewModel : ViewModelBase
             .FirstOrDefault(values =>
                 values.ContainsKey("RootKind")
                 || values.ContainsKey("WindowTitleBase64")
+                || values.ContainsKey("RootClassBase64")
                 || values.ContainsKey("CanResize")
                 || values.ContainsKey("StartupLocation")
                 || values.ContainsKey("RootMinWidth")
@@ -13245,6 +13296,11 @@ public partial class MainWindowViewModel : ViewModelBase
                 kind = DesignerRootKind.Window;
             }
         }
+
+        var xClass = root.Attribute(XNamespace.Get("http://schemas.microsoft.com/winfx/2006/xaml") + "Class")?.Value;
+        var className = xClass is not null
+            ? ReadRootClass(xClass, warnings)
+            : ReadRootClassMetadata(metadata, warnings);
 
         var title = isWindow
             ? root.Attribute("Title")?.Value ?? string.Empty
@@ -13293,7 +13349,8 @@ public partial class MainWindowViewModel : ViewModelBase
                 MinWidth: minWidth,
                 MinHeight: minHeight,
                 MaxWidth: maxWidth,
-                MaxHeight: maxHeight)
+                MaxHeight: maxHeight,
+                ClassName: className)
             : new DesignerRootSettings(
                 kind,
                 title,
@@ -13302,7 +13359,43 @@ public partial class MainWindowViewModel : ViewModelBase
                 minWidth,
                 minHeight,
                 maxWidth,
-                maxHeight);
+                maxHeight,
+                className);
+    }
+
+    private static string ReadRootClass(
+        string? raw,
+        ICollection<string> warnings)
+    {
+        if (TryNormalizeRootClassName(raw, out var className))
+        {
+            return className;
+        }
+
+        warnings.Add($"Ignored invalid x:Class value '{raw}'.");
+        return string.Empty;
+    }
+
+    private static string ReadRootClassMetadata(
+        IReadOnlyDictionary<string, string>? metadata,
+        ICollection<string> warnings)
+    {
+        if (metadata is null || !metadata.TryGetValue("RootClassBase64", out var encoded))
+        {
+            return string.Empty;
+        }
+
+        try
+        {
+            return ReadRootClass(
+                Encoding.UTF8.GetString(Convert.FromBase64String(encoded)),
+                warnings);
+        }
+        catch (FormatException)
+        {
+            warnings.Add("Ignored invalid root x:Class metadata: Base64 payload is malformed.");
+            return string.Empty;
+        }
     }
 
     private static string ReadRootTitle(
