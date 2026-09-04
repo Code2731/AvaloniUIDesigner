@@ -166,6 +166,7 @@ public partial class MainWindow : Window
         Project Explorer Ctrl+Shift+N  Create a new folder
         Project Explorer Ctrl+Shift+D  Duplicate the selected AXAML file
         Project Explorer Ctrl+Shift+M  Move the selected AXAML file to another project folder
+        Project Explorer drag file onto folder  Move the AXAML file to that project folder
         Project Explorer F2  Rename the selected AXAML file and keep open tabs linked
         Project Explorer folder F2  Rename the selected folder and keep open tabs linked
         Project Explorer Delete  Delete the selected AXAML file after dirty protection
@@ -340,6 +341,8 @@ public partial class MainWindow : Window
         DataFormat.CreateStringApplicationFormat("AvaloniaUIDesigner.ObjectTreeElement");
     private static readonly DataFormat<string> DocumentTabDragDataFormat =
         DataFormat.CreateStringApplicationFormat("AvaloniaUIDesigner.DocumentTab");
+    private static readonly DataFormat<string> ProjectExplorerDragDataFormat =
+        DataFormat.CreateStringApplicationFormat("AvaloniaUIDesigner.ProjectExplorerFile");
 
     private enum GuideOrientation { Horizontal, Vertical }
 
@@ -1174,6 +1177,28 @@ public partial class MainWindow : Window
         return null;
     }
 
+    private static ProjectExplorerNode? FindProjectExplorerFileNode(
+        IReadOnlyList<ProjectExplorerNode> roots,
+        string fullPath)
+    {
+        foreach (var node in roots)
+        {
+            if (node.IsFile
+                && string.Equals(node.FullPath, fullPath, StringComparison.OrdinalIgnoreCase))
+            {
+                return node;
+            }
+
+            var descendant = FindProjectExplorerFileNode(node.Children, fullPath);
+            if (descendant is not null)
+            {
+                return descendant;
+            }
+        }
+
+        return null;
+    }
+
     private static string? NavigateProjectExplorerTree(
         IReadOnlyList<ProjectExplorerNode> roots,
         string relativePath,
@@ -1885,6 +1910,8 @@ public partial class MainWindow : Window
         var projectFilesRefreshPending = false;
         var isDialogOpen = true;
         var shouldRevealCurrentDocument = true;
+        ProjectExplorerNode? pendingProjectExplorerDragNode = null;
+        var projectExplorerDragStart = default(Point);
 
         void RefreshResults(string? selectedRelativePath = null)
         {
@@ -2622,9 +2649,12 @@ public partial class MainWindow : Window
             return true;
         }
 
-        async Task MoveProjectExplorerFileAsync()
+        async Task MoveProjectExplorerFileAsync(
+            ProjectExplorerNode? sourceNode = null,
+            string? targetDirectory = null)
         {
-            if (list.SelectedItem is not ProjectExplorerNode { IsFile: true } node)
+            var node = sourceNode ?? list.SelectedItem as ProjectExplorerNode;
+            if (node is not { IsFile: true })
             {
                 Vm.StatusText = "Select an AXAML file to move.";
                 return;
@@ -2645,7 +2675,35 @@ public partial class MainWindow : Window
                 return;
             }
 
-            var newPath = await ShowMoveProjectExplorerFileDialogAsync(node, currentPath);
+            string? newPath;
+            if (targetDirectory is null)
+            {
+                newPath = await ShowMoveProjectExplorerFileDialogAsync(node, currentPath);
+            }
+            else
+            {
+                newPath = GetProjectExplorerMoveFilePath(
+                    node,
+                    targetDirectory,
+                    Vm.ProjectWorkspacePath);
+                if (newPath is null)
+                {
+                    Vm.StatusText = "The selected Project Explorer destination is unavailable.";
+                    return;
+                }
+
+                if (string.Equals(newPath, currentPath, StringComparison.OrdinalIgnoreCase))
+                {
+                    Vm.StatusText = "Choose a different Project Explorer folder.";
+                    return;
+                }
+
+                if (File.Exists(newPath) || File.Exists(GetDocumentBackupPath(newPath)))
+                {
+                    Vm.StatusText = $"A file or backup named {System.IO.Path.GetFileName(newPath)} already exists in that folder.";
+                    return;
+                }
+            }
             if (string.IsNullOrWhiteSpace(newPath))
             {
                 return;
@@ -3447,6 +3505,94 @@ public partial class MainWindow : Window
             RefreshResults(targetPath);
         }
 
+        void OnProjectExplorerDragOver(DragEventArgs e)
+        {
+            if (e.DataTransfer.TryGetValue(ProjectExplorerDragDataFormat) is not string sourcePath
+                || FindProjectExplorerFileNode(treeRoots, sourcePath) is not { } sourceNode
+                || FindProjectExplorerContextMenuNode(e.Source) is not { IsFile: false } targetNode)
+            {
+                e.DragEffects = DragDropEffects.None;
+                e.Handled = true;
+                return;
+            }
+
+            var targetDirectory = GetProjectExplorerClipboardPath(
+                targetNode,
+                Vm.ProjectWorkspacePath,
+                fullPath: true);
+            if (string.IsNullOrWhiteSpace(targetDirectory))
+            {
+                e.DragEffects = DragDropEffects.None;
+                e.Handled = true;
+                return;
+            }
+
+            var newPath = GetProjectExplorerMoveFilePath(
+                sourceNode,
+                targetDirectory,
+                Vm.ProjectWorkspacePath);
+            if (string.IsNullOrWhiteSpace(newPath)
+                || string.Equals(
+                    newPath,
+                    sourceNode.FullPath,
+                    StringComparison.OrdinalIgnoreCase)
+                || File.Exists(newPath)
+                || File.Exists(GetDocumentBackupPath(newPath)))
+            {
+                e.DragEffects = DragDropEffects.None;
+                e.Handled = true;
+                return;
+            }
+
+            list.SelectedItem = targetNode;
+            e.DragEffects = DragDropEffects.Move;
+            e.Handled = true;
+        }
+
+        async Task OnProjectExplorerDropAsync(DragEventArgs e)
+        {
+            if (e.DataTransfer.TryGetValue(ProjectExplorerDragDataFormat) is not string sourcePath
+                || FindProjectExplorerFileNode(treeRoots, sourcePath) is not { } sourceNode
+                || FindProjectExplorerContextMenuNode(e.Source) is not { IsFile: false } targetNode)
+            {
+                e.DragEffects = DragDropEffects.None;
+                e.Handled = true;
+                return;
+            }
+
+            var targetDirectory = GetProjectExplorerClipboardPath(
+                targetNode,
+                Vm.ProjectWorkspacePath,
+                fullPath: true);
+            if (string.IsNullOrWhiteSpace(targetDirectory))
+            {
+                e.DragEffects = DragDropEffects.None;
+                e.Handled = true;
+                return;
+            }
+
+            var newPath = GetProjectExplorerMoveFilePath(
+                sourceNode,
+                targetDirectory,
+                Vm.ProjectWorkspacePath);
+            if (string.IsNullOrWhiteSpace(newPath)
+                || string.Equals(
+                    newPath,
+                    sourceNode.FullPath,
+                    StringComparison.OrdinalIgnoreCase)
+                || File.Exists(newPath)
+                || File.Exists(GetDocumentBackupPath(newPath)))
+            {
+                e.DragEffects = DragDropEffects.None;
+                e.Handled = true;
+                return;
+            }
+
+            e.DragEffects = DragDropEffects.Move;
+            e.Handled = true;
+            await MoveProjectExplorerFileAsync(sourceNode, targetDirectory);
+        }
+
         var cancelButton = new Button { Content = "Cancel", MinWidth = 86 };
         var openButton = new Button { Content = "Open", MinWidth = 86 };
         var newFileMenu = new MenuItem { Header = "New AXAML File..." };
@@ -3528,6 +3674,16 @@ public partial class MainWindow : Window
             deleteFolderMenu.IsEnabled = hasSelectedFolder;
         };
         list.ContextMenu = projectExplorerContextMenu;
+        DragDrop.SetAllowDrop(list, true);
+        list.AddHandler(
+            DragDrop.DragOverEvent,
+            (_, e) => OnProjectExplorerDragOver(e));
+        list.AddHandler(
+            DragDrop.DragLeaveEvent,
+            (_, e) => e.Handled = true);
+        list.AddHandler(
+            DragDrop.DropEvent,
+            async (_, e) => await OnProjectExplorerDropAsync(e));
         list.KeyDown += async (_, e) =>
         {
             if (e.Key == Key.M
@@ -3560,17 +3716,53 @@ public partial class MainWindow : Window
         };
         list.PointerPressed += (_, e) =>
         {
-            if (e.GetCurrentPoint(list).Properties.PointerUpdateKind
-                != PointerUpdateKind.RightButtonPressed)
+            var point = e.GetCurrentPoint(list);
+            if (point.Properties.PointerUpdateKind
+                == PointerUpdateKind.RightButtonPressed)
+            {
+                var node = FindProjectExplorerContextMenuNode(e.Source);
+                if (node is not null)
+                {
+                    list.SelectedItem = node;
+                }
+
+                return;
+            }
+
+            if (point.Properties.IsLeftButtonPressed
+                && FindProjectExplorerContextMenuNode(e.Source) is { IsFile: true } dragNode)
+            {
+                pendingProjectExplorerDragNode = dragNode;
+                projectExplorerDragStart = e.GetPosition(list);
+                e.Pointer.Capture(list);
+            }
+        };
+        list.PointerMoved += async (_, e) =>
+        {
+            if (pendingProjectExplorerDragNode is not { } dragNode
+                || dragNode.FullPath is not { } fullPath)
             {
                 return;
             }
 
-            var node = FindProjectExplorerContextMenuNode(e.Source);
-            if (node is not null)
+            var point = e.GetPosition(list);
+            if (Math.Abs(point.X - projectExplorerDragStart.X) < MarqueeThreshold
+                && Math.Abs(point.Y - projectExplorerDragStart.Y) < MarqueeThreshold)
             {
-                list.SelectedItem = node;
+                return;
             }
+
+            pendingProjectExplorerDragNode = null;
+            e.Pointer.Capture(null);
+            var data = new DataTransfer();
+            data.Add(DataTransferItem.Create(ProjectExplorerDragDataFormat, fullPath));
+            await DragDrop.DoDragDropAsync(e, data, DragDropEffects.Move);
+            e.Handled = true;
+        };
+        list.PointerReleased += (_, e) =>
+        {
+            pendingProjectExplorerDragNode = null;
+            e.Pointer.Capture(null);
         };
         search.TextChanged += (_, _) => RefreshResults();
         search.KeyDown += (_, e) =>
@@ -3673,7 +3865,7 @@ public partial class MainWindow : Window
             {
                 new TextBlock
                 {
-                    Text = "Browse the project tree. Double-click an AXAML file to open it; press Enter on a folder or double-click a folder to expand or collapse it, use Ctrl+N or the context menu to create a new AXAML file from a UserControl or Window template, Ctrl+Shift+N or the context menu to create a new folder, Ctrl+Shift+D or the context menu to duplicate the selected AXAML file, Ctrl+Shift+M or the context menu to move the selected AXAML file to another project folder, F2 or the context menu to rename the selected AXAML file or folder, Delete or Backspace to remove a file after dirty protection or an empty folder after confirmation, Ctrl+C to copy the selected full path, or the context menu to open its location in the file manager.",
+                    Text = "Browse the project tree. Double-click an AXAML file to open it; press Enter on a folder or double-click a folder to expand or collapse it, use Ctrl+N or the context menu to create a new AXAML file from a UserControl or Window template, Ctrl+Shift+N or the context menu to create a new folder, Ctrl+Shift+D or the context menu to duplicate the selected AXAML file, Ctrl+Shift+M or the context menu to move the selected AXAML file to another project folder, drag an AXAML file onto a folder to move it directly, F2 or the context menu to rename the selected AXAML file or folder, Delete or Backspace to remove a file after dirty protection or an empty folder after confirmation, Ctrl+C to copy the selected full path, or the context menu to open its location in the file manager.",
                     TextWrapping = TextWrapping.Wrap,
                 },
                 rootText,
