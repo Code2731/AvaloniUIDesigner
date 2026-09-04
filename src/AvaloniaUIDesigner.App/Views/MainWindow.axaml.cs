@@ -168,6 +168,7 @@ public partial class MainWindow : Window
         Project Explorer Ctrl+Shift+M  Move the selected AXAML file to another project folder
         Project Explorer drag file onto folder  Move the AXAML file to that project folder
         Project Explorer drag file onto root    Move the AXAML file to the workspace root
+        Project Explorer external AXAML drag   Copy external AXAML files into the project
         Project Explorer F2  Rename the selected AXAML file and keep open tabs linked
         Project Explorer folder F2  Rename the selected folder and keep open tabs linked
         Project Explorer Delete  Delete the selected AXAML file after dirty protection
@@ -1601,6 +1602,117 @@ public partial class MainWindow : Window
         catch (ArgumentException)
         {
             return null;
+        }
+    }
+
+    private static IReadOnlyList<string> GetProjectExplorerExternalAxamlPaths(
+        IEnumerable<string> paths)
+    {
+        var normalizedPaths = new List<string>();
+        var seenPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var path in paths)
+        {
+            if (string.IsNullOrWhiteSpace(path))
+            {
+                return Array.Empty<string>();
+            }
+
+            try
+            {
+                var fullPath = System.IO.Path.GetFullPath(path);
+                var extension = System.IO.Path.GetExtension(fullPath);
+                if (!File.Exists(fullPath)
+                    || !string.Equals(extension, ".axaml", StringComparison.OrdinalIgnoreCase)
+                        && !string.Equals(extension, ".xaml", StringComparison.OrdinalIgnoreCase))
+                {
+                    return Array.Empty<string>();
+                }
+
+                if (seenPaths.Add(fullPath))
+                {
+                    normalizedPaths.Add(fullPath);
+                }
+            }
+            catch (ArgumentException)
+            {
+                return Array.Empty<string>();
+            }
+        }
+
+        return normalizedPaths.Count == 0
+            ? Array.Empty<string>()
+            : normalizedPaths;
+    }
+
+    private static IReadOnlyList<string> GetProjectExplorerExternalAxamlTargetPaths(
+        IEnumerable<string> paths,
+        string? targetDirectory,
+        string? workspacePath)
+    {
+        if (string.IsNullOrWhiteSpace(targetDirectory)
+            || string.IsNullOrWhiteSpace(workspacePath))
+        {
+            return Array.Empty<string>();
+        }
+
+        var sourcePaths = GetProjectExplorerExternalAxamlPaths(paths);
+        if (sourcePaths.Count == 0)
+        {
+            return Array.Empty<string>();
+        }
+
+        try
+        {
+            var fullWorkspacePath = System.IO.Path.GetFullPath(workspacePath);
+            var normalizedWorkspacePath = fullWorkspacePath
+                .TrimEnd(
+                    System.IO.Path.DirectorySeparatorChar,
+                    System.IO.Path.AltDirectorySeparatorChar);
+            var fullTargetDirectory = System.IO.Path.GetFullPath(targetDirectory);
+            var normalizedTargetDirectory = fullTargetDirectory
+                .TrimEnd(
+                    System.IO.Path.DirectorySeparatorChar,
+                    System.IO.Path.AltDirectorySeparatorChar);
+            var workspacePrefix = normalizedWorkspacePath
+                + System.IO.Path.DirectorySeparatorChar;
+            var targetIsInWorkspace = string.Equals(
+                    normalizedTargetDirectory,
+                    normalizedWorkspacePath,
+                    StringComparison.OrdinalIgnoreCase)
+                || normalizedTargetDirectory.StartsWith(
+                    workspacePrefix,
+                    StringComparison.OrdinalIgnoreCase);
+            if (!targetIsInWorkspace || !Directory.Exists(normalizedTargetDirectory))
+            {
+                return Array.Empty<string>();
+            }
+
+            var targetPaths = new List<string>();
+            var seenTargetPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var sourcePath in sourcePaths)
+            {
+                var targetPath = GetProjectExplorerNewFilePath(
+                    System.IO.Path.GetFileName(sourcePath),
+                    normalizedTargetDirectory);
+                if (targetPath is null)
+                {
+                    return Array.Empty<string>();
+                }
+
+                var fullTargetPath = System.IO.Path.GetFullPath(targetPath);
+                if (!seenTargetPaths.Add(fullTargetPath))
+                {
+                    return Array.Empty<string>();
+                }
+
+                targetPaths.Add(fullTargetPath);
+            }
+
+            return targetPaths;
+        }
+        catch (ArgumentException)
+        {
+            return Array.Empty<string>();
         }
     }
 
@@ -3522,21 +3634,41 @@ public partial class MainWindow : Window
                 return null;
             }
 
-            return ReferenceEquals(source, rootText) || ReferenceEquals(source, list)
+            if (ReferenceEquals(source, rootText) || ReferenceEquals(source, list))
+            {
+                return Vm.ProjectWorkspacePath;
+            }
+
+            return source is Visual visual
+                && visual.FindAncestorOfType<ListBox>() is { } ancestor
+                && ReferenceEquals(ancestor, list)
+                && FindProjectExplorerContextMenuNode(source) is null
                 ? Vm.ProjectWorkspacePath
                 : null;
         }
 
+        IReadOnlyList<string> GetProjectExplorerExternalDropSourcePaths(DragEventArgs e)
+        {
+            var storageItems = e.DataTransfer.TryGetFiles();
+            return storageItems is null
+                ? Array.Empty<string>()
+                : GetProjectExplorerExternalAxamlPaths(
+                    storageItems
+                        .Select(item => item.TryGetLocalPath() ?? string.Empty));
+        }
+
+        IReadOnlyList<string> GetProjectExplorerExternalDropTargetPaths(
+            IReadOnlyList<string> sourcePaths,
+            string targetDirectory)
+        {
+            return GetProjectExplorerExternalAxamlTargetPaths(
+                    sourcePaths,
+                    targetDirectory,
+                    Vm.ProjectWorkspacePath);
+        }
+
         void OnProjectExplorerDragOver(DragEventArgs e)
         {
-            if (e.DataTransfer.TryGetValue(ProjectExplorerDragDataFormat) is not string sourcePath
-                || FindProjectExplorerFileNode(treeRoots, sourcePath) is not { } sourceNode)
-            {
-                e.DragEffects = DragDropEffects.None;
-                e.Handled = true;
-                return;
-            }
-
             var targetNode = FindProjectExplorerContextMenuNode(e.Source);
             var targetDirectory = GetProjectExplorerDropTargetDirectory(e.Source);
             if (string.IsNullOrWhiteSpace(targetDirectory))
@@ -3546,17 +3678,44 @@ public partial class MainWindow : Window
                 return;
             }
 
-            var newPath = GetProjectExplorerMoveFilePath(
-                sourceNode,
-                targetDirectory,
-                Vm.ProjectWorkspacePath);
-            if (string.IsNullOrWhiteSpace(newPath)
-                || string.Equals(
-                    newPath,
-                    sourceNode.FullPath,
-                    StringComparison.OrdinalIgnoreCase)
-                || File.Exists(newPath)
-                || File.Exists(GetDocumentBackupPath(newPath)))
+            if (e.DataTransfer.TryGetValue(ProjectExplorerDragDataFormat) is string sourcePath
+                && FindProjectExplorerFileNode(treeRoots, sourcePath) is { } sourceNode)
+            {
+                var newPath = GetProjectExplorerMoveFilePath(
+                    sourceNode,
+                    targetDirectory,
+                    Vm.ProjectWorkspacePath);
+                if (string.IsNullOrWhiteSpace(newPath)
+                    || string.Equals(
+                        newPath,
+                        sourceNode.FullPath,
+                        StringComparison.OrdinalIgnoreCase)
+                    || File.Exists(newPath)
+                    || File.Exists(GetDocumentBackupPath(newPath)))
+                {
+                    e.DragEffects = DragDropEffects.None;
+                    e.Handled = true;
+                    return;
+                }
+
+                if (targetNode is not null)
+                {
+                    list.SelectedItem = targetNode;
+                }
+
+                e.DragEffects = DragDropEffects.Move;
+                e.Handled = true;
+                return;
+            }
+
+            var externalSourcePaths = GetProjectExplorerExternalDropSourcePaths(e);
+            var externalTargetPaths = GetProjectExplorerExternalDropTargetPaths(
+                externalSourcePaths,
+                targetDirectory);
+            if (externalTargetPaths.Count == 0
+                || externalTargetPaths.Any(path =>
+                    File.Exists(path)
+                    || File.Exists(GetDocumentBackupPath(path))))
             {
                 e.DragEffects = DragDropEffects.None;
                 e.Handled = true;
@@ -3568,20 +3727,12 @@ public partial class MainWindow : Window
                 list.SelectedItem = targetNode;
             }
 
-            e.DragEffects = DragDropEffects.Move;
+            e.DragEffects = DragDropEffects.Copy;
             e.Handled = true;
         }
 
         async Task OnProjectExplorerDropAsync(DragEventArgs e)
         {
-            if (e.DataTransfer.TryGetValue(ProjectExplorerDragDataFormat) is not string sourcePath
-                || FindProjectExplorerFileNode(treeRoots, sourcePath) is not { } sourceNode)
-            {
-                e.DragEffects = DragDropEffects.None;
-                e.Handled = true;
-                return;
-            }
-
             var targetDirectory = GetProjectExplorerDropTargetDirectory(e.Source);
             if (string.IsNullOrWhiteSpace(targetDirectory))
             {
@@ -3590,26 +3741,89 @@ public partial class MainWindow : Window
                 return;
             }
 
-            var newPath = GetProjectExplorerMoveFilePath(
-                sourceNode,
-                targetDirectory,
-                Vm.ProjectWorkspacePath);
-            if (string.IsNullOrWhiteSpace(newPath)
-                || string.Equals(
-                    newPath,
-                    sourceNode.FullPath,
-                    StringComparison.OrdinalIgnoreCase)
-                || File.Exists(newPath)
-                || File.Exists(GetDocumentBackupPath(newPath)))
+            if (e.DataTransfer.TryGetValue(ProjectExplorerDragDataFormat) is string sourcePath
+                && FindProjectExplorerFileNode(treeRoots, sourcePath) is { } sourceNode)
+            {
+                var newPath = GetProjectExplorerMoveFilePath(
+                    sourceNode,
+                    targetDirectory,
+                    Vm.ProjectWorkspacePath);
+                if (string.IsNullOrWhiteSpace(newPath)
+                    || string.Equals(
+                        newPath,
+                        sourceNode.FullPath,
+                        StringComparison.OrdinalIgnoreCase)
+                    || File.Exists(newPath)
+                    || File.Exists(GetDocumentBackupPath(newPath)))
+                {
+                    e.DragEffects = DragDropEffects.None;
+                    e.Handled = true;
+                    return;
+                }
+
+                e.DragEffects = DragDropEffects.Move;
+                e.Handled = true;
+                await MoveProjectExplorerFileAsync(sourceNode, targetDirectory);
+                return;
+            }
+
+            var externalSourcePaths = GetProjectExplorerExternalDropSourcePaths(e);
+            var externalTargetPaths = GetProjectExplorerExternalDropTargetPaths(
+                externalSourcePaths,
+                targetDirectory);
+            if (externalTargetPaths.Count == 0
+                || externalTargetPaths.Any(path =>
+                    File.Exists(path)
+                    || File.Exists(GetDocumentBackupPath(path))))
             {
                 e.DragEffects = DragDropEffects.None;
                 e.Handled = true;
                 return;
             }
 
-            e.DragEffects = DragDropEffects.Move;
+            var copiedPaths = new List<string>();
             e.Handled = true;
-            await MoveProjectExplorerFileAsync(sourceNode, targetDirectory);
+            e.DragEffects = DragDropEffects.Copy;
+            try
+            {
+                for (var index = 0; index < externalTargetPaths.Count; index++)
+                {
+                    File.Copy(
+                        externalSourcePaths[index],
+                        externalTargetPaths[index],
+                        overwrite: false);
+                    copiedPaths.Add(externalTargetPaths[index]);
+                }
+            }
+            catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+            {
+                foreach (var copiedPath in copiedPaths)
+                {
+                    try
+                    {
+                        File.Delete(copiedPath);
+                    }
+                    catch (Exception rollbackException) when (rollbackException is IOException or UnauthorizedAccessException)
+                    {
+                        // Preserve the original import failure if rollback is also blocked.
+                    }
+                }
+
+                Vm.StatusText = $"Could not import external AXAML files: {exception.Message}";
+                return;
+            }
+
+            if (!Vm.RefreshProjectWorkspace(out var refreshError))
+            {
+                RefreshProjectTree();
+                Vm.StatusText = $"Imported {copiedPaths.Count} AXAML file(s), but could not refresh Project Explorer: {refreshError}";
+                return;
+            }
+
+            RefreshProjectTree();
+            Vm.StatusText = copiedPaths.Count == 1
+                ? $"Imported {System.IO.Path.GetFileName(copiedPaths[0])} into Project Explorer."
+                : $"Imported {copiedPaths.Count} AXAML file(s) into Project Explorer.";
         }
 
         var cancelButton = new Button { Content = "Cancel", MinWidth = 86 };
@@ -3894,7 +4108,7 @@ public partial class MainWindow : Window
             {
                 new TextBlock
                 {
-                    Text = "Browse the project tree. Double-click an AXAML file to open it; press Enter on a folder or double-click a folder to expand or collapse it, use Ctrl+N or the context menu to create a new AXAML file from a UserControl or Window template, Ctrl+Shift+N or the context menu to create a new folder, Ctrl+Shift+D or the context menu to duplicate the selected AXAML file, Ctrl+Shift+M or the context menu to move the selected AXAML file to another project folder, drag an AXAML file onto a folder or the workspace root path to move it directly, F2 or the context menu to rename the selected AXAML file or folder, Delete or Backspace to remove a file after dirty protection or an empty folder after confirmation, Ctrl+C to copy the selected full path, or the context menu to open its location in the file manager.",
+                    Text = "Browse the project tree. Double-click an AXAML file to open it; press Enter on a folder or double-click a folder to expand or collapse it, use Ctrl+N or the context menu to create a new AXAML file from a UserControl or Window template, Ctrl+Shift+N or the context menu to create a new folder, Ctrl+Shift+D or the context menu to duplicate the selected AXAML file, Ctrl+Shift+M or the context menu to move the selected AXAML file to another project folder, drag an AXAML file onto a folder or the workspace root path to move it directly, or drag external .axaml/.xaml files here to copy them into the project, F2 or the context menu to rename the selected AXAML file or folder, Delete or Backspace to remove a file after dirty protection or an empty folder after confirmation, Ctrl+C to copy the selected full path, or the context menu to open its location in the file manager.",
                     TextWrapping = TextWrapping.Wrap,
                 },
                 rootText,
