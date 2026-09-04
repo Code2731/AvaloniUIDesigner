@@ -40,6 +40,7 @@ public sealed class DocumentTabViewModel : ViewModelBase
     private string _displayName;
     private bool _isActive;
     private bool _isDirty;
+    private bool _hasExternalChange;
     private bool _canClose;
     private bool _isDropTarget;
 
@@ -54,11 +55,13 @@ public sealed class DocumentTabViewModel : ViewModelBase
 
     public string DisplayName => _displayName;
 
-    public string Header => $"{_displayName}{(_isDirty ? " *" : string.Empty)}";
+    public string Header => $"{_displayName}{(_isDirty ? " *" : string.Empty)}{(_hasExternalChange ? " !" : string.Empty)}";
 
     public bool IsActive => _isActive;
 
     public bool IsDirty => _isDirty;
+
+    public bool HasExternalChange => _hasExternalChange;
 
     public bool CanClose => _canClose;
 
@@ -88,11 +91,18 @@ public sealed class DocumentTabViewModel : ViewModelBase
 
     public IBrush TabForeground => _isActive ? ActiveTabForeground : InactiveTabForeground;
 
-    internal void Update(string? documentPath, string displayName, bool isDirty, bool isActive, bool canClose)
+    internal void Update(
+        string? documentPath,
+        string displayName,
+        bool isDirty,
+        bool isActive,
+        bool canClose,
+        bool hasExternalChange = false)
     {
         SetField(ref _documentPath, documentPath, nameof(DocumentPath));
         SetField(ref _displayName, displayName, nameof(DisplayName));
         SetField(ref _isDirty, isDirty, nameof(IsDirty));
+        SetField(ref _hasExternalChange, hasExternalChange, nameof(HasExternalChange));
         SetField(ref _isActive, isActive, nameof(IsActive));
         SetField(ref _canClose, canClose, nameof(CanClose));
         OnPropertyChanged(nameof(Header));

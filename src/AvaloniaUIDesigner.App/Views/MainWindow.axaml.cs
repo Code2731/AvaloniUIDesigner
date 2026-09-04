@@ -430,6 +430,7 @@ public partial class MainWindow : Window
     private bool _hasPendingPropertyEdit;
     private bool _hasPendingLayoutEdit;
     private bool _allowCloseWithoutPrompt;
+    private string? _lastObservedDocumentPath;
     private string _propertyInspectorFilterText = string.Empty;
     private double _toolboxPaneWidth = 220;
     private double _inspectorPaneWidth = 280;
@@ -1157,7 +1158,13 @@ public partial class MainWindow : Window
             return;
         }
 
-        RememberKnownDocumentWriteTime(_boundVm?.CurrentDocumentPath);
+        foreach (var path in _boundVm?.DocumentTabs
+            .Select(tab => tab.DocumentPath)
+            .Where(path => !string.IsNullOrWhiteSpace(path))
+            ?? Enumerable.Empty<string>())
+        {
+            RememberKnownDocumentWriteTime(path);
+        }
         try
         {
             _projectWorkspaceWatcher = new FileSystemWatcher(rootPath)
@@ -9883,6 +9890,7 @@ public partial class MainWindow : Window
         _previewWindow = null;
 
         _boundVm = Vm;
+        _lastObservedDocumentPath = _boundVm?.CurrentDocumentPath;
         _boundCanvas = _boundVm?.Canvas;
         _guideStateTab = _boundVm?.SelectedDocumentTab;
         _viewportStateTab = _boundVm?.SelectedDocumentTab;
@@ -9947,7 +9955,28 @@ public partial class MainWindow : Window
 
         if (e.PropertyName == nameof(MainWindowViewModel.CurrentDocumentPath))
         {
-            RememberKnownDocumentWriteTime(Vm?.CurrentDocumentPath);
+            var path = Vm?.CurrentDocumentPath;
+            var pathChanged = !string.Equals(
+                _lastObservedDocumentPath,
+                path,
+                StringComparison.OrdinalIgnoreCase);
+            if (Vm is not null
+                && pathChanged
+                && path is not null
+                && HasKnownDocumentFileChanged(path))
+            {
+                Vm.MarkExternalDocumentChanged(path);
+            }
+
+            _lastObservedDocumentPath = path;
+            if (Vm is not null
+                && path is not null
+                && Vm.IsExternalDocumentChangePending(path))
+            {
+                Vm.MarkExternalDocumentChanged(path);
+            }
+
+            RememberKnownDocumentWriteTime(path);
             UpdateDocumentBackupMenu();
         }
 
@@ -12736,6 +12765,7 @@ public partial class MainWindow : Window
                         pickedPath,
                         axaml,
                         GetDocumentBackupPath(pickedPath));
+                    RememberKnownDocumentWriteTime(pickedPath);
                     Vm.MarkDocumentSaved(pickedPath);
                     Vm.StatusText = $"Saved {System.IO.Path.GetFileName(pickedPath)}";
                 }
@@ -12766,6 +12796,7 @@ public partial class MainWindow : Window
                 targetPath,
                 axaml,
                 GetDocumentBackupPath(targetPath));
+            RememberKnownDocumentWriteTime(targetPath);
             Vm.MarkDocumentSaved(targetPath);
             Vm.StatusText = $"Saved {System.IO.Path.GetFileName(targetPath)}";
             return true;
