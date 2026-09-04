@@ -206,10 +206,14 @@ public partial class MainWindow : Window
 
     private enum DragMode { None, Move, N, S, E, W, NE, NW, SE, SW }
     private enum UnsavedChoice { Save, Discard, Cancel }
+    private enum ExternalChangeResolution { OpenTab, Reload, KeepDesignerVersion }
     private enum PreviewThemeMode { Default, Light, Dark }
     private sealed record ComponentPackExportOptions(string PackName, string DisplayName, string NamePrefix);
     private sealed record ProjectExplorerNewFileResult(string FilePath, string Content);
     private sealed record ComponentPackManagementAction(string SourceId);
+    private sealed record ExternalChangeDialogResult(
+        ExternalDocumentChangeInfo Change,
+        ExternalChangeResolution Resolution);
     private sealed record CommonPropertiesDialogResult(
         string Margin,
         string HorizontalAlignment,
@@ -1112,6 +1116,175 @@ public partial class MainWindow : Window
         object? sender,
         Avalonia.Interactivity.RoutedEventArgs e)
         => await ReloadCurrentFileAsync();
+
+    private async void OnResolveExternalChangesMenuClicked(
+        object? sender,
+        Avalonia.Interactivity.RoutedEventArgs e)
+        => await ResolveExternalChangesAsync();
+
+    private async Task ResolveExternalChangesAsync()
+    {
+        if (Vm is null)
+        {
+            return;
+        }
+
+        FlushPendingPropertyHistory();
+        var changes = Vm.GetExternalDocumentChanges();
+        if (changes.Count == 0)
+        {
+            Vm.StatusText = "No open document has an unresolved external change.";
+            return;
+        }
+
+        var decision = await ShowExternalChangesDialogAsync(changes);
+        if (decision is null)
+        {
+            return;
+        }
+
+        if (!Vm.ActivateDocumentTab(decision.Change.Tab))
+        {
+            Vm.StatusText = "The selected document tab is no longer open.";
+            return;
+        }
+
+        switch (decision.Resolution)
+        {
+            case ExternalChangeResolution.OpenTab:
+                Vm.StatusText = Vm.IsExternalDocumentChangePending(decision.Change.DocumentPath)
+                    ? $"Opened {decision.Change.DisplayName}. The file still needs external-change resolution."
+                    : $"Opened {decision.Change.DisplayName}.";
+                break;
+            case ExternalChangeResolution.Reload:
+                await ReloadCurrentFileAsync();
+                break;
+            case ExternalChangeResolution.KeepDesignerVersion:
+                if (!Vm.AcknowledgeExternalDocumentChange(decision.Change.DocumentPath))
+                {
+                    Vm.StatusText = "The selected external change is no longer pending.";
+                    break;
+                }
+
+                if (File.Exists(decision.Change.DocumentPath))
+                {
+                    RememberKnownDocumentWriteTime(decision.Change.DocumentPath);
+                }
+                else
+                {
+                    _knownProjectFileWriteTimes.Remove(decision.Change.DocumentPath);
+                }
+
+                Vm.StatusText = $"Kept the designer version for {decision.Change.DisplayName}. New external changes will still be detected.";
+                break;
+        }
+    }
+
+    private async Task<ExternalChangeDialogResult?> ShowExternalChangesDialogAsync(
+        IReadOnlyList<ExternalDocumentChangeInfo> changes)
+    {
+        var dialog = new Window
+        {
+            Title = "Resolve External Changes",
+            Width = 820,
+            Height = 560,
+            MinWidth = 620,
+            MinHeight = 420,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner,
+        };
+        var list = new ListBox
+        {
+            ItemsSource = changes,
+            SelectionMode = SelectionMode.Single,
+            MinHeight = 250,
+        };
+        var detail = new TextBlock
+        {
+            Foreground = Brush.Parse("#475569"),
+            TextWrapping = TextWrapping.Wrap,
+        };
+        var openButton = new Button { Content = "Open Tab", MinWidth = 96 };
+        var reloadButton = new Button { Content = "Reload", MinWidth = 96 };
+        var keepButton = new Button { Content = "Keep Designer", MinWidth = 120 };
+        var cancelButton = new Button { Content = "Cancel", MinWidth = 86 };
+
+        ExternalDocumentChangeInfo? GetSelectedChange()
+            => list.SelectedItem as ExternalDocumentChangeInfo;
+
+        void RefreshSelection()
+        {
+            var selected = GetSelectedChange();
+            var hasSelection = selected is not null;
+            openButton.IsEnabled = hasSelection;
+            reloadButton.IsEnabled = hasSelection && selected is { IsMissing: false };
+            keepButton.IsEnabled = hasSelection;
+            detail.Text = selected is null
+                ? "Select an open document to review its external change."
+                : $"{selected.DisplayName}\n{selected.DocumentPath}\nStatus: {selected.StatusLabel}\n\nReload replaces the designer state with the current disk file. Keep Designer dismisses this warning without writing over the external file.";
+        }
+
+        void CloseWith(ExternalChangeResolution resolution)
+        {
+            if (GetSelectedChange() is { } selected)
+            {
+                dialog.Close(new ExternalChangeDialogResult(selected, resolution));
+            }
+        }
+
+        list.SelectionChanged += (_, _) => RefreshSelection();
+        openButton.Click += (_, _) => CloseWith(ExternalChangeResolution.OpenTab);
+        reloadButton.Click += (_, _) => CloseWith(ExternalChangeResolution.Reload);
+        keepButton.Click += (_, _) => CloseWith(ExternalChangeResolution.KeepDesignerVersion);
+        cancelButton.Click += (_, _) => dialog.Close(null);
+        list.KeyDown += (_, e) =>
+        {
+            if (e.Key == Key.Enter)
+            {
+                CloseWith(GetSelectedChange() is { IsMissing: false }
+                    ? ExternalChangeResolution.Reload
+                    : ExternalChangeResolution.OpenTab);
+                e.Handled = true;
+            }
+            else if (e.Key == Key.Escape)
+            {
+                dialog.Close(null);
+                e.Handled = true;
+            }
+        };
+
+        list.SelectedIndex = 0;
+        RefreshSelection();
+        var buttons = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            HorizontalAlignment = HorizontalAlignment.Right,
+            Spacing = 8,
+            Children = { cancelButton, openButton, reloadButton, keepButton },
+        };
+        var content = new Grid
+        {
+            Margin = new Thickness(16),
+            RowDefinitions = new RowDefinitions("Auto,*,Auto,Auto"),
+            RowSpacing = 10,
+            Children =
+            {
+                new TextBlock
+                {
+                    Text = "These open AXAML documents changed or disappeared outside the designer.",
+                    TextWrapping = TextWrapping.Wrap,
+                    FontWeight = FontWeight.SemiBold,
+                },
+                list,
+                detail,
+                buttons,
+            },
+        };
+        Grid.SetRow(list, 1);
+        Grid.SetRow(detail, 2);
+        Grid.SetRow(buttons, 3);
+        dialog.Content = content;
+        return await dialog.ShowDialog<ExternalChangeDialogResult?>(this);
+    }
 
     private async Task ReloadCurrentFileAsync()
     {
@@ -9987,7 +10160,8 @@ public partial class MainWindow : Window
 
         if (e.PropertyName is nameof(MainWindowViewModel.ProjectWorkspacePath)
             or nameof(MainWindowViewModel.HasRecentProjectWorkspaces)
-            or nameof(MainWindowViewModel.CanReloadCurrentFile))
+            or nameof(MainWindowViewModel.CanReloadCurrentFile)
+            or nameof(MainWindowViewModel.HasExternalDocumentChanges))
         {
             UpdateProjectWorkspaceMenuStates();
         }
@@ -10054,6 +10228,10 @@ public partial class MainWindow : Window
         var canReloadCurrentFile = Vm?.CanReloadCurrentFile == true;
         ReloadCurrentFileMenu.IsEnabled = canReloadCurrentFile;
         ReloadCurrentFileContextMenu.IsEnabled = canReloadCurrentFile;
+
+        var hasExternalDocumentChanges = Vm?.HasExternalDocumentChanges == true;
+        ResolveExternalChangesMenu.IsEnabled = hasExternalDocumentChanges;
+        ResolveExternalChangesContextMenu.IsEnabled = hasExternalDocumentChanges;
     }
 
     private void UpdatePreviewThemeMenuStates()

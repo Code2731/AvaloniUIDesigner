@@ -82,6 +82,10 @@
                           Header="Reload Current File (Ctrl+Shift+R)"
                           Click="OnReloadCurrentFileMenuClicked"
                           IsEnabled="{Binding CanReloadCurrentFile}"/>
+                <MenuItem Name="ResolveExternalChangesMenu"
+                          Header="Resolve External Changes..."
+                          Click="OnResolveExternalChangesMenuClicked"
+                          IsEnabled="{Binding HasExternalDocumentChanges}"/>
                 <Separator/>
                 <MenuItem Header="Save" Click="OnSaveMenuClicked"/>
                 <MenuItem Header="Save As..." Click="OnSaveAsMenuClicked"/>
@@ -546,6 +550,12 @@
                             Click="OnReloadCurrentFileMenuClicked"
                             IsEnabled="{Binding CanReloadCurrentFile}"
                             ToolTip.Tip="Reload the current file after an external change (Ctrl+Shift+R)"
+                            Padding="8,3"/>
+                    <Button Name="ResolveExternalChangesToolbar"
+                            Content="Resolve Changes"
+                            Click="OnResolveExternalChangesMenuClicked"
+                            IsEnabled="{Binding HasExternalDocumentChanges}"
+                            ToolTip.Tip="Review all open files changed outside the designer"
                             Padding="8,3"/>
                     <Button Content="Save"
                             Click="OnSaveMenuClicked"
@@ -1527,6 +1537,10 @@
                                               Header="Reload Current File (Ctrl+Shift+R)"
                                               Click="OnReloadCurrentFileMenuClicked"
                                               IsEnabled="{Binding CanReloadCurrentFile}"/>
+                                    <MenuItem Name="ResolveExternalChangesContextMenu"
+                                              Header="Resolve External Changes..."
+                                              Click="OnResolveExternalChangesMenuClicked"
+                                              IsEnabled="{Binding HasExternalDocumentChanges}"/>
                                     <MenuItem Header="Duplicate"
                                               Click="OnDuplicateMenuClicked"
                                               IsEnabled="{Binding Canvas.IsSelectionActive}"/>

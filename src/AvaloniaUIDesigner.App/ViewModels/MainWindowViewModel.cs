@@ -98,6 +98,22 @@ public sealed record ProjectWorkspaceFolder(string FullPath, string RelativePath
         => $"{DisplayName}/ - {RelativePath}";
 }
 
+public sealed record ExternalDocumentChangeInfo(
+    DocumentTabViewModel Tab,
+    string DocumentPath,
+    bool IsMissing,
+    bool IsDirty)
+{
+    public string DisplayName => Tab.DisplayName;
+
+    public string StatusLabel => IsMissing
+        ? IsDirty ? "Missing, modified" : "Missing"
+        : IsDirty ? "Changed, modified" : "Changed";
+
+    public override string ToString()
+        => $"{Tab.Header} - {DocumentPath} [{StatusLabel}]";
+}
+
 public enum ItemsEditorMode
 {
     Flat,
@@ -736,6 +752,9 @@ public partial class MainWindowViewModel : ViewModelBase
     public bool HasProjectWorkspace => !string.IsNullOrWhiteSpace(_projectWorkspacePath);
     public IReadOnlyCollection<string> ProjectWorkspaceCollapsedFolders
         => _projectWorkspaceCollapsedFolders;
+    public bool HasExternalDocumentChanges => GetExternalDocumentChanges().Count > 0;
+    public IReadOnlyList<ExternalDocumentChangeInfo> ExternalDocumentChanges
+        => GetExternalDocumentChanges();
     public bool CanReloadCurrentFile
         => IsExternalDocumentChangePending(CurrentDocumentPath);
 
@@ -10058,6 +10077,8 @@ public partial class MainWindowViewModel : ViewModelBase
                 ? string.Empty
                 : $" {_externalDocumentChangePaths.Count} document file(s) changed outside the designer; use Reload Current File.")
             + (packWarnings.Count == 0 ? string.Empty : $" {string.Join(" ", packWarnings)}");
+        OnPropertyChanged(nameof(HasExternalDocumentChanges));
+        OnPropertyChanged(nameof(ExternalDocumentChanges));
         return true;
     }
 
@@ -10423,6 +10444,8 @@ public partial class MainWindowViewModel : ViewModelBase
         DocumentTabs.Remove(tab);
         OnPropertyChanged(nameof(HasMultipleDocumentTabs));
         OnPropertyChanged(nameof(CanCloseCurrentDocumentTab));
+        OnPropertyChanged(nameof(HasExternalDocumentChanges));
+        OnPropertyChanged(nameof(ExternalDocumentChanges));
 
         if (wasActive)
         {
@@ -10451,6 +10474,8 @@ public partial class MainWindowViewModel : ViewModelBase
         OnPropertyChanged(nameof(HasMultipleDocumentTabs));
         OnPropertyChanged(nameof(CanCloseCurrentDocumentTab));
         OnPropertyChanged(nameof(CanReopenClosedDocumentTab));
+        OnPropertyChanged(nameof(HasExternalDocumentChanges));
+        OnPropertyChanged(nameof(ExternalDocumentChanges));
         UpdateDocumentTabPresentations();
         ActivateDocumentTab(state.Tab);
         StatusText = $"Reopened {state.Tab.DisplayName} tab.";
@@ -14707,6 +14732,8 @@ public partial class MainWindowViewModel : ViewModelBase
         OnPropertyChanged(nameof(HasMultipleDocumentTabs));
         OnPropertyChanged(nameof(CanCloseCurrentDocumentTab));
         OnPropertyChanged(nameof(CanReopenClosedDocumentTab));
+        OnPropertyChanged(nameof(HasExternalDocumentChanges));
+        OnPropertyChanged(nameof(ExternalDocumentChanges));
         OnPropertyChanged(nameof(RecentDocumentTabs));
         OnPropertyChanged(nameof(CanSwitchToRecentDocumentTab));
         OnPropertyChanged(nameof(SelectedDocumentTab));
@@ -15370,9 +15397,11 @@ public partial class MainWindowViewModel : ViewModelBase
             _currentDocumentPath = newFullPath;
         }
 
+        var externalPathChanged = false;
         if (_externalDocumentChangePaths.Remove(oldFullPath))
         {
             _externalDocumentChangePaths.Add(newFullPath);
+            externalPathChanged = true;
             changed = true;
         }
 
@@ -15388,6 +15417,12 @@ public partial class MainWindowViewModel : ViewModelBase
             OnPropertyChanged(nameof(CurrentDocumentPath));
             OnPropertyChanged(nameof(CanReloadCurrentFile));
             OnPropertyChanged(nameof(WindowTitle));
+        }
+
+        if (externalPathChanged)
+        {
+            OnPropertyChanged(nameof(HasExternalDocumentChanges));
+            OnPropertyChanged(nameof(ExternalDocumentChanges));
         }
 
         return true;
@@ -15463,7 +15498,7 @@ public partial class MainWindowViewModel : ViewModelBase
             _currentDocumentPath = null;
         }
 
-        _externalDocumentChangePaths.Remove(fullPath);
+        var externalChangeRemoved = _externalDocumentChangePaths.Remove(fullPath);
 
         if (RecentFiles.Any(pathEntry => string.Equals(
                 pathEntry,
@@ -15504,6 +15539,11 @@ public partial class MainWindowViewModel : ViewModelBase
         OnPropertyChanged(nameof(CanReopenClosedDocumentTab));
         OnPropertyChanged(nameof(CanCloseCurrentDocumentTab));
         OnPropertyChanged(nameof(HasMultipleDocumentTabs));
+        if (externalChangeRemoved)
+        {
+            OnPropertyChanged(nameof(HasExternalDocumentChanges));
+            OnPropertyChanged(nameof(ExternalDocumentChanges));
+        }
         return removedCount + (currentPathWasDeleted ? 1 : 0);
     }
 
@@ -15624,6 +15664,12 @@ public partial class MainWindowViewModel : ViewModelBase
         if (externalPathChanged && !currentPathChanged)
         {
             OnPropertyChanged(nameof(CanReloadCurrentFile));
+        }
+
+        if (externalPathChanged)
+        {
+            OnPropertyChanged(nameof(HasExternalDocumentChanges));
+            OnPropertyChanged(nameof(ExternalDocumentChanges));
         }
 
         return true;
@@ -15758,6 +15804,8 @@ public partial class MainWindowViewModel : ViewModelBase
 
         _externalDocumentChangePaths.Add(fullPath);
         UpdateDocumentTabPresentations();
+        OnPropertyChanged(nameof(HasExternalDocumentChanges));
+        OnPropertyChanged(nameof(ExternalDocumentChanges));
         if (string.Equals(fullPath, CurrentDocumentPath, StringComparison.OrdinalIgnoreCase))
         {
             OnPropertyChanged(nameof(CanReloadCurrentFile));
@@ -15768,13 +15816,55 @@ public partial class MainWindowViewModel : ViewModelBase
     public void ClearExternalDocumentChange()
     {
         if (!TryNormalizeDocumentPath(CurrentDocumentPath, out var fullPath)
-            || !_externalDocumentChangePaths.Remove(fullPath))
+            || !RemoveExternalDocumentChange(fullPath))
         {
             return;
         }
+    }
+
+    public bool AcknowledgeExternalDocumentChange(string path)
+    {
+        if (!TryNormalizeDocumentPath(path, out var fullPath)
+            || !RemoveExternalDocumentChange(fullPath))
+        {
+            return false;
+        }
+
+        if (string.Equals(fullPath, CurrentDocumentPath, StringComparison.OrdinalIgnoreCase))
+        {
+            StatusText = $"Kept the designer version for {Path.GetFileName(fullPath)}. New external changes will still be detected.";
+        }
+
+        return true;
+    }
+
+    public IReadOnlyList<ExternalDocumentChangeInfo> GetExternalDocumentChanges()
+        => DocumentTabs
+            .Where(tab => TryNormalizeDocumentPath(tab.DocumentPath, out var path)
+                && _externalDocumentChangePaths.Contains(path))
+            .Select(tab => new ExternalDocumentChangeInfo(
+                tab,
+                Path.GetFullPath(tab.DocumentPath!),
+                !File.Exists(tab.DocumentPath!),
+                IsDocumentTabDirty(tab)))
+            .ToList();
+
+    private bool RemoveExternalDocumentChange(string path)
+    {
+        if (!_externalDocumentChangePaths.Remove(path))
+        {
+            return false;
+        }
 
         UpdateDocumentTabPresentations();
-        OnPropertyChanged(nameof(CanReloadCurrentFile));
+        OnPropertyChanged(nameof(HasExternalDocumentChanges));
+        OnPropertyChanged(nameof(ExternalDocumentChanges));
+        if (string.Equals(path, CurrentDocumentPath, StringComparison.OrdinalIgnoreCase))
+        {
+            OnPropertyChanged(nameof(CanReloadCurrentFile));
+        }
+
+        return true;
     }
 
     public bool IsExternalDocumentChangePending(string? path)
