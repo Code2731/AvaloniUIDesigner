@@ -153,6 +153,7 @@ dotnet run --project src/AvaloniaUIDesigner.App/AvaloniaUIDesigner.App.csproj
 - **Batch External Change Resolution**: 해결 허브의 `Reload All`은 존재하는 파일을 탭별 dirty 보호·AXAML 검증 순서로 처리하고 실패나 취소 지점에서 안전하게 중단합니다. `Keep All`은 모든 열린 pending 파일을 디자이너 버전으로 확인 처리하며, 삭제된 파일은 Reload 대상에서 건너뛰고 다시 결정할 수 있도록 남겨 둡니다.
 - **Root Code-behind Identity**: Window/UserControl의 선택적인 `x:Class`를 AXAML 열기·편집·저장·Draft/Full export·세션 복원까지 보존하고, 루트 속성 편집기에서 dotted .NET 타입명으로 변경할 수 있습니다. 다른 root kind로 UserControl을 내보낼 때는 현재 코드비하인드 타입을 잘못 복사하지 않습니다.
 - **Paired AXAML Code-behind Creation**: Project Explorer의 새 AXAML 파일 대화상자에서 선택적인 `x:Class`와 `.axaml.cs` paired file을 함께 생성하고, Window/UserControl base type·namespace·`InitializeComponent()`를 일치시킵니다. paired file 충돌이나 쓰기 실패 시 부분 생성물을 정리합니다.
+- **Paired AXAML Code-behind Management**: Project Explorer의 AXAML 행에 `paired` 상태를 표시하고, rename·move·delete 시 같은 이름의 `.axaml.cs`와 함께 처리합니다. duplicate에서는 새 파일명에 맞춰 AXAML `x:Class`와 code-behind partial class·constructor를 함께 재작성해 동일한 타입 충돌을 피합니다.
 - **Command-line Startup Paths**: 파일 탐색기나 터미널에서 하나 이상의 `.axaml`·`.xaml` 문서, 폴더, `.csproj`·`.sln`·`.slnx` 경로를 인수로 전달해 실행하면 세션 복원 후 해당 문서 탭과 Project Workspace를 바로 엽니다. 지원하지 않는 경로와 읽기 실패는 성공한 경로와 기존 세션을 유지한 채 상태바에 안내합니다.
 - **Tab View Navigation**: `Ctrl+Tab`/`Ctrl+Shift+Tab`으로 문서 탭을 순환하고, `Ctrl+Shift+PageUp/PageDown` 또는 탭 컨텍스트 메뉴로 활성 탭을 좌우 이동하며, 탭별 캔버스 줌·스크롤 위치와 Object Tree 선택을 전환·세션 복원 때 보존합니다.
 - **Viewport 복원 우선순위**: 문서 탭을 복원하는 짧은 pending 구간에는 선택 컨트롤 자동 스크롤을 보류해 저장된 Canvas 위치가 Object Tree/Canvas 선택 추적에 의해 덮어써지지 않도록 합니다.
@@ -255,6 +256,7 @@ dotnet run --project src/AvaloniaUIDesigner.App/AvaloniaUIDesigner.App.csproj
 12ac. 외부 변경 해결 목록에서 `Reload All`은 존재하는 파일을 순서대로 Reload하고 dirty 확인을 취소하거나 Reload가 실패하면 남은 pending 파일을 보존한 채 중단합니다. `Keep All`은 열린 목록의 모든 외부 변경을 한 번에 확인 처리하며, 파일이 존재하면 현재 timestamp를 새 watcher 기준점으로 삼고 삭제된 경로는 기준점을 비워 새 파일 생성 이후의 변경을 다시 감지합니다.
 12ad. Window/UserControl AXAML의 선택적 `x:Class`는 문서 루트 속성으로 읽혀 Full AXAML 저장·Draft metadata·session restore에서 유지됩니다. `Edit > Edit Root Properties...`에서 `Views.MainWindow` 같은 dotted .NET 타입명을 검증하며, UserControl export가 현재 Window를 변환하는 경우 원래 Window의 `x:Class`를 복사하지 않습니다.
 12ae. Project Explorer에서 `New AXAML File...`을 실행하면 기본적으로 `x:Class`가 들어간 AXAML과 같은 이름의 `.axaml.cs`를 함께 생성합니다. `UserControl`/`Window` 선택, `Views.NewView` 타입명, paired file 충돌 검사를 적용하며 checkbox를 해제하면 순수 AXAML만 만들 수 있습니다.
+12af. Project Explorer의 AXAML 행에 `paired` 표시가 있으면 같은 이름의 `.axaml.cs`가 연결된 상태입니다. `F2` rename, `Move`, `Duplicate`, `Delete`는 paired file을 함께 보호·이동·복제·삭제하며, duplicate는 새 파일명 기준으로 `x:Class`와 partial class/constructor 이름을 갱신합니다.
 13. `Edit > Edit Typography Properties...`에서 글꼴과 지원 컨트롤의 텍스트 정렬·줄바꿈 편집
 14. `Edit > Edit Transform Properties...`에서 선택 컨트롤의 이동·회전·크기·기울기와 변환 기준점 편집
 15. `Edit > Edit Accessibility & Navigation...`에서 스크린리더 메타데이터와 키보드 포커스 순서 편집
@@ -434,6 +436,7 @@ dotnet run --project src/AvaloniaUIDesigner.App/AvaloniaUIDesigner.App.csproj
 75dj. 외부 변경 해결 허브의 `Reload All`은 snapshot 당시 목록을 기준으로 missing 파일을 건너뛰고 나머지를 하나씩 Reload합니다. 각 파일에 기존 Save/Discard/Cancel 보호를 적용하고, 취소·파일 접근 실패·AXAML 검증 실패가 발생하면 처리한 개수와 남은 파일을 상태바에 알립니다. `Keep All`은 모든 pending 파일의 외부 경고를 선택적으로 지우고 존재 여부에 맞는 watcher 기준점을 갱신합니다.
 75dk. 루트 속성의 선택적 `x:Class`를 dotted .NET type name으로 검증하고 Window/UserControl AXAML의 실제 속성, Canvas draft metadata, 세션 스냅샷에 왕복 보존합니다. Full AXAML을 다른 root kind로 변환할 때는 원래 root의 `x:Class`를 생략해 잘못된 code-behind 연결을 방지합니다.
 75dl. Project Explorer 새 AXAML 파일 생성은 선택한 root template와 dotted `x:Class`를 바탕으로 `.axaml`/`.xaml`과 `.axaml.cs` paired file을 원자적으로 준비합니다. code-behind를 생성할 때 namespace·partial class·Window/UserControl base type·`InitializeComponent()`가 서로 일치하며, 두 번째 파일 생성이 실패하면 이미 생성한 첫 번째 파일을 rollback합니다.
+75dm. Project Explorer는 AXAML 옆에 존재하는 `.axaml.cs`를 `paired` 상태로 표시하고, AXAML rename·move·delete 작업에서 backup과 함께 code-behind를 동반 처리합니다. paired AXAML duplicate는 새 파일명으로 `x:Class`, partial class, constructor를 함께 바꾸며 대상 AXAML·backup·code-behind 충돌을 사전에 차단하고 부분 작업을 rollback합니다.
 76. `File > Load Component Pack...` 또는 `File > Load Toolbox Preset Pack...`으로 외부 Toolbox 팩을 추가하면 파일 경로가 세션에 등록되어 다음 실행 때 자동으로 다시 로드됩니다. 파일이 없어도 문서 탭 복원은 계속되며 상태바에 경고가 표시됩니다.
 77. 외부 프로젝트의 컨트롤은 Component Pack 항목에 `designOnly: true`, `avaloniaTypeName`, `previewText`, `defaultProperties`를 지정해 등록합니다. 디자이너에서는 타입명 플레이스홀더로 편집하고, 생성 AXAML에는 원래 커스텀 타입과 속성을 출력합니다. 예시는 [custom-component-pack.example.json](docs/custom-component-pack.example.json)을 참고하세요.
 78. `File > Load Component Pack Plugin...`에서 `IComponentPackPlugin`을 구현한 신뢰할 수 있는 DLL을 선택하면 플러그인이 제공한 Component Pack을 Toolbox에 등록합니다. DLL 경로는 세션 JSON의 `ComponentPluginPaths`에 저장되고, 앱 재시작 시 플러그인·JSON 팩·프리셋 팩 순서로 복원됩니다.
@@ -787,6 +790,7 @@ AXAML 소스 편집기의 `Validate`와 `Preview`는 현재 디자인과 Undo �
 - v2.85: 외부 변경 해결 허브에 Reload All·Keep All 일괄 처리와 안전한 중단 정책 추가
 - v2.86: Window/UserControl `x:Class` 보존과 루트 속성 편집기 입력 검증 추가
 - v2.87: Project Explorer 새 AXAML paired code-behind 생성과 rollback 보호 추가
+- v2.88: Project Explorer paired AXAML code-behind 상태 표시와 파일 작업 동기화 추가
 
 ## 컴포넌트 팩
 

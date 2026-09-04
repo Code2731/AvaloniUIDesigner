@@ -6,7 +6,9 @@ using System.Globalization;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
+using System.Xml.Linq;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
@@ -320,7 +322,8 @@ public partial class MainWindow : Window
             string? fullPath,
             int depth,
             IReadOnlyList<ProjectExplorerNode>? children = null,
-            bool isExpanded = true)
+            bool isExpanded = true,
+            bool hasCodeBehind = false)
         {
             DisplayName = displayName;
             RelativePath = relativePath;
@@ -328,6 +331,7 @@ public partial class MainWindow : Window
             Depth = depth;
             Children = children ?? Array.Empty<ProjectExplorerNode>();
             IsExpanded = isExpanded;
+            HasCodeBehind = hasCodeBehind;
         }
 
         public string DisplayName { get; }
@@ -337,13 +341,16 @@ public partial class MainWindow : Window
         public IReadOnlyList<ProjectExplorerNode> Children { get; }
         public bool IsFile => FullPath is not null;
         public bool IsExpanded { get; set; }
+        public bool HasCodeBehind { get; }
 
         public override string ToString()
         {
             var indentation = new string(' ', Depth * 2);
             var marker = IsFile ? "[F]" : IsExpanded ? "[-]" : "[+]";
             return IsFile
-                ? $"{indentation}{marker} {DisplayName} - {RelativePath}"
+                ? HasCodeBehind
+                    ? $"{indentation}{marker} {DisplayName} - {RelativePath} [paired]"
+                    : $"{indentation}{marker} {DisplayName} - {RelativePath}"
                 : $"{indentation}{marker} {DisplayName}/";
         }
     }
@@ -1601,7 +1608,9 @@ public partial class MainWindow : Window
             var extension = System.IO.Path.GetExtension(path);
             return string.IsNullOrEmpty(extension)
                 || string.Equals(extension, ".axaml", StringComparison.OrdinalIgnoreCase)
-                || string.Equals(extension, ".xaml", StringComparison.OrdinalIgnoreCase);
+                || string.Equals(extension, ".xaml", StringComparison.OrdinalIgnoreCase)
+                || path.EndsWith(".axaml.cs", StringComparison.OrdinalIgnoreCase)
+                || path.EndsWith(".xaml.cs", StringComparison.OrdinalIgnoreCase);
         }
         catch (ArgumentException)
         {
@@ -1723,7 +1732,8 @@ public partial class MainWindow : Window
                         relativePath,
                         isFile ? file.FullPath : null,
                         index,
-                        children);
+                        children,
+                        hasCodeBehind: isFile && file.HasCodeBehind);
                     siblings.Add(node);
                 }
 
@@ -2116,6 +2126,132 @@ public partial class MainWindow : Window
         {
             return null;
         }
+    }
+
+    private static string GetProjectExplorerCodeBehindPath(string axamlPath)
+        => axamlPath + ".cs";
+
+    private static bool TryPrepareProjectExplorerDuplicate(
+        string sourceAxamlPath,
+        string targetAxamlPath,
+        string sourceCodeBehindPath,
+        out string targetAxaml,
+        out string targetCodeBehind,
+        out string error)
+    {
+        targetAxaml = string.Empty;
+        targetCodeBehind = string.Empty;
+        error = string.Empty;
+
+        string sourceAxaml;
+        string sourceCodeBehind;
+        try
+        {
+            sourceAxaml = File.ReadAllText(sourceAxamlPath);
+            sourceCodeBehind = File.ReadAllText(sourceCodeBehindPath);
+        }
+        catch (Exception exception) when (exception is IOException
+            or UnauthorizedAccessException
+            or ArgumentException
+            or NotSupportedException)
+        {
+            error = $"Could not read the paired files: {exception.Message}";
+            return false;
+        }
+
+        XDocument document;
+        try
+        {
+            document = XDocument.Parse(sourceAxaml, LoadOptions.PreserveWhitespace);
+        }
+        catch (Exception exception) when (exception is System.Xml.XmlException
+            or ArgumentException)
+        {
+            error = $"The AXAML root could not be read: {exception.Message}";
+            return false;
+        }
+
+        var xClassName = XNamespace.Get("http://schemas.microsoft.com/winfx/2006/xaml") + "Class";
+        var oldClassName = document.Root?.Attribute(xClassName)?.Value.Trim();
+        if (!MainWindowViewModel.TryNormalizeRootClassName(oldClassName, out var normalizedOldClassName)
+            || normalizedOldClassName.Length == 0)
+        {
+            error = "The source AXAML does not contain a valid x:Class to rename for duplication.";
+            return false;
+        }
+
+        var separator = normalizedOldClassName.LastIndexOf('.');
+        var namespaceName = separator > 0
+            ? normalizedOldClassName[..separator]
+            : string.Empty;
+        var oldTypeName = separator > 0
+            ? normalizedOldClassName[(separator + 1)..]
+            : normalizedOldClassName;
+        var targetTypeName = CreateProjectExplorerTypeName(
+            System.IO.Path.GetFileNameWithoutExtension(targetAxamlPath));
+        var normalizedTargetClassName = string.IsNullOrWhiteSpace(namespaceName)
+            ? targetTypeName
+            : $"{namespaceName}.{targetTypeName}";
+        if (string.Equals(
+                normalizedOldClassName,
+                normalizedTargetClassName,
+                StringComparison.Ordinal))
+        {
+            error = "Choose a different file name so the duplicate gets a different x:Class.";
+            return false;
+        }
+
+        var classAttributePattern = $@"(?<prefix>[\w.-]+:Class\s*=\s*)(?<quote>[""']){Regex.Escape(normalizedOldClassName)}\k<quote>";
+        if (!Regex.IsMatch(sourceAxaml, classAttributePattern))
+        {
+            error = "The source AXAML x:Class attribute could not be located.";
+            return false;
+        }
+
+        targetAxaml = new Regex(classAttributePattern).Replace(
+            sourceAxaml,
+            match => match.Groups["prefix"].Value + $"\"{normalizedTargetClassName}\"",
+            count: 1);
+
+        var classPattern = $"(?<prefix>\\bpartial\\s+class\\s+){Regex.Escape(oldTypeName)}\\b";
+        if (!Regex.IsMatch(sourceCodeBehind, classPattern))
+        {
+            error = $"The paired code-behind class '{oldTypeName}' could not be identified.";
+            return false;
+        }
+
+        targetCodeBehind = new Regex(classPattern).Replace(
+            sourceCodeBehind,
+            match => match.Groups["prefix"].Value + targetTypeName,
+            count: 1);
+        var constructorPattern = $"\\bpublic\\s+{Regex.Escape(oldTypeName)}\\s*\\(";
+        if (Regex.IsMatch(targetCodeBehind, constructorPattern))
+        {
+            targetCodeBehind = Regex.Replace(
+                targetCodeBehind,
+                constructorPattern,
+                $"public {targetTypeName}(");
+        }
+        return true;
+    }
+
+    private static string CreateProjectExplorerTypeName(string? fileName)
+    {
+        var typeName = string.Concat((fileName ?? string.Empty).Select(character =>
+            char.IsLetterOrDigit(character) || character == '_'
+                ? character
+                : '_'));
+        if (typeName.Length == 0)
+        {
+            typeName = "View";
+        }
+
+        if (!char.IsLetter(typeName[0]) && typeName[0] != '_')
+        {
+            typeName = "_" + typeName;
+        }
+
+        return typeName;
     }
 
     private static string? GetProjectExplorerRenameFilePath(
@@ -2569,7 +2705,8 @@ public partial class MainWindow : Window
                 null,
                 node.Depth,
                 children,
-                isExpanded: true);
+                isExpanded: true,
+                hasCodeBehind: node.HasCodeBehind);
     }
 
     private static List<ProjectExplorerNode> SortProjectExplorerNodes(
@@ -2583,7 +2720,8 @@ public partial class MainWindow : Window
                 node.FullPath,
                 node.Depth,
                 SortProjectExplorerNodes(node.Children),
-                node.IsExpanded))
+                node.IsExpanded,
+                node.HasCodeBehind))
             .ToList();
 
     private static List<ProjectExplorerNode> FlattenProjectExplorerTree(
@@ -2652,6 +2790,12 @@ public partial class MainWindow : Window
                             Text = pathText,
                             Foreground = Brush.Parse("#94A3B8"),
                             TextTrimming = TextTrimming.CharacterEllipsis,
+                        },
+                        new TextBlock
+                        {
+                            Text = node.HasCodeBehind ? "paired" : string.Empty,
+                            Foreground = Brush.Parse("#86EFAC"),
+                            IsVisible = node.HasCodeBehind,
                         },
                     },
                 },
@@ -3260,9 +3404,16 @@ public partial class MainWindow : Window
                     return;
                 }
 
-                if (File.Exists(path))
+                if (File.Exists(path) || File.Exists(GetDocumentBackupPath(path)))
                 {
-                    errorText.Text = $"A file named {System.IO.Path.GetFileName(path)} already exists.";
+                    errorText.Text = $"A file or backup named {System.IO.Path.GetFileName(path)} already exists.";
+                    return;
+                }
+
+                var pairedPath = GetProjectExplorerCodeBehindPath(path);
+                if (File.Exists(pairedPath) || Directory.Exists(pairedPath))
+                {
+                    errorText.Text = $"The paired file {System.IO.Path.GetFileName(pairedPath)} already exists.";
                     return;
                 }
 
@@ -3336,28 +3487,62 @@ public partial class MainWindow : Window
                 return;
             }
 
+            var oldCodeBehindPath = GetProjectExplorerCodeBehindPath(currentPath);
+            var newCodeBehindPath = GetProjectExplorerCodeBehindPath(newPath);
+            var sourceCodeBehindExists = File.Exists(oldCodeBehindPath);
+            var sourceMoved = false;
+            var backupMoved = false;
+            var codeBehindMoved = false;
+            var oldBackupPath = GetDocumentBackupPath(currentPath);
+            var newBackupPath = GetDocumentBackupPath(newPath);
             try
             {
                 File.Move(currentPath, newPath);
-            }
-            catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
-            {
-                Vm.StatusText = $"Could not rename {System.IO.Path.GetFileName(currentPath)}: {exception.Message}";
-                return;
-            }
-
-            try
-            {
-                var oldBackupPath = GetDocumentBackupPath(currentPath);
-                var newBackupPath = GetDocumentBackupPath(newPath);
-                if (File.Exists(oldBackupPath) && !File.Exists(newBackupPath))
+                sourceMoved = true;
+                if (File.Exists(oldBackupPath))
                 {
                     File.Move(oldBackupPath, newBackupPath);
+                    backupMoved = true;
+                }
+
+                if (sourceCodeBehindExists)
+                {
+                    File.Move(oldCodeBehindPath, newCodeBehindPath);
+                    codeBehindMoved = true;
                 }
             }
-            catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+            catch (Exception exception) when (exception is IOException
+                or UnauthorizedAccessException
+                or ArgumentException
+                or NotSupportedException)
             {
-                // Renaming the source file is complete; an old backup can be regenerated on save.
+                try
+                {
+                    if (codeBehindMoved && File.Exists(newCodeBehindPath) && !File.Exists(oldCodeBehindPath))
+                    {
+                        File.Move(newCodeBehindPath, oldCodeBehindPath);
+                    }
+
+                    if (backupMoved && File.Exists(newBackupPath) && !File.Exists(oldBackupPath))
+                    {
+                        File.Move(newBackupPath, oldBackupPath);
+                    }
+
+                    if (sourceMoved && File.Exists(newPath) && !File.Exists(currentPath))
+                    {
+                        File.Move(newPath, currentPath);
+                    }
+                }
+                catch (Exception rollbackException) when (rollbackException is IOException
+                    or UnauthorizedAccessException
+                    or ArgumentException
+                    or NotSupportedException)
+                {
+                    // Preserve the original rename failure if rollback is also blocked.
+                }
+
+                Vm.StatusText = $"Could not rename {System.IO.Path.GetFileName(currentPath)}: {exception.Message}";
+                return;
             }
 
             Vm.UpdateDocumentPathAfterRename(currentPath, newPath);
@@ -3372,7 +3557,9 @@ public partial class MainWindow : Window
                     newPath)
                 .Replace(System.IO.Path.DirectorySeparatorChar, '/');
             RefreshProjectTree(relativePath);
-            Vm.StatusText = $"Renamed {System.IO.Path.GetFileName(currentPath)} to {System.IO.Path.GetFileName(newPath)}.";
+            Vm.StatusText = sourceCodeBehindExists
+                ? $"Renamed {System.IO.Path.GetFileName(currentPath)} and its paired code-behind."
+                : $"Renamed {System.IO.Path.GetFileName(currentPath)} to {System.IO.Path.GetFileName(newPath)}.";
         }
 
         async Task<string?> ShowMoveProjectExplorerFileDialogAsync(
@@ -3450,6 +3637,13 @@ public partial class MainWindow : Window
                 if (File.Exists(path) || File.Exists(GetDocumentBackupPath(path)))
                 {
                     errorText.Text = $"A file or backup named {System.IO.Path.GetFileName(path)} already exists in that folder.";
+                    return;
+                }
+
+                var pairedPath = GetProjectExplorerCodeBehindPath(path);
+                if (File.Exists(pairedPath) || Directory.Exists(pairedPath))
+                {
+                    errorText.Text = $"The paired file {System.IO.Path.GetFileName(pairedPath)} already exists in that folder.";
                     return;
                 }
 
@@ -3587,7 +3781,11 @@ public partial class MainWindow : Window
                     return;
                 }
 
-                if (File.Exists(newPath) || File.Exists(GetDocumentBackupPath(newPath)))
+                if (File.Exists(newPath)
+                    || File.Exists(GetDocumentBackupPath(newPath))
+                    || (node.HasCodeBehind
+                        && (File.Exists(GetProjectExplorerCodeBehindPath(newPath))
+                            || Directory.Exists(GetProjectExplorerCodeBehindPath(newPath)))))
                 {
                     Vm.StatusText = $"A file or backup named {System.IO.Path.GetFileName(newPath)} already exists in that folder.";
                     return;
@@ -3600,6 +3798,10 @@ public partial class MainWindow : Window
 
             var sourceMoved = false;
             var backupMoved = false;
+            var codeBehindMoved = false;
+            var oldCodeBehindPath = GetProjectExplorerCodeBehindPath(currentPath);
+            var newCodeBehindPath = GetProjectExplorerCodeBehindPath(newPath);
+            var sourceCodeBehindExists = File.Exists(oldCodeBehindPath);
             var oldBackupPath = GetDocumentBackupPath(currentPath);
             var newBackupPath = GetDocumentBackupPath(newPath);
             try
@@ -3611,11 +3813,25 @@ public partial class MainWindow : Window
                     File.Move(oldBackupPath, newBackupPath);
                     backupMoved = true;
                 }
+
+                if (sourceCodeBehindExists)
+                {
+                    File.Move(oldCodeBehindPath, newCodeBehindPath);
+                    codeBehindMoved = true;
+                }
             }
-            catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+            catch (Exception exception) when (exception is IOException
+                or UnauthorizedAccessException
+                or ArgumentException
+                or NotSupportedException)
             {
                 try
                 {
+                    if (codeBehindMoved && File.Exists(newCodeBehindPath) && !File.Exists(oldCodeBehindPath))
+                    {
+                        File.Move(newCodeBehindPath, oldCodeBehindPath);
+                    }
+
                     if (backupMoved && File.Exists(newBackupPath) && !File.Exists(oldBackupPath))
                     {
                         File.Move(newBackupPath, oldBackupPath);
@@ -3626,7 +3842,10 @@ public partial class MainWindow : Window
                         File.Move(newPath, currentPath);
                     }
                 }
-                catch (Exception rollbackException) when (rollbackException is IOException or UnauthorizedAccessException)
+                catch (Exception rollbackException) when (rollbackException is IOException
+                    or UnauthorizedAccessException
+                    or ArgumentException
+                    or NotSupportedException)
                 {
                     // Preserve the failure status if a concurrent file operation prevents rollback.
                 }
@@ -3658,6 +3877,9 @@ public partial class MainWindow : Window
             }
 
             RefreshProjectTree(relativePath);
+            Vm.StatusText = sourceCodeBehindExists
+                ? $"Moved {System.IO.Path.GetFileName(currentPath)} and its paired code-behind."
+                : $"Moved {System.IO.Path.GetFileName(currentPath)}.";
             dialog.Close(newPath);
         }
 
@@ -3713,6 +3935,13 @@ public partial class MainWindow : Window
                     return;
                 }
 
+                var pairedPath = GetProjectExplorerCodeBehindPath(path);
+                if (File.Exists(pairedPath) || Directory.Exists(pairedPath))
+                {
+                    errorText.Text = $"The paired file {System.IO.Path.GetFileName(pairedPath)} already exists.";
+                    return;
+                }
+
                 duplicateDialog.Close(path);
             }
 
@@ -3747,7 +3976,7 @@ public partial class MainWindow : Window
                     nameEditor,
                     new TextBlock
                     {
-                        Text = "The AXAML file and its recovery backup will be copied.",
+                        Text = "The AXAML file and its recovery backup will be copied. A paired code-behind gets a new x:Class.",
                         Foreground = Brush.Parse("#64748B"),
                         TextWrapping = TextWrapping.Wrap,
                     },
@@ -3831,11 +4060,38 @@ public partial class MainWindow : Window
                 return;
             }
 
+            var oldCodeBehindPath = GetProjectExplorerCodeBehindPath(currentPath);
+            var newCodeBehindPath = GetProjectExplorerCodeBehindPath(newPath);
+            var sourceCodeBehindExists = File.Exists(oldCodeBehindPath);
+            var targetAxaml = string.Empty;
+            var targetCodeBehind = string.Empty;
+            if (sourceCodeBehindExists
+                && !TryPrepareProjectExplorerDuplicate(
+                    currentPath,
+                    newPath,
+                    oldCodeBehindPath,
+                    out targetAxaml,
+                    out targetCodeBehind,
+                    out var duplicateError))
+            {
+                Vm.StatusText = $"Could not prepare the paired duplicate: {duplicateError}";
+                return;
+            }
+
             var sourceCopied = false;
             var backupCopied = false;
+            var codeBehindCopied = false;
             try
             {
-                File.Copy(currentPath, newPath);
+                if (sourceCodeBehindExists)
+                {
+                    await AtomicFileWriter.WriteAllTextAsync(newPath, targetAxaml);
+                }
+                else
+                {
+                    File.Copy(currentPath, newPath);
+                }
+
                 sourceCopied = true;
                 var oldBackupPath = GetDocumentBackupPath(currentPath);
                 var newBackupPath = GetDocumentBackupPath(newPath);
@@ -3844,11 +4100,25 @@ public partial class MainWindow : Window
                     File.Copy(oldBackupPath, newBackupPath);
                     backupCopied = true;
                 }
+
+                if (sourceCodeBehindExists)
+                {
+                    await AtomicFileWriter.WriteAllTextAsync(newCodeBehindPath, targetCodeBehind);
+                    codeBehindCopied = true;
+                }
             }
-            catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+            catch (Exception exception) when (exception is IOException
+                or UnauthorizedAccessException
+                or ArgumentException
+                or NotSupportedException)
             {
                 try
                 {
+                    if (codeBehindCopied && File.Exists(newCodeBehindPath))
+                    {
+                        File.Delete(newCodeBehindPath);
+                    }
+
                     if (sourceCopied && File.Exists(newPath))
                     {
                         File.Delete(newPath);
@@ -3860,7 +4130,10 @@ public partial class MainWindow : Window
                         File.Delete(newBackupPath);
                     }
                 }
-                catch (Exception cleanupException) when (cleanupException is IOException or UnauthorizedAccessException)
+                catch (Exception cleanupException) when (cleanupException is IOException
+                    or UnauthorizedAccessException
+                    or ArgumentException
+                    or NotSupportedException)
                 {
                     // A partial duplicate is best-effort cleanup; the original remains untouched.
                 }
@@ -3892,6 +4165,9 @@ public partial class MainWindow : Window
             }
 
             RefreshProjectTree(relativePath);
+            Vm.StatusText = sourceCodeBehindExists
+                ? $"Duplicated {System.IO.Path.GetFileName(currentPath)} with a new paired code-behind class."
+                : $"Duplicated {System.IO.Path.GetFileName(currentPath)}.";
             dialog.Close(newPath);
         }
 
@@ -4206,9 +4482,14 @@ public partial class MainWindow : Window
             };
             var deleteButton = new Button { Content = "Delete", MinWidth = 86 };
             var cancelButton = new Button { Content = "Cancel", MinWidth = 86 };
+            var hasCodeBehind = File.Exists(GetProjectExplorerCodeBehindPath(currentPath));
             var message = openTabCount > 0
                 ? $"Delete {System.IO.Path.GetFileName(currentPath)}? {openTabCount} open document tab(s) will be closed."
                 : $"Delete {System.IO.Path.GetFileName(currentPath)} permanently?";
+            if (hasCodeBehind)
+            {
+                message += " Its paired code-behind will also be removed.";
+            }
 
             deleteButton.Click += (_, _) => deleteDialog.Close(true);
             cancelButton.Click += (_, _) => deleteDialog.Close(false);
@@ -4225,7 +4506,9 @@ public partial class MainWindow : Window
                     },
                     new TextBlock
                     {
-                        Text = "The file and its recovery backup will be removed.",
+                        Text = hasCodeBehind
+                            ? "The AXAML file, paired code-behind, and recovery backup will be removed."
+                            : "The file and its recovery backup will be removed.",
                         Foreground = Brush.Parse("#64748B"),
                         TextWrapping = TextWrapping.Wrap,
                     },
@@ -4305,12 +4588,65 @@ public partial class MainWindow : Window
                 return;
             }
 
+            var codeBehindPath = GetProjectExplorerCodeBehindPath(currentPath);
+            var hasCodeBehind = File.Exists(codeBehindPath);
+            string sourceContent;
+            string? codeBehindContent = null;
             try
             {
-                File.Delete(currentPath);
+                sourceContent = File.ReadAllText(currentPath);
+                if (hasCodeBehind)
+                {
+                    codeBehindContent = File.ReadAllText(codeBehindPath);
+                }
             }
-            catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+            catch (Exception exception) when (exception is IOException
+                or UnauthorizedAccessException
+                or ArgumentException
+                or NotSupportedException)
             {
+                Vm.StatusText = $"Could not read {System.IO.Path.GetFileName(currentPath)} before deletion: {exception.Message}";
+                return;
+            }
+
+            var sourceDeleted = false;
+            var codeBehindDeleted = false;
+            try
+            {
+                if (hasCodeBehind)
+                {
+                    File.Delete(codeBehindPath);
+                    codeBehindDeleted = true;
+                }
+
+                File.Delete(currentPath);
+                sourceDeleted = true;
+            }
+            catch (Exception exception) when (exception is IOException
+                or UnauthorizedAccessException
+                or ArgumentException
+                or NotSupportedException)
+            {
+                try
+                {
+                    if (sourceDeleted && !File.Exists(currentPath))
+                    {
+                        await AtomicFileWriter.WriteAllTextAsync(currentPath, sourceContent);
+                    }
+
+                    if (codeBehindDeleted && codeBehindContent is not null && !File.Exists(codeBehindPath))
+                    {
+                        await AtomicFileWriter.WriteAllTextAsync(codeBehindPath, codeBehindContent);
+                    }
+                }
+                catch (Exception rollbackException) when (rollbackException is IOException
+                    or UnauthorizedAccessException
+                    or ArgumentException
+                    or NotSupportedException)
+                {
+                    // Preserve the original deletion failure if rollback is also blocked.
+                }
+
                 Vm.StatusText = $"Could not delete {System.IO.Path.GetFileName(currentPath)}: {exception.Message}";
                 return;
             }
@@ -4333,7 +4669,9 @@ public partial class MainWindow : Window
             }
 
             RefreshProjectTree();
-            Vm.StatusText = $"Deleted {System.IO.Path.GetFileName(currentPath)}.";
+            Vm.StatusText = hasCodeBehind
+                ? $"Deleted {System.IO.Path.GetFileName(currentPath)} and its paired code-behind."
+                : $"Deleted {System.IO.Path.GetFileName(currentPath)}.";
         }
 
         void MoveSelection(int offset)
@@ -4467,7 +4805,10 @@ public partial class MainWindow : Window
                         sourceNode.FullPath,
                         StringComparison.OrdinalIgnoreCase)
                     || File.Exists(newPath)
-                    || File.Exists(GetDocumentBackupPath(newPath)))
+                    || File.Exists(GetDocumentBackupPath(newPath))
+                    || (sourceNode.HasCodeBehind
+                        && (File.Exists(GetProjectExplorerCodeBehindPath(newPath))
+                            || Directory.Exists(GetProjectExplorerCodeBehindPath(newPath)))))
                 {
                     e.DragEffects = DragDropEffects.None;
                     e.Handled = true;
@@ -4530,7 +4871,10 @@ public partial class MainWindow : Window
                         sourceNode.FullPath,
                         StringComparison.OrdinalIgnoreCase)
                     || File.Exists(newPath)
-                    || File.Exists(GetDocumentBackupPath(newPath)))
+                    || File.Exists(GetDocumentBackupPath(newPath))
+                    || (sourceNode.HasCodeBehind
+                        && (File.Exists(GetProjectExplorerCodeBehindPath(newPath))
+                            || Directory.Exists(GetProjectExplorerCodeBehindPath(newPath)))))
                 {
                     e.DragEffects = DragDropEffects.None;
                     e.Handled = true;

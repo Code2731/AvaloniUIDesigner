@@ -84,8 +84,13 @@ public sealed record ProjectWorkspaceFile(
 
     public string Extension => IsDirectory ? string.Empty : Path.GetExtension(FullPath);
 
+    public bool HasCodeBehind
+        => !IsDirectory && File.Exists(FullPath + ".cs");
+
     public override string ToString()
-        => $"{DisplayName} - {RelativePath}";
+        => HasCodeBehind
+            ? $"{DisplayName} - {RelativePath} [paired]"
+            : $"{DisplayName} - {RelativePath}";
 }
 
 public sealed record ProjectWorkspaceFolder(string FullPath, string RelativePath)
@@ -15989,7 +15994,9 @@ public partial class MainWindowViewModel : ViewModelBase
         var folders = EnumerateProjectWorkspaceFolders(rootPath);
         var filesUnchanged = ProjectFiles.Select(file => file.FullPath).SequenceEqual(
             files.Select(file => file.FullPath),
-            StringComparer.OrdinalIgnoreCase);
+            StringComparer.OrdinalIgnoreCase)
+            && ProjectFiles.Select(file => file.HasCodeBehind).SequenceEqual(
+                files.Select(file => file.HasCodeBehind));
         var foldersUnchanged = ProjectWorkspaceFolders.Select(folder => folder.FullPath).SequenceEqual(
             folders.Select(folder => folder.FullPath),
             StringComparer.OrdinalIgnoreCase);
