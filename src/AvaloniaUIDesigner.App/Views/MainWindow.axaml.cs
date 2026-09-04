@@ -164,6 +164,7 @@ public partial class MainWindow : Window
         Project Explorer double-click  Open files or toggle folders
         Project Explorer Ctrl+N  Create a new AXAML file from a UserControl or Window template
         Project Explorer Ctrl+Shift+N  Create a new folder
+        Project Explorer Ctrl+Shift+D  Duplicate the selected AXAML file
         Project Explorer F2  Rename the selected AXAML file and keep open tabs linked
         Project Explorer folder F2  Rename the selected folder and keep open tabs linked
         Project Explorer Delete  Delete the selected AXAML file after dirty protection
@@ -1470,6 +1471,40 @@ public partial class MainWindow : Window
         }
     }
 
+    private static string? GetProjectExplorerDuplicateFilePath(
+        ProjectExplorerNode? node,
+        string? fileName,
+        string? workspacePath)
+    {
+        if (node is not { IsFile: true })
+        {
+            return null;
+        }
+
+        var currentPath = GetProjectExplorerClipboardPath(
+            node,
+            workspacePath,
+            fullPath: true);
+        if (string.IsNullOrWhiteSpace(currentPath))
+        {
+            return null;
+        }
+
+        try
+        {
+            var fullCurrentPath = System.IO.Path.GetFullPath(currentPath);
+            return File.Exists(fullCurrentPath)
+                ? GetProjectExplorerNewFilePath(
+                    fileName,
+                    System.IO.Path.GetDirectoryName(fullCurrentPath))
+                : null;
+        }
+        catch (ArgumentException)
+        {
+            return null;
+        }
+    }
+
     private static string? GetProjectExplorerDeleteFilePath(
         ProjectExplorerNode? node,
         string? workspacePath)
@@ -2351,6 +2386,240 @@ public partial class MainWindow : Window
             Vm.StatusText = $"Renamed {System.IO.Path.GetFileName(currentPath)} to {System.IO.Path.GetFileName(newPath)}.";
         }
 
+        async Task<string?> ShowDuplicateProjectExplorerFileDialogAsync(
+            ProjectExplorerNode node,
+            string currentPath)
+        {
+            var duplicateDialog = new Window
+            {
+                Title = "Duplicate AXAML File",
+                Width = 460,
+                Height = 220,
+                MinWidth = 380,
+                MinHeight = 200,
+                CanResize = false,
+                WindowStartupLocation = WindowStartupLocation.CenterOwner,
+            };
+            var nameEditor = new TextBox
+            {
+                Text = $"{System.IO.Path.GetFileNameWithoutExtension(currentPath)}Copy{System.IO.Path.GetExtension(currentPath)}",
+                Watermark = "File name (.axaml or .xaml)",
+                MinWidth = 340,
+            };
+            var errorText = new TextBlock
+            {
+                Foreground = Brush.Parse("#B91C1C"),
+                TextWrapping = TextWrapping.Wrap,
+            };
+            var duplicateButton = new Button { Content = "Duplicate", MinWidth = 86 };
+            var cancelButton = new Button { Content = "Cancel", MinWidth = 86 };
+
+            void DuplicateFile()
+            {
+                var path = GetProjectExplorerDuplicateFilePath(
+                    node,
+                    nameEditor.Text,
+                    Vm.ProjectWorkspacePath);
+                if (path is null)
+                {
+                    errorText.Text = "Use a file name with an .axaml or .xaml extension, without folders.";
+                    return;
+                }
+
+                if (string.Equals(path, currentPath, StringComparison.OrdinalIgnoreCase))
+                {
+                    errorText.Text = "Choose a different file name for the duplicate.";
+                    return;
+                }
+
+                if (File.Exists(path) || File.Exists(GetDocumentBackupPath(path)))
+                {
+                    errorText.Text = $"A file or backup named {System.IO.Path.GetFileName(path)} already exists.";
+                    return;
+                }
+
+                duplicateDialog.Close(path);
+            }
+
+            duplicateButton.Click += (_, _) => DuplicateFile();
+            cancelButton.Click += (_, _) => duplicateDialog.Close(null);
+            nameEditor.KeyDown += (_, e) =>
+            {
+                if (e.Key == Key.Enter)
+                {
+                    DuplicateFile();
+                    e.Handled = true;
+                }
+                else if (e.Key == Key.Escape)
+                {
+                    duplicateDialog.Close(null);
+                    e.Handled = true;
+                }
+            };
+            duplicateDialog.Opened += (_, _) =>
+            {
+                nameEditor.Focus();
+                nameEditor.SelectAll();
+            };
+
+            duplicateDialog.Content = new StackPanel
+            {
+                Margin = new Thickness(16),
+                Spacing = 10,
+                Children =
+                {
+                    new TextBlock { Text = $"Duplicate {System.IO.Path.GetFileName(currentPath)}." },
+                    nameEditor,
+                    new TextBlock
+                    {
+                        Text = "The AXAML file and its recovery backup will be copied.",
+                        Foreground = Brush.Parse("#64748B"),
+                        TextWrapping = TextWrapping.Wrap,
+                    },
+                    errorText,
+                    new StackPanel
+                    {
+                        Orientation = Orientation.Horizontal,
+                        HorizontalAlignment = HorizontalAlignment.Right,
+                        Spacing = 8,
+                        Children = { cancelButton, duplicateButton },
+                    },
+                },
+            };
+
+            return await duplicateDialog.ShowDialog<string?>(dialog);
+        }
+
+        async Task<bool> EnsureDuplicateProjectExplorerSourceReadyAsync(string currentPath)
+        {
+            var originalTab = Vm.SelectedDocumentTab;
+            var dirtyTabs = Vm.DocumentTabs
+                .Where(tab => string.Equals(
+                    tab.DocumentPath,
+                    currentPath,
+                    StringComparison.OrdinalIgnoreCase))
+                .Where(Vm.IsDocumentTabDirty)
+                .ToList();
+            foreach (var tab in dirtyTabs)
+            {
+                if (!ReferenceEquals(Vm.SelectedDocumentTab, tab))
+                {
+                    Vm.ActivateDocumentTab(tab);
+                }
+
+                FlushPendingPropertyHistory();
+                if (!await EnsureCanContinueWithUnsavedChangesAsync())
+                {
+                    if (originalTab is not null)
+                    {
+                        RestoreDocumentTabIfPresent(originalTab);
+                    }
+
+                    return false;
+                }
+            }
+
+            if (originalTab is not null)
+            {
+                RestoreDocumentTabIfPresent(originalTab);
+            }
+
+            return true;
+        }
+
+        async Task DuplicateProjectExplorerFileAsync()
+        {
+            if (list.SelectedItem is not ProjectExplorerNode { IsFile: true } node)
+            {
+                Vm.StatusText = "Select an AXAML file to duplicate.";
+                return;
+            }
+
+            var currentPath = GetProjectExplorerClipboardPath(
+                node,
+                Vm.ProjectWorkspacePath,
+                fullPath: true);
+            if (string.IsNullOrWhiteSpace(currentPath) || !File.Exists(currentPath))
+            {
+                Vm.StatusText = "The selected Project Explorer file is unavailable.";
+                return;
+            }
+
+            if (!await EnsureDuplicateProjectExplorerSourceReadyAsync(currentPath))
+            {
+                return;
+            }
+
+            var newPath = await ShowDuplicateProjectExplorerFileDialogAsync(node, currentPath);
+            if (string.IsNullOrWhiteSpace(newPath))
+            {
+                return;
+            }
+
+            var sourceCopied = false;
+            var backupCopied = false;
+            try
+            {
+                File.Copy(currentPath, newPath);
+                sourceCopied = true;
+                var oldBackupPath = GetDocumentBackupPath(currentPath);
+                var newBackupPath = GetDocumentBackupPath(newPath);
+                if (File.Exists(oldBackupPath))
+                {
+                    File.Copy(oldBackupPath, newBackupPath);
+                    backupCopied = true;
+                }
+            }
+            catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+            {
+                try
+                {
+                    if (sourceCopied && File.Exists(newPath))
+                    {
+                        File.Delete(newPath);
+                    }
+
+                    var newBackupPath = GetDocumentBackupPath(newPath);
+                    if (backupCopied && File.Exists(newBackupPath))
+                    {
+                        File.Delete(newBackupPath);
+                    }
+                }
+                catch (Exception cleanupException) when (cleanupException is IOException or UnauthorizedAccessException)
+                {
+                    // A partial duplicate is best-effort cleanup; the original remains untouched.
+                }
+
+                Vm.StatusText = $"Could not duplicate {System.IO.Path.GetFileName(currentPath)}: {exception.Message}";
+                return;
+            }
+
+            if (!Vm.RefreshProjectWorkspace(out var refreshError))
+            {
+                RefreshProjectTree();
+                Vm.StatusText = $"Duplicated the file, but could not refresh Project Explorer: {refreshError}";
+                return;
+            }
+
+            string relativePath;
+            try
+            {
+                relativePath = System.IO.Path.GetRelativePath(
+                        Vm.ProjectWorkspacePath!,
+                        newPath)
+                    .Replace(System.IO.Path.DirectorySeparatorChar, '/');
+            }
+            catch (ArgumentException)
+            {
+                RefreshProjectTree();
+                Vm.StatusText = $"Duplicated {System.IO.Path.GetFileName(currentPath)}.";
+                return;
+            }
+
+            RefreshProjectTree(relativePath);
+            dialog.Close(newPath);
+        }
+
         async Task<string?> ShowRenameProjectExplorerFolderDialogAsync(
             ProjectExplorerNode node,
             string currentPath)
@@ -2854,6 +3123,11 @@ public partial class MainWindow : Window
         var openButton = new Button { Content = "Open", MinWidth = 86 };
         var newFileMenu = new MenuItem { Header = "New AXAML File..." };
         var newFolderMenu = new MenuItem { Header = "New Folder..." };
+        var duplicateFileMenu = new MenuItem
+        {
+            Header = "Duplicate AXAML File...",
+            IsEnabled = false,
+        };
         var renameFileMenu = new MenuItem
         {
             Header = "Rename AXAML File...",
@@ -2882,6 +3156,7 @@ public partial class MainWindow : Window
         list.DoubleTapped += (_, _) => SelectCurrent();
         newFileMenu.Click += async (_, _) => await CreateNewProjectExplorerFileAsync();
         newFolderMenu.Click += async (_, _) => await CreateNewProjectExplorerFolderAsync();
+        duplicateFileMenu.Click += async (_, _) => await DuplicateProjectExplorerFileAsync();
         renameFileMenu.Click += async (_, _) => await RenameProjectExplorerFileAsync();
         renameFolderMenu.Click += async (_, _) => await RenameProjectExplorerFolderAsync();
         deleteFileMenu.Click += async (_, _) => await DeleteProjectExplorerFileAsync();
@@ -2895,6 +3170,7 @@ public partial class MainWindow : Window
             {
                 newFileMenu,
                 newFolderMenu,
+                duplicateFileMenu,
                 renameFileMenu,
                 renameFolderMenu,
                 deleteFileMenu,
@@ -2909,6 +3185,7 @@ public partial class MainWindow : Window
         {
             var hasSelectedFile = list.SelectedItem is ProjectExplorerNode { IsFile: true };
             var hasSelectedFolder = list.SelectedItem is ProjectExplorerNode { IsFile: false };
+            duplicateFileMenu.IsEnabled = hasSelectedFile;
             renameFileMenu.IsEnabled = hasSelectedFile;
             renameFolderMenu.IsEnabled = hasSelectedFolder;
             deleteFileMenu.IsEnabled = hasSelectedFile;
@@ -2917,7 +3194,14 @@ public partial class MainWindow : Window
         list.ContextMenu = projectExplorerContextMenu;
         list.KeyDown += async (_, e) =>
         {
-            if (e.Key == Key.N
+            if (e.Key == Key.D
+                && e.KeyModifiers.HasFlag(KeyModifiers.Control)
+                && e.KeyModifiers.HasFlag(KeyModifiers.Shift))
+            {
+                await DuplicateProjectExplorerFileAsync();
+                e.Handled = true;
+            }
+            else if (e.Key == Key.N
                 && e.KeyModifiers.HasFlag(KeyModifiers.Control)
                 && e.KeyModifiers.HasFlag(KeyModifiers.Shift))
             {
@@ -3046,7 +3330,7 @@ public partial class MainWindow : Window
             {
                 new TextBlock
                 {
-                    Text = "Browse the project tree. Double-click an AXAML file to open it; press Enter on a folder or double-click a folder to expand or collapse it, use Ctrl+N or the context menu to create a new AXAML file from a UserControl or Window template, Ctrl+Shift+N or the context menu to create a new folder, F2 or the context menu to rename the selected AXAML file or folder, Delete or Backspace to remove a file after dirty protection or an empty folder after confirmation, Ctrl+C to copy the selected full path, or the context menu to open its location in the file manager.",
+                    Text = "Browse the project tree. Double-click an AXAML file to open it; press Enter on a folder or double-click a folder to expand or collapse it, use Ctrl+N or the context menu to create a new AXAML file from a UserControl or Window template, Ctrl+Shift+N or the context menu to create a new folder, Ctrl+Shift+D or the context menu to duplicate the selected AXAML file, F2 or the context menu to rename the selected AXAML file or folder, Delete or Backspace to remove a file after dirty protection or an empty folder after confirmation, Ctrl+C to copy the selected full path, or the context menu to open its location in the file manager.",
                     TextWrapping = TextWrapping.Wrap,
                 },
                 rootText,
