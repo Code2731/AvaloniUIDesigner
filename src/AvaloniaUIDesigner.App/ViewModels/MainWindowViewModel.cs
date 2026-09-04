@@ -29,6 +29,12 @@ namespace AvaloniaUIDesigner.App.ViewModels;
 
 public sealed record StylePreviewOption(string DisplayName, string? PseudoClass);
 
+public enum ProjectBuildConfiguration
+{
+    Debug,
+    Release,
+}
+
 public sealed record HistoryTimelineEntry(
     string Label,
     bool IsCurrent,
@@ -664,6 +670,7 @@ public partial class MainWindowViewModel : ViewModelBase
     private DocumentTabViewModel? _selectedDocumentTab;
     private WorkspacePanelState _workspacePanelState = WorkspacePanelState.Default;
     private string? _projectWorkspacePath;
+    private ProjectBuildConfiguration _projectBuildConfiguration = ProjectBuildConfiguration.Debug;
     private readonly HashSet<string> _projectWorkspaceCollapsedFolders = new(StringComparer.OrdinalIgnoreCase);
     private readonly HashSet<string> _externalDocumentChangePaths = new(StringComparer.OrdinalIgnoreCase);
 
@@ -756,6 +763,7 @@ public partial class MainWindowViewModel : ViewModelBase
         ? "No project folder"
         : GetProjectWorkspaceName(_projectWorkspacePath);
     public bool HasProjectWorkspace => !string.IsNullOrWhiteSpace(_projectWorkspacePath);
+    public ProjectBuildConfiguration ProjectBuildConfiguration => _projectBuildConfiguration;
     public IReadOnlyCollection<string> ProjectWorkspaceCollapsedFolders
         => _projectWorkspaceCollapsedFolders;
     public bool HasExternalDocumentChanges => GetExternalDocumentChanges().Count > 0;
@@ -763,6 +771,17 @@ public partial class MainWindowViewModel : ViewModelBase
         => GetExternalDocumentChanges();
     public bool CanReloadCurrentFile
         => IsExternalDocumentChangePending(CurrentDocumentPath);
+
+    public void SetProjectBuildConfiguration(ProjectBuildConfiguration configuration)
+    {
+        if (_projectBuildConfiguration == configuration)
+        {
+            return;
+        }
+
+        _projectBuildConfiguration = configuration;
+        OnPropertyChanged(nameof(ProjectBuildConfiguration));
+    }
 
     public PropertyInspectorState GetPropertyInspectorState()
     {
@@ -9976,7 +9995,8 @@ public partial class MainWindowViewModel : ViewModelBase
                     _workspacePanelState.ProjectExplorerWidth,
                     _workspacePanelState.ProjectExplorerHeight),
                 closedTabs,
-                recentTabIndexes),
+                recentTabIndexes,
+                ProjectBuildConfiguration.ToString()),
             new JsonSerializerOptions { WriteIndented = true });
     }
 
@@ -10061,6 +10081,9 @@ public partial class MainWindowViewModel : ViewModelBase
             : WorkspacePanelState.Default;
 
         ClearDocumentTabsForSessionRestore();
+        _projectBuildConfiguration = ParseProjectBuildConfiguration(
+            session.ProjectBuildConfiguration);
+        OnPropertyChanged(nameof(ProjectBuildConfiguration));
         _workspacePanelState = workspacePanelState;
         foreach (var restoredDocument in restoredDocuments.Concat(restoredClosedDocuments))
         {
@@ -10127,6 +10150,12 @@ public partial class MainWindowViewModel : ViewModelBase
         OnPropertyChanged(nameof(ExternalDocumentChanges));
         return true;
     }
+
+    private static ProjectBuildConfiguration ParseProjectBuildConfiguration(string? value)
+        => Enum.TryParse<ProjectBuildConfiguration>(value, ignoreCase: true, out var configuration)
+            && Enum.IsDefined(configuration)
+                ? configuration
+                : ProjectBuildConfiguration.Debug;
 
     private bool HasExternalDocumentChangedSinceSavedSnapshot(
         RestoredDocumentTab restoredDocument,
@@ -19166,7 +19195,8 @@ public partial class MainWindowViewModel : ViewModelBase
         List<string>? RecentToolboxItems = null,
         PersistedWorkspacePanelState? WorkspacePanels = null,
         List<PersistedDocumentTab>? ClosedTabs = null,
-        List<int>? RecentDocumentTabIndexes = null);
+        List<int>? RecentDocumentTabIndexes = null,
+        string? ProjectBuildConfiguration = null);
 
     private sealed record PersistedWorkspacePanelState(
         bool ToolboxVisible = true,

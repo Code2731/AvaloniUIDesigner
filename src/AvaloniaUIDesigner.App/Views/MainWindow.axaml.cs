@@ -176,7 +176,7 @@ public partial class MainWindow : Window
         Project Explorer create paired file  Generate code-behind for an existing Window or UserControl AXAML
         Project Explorer repair pair  Restore AXAML x:Class from an existing code-behind identity
         Project Workspace build  Run dotnet build and inspect compiler output for a project or solution
-        Project build configuration  Choose Debug or Release before running a workspace build
+        Project build configuration  Choose Debug or Release before running a workspace build; the selection is session-persisted
         Project build diagnostics  Double-click a compiler diagnostic to open its AXAML or source file
         Project build dirty choice  Choose Save All & Build or build saved files when designer changes are pending
         Project Explorer Ctrl+Shift+N  Create a new folder
@@ -220,7 +220,6 @@ public partial class MainWindow : Window
     private enum DragMode { None, Move, N, S, E, W, NE, NW, SE, SW }
     private enum UnsavedChoice { Save, Discard, Cancel }
     private enum BuildDirtyDocumentChoice { Cancel, SaveAllAndBuild, BuildSavedFiles }
-    private enum ProjectBuildConfiguration { Debug, Release }
     private enum ExternalChangeResolution
     {
         OpenTab,
@@ -489,7 +488,6 @@ public partial class MainWindow : Window
     private MainWindowViewModel? _boundVm;
     private PreviewWindow? _previewWindow;
     private PreviewThemeMode _previewThemeMode = PreviewThemeMode.Default;
-    private ProjectBuildConfiguration _projectBuildConfiguration = ProjectBuildConfiguration.Debug;
 
     private readonly DispatcherTimer _propertyEditTimer;
     private readonly DispatcherTimer _projectWorkspaceRefreshTimer;
@@ -1030,7 +1028,7 @@ public partial class MainWindow : Window
 
     private void SetProjectBuildConfiguration(ProjectBuildConfiguration configuration)
     {
-        _projectBuildConfiguration = configuration;
+        Vm?.SetProjectBuildConfiguration(configuration);
         UpdateProjectBuildConfigurationMenuStates();
         if (Vm is not null)
         {
@@ -1328,7 +1326,7 @@ public partial class MainWindow : Window
             return;
         }
 
-        var configuration = _projectBuildConfiguration;
+        var configuration = Vm.ProjectBuildConfiguration;
         var dirtyDocumentCount = Vm.DocumentTabs.Count(Vm.IsDocumentTabDirty);
         var savedDocumentCount = 0;
         var buildsSavedFiles = false;
@@ -12453,11 +12451,18 @@ public partial class MainWindow : Window
         }
 
         if (e.PropertyName is nameof(MainWindowViewModel.ProjectWorkspacePath)
+            or nameof(MainWindowViewModel.ProjectBuildConfiguration)
             or nameof(MainWindowViewModel.HasRecentProjectWorkspaces)
             or nameof(MainWindowViewModel.CanReloadCurrentFile)
             or nameof(MainWindowViewModel.HasExternalDocumentChanges))
         {
             UpdateProjectWorkspaceMenuStates();
+            UpdateProjectBuildConfigurationMenuStates();
+        }
+
+        if (e.PropertyName == nameof(MainWindowViewModel.ProjectBuildConfiguration))
+        {
+            ScheduleSessionCheckpoint();
         }
     }
 
@@ -12530,10 +12535,12 @@ public partial class MainWindow : Window
 
     private void UpdateProjectBuildConfigurationMenuStates()
     {
+        var configuration = Vm?.ProjectBuildConfiguration
+            ?? ProjectBuildConfiguration.Debug;
         BuildConfigurationDebugMenu.IsChecked =
-            _projectBuildConfiguration == ProjectBuildConfiguration.Debug;
+            configuration == ProjectBuildConfiguration.Debug;
         BuildConfigurationReleaseMenu.IsChecked =
-            _projectBuildConfiguration == ProjectBuildConfiguration.Release;
+            configuration == ProjectBuildConfiguration.Release;
     }
 
     private void UpdatePreviewThemeMenuStates()
