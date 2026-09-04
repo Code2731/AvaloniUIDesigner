@@ -169,6 +169,7 @@ public partial class MainWindow : Window
         Project Explorer double-click  Open files or toggle folders
         Project Explorer Ctrl+N  Create a new AXAML file from a UserControl or Window template
         Project Explorer paired file  Create a matching x:Class and .axaml.cs with a new AXAML file
+        Project Explorer paired code-behind  Open the paired .axaml.cs in the OS default editor
         Project Explorer Ctrl+Shift+N  Create a new folder
         Project Explorer Ctrl+Shift+D  Duplicate the selected AXAML file
         Project Explorer Ctrl+Shift+M  Move the selected AXAML file to another project folder
@@ -2989,6 +2990,39 @@ public partial class MainWindow : Window
             Vm.StatusText = $"Opened the location in the file manager: {path}";
         }
 
+        void OpenProjectExplorerCodeBehind()
+        {
+            if (list.SelectedItem is not ProjectExplorerNode { IsFile: true } node)
+            {
+                return;
+            }
+
+            var axamlPath = GetProjectExplorerClipboardPath(
+                node,
+                Vm.ProjectWorkspacePath,
+                fullPath: true);
+            if (string.IsNullOrWhiteSpace(axamlPath))
+            {
+                Vm.StatusText = "The selected Project Explorer file is unavailable.";
+                return;
+            }
+
+            var codeBehindPath = GetProjectExplorerCodeBehindPath(axamlPath);
+            if (!File.Exists(codeBehindPath))
+            {
+                Vm.StatusText = $"No paired code-behind exists for {System.IO.Path.GetFileName(axamlPath)}.";
+                return;
+            }
+
+            if (!TryOpenProjectExplorerFileManager(codeBehindPath))
+            {
+                Vm.StatusText = $"Could not open the paired code-behind: {codeBehindPath}";
+                return;
+            }
+
+            Vm.StatusText = $"Opened paired code-behind: {codeBehindPath}";
+        }
+
         async Task<ProjectExplorerNewFileResult?> ShowNewProjectExplorerFileDialogAsync(
             string directory)
         {
@@ -4982,6 +5016,11 @@ public partial class MainWindow : Window
         };
         var copyRelativePathMenu = new MenuItem { Header = "Copy Relative Path" };
         var copyFullPathMenu = new MenuItem { Header = "Copy Full Path" };
+        var openCodeBehindMenu = new MenuItem
+        {
+            Header = "Open Paired Code-behind",
+            IsEnabled = false,
+        };
         var openFileManagerMenu = new MenuItem { Header = "Open in File Manager" };
         cancelButton.Click += (_, _) => dialog.Close(null);
         openButton.Click += (_, _) => SelectCurrent();
@@ -4996,6 +5035,7 @@ public partial class MainWindow : Window
         deleteFolderMenu.Click += async (_, _) => await DeleteProjectExplorerFolderAsync();
         copyRelativePathMenu.Click += async (_, _) => await CopyProjectExplorerPathAsync(fullPath: false);
         copyFullPathMenu.Click += async (_, _) => await CopyProjectExplorerPathAsync(fullPath: true);
+        openCodeBehindMenu.Click += (_, _) => OpenProjectExplorerCodeBehind();
         openFileManagerMenu.Click += (_, _) => OpenProjectExplorerFileManager();
         var projectExplorerContextMenu = new ContextMenu
         {
@@ -5012,6 +5052,7 @@ public partial class MainWindow : Window
                 new Separator(),
                 copyRelativePathMenu,
                 copyFullPathMenu,
+                openCodeBehindMenu,
                 openFileManagerMenu,
             },
         };
@@ -5025,6 +5066,11 @@ public partial class MainWindow : Window
             renameFolderMenu.IsEnabled = hasSelectedFolder;
             deleteFileMenu.IsEnabled = hasSelectedFile;
             deleteFolderMenu.IsEnabled = hasSelectedFolder;
+            openCodeBehindMenu.IsEnabled = list.SelectedItem is ProjectExplorerNode
+                {
+                    IsFile: true,
+                    HasCodeBehind: true,
+                };
         };
         list.ContextMenu = projectExplorerContextMenu;
         DragDrop.SetAllowDrop(list, true);
