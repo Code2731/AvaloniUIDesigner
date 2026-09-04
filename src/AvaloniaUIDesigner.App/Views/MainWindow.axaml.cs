@@ -33,6 +33,7 @@ public partial class MainWindow : Window
         Ctrl+N              New document
         Ctrl+O              Open AXAML document
         Ctrl+Shift+O        Open recent AXAML files
+        Ctrl+Shift+J        Open an Avalonia project or solution file
         Ctrl+Shift+P        Open project explorer
         Ctrl+Shift+R        Reload current file after an external change
         Ctrl+S              Save document
@@ -691,6 +692,11 @@ public partial class MainWindow : Window
         Avalonia.Interactivity.RoutedEventArgs e)
         => await OpenProjectFolderAsync();
 
+    private async void OnOpenProjectFileMenuClicked(
+        object? sender,
+        Avalonia.Interactivity.RoutedEventArgs e)
+        => await OpenProjectFileAsync();
+
     private async void OnProjectExplorerMenuClicked(
         object? sender,
         Avalonia.Interactivity.RoutedEventArgs e)
@@ -700,6 +706,33 @@ public partial class MainWindow : Window
         object? sender,
         Avalonia.Interactivity.RoutedEventArgs e)
         => RefreshProjectFiles();
+
+    private static string? GetProjectWorkspaceRootFromProjectFile(string? projectFilePath)
+    {
+        if (string.IsNullOrWhiteSpace(projectFilePath))
+        {
+            return null;
+        }
+
+        try
+        {
+            var fullPath = System.IO.Path.GetFullPath(projectFilePath);
+            var extension = System.IO.Path.GetExtension(fullPath);
+            if (!File.Exists(fullPath)
+                || !string.Equals(extension, ".csproj", StringComparison.OrdinalIgnoreCase)
+                    && !string.Equals(extension, ".sln", StringComparison.OrdinalIgnoreCase)
+                    && !string.Equals(extension, ".slnx", StringComparison.OrdinalIgnoreCase))
+            {
+                return null;
+            }
+
+            return System.IO.Path.GetDirectoryName(fullPath);
+        }
+        catch (ArgumentException)
+        {
+            return null;
+        }
+    }
 
     private async Task OpenProjectFolderAsync()
     {
@@ -732,6 +765,47 @@ public partial class MainWindow : Window
         }
 
         Vm.StatusText = $"Opened project {Vm.ProjectWorkspaceName} ({Vm.ProjectFiles.Count} AXAML file(s)).";
+    }
+
+    private async Task OpenProjectFileAsync()
+    {
+        if (Vm is null)
+        {
+            return;
+        }
+
+        var files = await StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
+        {
+            Title = "Open Avalonia Project or Solution",
+            AllowMultiple = false,
+            FileTypeFilter =
+            [
+                new FilePickerFileType("Avalonia Project or Solution")
+                {
+                    Patterns = ["*.csproj", "*.sln", "*.slnx"]
+                }
+            ]
+        });
+        if (files.Count == 0)
+        {
+            return;
+        }
+
+        var projectFilePath = files[0].TryGetLocalPath();
+        var workspacePath = GetProjectWorkspaceRootFromProjectFile(projectFilePath);
+        if (string.IsNullOrWhiteSpace(workspacePath))
+        {
+            Vm.StatusText = "The selected project or solution file is not available as a local file.";
+            return;
+        }
+
+        if (!Vm.TryOpenProjectWorkspace(workspacePath, out var error))
+        {
+            Vm.StatusText = $"Could not open project workspace: {error}";
+            return;
+        }
+
+        Vm.StatusText = $"Opened project {Vm.ProjectWorkspaceName} from {System.IO.Path.GetFileName(projectFilePath)} ({Vm.ProjectFiles.Count} AXAML file(s)).";
     }
 
     private async Task OpenProjectExplorerAsync()
@@ -9305,6 +9379,13 @@ public partial class MainWindow : Window
         if (ctrl && shift && !alt && e.Key == Key.P)
         {
             await OpenProjectExplorerAsync();
+            e.Handled = true;
+            return;
+        }
+
+        if (ctrl && shift && !alt && e.Key == Key.J)
+        {
+            await OpenProjectFileAsync();
             e.Handled = true;
             return;
         }

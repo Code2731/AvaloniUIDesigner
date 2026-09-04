@@ -59,6 +59,8 @@
                           IsEnabled="{Binding HasRecentFiles}"/>
                 <MenuItem Header="Open Project Folder..."
                           Click="OnOpenProjectFolderMenuClicked"/>
+                <MenuItem Header="Open Project or Solution... (Ctrl+Shift+J)"
+                          Click="OnOpenProjectFileMenuClicked"/>
                 <MenuItem Name="ProjectExplorerMenu"
                           Header="Project Explorer... (Ctrl+Shift+P)"
                           Click="OnProjectExplorerMenuClicked"
@@ -500,6 +502,11 @@
                             Content="Project"
                             Click="OnOpenProjectFolderMenuClicked"
                             ToolTip.Tip="Open an Avalonia project folder"
+                            Padding="8,3"/>
+                    <Button Name="OpenProjectFileToolbar"
+                            Content="Project File"
+                            Click="OnOpenProjectFileMenuClicked"
+                            ToolTip.Tip="Open an Avalonia .csproj or solution file (Ctrl+Shift+J)"
                             Padding="8,3"/>
                     <Button Name="ProjectExplorerToolbar"
                             Content="Explorer"
