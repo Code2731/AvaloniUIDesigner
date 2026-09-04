@@ -206,7 +206,14 @@ public partial class MainWindow : Window
 
     private enum DragMode { None, Move, N, S, E, W, NE, NW, SE, SW }
     private enum UnsavedChoice { Save, Discard, Cancel }
-    private enum ExternalChangeResolution { OpenTab, Reload, KeepDesignerVersion }
+    private enum ExternalChangeResolution
+    {
+        OpenTab,
+        Reload,
+        ReloadAll,
+        KeepDesignerVersion,
+        KeepAll,
+    }
     private enum PreviewThemeMode { Default, Light, Dark }
     private sealed record ComponentPackExportOptions(string PackName, string DisplayName, string NamePrefix);
     private sealed record ProjectExplorerNewFileResult(string FilePath, string Content);
@@ -1143,6 +1150,18 @@ public partial class MainWindow : Window
             return;
         }
 
+        if (decision.Resolution == ExternalChangeResolution.ReloadAll)
+        {
+            await ReloadAllExternalChangesAsync(changes);
+            return;
+        }
+
+        if (decision.Resolution == ExternalChangeResolution.KeepAll)
+        {
+            KeepAllExternalChanges(changes);
+            return;
+        }
+
         if (!Vm.ActivateDocumentTab(decision.Change.Tab))
         {
             Vm.StatusText = "The selected document tab is no longer open.";
@@ -1166,17 +1185,98 @@ public partial class MainWindow : Window
                     break;
                 }
 
-                if (File.Exists(decision.Change.DocumentPath))
-                {
-                    RememberKnownDocumentWriteTime(decision.Change.DocumentPath);
-                }
-                else
-                {
-                    _knownProjectFileWriteTimes.Remove(decision.Change.DocumentPath);
-                }
+                AcknowledgeKnownExternalDocumentPath(decision.Change.DocumentPath);
 
                 Vm.StatusText = $"Kept the designer version for {decision.Change.DisplayName}. New external changes will still be detected.";
                 break;
+        }
+    }
+
+    private async Task ReloadAllExternalChangesAsync(
+        IReadOnlyList<ExternalDocumentChangeInfo> changes)
+    {
+        if (Vm is null)
+        {
+            return;
+        }
+
+        var originalTab = Vm.SelectedDocumentTab;
+        var reloadedCount = 0;
+        var stopped = false;
+        foreach (var change in changes)
+        {
+            if (change.IsMissing || !Vm.DocumentTabs.Contains(change.Tab))
+            {
+                continue;
+            }
+
+            if (!Vm.ActivateDocumentTab(change.Tab)
+                || !await ReloadCurrentFileAsync())
+            {
+                stopped = true;
+                break;
+            }
+
+            reloadedCount++;
+        }
+
+        if (originalTab is not null
+            && Vm.DocumentTabs.Contains(originalTab)
+            && !ReferenceEquals(Vm.SelectedDocumentTab, originalTab))
+        {
+            Vm.ActivateDocumentTab(originalTab);
+        }
+
+        var remainingMissingCount = Vm.GetExternalDocumentChanges()
+            .Count(change => change.IsMissing);
+        if (stopped)
+        {
+            Vm.StatusText = $"Reload All stopped after {reloadedCount} file(s). Resolve the remaining external changes individually.";
+        }
+        else if (remainingMissingCount > 0)
+        {
+            Vm.StatusText = $"Reloaded {reloadedCount} file(s). {remainingMissingCount} missing file(s) still need a decision.";
+        }
+        else
+        {
+            Vm.StatusText = $"Reloaded {reloadedCount} external file(s).";
+        }
+    }
+
+    private void KeepAllExternalChanges(
+        IReadOnlyList<ExternalDocumentChangeInfo> changes)
+    {
+        if (Vm is null)
+        {
+            return;
+        }
+
+        var keptCount = 0;
+        foreach (var change in changes)
+        {
+            if (!Vm.AcknowledgeExternalDocumentChange(change.DocumentPath))
+            {
+                continue;
+            }
+
+            AcknowledgeKnownExternalDocumentPath(change.DocumentPath);
+            keptCount++;
+        }
+
+        Vm.StatusText = keptCount == 0
+            ? "No external changes were still pending."
+            : $"Kept the designer version for {keptCount} external file(s). New external changes will still be detected.";
+    }
+
+    private void AcknowledgeKnownExternalDocumentPath(string path)
+    {
+        if (File.Exists(path))
+        {
+            RememberKnownDocumentWriteTime(path);
+        }
+        else
+        {
+            _knownProjectFileWriteTimes.Remove(path);
         }
     }
 
@@ -1205,7 +1305,9 @@ public partial class MainWindow : Window
         };
         var openButton = new Button { Content = "Open Tab", MinWidth = 96 };
         var reloadButton = new Button { Content = "Reload", MinWidth = 96 };
+        var reloadAllButton = new Button { Content = "Reload All", MinWidth = 104 };
         var keepButton = new Button { Content = "Keep Designer", MinWidth = 120 };
+        var keepAllButton = new Button { Content = "Keep All", MinWidth = 96 };
         var cancelButton = new Button { Content = "Cancel", MinWidth = 86 };
 
         ExternalDocumentChangeInfo? GetSelectedChange()
@@ -1217,15 +1319,22 @@ public partial class MainWindow : Window
             var hasSelection = selected is not null;
             openButton.IsEnabled = hasSelection;
             reloadButton.IsEnabled = hasSelection && selected is { IsMissing: false };
+            reloadAllButton.IsEnabled = changes.Any(change => !change.IsMissing);
             keepButton.IsEnabled = hasSelection;
+            keepAllButton.IsEnabled = changes.Count > 0;
             detail.Text = selected is null
                 ? "Select an open document to review its external change."
-                : $"{selected.DisplayName}\n{selected.DocumentPath}\nStatus: {selected.StatusLabel}\n\nReload replaces the designer state with the current disk file. Keep Designer dismisses this warning without writing over the external file.";
+                : $"{selected.DisplayName}\n{selected.DocumentPath}\nStatus: {selected.StatusLabel}\n\nReload replaces the designer state with the current disk file. Keep Designer dismisses this warning without writing over the external file. Reload All skips missing files and stops if a dirty-document confirmation is cancelled. Keep All acknowledges every listed file without writing to disk.";
         }
 
         void CloseWith(ExternalChangeResolution resolution)
         {
-            if (GetSelectedChange() is { } selected)
+            if (resolution is ExternalChangeResolution.ReloadAll
+                or ExternalChangeResolution.KeepAll)
+            {
+                dialog.Close(new ExternalChangeDialogResult(changes[0], resolution));
+            }
+            else if (GetSelectedChange() is { } selected)
             {
                 dialog.Close(new ExternalChangeDialogResult(selected, resolution));
             }
@@ -1234,7 +1343,9 @@ public partial class MainWindow : Window
         list.SelectionChanged += (_, _) => RefreshSelection();
         openButton.Click += (_, _) => CloseWith(ExternalChangeResolution.OpenTab);
         reloadButton.Click += (_, _) => CloseWith(ExternalChangeResolution.Reload);
+        reloadAllButton.Click += (_, _) => CloseWith(ExternalChangeResolution.ReloadAll);
         keepButton.Click += (_, _) => CloseWith(ExternalChangeResolution.KeepDesignerVersion);
+        keepAllButton.Click += (_, _) => CloseWith(ExternalChangeResolution.KeepAll);
         cancelButton.Click += (_, _) => dialog.Close(null);
         list.KeyDown += (_, e) =>
         {
@@ -1259,7 +1370,15 @@ public partial class MainWindow : Window
             Orientation = Orientation.Horizontal,
             HorizontalAlignment = HorizontalAlignment.Right,
             Spacing = 8,
-            Children = { cancelButton, openButton, reloadButton, keepButton },
+            Children =
+            {
+                cancelButton,
+                openButton,
+                reloadButton,
+                reloadAllButton,
+                keepButton,
+                keepAllButton,
+            },
         };
         var content = new Grid
         {
@@ -1286,18 +1405,18 @@ public partial class MainWindow : Window
         return await dialog.ShowDialog<ExternalChangeDialogResult?>(this);
     }
 
-    private async Task ReloadCurrentFileAsync()
+    private async Task<bool> ReloadCurrentFileAsync()
     {
         if (Vm is null || string.IsNullOrWhiteSpace(Vm.CurrentDocumentPath))
         {
-            return;
+            return false;
         }
 
         var path = Vm.CurrentDocumentPath;
         FlushPendingPropertyHistory();
         if (!await EnsureCanContinueWithUnsavedChangesAsync())
         {
-            return;
+            return false;
         }
 
         try
@@ -1306,17 +1425,19 @@ public partial class MainWindow : Window
             if (!Vm.TryImportDraftAxaml(content, out var error, out var warning))
             {
                 Vm.StatusText = $"Reload failed: {error}";
-                return;
+                return false;
             }
 
             Vm.ClearExternalDocumentChange();
             RememberKnownDocumentWriteTime(path);
             ClearDesignGuides();
             Vm.StatusText = BuildOpenStatus(System.IO.Path.GetFileName(path), warning);
+            return true;
         }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
         {
             Vm.StatusText = $"Could not reload {System.IO.Path.GetFileName(path)}: {exception.Message}";
+            return false;
         }
     }
 
