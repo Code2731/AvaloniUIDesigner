@@ -1,12 +1,12 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using System.Collections.Specialized;
 using System.ComponentModel;
-using System.Globalization;
 using System.Diagnostics;
+using System.Globalization;
 using System.IO;
 using System.Linq;
-using System.Collections.ObjectModel;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using System.Xml.Linq;
@@ -177,6 +177,7 @@ public partial class MainWindow : Window
         Project Explorer repair pair  Restore AXAML x:Class from an existing code-behind identity
         Project Workspace build  Run dotnet build and inspect compiler output for a project or solution
         Project build diagnostics  Double-click a compiler diagnostic to open its AXAML or source file
+        Project build dirty choice  Choose Save All & Build or build saved files when designer changes are pending
         Project Explorer Ctrl+Shift+N  Create a new folder
         Project Explorer Ctrl+Shift+D  Duplicate the selected AXAML file
         Project Explorer Ctrl+Shift+M  Move the selected AXAML file to another project folder
@@ -217,6 +218,7 @@ public partial class MainWindow : Window
 
     private enum DragMode { None, Move, N, S, E, W, NE, NW, SE, SW }
     private enum UnsavedChoice { Save, Discard, Cancel }
+    private enum BuildDirtyDocumentChoice { Cancel, SaveAllAndBuild, BuildSavedFiles }
     private enum ExternalChangeResolution
     {
         OpenTab,
@@ -1301,6 +1303,29 @@ public partial class MainWindow : Window
         }
 
         var dirtyDocumentCount = Vm.DocumentTabs.Count(Vm.IsDocumentTabDirty);
+        var savedDocumentCount = 0;
+        var buildsSavedFiles = false;
+        if (dirtyDocumentCount > 0)
+        {
+            var choice = await ShowBuildDirtyDocumentDialogAsync(target, dirtyDocumentCount);
+            switch (choice)
+            {
+                case BuildDirtyDocumentChoice.SaveAllAndBuild:
+                    if (!await SaveAllDocumentsAsync())
+                    {
+                        return;
+                    }
+
+                    savedDocumentCount = dirtyDocumentCount;
+                    break;
+                case BuildDirtyDocumentChoice.BuildSavedFiles:
+                    buildsSavedFiles = true;
+                    break;
+                default:
+                    return;
+            }
+        }
+
         var result = await ShowProjectBuildOutputDialogAsync(target);
         if (result is null)
         {
@@ -1308,14 +1333,63 @@ public partial class MainWindow : Window
         }
 
         Vm.StatusText = result.Canceled
-            ? $"Build canceled: {target.RelativePath}"
+            ? savedDocumentCount > 0
+                ? $"Build canceled after saving {savedDocumentCount} document(s): {target.RelativePath}"
+                : $"Build canceled: {target.RelativePath}"
             : result.Succeeded
-                ? dirtyDocumentCount > 0
-                    ? $"Build succeeded: {target.RelativePath}. Saved files were built; {dirtyDocumentCount} open document(s) remain unsaved."
-                    : $"Build succeeded: {target.RelativePath}"
+                ? savedDocumentCount > 0
+                    ? $"Saved {savedDocumentCount} document(s) and built {target.RelativePath}"
+                    : buildsSavedFiles && dirtyDocumentCount > 0
+                        ? $"Build succeeded: {target.RelativePath}. Saved files were built; {dirtyDocumentCount} open document(s) remain unsaved."
+                        : $"Build succeeded: {target.RelativePath}"
                 : string.IsNullOrWhiteSpace(result.Error)
                     ? $"Build failed (exit code {result.ExitCode}): {target.RelativePath}"
                     : $"Build could not run for {target.RelativePath}: {result.Error}";
+    }
+
+    private async Task<BuildDirtyDocumentChoice> ShowBuildDirtyDocumentDialogAsync(
+        ProjectBuildTarget target,
+        int dirtyDocumentCount)
+    {
+        var dialog = new Window
+        {
+            Title = "Unsaved Documents Before Build",
+            Width = 580,
+            Height = 230,
+            MinWidth = 500,
+            MinHeight = 210,
+            CanResize = false,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner,
+        };
+        var message = new TextBlock
+        {
+            Text = $"{dirtyDocumentCount} open document(s) have unsaved designer changes.\n\nBuild target: {target.RelativePath}\nChoose whether to save those changes before building.",
+            TextWrapping = TextWrapping.Wrap,
+        };
+        var saveButton = new Button { Content = "Save All & Build", MinWidth = 132 };
+        var savedFilesButton = new Button { Content = "Build Saved Files", MinWidth = 132 };
+        var cancelButton = new Button { Content = "Cancel", MinWidth = 90 };
+        saveButton.Click += (_, _) => dialog.Close(BuildDirtyDocumentChoice.SaveAllAndBuild);
+        savedFilesButton.Click += (_, _) => dialog.Close(BuildDirtyDocumentChoice.BuildSavedFiles);
+        cancelButton.Click += (_, _) => dialog.Close(BuildDirtyDocumentChoice.Cancel);
+        dialog.Content = new StackPanel
+        {
+            Margin = new Thickness(16),
+            Spacing = 14,
+            Children =
+            {
+                message,
+                new StackPanel
+                {
+                    Orientation = Orientation.Horizontal,
+                    HorizontalAlignment = HorizontalAlignment.Right,
+                    Spacing = 8,
+                    Children = { saveButton, savedFilesButton, cancelButton },
+                },
+            },
+        };
+
+        return await dialog.ShowDialog<BuildDirtyDocumentChoice>(this);
     }
 
     private async Task OpenProjectBuildDiagnosticAsync(ProjectBuildDiagnostic diagnostic)
