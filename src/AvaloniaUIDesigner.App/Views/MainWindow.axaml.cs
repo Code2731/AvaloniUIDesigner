@@ -176,6 +176,7 @@ public partial class MainWindow : Window
         Project Explorer create paired file  Generate code-behind for an existing Window or UserControl AXAML
         Project Explorer repair pair  Restore AXAML x:Class from an existing code-behind identity
         Project Workspace build  Run dotnet build and inspect compiler output for a project or solution
+        Project build configuration  Choose Debug or Release before running a workspace build
         Project build diagnostics  Double-click a compiler diagnostic to open its AXAML or source file
         Project build dirty choice  Choose Save All & Build or build saved files when designer changes are pending
         Project Explorer Ctrl+Shift+N  Create a new folder
@@ -219,6 +220,7 @@ public partial class MainWindow : Window
     private enum DragMode { None, Move, N, S, E, W, NE, NW, SE, SW }
     private enum UnsavedChoice { Save, Discard, Cancel }
     private enum BuildDirtyDocumentChoice { Cancel, SaveAllAndBuild, BuildSavedFiles }
+    private enum ProjectBuildConfiguration { Debug, Release }
     private enum ExternalChangeResolution
     {
         OpenTab,
@@ -487,6 +489,7 @@ public partial class MainWindow : Window
     private MainWindowViewModel? _boundVm;
     private PreviewWindow? _previewWindow;
     private PreviewThemeMode _previewThemeMode = PreviewThemeMode.Default;
+    private ProjectBuildConfiguration _projectBuildConfiguration = ProjectBuildConfiguration.Debug;
 
     private readonly DispatcherTimer _propertyEditTimer;
     private readonly DispatcherTimer _projectWorkspaceRefreshTimer;
@@ -1015,6 +1018,26 @@ public partial class MainWindow : Window
         Avalonia.Interactivity.RoutedEventArgs e)
         => await BuildProjectWorkspaceAsync();
 
+    private void OnBuildConfigurationDebugMenuClicked(
+        object? sender,
+        Avalonia.Interactivity.RoutedEventArgs e)
+        => SetProjectBuildConfiguration(ProjectBuildConfiguration.Debug);
+
+    private void OnBuildConfigurationReleaseMenuClicked(
+        object? sender,
+        Avalonia.Interactivity.RoutedEventArgs e)
+        => SetProjectBuildConfiguration(ProjectBuildConfiguration.Release);
+
+    private void SetProjectBuildConfiguration(ProjectBuildConfiguration configuration)
+    {
+        _projectBuildConfiguration = configuration;
+        UpdateProjectBuildConfigurationMenuStates();
+        if (Vm is not null)
+        {
+            Vm.StatusText = $"Build configuration: {configuration}.";
+        }
+    }
+
     private void OnCloseProjectWorkspaceMenuClicked(
         object? sender,
         Avalonia.Interactivity.RoutedEventArgs e)
@@ -1058,11 +1081,12 @@ public partial class MainWindow : Window
     }
 
     private async Task<ProjectBuildResult?> ShowProjectBuildOutputDialogAsync(
-        ProjectBuildTarget target)
+        ProjectBuildTarget target,
+        ProjectBuildConfiguration configuration)
     {
         var dialog = new Window
         {
-            Title = $"Build Project - {target.RelativePath}",
+            Title = $"Build Project - {target.RelativePath} ({configuration})",
             Width = 820,
             Height = 600,
             MinWidth = 620,
@@ -1129,8 +1153,10 @@ public partial class MainWindow : Window
                 };
                 process.StartInfo.ArgumentList.Add("build");
                 process.StartInfo.ArgumentList.Add(target.FullPath);
+                process.StartInfo.ArgumentList.Add("--configuration");
+                process.StartInfo.ArgumentList.Add(configuration.ToString());
                 process.StartInfo.ArgumentList.Add("--nologo");
-                output.Text = $"$ dotnet build \"{target.RelativePath}\" --nologo{Environment.NewLine}{Environment.NewLine}";
+                output.Text = $"$ dotnet build \"{target.RelativePath}\" --configuration {configuration} --nologo{Environment.NewLine}{Environment.NewLine}";
                 if (dirtyDocumentCount > 0)
                 {
                     output.Text += $"Warning: build uses saved files; {dirtyDocumentCount} open document(s) have unsaved designer changes.{Environment.NewLine}{Environment.NewLine}";
@@ -1248,7 +1274,7 @@ public partial class MainWindow : Window
                     Background = Brush.Parse("#F1F5F9"),
                     Child = new TextBlock
                     {
-                        Text = $"Target: {target.RelativePath}",
+                        Text = $"Target: {target.RelativePath}\nConfiguration: {configuration}",
                         Foreground = Brush.Parse("#334155"),
                         TextWrapping = TextWrapping.Wrap,
                     },
@@ -1302,12 +1328,16 @@ public partial class MainWindow : Window
             return;
         }
 
+        var configuration = _projectBuildConfiguration;
         var dirtyDocumentCount = Vm.DocumentTabs.Count(Vm.IsDocumentTabDirty);
         var savedDocumentCount = 0;
         var buildsSavedFiles = false;
         if (dirtyDocumentCount > 0)
         {
-            var choice = await ShowBuildDirtyDocumentDialogAsync(target, dirtyDocumentCount);
+            var choice = await ShowBuildDirtyDocumentDialogAsync(
+                target,
+                configuration,
+                dirtyDocumentCount);
             switch (choice)
             {
                 case BuildDirtyDocumentChoice.SaveAllAndBuild:
@@ -1326,7 +1356,7 @@ public partial class MainWindow : Window
             }
         }
 
-        var result = await ShowProjectBuildOutputDialogAsync(target);
+        var result = await ShowProjectBuildOutputDialogAsync(target, configuration);
         if (result is null)
         {
             return;
@@ -1334,21 +1364,22 @@ public partial class MainWindow : Window
 
         Vm.StatusText = result.Canceled
             ? savedDocumentCount > 0
-                ? $"Build canceled after saving {savedDocumentCount} document(s): {target.RelativePath}"
-                : $"Build canceled: {target.RelativePath}"
+                ? $"Build canceled after saving {savedDocumentCount} document(s): {target.RelativePath} ({configuration})"
+                : $"Build canceled: {target.RelativePath} ({configuration})"
             : result.Succeeded
                 ? savedDocumentCount > 0
-                    ? $"Saved {savedDocumentCount} document(s) and built {target.RelativePath}"
+                    ? $"Saved {savedDocumentCount} document(s) and built {target.RelativePath} ({configuration})"
                     : buildsSavedFiles && dirtyDocumentCount > 0
-                        ? $"Build succeeded: {target.RelativePath}. Saved files were built; {dirtyDocumentCount} open document(s) remain unsaved."
-                        : $"Build succeeded: {target.RelativePath}"
+                        ? $"Build succeeded: {target.RelativePath} ({configuration}). Saved files were built; {dirtyDocumentCount} open document(s) remain unsaved."
+                        : $"Build succeeded: {target.RelativePath} ({configuration})"
                 : string.IsNullOrWhiteSpace(result.Error)
-                    ? $"Build failed (exit code {result.ExitCode}): {target.RelativePath}"
-                    : $"Build could not run for {target.RelativePath}: {result.Error}";
+                    ? $"Build failed (exit code {result.ExitCode}): {target.RelativePath} ({configuration})"
+                    : $"Build could not run for {target.RelativePath} ({configuration}): {result.Error}";
     }
 
     private async Task<BuildDirtyDocumentChoice> ShowBuildDirtyDocumentDialogAsync(
         ProjectBuildTarget target,
+        ProjectBuildConfiguration configuration,
         int dirtyDocumentCount)
     {
         var dialog = new Window
@@ -1363,7 +1394,7 @@ public partial class MainWindow : Window
         };
         var message = new TextBlock
         {
-            Text = $"{dirtyDocumentCount} open document(s) have unsaved designer changes.\n\nBuild target: {target.RelativePath}\nChoose whether to save those changes before building.",
+            Text = $"{dirtyDocumentCount} open document(s) have unsaved designer changes.\n\nBuild target: {target.RelativePath}\nConfiguration: {configuration}\nChoose whether to save those changes before building.",
             TextWrapping = TextWrapping.Wrap,
         };
         var saveButton = new Button
@@ -12349,6 +12380,7 @@ public partial class MainWindow : Window
         RebuildRecentFilesMenu();
         RebuildRecentProjectWorkspacesMenu();
         UpdateProjectWorkspaceMenuStates();
+        UpdateProjectBuildConfigurationMenuStates();
         UpdateDocumentBackupMenu();
         ApplyWorkspacePanelState();
         ApplyPropertyInspectorState();
@@ -12494,6 +12526,14 @@ public partial class MainWindow : Window
         var hasExternalDocumentChanges = Vm?.HasExternalDocumentChanges == true;
         ResolveExternalChangesMenu.IsEnabled = hasExternalDocumentChanges;
         ResolveExternalChangesContextMenu.IsEnabled = hasExternalDocumentChanges;
+    }
+
+    private void UpdateProjectBuildConfigurationMenuStates()
+    {
+        BuildConfigurationDebugMenu.IsChecked =
+            _projectBuildConfiguration == ProjectBuildConfiguration.Debug;
+        BuildConfigurationReleaseMenu.IsChecked =
+            _projectBuildConfiguration == ProjectBuildConfiguration.Release;
     }
 
     private void UpdatePreviewThemeMenuStates()

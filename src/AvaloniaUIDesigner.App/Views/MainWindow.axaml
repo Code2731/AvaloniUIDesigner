@@ -82,6 +82,15 @@
                           Header="Build Project Workspace..."
                           Click="OnBuildProjectWorkspaceMenuClicked"
                           IsEnabled="{Binding HasProjectWorkspace}"/>
+                <MenuItem Header="Build Configuration"
+                          IsEnabled="{Binding HasProjectWorkspace}">
+                    <MenuItem Name="BuildConfigurationDebugMenu"
+                              Header="Debug"
+                              Click="OnBuildConfigurationDebugMenuClicked"/>
+                    <MenuItem Name="BuildConfigurationReleaseMenu"
+                              Header="Release"
+                              Click="OnBuildConfigurationReleaseMenuClicked"/>
+                </MenuItem>
                 <MenuItem Name="ReloadCurrentFileMenu"
                           Header="Reload Current File (Ctrl+Shift+R)"
                           Click="OnReloadCurrentFileMenuClicked"
