@@ -412,6 +412,7 @@ dotnet run --project src/AvaloniaUIDesigner.App/AvaloniaUIDesigner.App.csproj
 75cw. Project Explorer에서 AXAML 파일을 선택하고 `Ctrl+Shift+D` 또는 context menu의 `Duplicate AXAML File...`을 실행하면 원본과 `.bak`를 함께 복제하고 새 문서 탭으로 엽니다. dirty 원본은 저장·폐기·취소를 먼저 확인하며, 기본 이름은 `Copy` 접미사를 사용하고 기존 파일·backup과의 충돌을 차단합니다.
 75cx. Project Explorer에서 AXAML 파일을 선택하고 `Ctrl+Shift+M` 또는 context menu의 `Move AXAML File...`을 실행하면 workspace root 또는 기존 하위 폴더로 파일을 이동합니다. 원본과 `.bak`를 함께 이동하고 dirty 보호를 거친 뒤 열린/닫힌 탭·Recent Files·외부 변경 경로를 새 위치로 갱신하며, 대상 충돌과 workspace 밖 경로는 거부합니다.
 75cy. Project Explorer AXAML 파일 행을 기존 폴더 행으로 drag-and-drop하면 `Move AXAML File...`과 같은 대상 검증·dirty 보호·source/`.bak` 이동·열린/닫힌 탭 경로 갱신을 수행합니다. 유효하지 않은 대상, 같은 폴더, 기존 파일·backup 충돌은 drop cursor를 거부하고 원본을 유지합니다.
+75cz. Project Explorer AXAML 파일을 workspace root 경로 표시 또는 목록 빈 공간으로 drag-and-drop하면 프로젝트 루트로 이동합니다. 폴더 대상과 동일하게 dirty 보호·source/`.bak` 이동·탭 경로 갱신과 대상 충돌 검증을 적용합니다.
 76. `File > Load Component Pack...` 또는 `File > Load Toolbox Preset Pack...`으로 외부 Toolbox 팩을 추가하면 파일 경로가 세션에 등록되어 다음 실행 때 자동으로 다시 로드됩니다. 파일이 없어도 문서 탭 복원은 계속되며 상태바에 경고가 표시됩니다.
 77. 외부 프로젝트의 컨트롤은 Component Pack 항목에 `designOnly: true`, `avaloniaTypeName`, `previewText`, `defaultProperties`를 지정해 등록합니다. 디자이너에서는 타입명 플레이스홀더로 편집하고, 생성 AXAML에는 원래 커스텀 타입과 속성을 출력합니다. 예시는 [custom-component-pack.example.json](docs/custom-component-pack.example.json)을 참고하세요.
 78. `File > Load Component Pack Plugin...`에서 `IComponentPackPlugin`을 구현한 신뢰할 수 있는 DLL을 선택하면 플러그인이 제공한 Component Pack을 Toolbox에 등록합니다. DLL 경로는 세션 JSON의 `ComponentPluginPaths`에 저장되고, 앱 재시작 시 플러그인·JSON 팩·프리셋 팩 순서로 복원됩니다.
@@ -751,6 +752,7 @@ AXAML 소스 편집기의 `Validate`와 `Preview`는 현재 디자인과 Undo �
 - v2.71: Project Explorer AXAML 파일 복제와 dirty 원본 보호 추가
 - v2.72: Project Explorer AXAML 파일 이동과 대상 workspace 검증 추가
 - v2.73: Project Explorer AXAML 파일 drag-and-drop 이동 추가
+- v2.74: Project Explorer workspace root drag-and-drop 대상 추가
 
 ## 컴포넌트 팩
 
