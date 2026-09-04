@@ -15249,6 +15249,86 @@ public partial class MainWindowViewModel : ViewModelBase
         SaveProjectWorkspaceToDisk();
     }
 
+    public bool UpdateDocumentPathAfterRename(string oldPath, string newPath)
+    {
+        if (string.IsNullOrWhiteSpace(oldPath)
+            || string.IsNullOrWhiteSpace(newPath))
+        {
+            return false;
+        }
+
+        string oldFullPath;
+        string newFullPath;
+        try
+        {
+            oldFullPath = Path.GetFullPath(oldPath.Trim());
+            newFullPath = Path.GetFullPath(newPath.Trim());
+        }
+        catch (Exception exception) when (exception is ArgumentException or IOException or NotSupportedException)
+        {
+            return false;
+        }
+
+        if (string.Equals(oldFullPath, newFullPath, StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        var changed = false;
+        foreach (var state in _documentTabStates.Values.Concat(_closedDocumentTabs))
+        {
+            if (!string.Equals(state.DocumentPath, oldFullPath, StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            state.DocumentPath = newFullPath;
+            changed = true;
+        }
+
+        for (var index = RecentFiles.Count - 1; index >= 0; index--)
+        {
+            if (string.Equals(RecentFiles[index], oldFullPath, StringComparison.OrdinalIgnoreCase))
+            {
+                RecentFiles.RemoveAt(index);
+                changed = true;
+            }
+        }
+
+        var currentPathChanged = string.Equals(
+            _currentDocumentPath,
+            oldFullPath,
+            StringComparison.OrdinalIgnoreCase);
+        if (currentPathChanged)
+        {
+            _currentDocumentPath = newFullPath;
+        }
+
+        if (string.Equals(
+                _externalDocumentChangePath,
+                oldFullPath,
+                StringComparison.OrdinalIgnoreCase))
+        {
+            _externalDocumentChangePath = newFullPath;
+        }
+
+        if (!changed && !currentPathChanged)
+        {
+            return false;
+        }
+
+        RegisterRecentFile(newFullPath);
+        UpdateDocumentTabPresentations();
+        if (currentPathChanged)
+        {
+            OnPropertyChanged(nameof(CurrentDocumentPath));
+            OnPropertyChanged(nameof(CanReloadCurrentFile));
+            OnPropertyChanged(nameof(WindowTitle));
+        }
+
+        return true;
+    }
+
     public void SetProjectWorkspaceCollapsedFolders(IEnumerable<string> relativePaths)
     {
         var normalizedPaths = NormalizeProjectWorkspaceFolders(relativePaths);

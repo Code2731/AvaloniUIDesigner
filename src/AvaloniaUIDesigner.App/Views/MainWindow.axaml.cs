@@ -163,6 +163,7 @@ public partial class MainWindow : Window
         Project Explorer arrows  Collapse, expand, and navigate the project tree
         Project Explorer double-click  Open files or toggle folders
         Project Explorer Ctrl+N  Create a new AXAML file from a UserControl or Window template
+        Project Explorer F2  Rename the selected AXAML file and keep open tabs linked
         Project Explorer Ctrl+C  Copy the selected full path
         Project Explorer file manager  Open the selected location in the OS file manager
         """;
@@ -1387,6 +1388,37 @@ public partial class MainWindow : Window
         }
     }
 
+    private static string? GetProjectExplorerRenameFilePath(
+        ProjectExplorerNode? node,
+        string? fileName,
+        string? workspacePath)
+    {
+        if (node is not { IsFile: true })
+        {
+            return null;
+        }
+
+        var currentPath = GetProjectExplorerClipboardPath(
+            node,
+            workspacePath,
+            fullPath: true);
+        if (string.IsNullOrWhiteSpace(currentPath))
+        {
+            return null;
+        }
+
+        try
+        {
+            return GetProjectExplorerNewFilePath(
+                fileName,
+                System.IO.Path.GetDirectoryName(currentPath));
+        }
+        catch (ArgumentException)
+        {
+            return null;
+        }
+    }
+
     private static string? GetProjectExplorerNewFileContent(string? rootKind)
         => rootKind switch
         {
@@ -1624,9 +1656,10 @@ public partial class MainWindow : Window
                 : $"{fileCount} matching AXAML file(s) in the project tree";
         }
 
-        void RefreshProjectTree()
+        void RefreshProjectTree(string? selectedRelativePathOverride = null)
         {
-            var selectedRelativePath = (list.SelectedItem as ProjectExplorerNode)?.RelativePath;
+            var selectedRelativePath = selectedRelativePathOverride
+                ?? (list.SelectedItem as ProjectExplorerNode)?.RelativePath;
             paths = Vm.ProjectFiles.ToList();
             treeRoots = BuildProjectExplorerTree(paths);
             ApplyProjectExplorerCollapsedFolders(
@@ -1856,6 +1889,167 @@ public partial class MainWindow : Window
             dialog.Close(file.FilePath);
         }
 
+        async Task<string?> ShowRenameProjectExplorerFileDialogAsync(
+            ProjectExplorerNode node,
+            string currentPath)
+        {
+            var renameDialog = new Window
+            {
+                Title = "Rename AXAML File",
+                Width = 460,
+                Height = 220,
+                MinWidth = 380,
+                MinHeight = 200,
+                CanResize = false,
+                WindowStartupLocation = WindowStartupLocation.CenterOwner,
+            };
+            var nameEditor = new TextBox
+            {
+                Text = System.IO.Path.GetFileName(currentPath),
+                Watermark = "File name (.axaml or .xaml)",
+                MinWidth = 340,
+            };
+            var errorText = new TextBlock
+            {
+                Foreground = Brush.Parse("#B91C1C"),
+                TextWrapping = TextWrapping.Wrap,
+            };
+            var renameButton = new Button { Content = "Rename", MinWidth = 86 };
+            var cancelButton = new Button { Content = "Cancel", MinWidth = 86 };
+
+            void RenameFile()
+            {
+                var path = GetProjectExplorerRenameFilePath(
+                    node,
+                    nameEditor.Text,
+                    Vm.ProjectWorkspacePath);
+                if (path is null)
+                {
+                    errorText.Text = "Use a file name with an .axaml or .xaml extension, without folders.";
+                    return;
+                }
+
+                if (string.Equals(path, currentPath, StringComparison.OrdinalIgnoreCase))
+                {
+                    renameDialog.Close(null);
+                    return;
+                }
+
+                if (File.Exists(path))
+                {
+                    errorText.Text = $"A file named {System.IO.Path.GetFileName(path)} already exists.";
+                    return;
+                }
+
+                renameDialog.Close(path);
+            }
+
+            renameButton.Click += (_, _) => RenameFile();
+            cancelButton.Click += (_, _) => renameDialog.Close(null);
+            nameEditor.KeyDown += (_, e) =>
+            {
+                if (e.Key == Key.Enter)
+                {
+                    RenameFile();
+                    e.Handled = true;
+                }
+                else if (e.Key == Key.Escape)
+                {
+                    renameDialog.Close(null);
+                    e.Handled = true;
+                }
+            };
+            renameDialog.Opened += (_, _) =>
+            {
+                nameEditor.Focus();
+                nameEditor.SelectAll();
+            };
+
+            renameDialog.Content = new StackPanel
+            {
+                Margin = new Thickness(16),
+                Spacing = 10,
+                Children =
+                {
+                    new TextBlock { Text = $"Rename {System.IO.Path.GetFileName(currentPath)}." },
+                    nameEditor,
+                    errorText,
+                    new StackPanel
+                    {
+                        Orientation = Orientation.Horizontal,
+                        HorizontalAlignment = HorizontalAlignment.Right,
+                        Spacing = 8,
+                        Children = { cancelButton, renameButton },
+                    },
+                },
+            };
+
+            return await renameDialog.ShowDialog<string?>(dialog);
+        }
+
+        async Task RenameProjectExplorerFileAsync()
+        {
+            if (list.SelectedItem is not ProjectExplorerNode { IsFile: true } node)
+            {
+                Vm.StatusText = "Select an AXAML file to rename.";
+                return;
+            }
+
+            var currentPath = GetProjectExplorerClipboardPath(
+                node,
+                Vm.ProjectWorkspacePath,
+                fullPath: true);
+            if (string.IsNullOrWhiteSpace(currentPath) || !File.Exists(currentPath))
+            {
+                Vm.StatusText = "The selected Project Explorer file is unavailable.";
+                return;
+            }
+
+            var newPath = await ShowRenameProjectExplorerFileDialogAsync(node, currentPath);
+            if (string.IsNullOrWhiteSpace(newPath))
+            {
+                return;
+            }
+
+            try
+            {
+                File.Move(currentPath, newPath);
+            }
+            catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+            {
+                Vm.StatusText = $"Could not rename {System.IO.Path.GetFileName(currentPath)}: {exception.Message}";
+                return;
+            }
+
+            try
+            {
+                var oldBackupPath = GetDocumentBackupPath(currentPath);
+                var newBackupPath = GetDocumentBackupPath(newPath);
+                if (File.Exists(oldBackupPath) && !File.Exists(newBackupPath))
+                {
+                    File.Move(oldBackupPath, newBackupPath);
+                }
+            }
+            catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+            {
+                // Renaming the source file is complete; an old backup can be regenerated on save.
+            }
+
+            Vm.UpdateDocumentPathAfterRename(currentPath, newPath);
+            if (!Vm.RefreshProjectWorkspace(out var refreshError))
+            {
+                Vm.StatusText = $"Renamed the file, but could not refresh Project Explorer: {refreshError}";
+                return;
+            }
+
+            var relativePath = System.IO.Path.GetRelativePath(
+                    Vm.ProjectWorkspacePath!,
+                    newPath)
+                .Replace(System.IO.Path.DirectorySeparatorChar, '/');
+            RefreshProjectTree(relativePath);
+            Vm.StatusText = $"Renamed {System.IO.Path.GetFileName(currentPath)} to {System.IO.Path.GetFileName(newPath)}.";
+        }
+
         void MoveSelection(int offset)
         {
             if (visibleNodes.Count == 0)
@@ -1917,6 +2111,11 @@ public partial class MainWindow : Window
         var cancelButton = new Button { Content = "Cancel", MinWidth = 86 };
         var openButton = new Button { Content = "Open", MinWidth = 86 };
         var newFileMenu = new MenuItem { Header = "New AXAML File..." };
+        var renameFileMenu = new MenuItem
+        {
+            Header = "Rename AXAML File...",
+            IsEnabled = false,
+        };
         var copyRelativePathMenu = new MenuItem { Header = "Copy Relative Path" };
         var copyFullPathMenu = new MenuItem { Header = "Copy Full Path" };
         var openFileManagerMenu = new MenuItem { Header = "Open in File Manager" };
@@ -1924,20 +2123,27 @@ public partial class MainWindow : Window
         openButton.Click += (_, _) => SelectCurrent();
         list.DoubleTapped += (_, _) => SelectCurrent();
         newFileMenu.Click += async (_, _) => await CreateNewProjectExplorerFileAsync();
+        renameFileMenu.Click += async (_, _) => await RenameProjectExplorerFileAsync();
         copyRelativePathMenu.Click += async (_, _) => await CopyProjectExplorerPathAsync(fullPath: false);
         copyFullPathMenu.Click += async (_, _) => await CopyProjectExplorerPathAsync(fullPath: true);
         openFileManagerMenu.Click += (_, _) => OpenProjectExplorerFileManager();
-        list.ContextMenu = new ContextMenu
+        var projectExplorerContextMenu = new ContextMenu
         {
             Items =
             {
                 newFileMenu,
+                renameFileMenu,
                 new Separator(),
                 copyRelativePathMenu,
                 copyFullPathMenu,
                 openFileManagerMenu,
             },
         };
+        projectExplorerContextMenu.Opened += (_, _) =>
+        {
+            renameFileMenu.IsEnabled = list.SelectedItem is ProjectExplorerNode { IsFile: true };
+        };
+        list.ContextMenu = projectExplorerContextMenu;
         list.KeyDown += async (_, e) =>
         {
             if (e.Key == Key.N
@@ -2000,6 +2206,11 @@ public partial class MainWindow : Window
                 SelectCurrent();
                 e.Handled = true;
             }
+            else if (e.Key == Key.F2)
+            {
+                await RenameProjectExplorerFileAsync();
+                e.Handled = true;
+            }
             else if (e.Key == Key.Escape)
             {
                 dialog.Close(null);
@@ -2037,7 +2248,7 @@ public partial class MainWindow : Window
             {
                 new TextBlock
                 {
-                    Text = "Browse the project tree. Double-click an AXAML file to open it; press Enter on a folder or double-click a folder to expand or collapse it, use Left/Right to navigate, Ctrl+N or the context menu to create a new AXAML file from a UserControl or Window template, Ctrl+C to copy the selected full path, or the context menu to open its location in the file manager.",
+                    Text = "Browse the project tree. Double-click an AXAML file to open it; press Enter on a folder or double-click a folder to expand or collapse it, use Left/Right to navigate, Ctrl+N or the context menu to create a new AXAML file from a UserControl or Window template, F2 or the context menu to rename the selected AXAML file, Ctrl+C to copy the selected full path, or the context menu to open its location in the file manager.",
                     TextWrapping = TextWrapping.Wrap,
                 },
                 rootText,
