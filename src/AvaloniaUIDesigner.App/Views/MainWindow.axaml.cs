@@ -171,6 +171,8 @@ public partial class MainWindow : Window
         Project Explorer paired file  Create a matching x:Class and .axaml.cs with a new AXAML file
         Project Explorer paired code-behind  Open the paired .axaml.cs in the OS default editor
         Project Explorer pair status  Distinguish matching and mismatched AXAML/code-behind identities
+        Project Explorer attach code-behind  Add a matching x:Class and .axaml.cs to an existing AXAML file
+        Project Explorer create paired file  Generate code-behind for an existing Window or UserControl AXAML
         Project Explorer Ctrl+Shift+N  Create a new folder
         Project Explorer Ctrl+Shift+D  Duplicate the selected AXAML file
         Project Explorer Ctrl+Shift+M  Move the selected AXAML file to another project folder
@@ -2209,6 +2211,169 @@ public partial class MainWindow : Window
         }
     }
 
+    private static bool TryGetProjectExplorerRootInfo(
+        string axaml,
+        out string rootKind,
+        out string? className,
+        out string error)
+    {
+        rootKind = string.Empty;
+        className = null;
+        error = string.Empty;
+        try
+        {
+            var document = XDocument.Parse(axaml);
+            var rootName = document.Root?.Name.LocalName;
+            rootKind = rootName switch
+            {
+                nameof(DesignerRootKind.Window) => nameof(DesignerRootKind.Window),
+                nameof(DesignerRootKind.UserControl) => nameof(DesignerRootKind.UserControl),
+                _ => string.Empty,
+            };
+            if (rootKind.Length == 0)
+            {
+                error = "Only Window and UserControl AXAML roots can receive a generated code-behind.";
+                return false;
+            }
+
+            var xClassName = XNamespace.Get("http://schemas.microsoft.com/winfx/2006/xaml") + "Class";
+            var rawClassName = document.Root?.Attribute(xClassName)?.Value;
+            if (MainWindowViewModel.TryNormalizeRootClassName(rawClassName, out var normalizedClassName)
+                && normalizedClassName.Length > 0)
+            {
+                className = normalizedClassName;
+            }
+
+            return true;
+        }
+        catch (Exception exception) when (exception is System.Xml.XmlException or ArgumentException)
+        {
+            error = $"The AXAML root could not be read: {exception.Message}";
+            return false;
+        }
+    }
+
+    private static bool TryPrepareProjectExplorerCodeBehind(
+        string sourceAxaml,
+        string requestedClassName,
+        out string targetAxaml,
+        out string targetCodeBehind,
+        out string error)
+    {
+        targetAxaml = string.Empty;
+        targetCodeBehind = string.Empty;
+        error = string.Empty;
+        if (!TryGetProjectExplorerRootInfo(sourceAxaml, out var rootKind, out _, out error)
+            || !MainWindowViewModel.TryNormalizeRootClassName(
+                requestedClassName,
+                out var normalizedClassName)
+            || normalizedClassName.Length == 0)
+        {
+            if (error.Length == 0)
+            {
+                error = "Use a dotted .NET type name such as Views.MainView.";
+            }
+
+            return false;
+        }
+
+        targetCodeBehind = GetProjectExplorerCodeBehindContent(rootKind, normalizedClassName)
+            ?? string.Empty;
+        if (targetCodeBehind.Length == 0)
+        {
+            error = "Could not create a code-behind for the selected AXAML root.";
+            return false;
+        }
+
+        return TrySetProjectExplorerClassAttribute(
+            sourceAxaml,
+            normalizedClassName,
+            out targetAxaml,
+            out error);
+    }
+
+    private static bool TrySetProjectExplorerClassAttribute(
+        string sourceAxaml,
+        string className,
+        out string targetAxaml,
+        out string error)
+    {
+        targetAxaml = string.Empty;
+        error = string.Empty;
+        var classAttributePattern = @"(?<prefix>[\w.-]+:Class\s*=\s*)(?<quote>[""'])(?<value>.*?)\k<quote>";
+        var rootMatch = Regex.Match(
+            sourceAxaml,
+            @"<(?<name>[A-Za-z_][\w:.-]*)(?=[\s/>])",
+            RegexOptions.Singleline);
+        if (!rootMatch.Success)
+        {
+            error = "The AXAML root tag could not be located.";
+            return false;
+        }
+
+        var tagEnd = FindProjectExplorerTagEnd(sourceAxaml, rootMatch.Index);
+        if (tagEnd < 0)
+        {
+            error = "The AXAML root tag is incomplete.";
+            return false;
+        }
+
+        var rootTagEnd = tagEnd + 1;
+        var rootTag = sourceAxaml[..rootTagEnd];
+        if (Regex.IsMatch(rootTag, classAttributePattern, RegexOptions.Singleline))
+        {
+            var updatedRootTag = new Regex(classAttributePattern, RegexOptions.Singleline).Replace(
+                rootTag,
+                match => match.Groups["prefix"].Value + $"\"{className}\"",
+                count: 1);
+            targetAxaml = updatedRootTag + sourceAxaml[rootTagEnd..];
+            return true;
+        }
+
+        var insertionIndex = tagEnd;
+        if (insertionIndex > rootMatch.Index && sourceAxaml[insertionIndex - 1] == '/')
+        {
+            insertionIndex--;
+        }
+
+        var namespaceAttribute = Regex.IsMatch(sourceAxaml, @"\bxmlns:x\s*=", RegexOptions.Singleline)
+            ? string.Empty
+            : " xmlns:x=\"http://schemas.microsoft.com/winfx/2006/xaml\"";
+        targetAxaml = sourceAxaml.Insert(
+            insertionIndex,
+            namespaceAttribute + $" x:Class=\"{className}\"");
+        return true;
+    }
+
+    private static int FindProjectExplorerTagEnd(string source, int startIndex)
+    {
+        var quote = '\0';
+        for (var index = startIndex; index < source.Length; index++)
+        {
+            var character = source[index];
+            if (quote != '\0')
+            {
+                if (character == quote)
+                {
+                    quote = '\0';
+                }
+
+                continue;
+            }
+
+            if (character is '\"' or '\'')
+            {
+                quote = character;
+            }
+            else if (character == '>')
+            {
+                return index;
+            }
+        }
+
+        return -1;
+    }
+
     private static bool TryPrepareProjectExplorerDuplicate(
         string sourceAxamlPath,
         string targetAxamlPath,
@@ -3110,6 +3275,286 @@ public partial class MainWindow : Window
             }
 
             Vm.StatusText = $"Opened paired code-behind: {codeBehindPath}";
+        }
+
+        async Task<string?> ShowCreateProjectExplorerCodeBehindDialogAsync(
+            string currentPath,
+            string rootKind,
+            string? existingClassName)
+        {
+            var dialog = new Window
+            {
+                Title = "Create Paired Code-behind",
+                Width = 460,
+                Height = 250,
+                MinWidth = 380,
+                MinHeight = 220,
+                CanResize = false,
+                WindowStartupLocation = WindowStartupLocation.CenterOwner,
+            };
+            var classNameEditor = new TextBox
+            {
+                Text = existingClassName
+                    ?? CreateProjectExplorerTypeName(System.IO.Path.GetFileNameWithoutExtension(currentPath)),
+                Watermark = "Views.MainView",
+                MinWidth = 340,
+            };
+            var errorText = new TextBlock
+            {
+                Foreground = Brush.Parse("#B91C1C"),
+                TextWrapping = TextWrapping.Wrap,
+            };
+            var createButton = new Button { Content = "Create", MinWidth = 86 };
+            var cancelButton = new Button { Content = "Cancel", MinWidth = 86 };
+
+            void CreatePair()
+            {
+                if (!MainWindowViewModel.TryNormalizeRootClassName(
+                        classNameEditor.Text,
+                        out var normalizedClassName)
+                    || normalizedClassName.Length == 0)
+                {
+                    errorText.Text = "Use a dotted .NET type name such as Views.MainView.";
+                    return;
+                }
+
+                var codeBehindPath = GetProjectExplorerCodeBehindPath(currentPath);
+                if (File.Exists(codeBehindPath) || Directory.Exists(codeBehindPath))
+                {
+                    errorText.Text = $"The paired file {System.IO.Path.GetFileName(codeBehindPath)} already exists.";
+                    return;
+                }
+
+                dialog.Close(normalizedClassName);
+            }
+
+            createButton.Click += (_, _) => CreatePair();
+            cancelButton.Click += (_, _) => dialog.Close(null);
+            classNameEditor.KeyDown += (_, e) =>
+            {
+                if (e.Key == Key.Enter)
+                {
+                    CreatePair();
+                    e.Handled = true;
+                }
+                else if (e.Key == Key.Escape)
+                {
+                    dialog.Close(null);
+                    e.Handled = true;
+                }
+            };
+            dialog.Opened += (_, _) =>
+            {
+                classNameEditor.Focus();
+                classNameEditor.SelectAll();
+            };
+            dialog.Content = new StackPanel
+            {
+                Margin = new Thickness(16),
+                Spacing = 10,
+                Children =
+                {
+                    new TextBlock { Text = $"Create a paired code-behind for {System.IO.Path.GetFileName(currentPath)}." },
+                    new TextBlock
+                    {
+                        Text = $"Detected root: {rootKind}. The AXAML will receive x:Class and the .axaml.cs will use this type.",
+                        Foreground = Brush.Parse("#64748B"),
+                        TextWrapping = TextWrapping.Wrap,
+                    },
+                    classNameEditor,
+                    errorText,
+                    new StackPanel
+                    {
+                        Orientation = Orientation.Horizontal,
+                        HorizontalAlignment = HorizontalAlignment.Right,
+                        Spacing = 8,
+                        Children = { cancelButton, createButton },
+                    },
+                },
+            };
+
+            return await dialog.ShowDialog<string?>(this);
+        }
+
+        async Task CreateProjectExplorerCodeBehindAsync()
+        {
+            if (list.SelectedItem is not ProjectExplorerNode { IsFile: true } node)
+            {
+                Vm.StatusText = "Select an AXAML file to create a paired code-behind.";
+                return;
+            }
+
+            var currentPath = GetProjectExplorerClipboardPath(
+                node,
+                Vm.ProjectWorkspacePath,
+                fullPath: true);
+            if (string.IsNullOrWhiteSpace(currentPath) || !File.Exists(currentPath))
+            {
+                Vm.StatusText = "The selected Project Explorer file is unavailable.";
+                return;
+            }
+
+            var codeBehindPath = GetProjectExplorerCodeBehindPath(currentPath);
+            if (File.Exists(codeBehindPath) || Directory.Exists(codeBehindPath))
+            {
+                Vm.StatusText = $"The paired file {System.IO.Path.GetFileName(codeBehindPath)} already exists.";
+                return;
+            }
+
+            if (!await EnsureMoveProjectExplorerSourceReadyAsync(currentPath))
+            {
+                return;
+            }
+
+            string sourceAxaml;
+            try
+            {
+                sourceAxaml = await File.ReadAllTextAsync(currentPath);
+            }
+            catch (Exception exception) when (exception is IOException
+                or UnauthorizedAccessException
+                or ArgumentException
+                or NotSupportedException)
+            {
+                Vm.StatusText = $"Could not read {System.IO.Path.GetFileName(currentPath)}: {exception.Message}";
+                return;
+            }
+
+            if (!TryGetProjectExplorerRootInfo(
+                    sourceAxaml,
+                    out var rootKind,
+                    out var existingClassName,
+                    out var rootError))
+            {
+                Vm.StatusText = $"Could not create a paired code-behind: {rootError}";
+                return;
+            }
+
+            var className = await ShowCreateProjectExplorerCodeBehindDialogAsync(
+                currentPath,
+                rootKind,
+                existingClassName);
+            if (string.IsNullOrWhiteSpace(className))
+            {
+                return;
+            }
+
+            if (!TryPrepareProjectExplorerCodeBehind(
+                    sourceAxaml,
+                    className,
+                    out var targetAxaml,
+                    out var targetCodeBehind,
+                    out var prepareError))
+            {
+                Vm.StatusText = $"Could not create the paired code-behind: {prepareError}";
+                return;
+            }
+
+            if (File.Exists(codeBehindPath) || Directory.Exists(codeBehindPath))
+            {
+                Vm.StatusText = $"The paired file {System.IO.Path.GetFileName(codeBehindPath)} already exists.";
+                return;
+            }
+
+            var backupPath = GetDocumentBackupPath(currentPath);
+            var backupCreated = false;
+            var axamlWritten = false;
+            var codeBehindWritten = false;
+            try
+            {
+                if (!File.Exists(backupPath))
+                {
+                    await AtomicFileWriter.WriteAllTextAsync(backupPath, sourceAxaml);
+                    backupCreated = true;
+                }
+
+                await AtomicFileWriter.WriteAllTextAsync(currentPath, targetAxaml);
+                axamlWritten = true;
+                await AtomicFileWriter.WriteAllTextAsync(codeBehindPath, targetCodeBehind);
+                codeBehindWritten = true;
+            }
+            catch (Exception exception) when (exception is IOException
+                or UnauthorizedAccessException
+                or ArgumentException
+                or NotSupportedException)
+            {
+                try
+                {
+                    if (codeBehindWritten && File.Exists(codeBehindPath))
+                    {
+                        File.Delete(codeBehindPath);
+                    }
+
+                    if (axamlWritten)
+                    {
+                        await AtomicFileWriter.WriteAllTextAsync(currentPath, sourceAxaml);
+                    }
+
+                    if (backupCreated && File.Exists(backupPath))
+                    {
+                        File.Delete(backupPath);
+                    }
+                }
+                catch (Exception rollbackException) when (rollbackException is IOException
+                    or UnauthorizedAccessException
+                    or ArgumentException
+                    or NotSupportedException)
+                {
+                    // Preserve the original creation failure if rollback is also blocked.
+                }
+
+                Vm.StatusText = $"Could not create the paired code-behind: {exception.Message}";
+                return;
+            }
+
+            if (string.Equals(Vm.CurrentDocumentPath, currentPath, StringComparison.OrdinalIgnoreCase))
+            {
+                if (!Vm.TryImportDraftAxaml(targetAxaml, out var importError, out var warning))
+                {
+                    Vm.MarkExternalDocumentChanged(currentPath);
+                    Vm.StatusText = $"Created the paired files, but could not refresh the open document: {importError}";
+                }
+                else
+                {
+                    RememberKnownDocumentWriteTime(currentPath);
+                    Vm.ClearExternalDocumentChange();
+                    ClearDesignGuides();
+                    Vm.StatusText = string.IsNullOrWhiteSpace(warning)
+                        ? $"Created paired code-behind for {System.IO.Path.GetFileName(currentPath)}."
+                        : $"Created paired code-behind for {System.IO.Path.GetFileName(currentPath)}. {warning}";
+                }
+            }
+            else
+            {
+                Vm.MarkExternalDocumentChanged(currentPath);
+            }
+
+            if (!Vm.RefreshProjectWorkspace(out var refreshError))
+            {
+                RefreshProjectTree();
+                Vm.StatusText = $"Created the paired files, but could not refresh Project Explorer: {refreshError}";
+                return;
+            }
+
+            string relativePath;
+            try
+            {
+                relativePath = System.IO.Path.GetRelativePath(
+                        Vm.ProjectWorkspacePath!,
+                        currentPath)
+                    .Replace(System.IO.Path.DirectorySeparatorChar, '/');
+            }
+            catch (ArgumentException)
+            {
+                RefreshProjectTree();
+                return;
+            }
+
+            RefreshProjectTree(relativePath);
+            if (!string.Equals(Vm.CurrentDocumentPath, currentPath, StringComparison.OrdinalIgnoreCase))
+            {
+                Vm.StatusText = $"Created paired code-behind for {System.IO.Path.GetFileName(currentPath)}.";
+            }
         }
 
         async Task<ProjectExplorerNewFileResult?> ShowNewProjectExplorerFileDialogAsync(
@@ -5105,6 +5550,11 @@ public partial class MainWindow : Window
         };
         var copyRelativePathMenu = new MenuItem { Header = "Copy Relative Path" };
         var copyFullPathMenu = new MenuItem { Header = "Copy Full Path" };
+        var createCodeBehindMenu = new MenuItem
+        {
+            Header = "Create Paired Code-behind...",
+            IsEnabled = false,
+        };
         var openCodeBehindMenu = new MenuItem
         {
             Header = "Open Paired Code-behind",
@@ -5124,6 +5574,7 @@ public partial class MainWindow : Window
         deleteFolderMenu.Click += async (_, _) => await DeleteProjectExplorerFolderAsync();
         copyRelativePathMenu.Click += async (_, _) => await CopyProjectExplorerPathAsync(fullPath: false);
         copyFullPathMenu.Click += async (_, _) => await CopyProjectExplorerPathAsync(fullPath: true);
+        createCodeBehindMenu.Click += async (_, _) => await CreateProjectExplorerCodeBehindAsync();
         openCodeBehindMenu.Click += (_, _) => OpenProjectExplorerCodeBehind();
         openFileManagerMenu.Click += (_, _) => OpenProjectExplorerFileManager();
         var projectExplorerContextMenu = new ContextMenu
@@ -5141,6 +5592,7 @@ public partial class MainWindow : Window
                 new Separator(),
                 copyRelativePathMenu,
                 copyFullPathMenu,
+                createCodeBehindMenu,
                 openCodeBehindMenu,
                 openFileManagerMenu,
             },
@@ -5155,12 +5607,20 @@ public partial class MainWindow : Window
             renameFolderMenu.IsEnabled = hasSelectedFolder;
             deleteFileMenu.IsEnabled = hasSelectedFile;
             deleteFolderMenu.IsEnabled = hasSelectedFolder;
-            openCodeBehindMenu.IsEnabled = list.SelectedItem is ProjectExplorerNode
+            createCodeBehindMenu.IsEnabled = list.SelectedItem is ProjectExplorerNode
                 {
                     IsFile: true,
                     FullPath: { } axamlPath,
                 }
-                && File.Exists(GetProjectExplorerCodeBehindPath(axamlPath));
+                && File.Exists(axamlPath)
+                && !File.Exists(GetProjectExplorerCodeBehindPath(axamlPath))
+                && !Directory.Exists(GetProjectExplorerCodeBehindPath(axamlPath));
+            openCodeBehindMenu.IsEnabled = list.SelectedItem is ProjectExplorerNode
+                {
+                    IsFile: true,
+                    FullPath: { } openAxamlPath,
+                }
+                && File.Exists(GetProjectExplorerCodeBehindPath(openAxamlPath));
         };
         list.ContextMenu = projectExplorerContextMenu;
         DragDrop.SetAllowDrop(list, true);
