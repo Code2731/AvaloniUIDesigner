@@ -164,6 +164,7 @@ public partial class MainWindow : Window
         Project Explorer double-click  Open files or toggle folders
         Project Explorer Ctrl+N  Create a new AXAML file from a UserControl or Window template
         Project Explorer F2  Rename the selected AXAML file and keep open tabs linked
+        Project Explorer Delete  Delete the selected AXAML file after dirty protection
         Project Explorer Ctrl+C  Copy the selected full path
         Project Explorer file manager  Open the selected location in the OS file manager
         """;
@@ -1419,6 +1420,36 @@ public partial class MainWindow : Window
         }
     }
 
+    private static string? GetProjectExplorerDeleteFilePath(
+        ProjectExplorerNode? node,
+        string? workspacePath)
+    {
+        if (node is not { IsFile: true })
+        {
+            return null;
+        }
+
+        var path = GetProjectExplorerClipboardPath(
+            node,
+            workspacePath,
+            fullPath: true);
+        if (string.IsNullOrWhiteSpace(path))
+        {
+            return null;
+        }
+
+        try
+        {
+            return File.Exists(path)
+                ? System.IO.Path.GetFullPath(path)
+                : null;
+        }
+        catch (ArgumentException)
+        {
+            return null;
+        }
+    }
+
     private static string? GetProjectExplorerNewFileContent(string? rootKind)
         => rootKind switch
         {
@@ -2050,6 +2081,152 @@ public partial class MainWindow : Window
             Vm.StatusText = $"Renamed {System.IO.Path.GetFileName(currentPath)} to {System.IO.Path.GetFileName(newPath)}.";
         }
 
+        async Task<bool> ShowDeleteProjectExplorerFileDialogAsync(
+            string currentPath,
+            int openTabCount)
+        {
+            var deleteDialog = new Window
+            {
+                Title = "Delete AXAML File",
+                Width = 480,
+                Height = openTabCount > 0 ? 250 : 220,
+                MinWidth = 400,
+                MinHeight = 200,
+                CanResize = false,
+                WindowStartupLocation = WindowStartupLocation.CenterOwner,
+            };
+            var deleteButton = new Button { Content = "Delete", MinWidth = 86 };
+            var cancelButton = new Button { Content = "Cancel", MinWidth = 86 };
+            var message = openTabCount > 0
+                ? $"Delete {System.IO.Path.GetFileName(currentPath)}? {openTabCount} open document tab(s) will be closed."
+                : $"Delete {System.IO.Path.GetFileName(currentPath)} permanently?";
+
+            deleteButton.Click += (_, _) => deleteDialog.Close(true);
+            cancelButton.Click += (_, _) => deleteDialog.Close(false);
+            deleteDialog.Content = new StackPanel
+            {
+                Margin = new Thickness(16),
+                Spacing = 12,
+                Children =
+                {
+                    new TextBlock
+                    {
+                        Text = message,
+                        TextWrapping = TextWrapping.Wrap,
+                    },
+                    new TextBlock
+                    {
+                        Text = "The file and its recovery backup will be removed.",
+                        Foreground = Brush.Parse("#64748B"),
+                        TextWrapping = TextWrapping.Wrap,
+                    },
+                    new StackPanel
+                    {
+                        Orientation = Orientation.Horizontal,
+                        HorizontalAlignment = HorizontalAlignment.Right,
+                        Spacing = 8,
+                        Children = { cancelButton, deleteButton },
+                    },
+                },
+            };
+
+            return await deleteDialog.ShowDialog<bool>(dialog);
+        }
+
+        async Task<bool> ConfirmDeleteProjectExplorerFileAsync(string currentPath)
+        {
+            var originalTab = Vm.SelectedDocumentTab;
+            var dirtyTabs = Vm.DocumentTabs
+                .Where(tab => string.Equals(
+                    tab.DocumentPath,
+                    currentPath,
+                    StringComparison.OrdinalIgnoreCase))
+                .Where(Vm.IsDocumentTabDirty)
+                .ToList();
+            foreach (var tab in dirtyTabs)
+            {
+                if (!ReferenceEquals(Vm.SelectedDocumentTab, tab))
+                {
+                    Vm.ActivateDocumentTab(tab);
+                }
+
+                FlushPendingPropertyHistory();
+                if (!await EnsureCanContinueWithUnsavedChangesAsync())
+                {
+                    if (originalTab is not null)
+                    {
+                        RestoreDocumentTabIfPresent(originalTab);
+                    }
+
+                    return false;
+                }
+            }
+
+            if (originalTab is not null)
+            {
+                RestoreDocumentTabIfPresent(originalTab);
+            }
+
+            var openTabCount = Vm.DocumentTabs.Count(tab => string.Equals(
+                tab.DocumentPath,
+                currentPath,
+                StringComparison.OrdinalIgnoreCase));
+            return await ShowDeleteProjectExplorerFileDialogAsync(currentPath, openTabCount);
+        }
+
+        async Task DeleteProjectExplorerFileAsync()
+        {
+            if (list.SelectedItem is not ProjectExplorerNode { IsFile: true } node)
+            {
+                Vm.StatusText = "Select an AXAML file to delete.";
+                return;
+            }
+
+            var currentPath = GetProjectExplorerDeleteFilePath(
+                node,
+                Vm.ProjectWorkspacePath);
+            if (string.IsNullOrWhiteSpace(currentPath))
+            {
+                Vm.StatusText = "The selected Project Explorer file is unavailable.";
+                return;
+            }
+
+            if (!await ConfirmDeleteProjectExplorerFileAsync(currentPath))
+            {
+                return;
+            }
+
+            try
+            {
+                File.Delete(currentPath);
+            }
+            catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+            {
+                Vm.StatusText = $"Could not delete {System.IO.Path.GetFileName(currentPath)}: {exception.Message}";
+                return;
+            }
+
+            try
+            {
+                File.Delete(GetDocumentBackupPath(currentPath));
+            }
+            catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+            {
+                // The source file is already deleted; a stale backup is harmless and can be removed later.
+            }
+
+            Vm.ForgetDocumentTabsForDeletedPath(currentPath);
+            if (!Vm.RefreshProjectWorkspace(out var refreshError))
+            {
+                RefreshProjectTree();
+                Vm.StatusText = $"Deleted the file, but could not refresh Project Explorer: {refreshError}";
+                return;
+            }
+
+            RefreshProjectTree();
+            Vm.StatusText = $"Deleted {System.IO.Path.GetFileName(currentPath)}.";
+        }
+
         void MoveSelection(int offset)
         {
             if (visibleNodes.Count == 0)
@@ -2116,6 +2293,11 @@ public partial class MainWindow : Window
             Header = "Rename AXAML File...",
             IsEnabled = false,
         };
+        var deleteFileMenu = new MenuItem
+        {
+            Header = "Delete AXAML File...",
+            IsEnabled = false,
+        };
         var copyRelativePathMenu = new MenuItem { Header = "Copy Relative Path" };
         var copyFullPathMenu = new MenuItem { Header = "Copy Full Path" };
         var openFileManagerMenu = new MenuItem { Header = "Open in File Manager" };
@@ -2124,6 +2306,7 @@ public partial class MainWindow : Window
         list.DoubleTapped += (_, _) => SelectCurrent();
         newFileMenu.Click += async (_, _) => await CreateNewProjectExplorerFileAsync();
         renameFileMenu.Click += async (_, _) => await RenameProjectExplorerFileAsync();
+        deleteFileMenu.Click += async (_, _) => await DeleteProjectExplorerFileAsync();
         copyRelativePathMenu.Click += async (_, _) => await CopyProjectExplorerPathAsync(fullPath: false);
         copyFullPathMenu.Click += async (_, _) => await CopyProjectExplorerPathAsync(fullPath: true);
         openFileManagerMenu.Click += (_, _) => OpenProjectExplorerFileManager();
@@ -2133,6 +2316,7 @@ public partial class MainWindow : Window
             {
                 newFileMenu,
                 renameFileMenu,
+                deleteFileMenu,
                 new Separator(),
                 copyRelativePathMenu,
                 copyFullPathMenu,
@@ -2141,7 +2325,9 @@ public partial class MainWindow : Window
         };
         projectExplorerContextMenu.Opened += (_, _) =>
         {
-            renameFileMenu.IsEnabled = list.SelectedItem is ProjectExplorerNode { IsFile: true };
+            var hasSelectedFile = list.SelectedItem is ProjectExplorerNode { IsFile: true };
+            renameFileMenu.IsEnabled = hasSelectedFile;
+            deleteFileMenu.IsEnabled = hasSelectedFile;
         };
         list.ContextMenu = projectExplorerContextMenu;
         list.KeyDown += async (_, e) =>
@@ -2211,6 +2397,11 @@ public partial class MainWindow : Window
                 await RenameProjectExplorerFileAsync();
                 e.Handled = true;
             }
+            else if (e.Key is Key.Delete or Key.Back)
+            {
+                await DeleteProjectExplorerFileAsync();
+                e.Handled = true;
+            }
             else if (e.Key == Key.Escape)
             {
                 dialog.Close(null);
@@ -2248,7 +2439,7 @@ public partial class MainWindow : Window
             {
                 new TextBlock
                 {
-                    Text = "Browse the project tree. Double-click an AXAML file to open it; press Enter on a folder or double-click a folder to expand or collapse it, use Left/Right to navigate, Ctrl+N or the context menu to create a new AXAML file from a UserControl or Window template, F2 or the context menu to rename the selected AXAML file, Ctrl+C to copy the selected full path, or the context menu to open its location in the file manager.",
+                    Text = "Browse the project tree. Double-click an AXAML file to open it; press Enter on a folder or double-click a folder to expand or collapse it, use Left/Right to navigate, Ctrl+N or the context menu to create a new AXAML file from a UserControl or Window template, F2 or the context menu to rename the selected AXAML file, Delete or Backspace to remove it after dirty protection, Ctrl+C to copy the selected full path, or the context menu to open its location in the file manager.",
                     TextWrapping = TextWrapping.Wrap,
                 },
                 rootText,

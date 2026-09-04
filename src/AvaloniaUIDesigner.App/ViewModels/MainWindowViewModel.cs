@@ -15329,6 +15329,126 @@ public partial class MainWindowViewModel : ViewModelBase
         return true;
     }
 
+    public int ForgetDocumentTabsForDeletedPath(string path)
+    {
+        if (string.IsNullOrWhiteSpace(path))
+        {
+            return 0;
+        }
+
+        string fullPath;
+        try
+        {
+            fullPath = Path.GetFullPath(path.Trim());
+        }
+        catch (Exception exception) when (exception is ArgumentException or IOException or NotSupportedException)
+        {
+            return 0;
+        }
+
+        var openStates = _documentTabStates.Values
+            .Where(state => string.Equals(
+                state.DocumentPath,
+                fullPath,
+                StringComparison.OrdinalIgnoreCase))
+            .ToList();
+        var closedStates = _closedDocumentTabs
+            .Where(state => string.Equals(
+                state.DocumentPath,
+                fullPath,
+                StringComparison.OrdinalIgnoreCase))
+            .ToList();
+        var wasActive = _selectedDocumentTab is not null
+            && openStates.Any(state => ReferenceEquals(state.Tab, _selectedDocumentTab));
+        var activeIndex = wasActive
+            ? DocumentTabs.IndexOf(_selectedDocumentTab!)
+            : -1;
+        var removedCount = 0;
+
+        var retainedClosedStates = _closedDocumentTabs
+            .Where(state => !string.Equals(
+                state.DocumentPath,
+                fullPath,
+                StringComparison.OrdinalIgnoreCase))
+            .ToList();
+        _closedDocumentTabs.Clear();
+        foreach (var state in retainedClosedStates.AsEnumerable().Reverse())
+        {
+            _closedDocumentTabs.Push(state);
+        }
+        removedCount += closedStates.Count;
+
+        foreach (var state in openStates)
+        {
+            if (!_documentTabStates.Remove(state.Tab))
+            {
+                continue;
+            }
+
+            RemoveRecentDocumentTab(state.Tab);
+            DocumentTabs.Remove(state.Tab);
+            removedCount++;
+        }
+
+        var currentPathWasDeleted = string.Equals(
+            _currentDocumentPath,
+            fullPath,
+            StringComparison.OrdinalIgnoreCase);
+        if (currentPathWasDeleted)
+        {
+            _currentDocumentPath = null;
+        }
+
+        if (string.Equals(
+                _externalDocumentChangePath,
+                fullPath,
+                StringComparison.OrdinalIgnoreCase))
+        {
+            _externalDocumentChangePath = null;
+        }
+
+        if (RecentFiles.Any(pathEntry => string.Equals(
+                pathEntry,
+                fullPath,
+                StringComparison.OrdinalIgnoreCase)))
+        {
+            RemoveRecentFile(fullPath);
+        }
+
+        if (wasActive)
+        {
+            _selectedDocumentTab = null;
+            if (DocumentTabs.Count == 0)
+            {
+                AddDocumentTab(
+                    new DesignerCanvasDocument(Array.Empty<DesignerElementSnapshot>()),
+                    documentPath: null,
+                    isDirty: false,
+                    lastSavedSnapshot: null,
+                    activate: true);
+            }
+            else
+            {
+                ActivateDocumentTab(DocumentTabs[Math.Clamp(
+                    activeIndex,
+                    0,
+                    DocumentTabs.Count - 1)]);
+            }
+        }
+        else
+        {
+            UpdateDocumentTabPresentations();
+        }
+
+        OnPropertyChanged(nameof(CurrentDocumentPath));
+        OnPropertyChanged(nameof(CanReloadCurrentFile));
+        OnPropertyChanged(nameof(WindowTitle));
+        OnPropertyChanged(nameof(CanReopenClosedDocumentTab));
+        OnPropertyChanged(nameof(CanCloseCurrentDocumentTab));
+        OnPropertyChanged(nameof(HasMultipleDocumentTabs));
+        return removedCount + (currentPathWasDeleted ? 1 : 0);
+    }
+
     public void SetProjectWorkspaceCollapsedFolders(IEnumerable<string> relativePaths)
     {
         var normalizedPaths = NormalizeProjectWorkspaceFolders(relativePaths);
