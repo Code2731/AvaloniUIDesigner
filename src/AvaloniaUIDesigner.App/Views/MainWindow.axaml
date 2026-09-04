@@ -78,6 +78,10 @@
                           Header="Refresh Project Files"
                           Click="OnRefreshProjectFilesMenuClicked"
                           IsEnabled="{Binding HasProjectWorkspace}"/>
+                <MenuItem Name="BuildProjectWorkspaceMenu"
+                          Header="Build Project Workspace..."
+                          Click="OnBuildProjectWorkspaceMenuClicked"
+                          IsEnabled="{Binding HasProjectWorkspace}"/>
                 <MenuItem Name="ReloadCurrentFileMenu"
                           Header="Reload Current File (Ctrl+Shift+R)"
                           Click="OnReloadCurrentFileMenuClicked"

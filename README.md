@@ -158,6 +158,7 @@ dotnet run --project src/AvaloniaUIDesigner.App/AvaloniaUIDesigner.App.csproj
 - **Paired Identity Diagnostics**: AXAML `x:Class`와 `.axaml.cs`의 namespace·partial class를 비교해 일치하면 `paired`, 누락·불일치하면 amber `pair mismatch`로 표시하고 hover tooltip으로 원인을 설명합니다. 파일 존재만으로 유효한 pairing으로 오인하지 않도록 합니다.
 - **Existing AXAML Pairing**: code-behind가 없는 기존 `Window`/`UserControl` AXAML을 Explorer에서 `Create Paired Code-behind...`로 선택하면 타입명을 확인한 뒤 `x:Class`와 `.axaml.cs`를 함께 생성합니다. 원본 AXAML backup, dirty 보호, 원자적 rollback, 열린 문서 동기화를 적용합니다.
 - **Paired Identity Repair**: `pair mismatch` AXAML에서 `Repair AXAML x:Class from Code-behind...`를 실행하면 기존 `.axaml.cs`의 namespace·partial class identity를 기준으로 AXAML root의 `x:Class`만 복구합니다. code-behind는 보존하고 backup, dirty 보호, rollback, 열린 문서 동기화를 적용합니다.
+- **Project Workspace Build**: `File > Build Project Workspace...`에서 workspace의 `.csproj`·`.sln`·`.slnx`를 선택해 `dotnet build`를 실행하고 실시간 stdout/stderr, 성공·실패·취소 결과를 전용 로그 창에서 확인합니다. `bin`·`obj`·`.git`·`.vs` 아래의 생성물은 build target에서 제외합니다.
 - **Command-line Startup Paths**: 파일 탐색기나 터미널에서 하나 이상의 `.axaml`·`.xaml` 문서, 폴더, `.csproj`·`.sln`·`.slnx` 경로를 인수로 전달해 실행하면 세션 복원 후 해당 문서 탭과 Project Workspace를 바로 엽니다. 지원하지 않는 경로와 읽기 실패는 성공한 경로와 기존 세션을 유지한 채 상태바에 안내합니다.
 - **Tab View Navigation**: `Ctrl+Tab`/`Ctrl+Shift+Tab`으로 문서 탭을 순환하고, `Ctrl+Shift+PageUp/PageDown` 또는 탭 컨텍스트 메뉴로 활성 탭을 좌우 이동하며, 탭별 캔버스 줌·스크롤 위치와 Object Tree 선택을 전환·세션 복원 때 보존합니다.
 - **Viewport 복원 우선순위**: 문서 탭을 복원하는 짧은 pending 구간에는 선택 컨트롤 자동 스크롤을 보류해 저장된 Canvas 위치가 Object Tree/Canvas 선택 추적에 의해 덮어써지지 않도록 합니다.
@@ -265,6 +266,7 @@ dotnet run --project src/AvaloniaUIDesigner.App/AvaloniaUIDesigner.App.csproj
 12b1. AXAML에 `.axaml.cs`가 있어도 `x:Class`가 없거나 namespace·partial class가 일치하지 않으면 Explorer 상태가 `pair mismatch`로 표시됩니다. 일치하는 경우에만 `paired`로 표시되며, 상태 chip에 마우스를 올리면 진단 설명을 확인할 수 있습니다.
 12b2. code-behind가 없는 기존 `Window`/`UserControl` AXAML을 선택하고 `Create Paired Code-behind...`를 실행하면 타입명을 확인한 뒤 AXAML `x:Class`와 `.axaml.cs`를 원자적으로 생성합니다. 기존 `x:Class`가 있으면 기본값으로 재사용하고, 없으면 파일명에서 안전한 타입명을 제안합니다.
 12b3. `pair mismatch` AXAML을 선택하고 `Repair AXAML x:Class from Code-behind...`를 실행하면 `.axaml.cs`의 namespace·partial class identity를 확인한 뒤 AXAML root의 `x:Class`만 교체합니다. 기존 code-behind는 수정하지 않으며, backup·dirty 보호·원자적 rollback 후 현재 문서만 즉시 재import하고 백그라운드 탭은 reload 대기로 표시합니다.
+12b4. `File > Build Project Workspace...`를 실행하면 workspace에서 찾은 `.csproj`·`.sln`·`.slnx` 중 하나를 고르고 `dotnet build --nologo`를 실행합니다. 여러 대상은 이름·경로 검색으로 고를 수 있으며, 빌드 중 `Cancel Build`는 dotnet 프로세스 트리를 종료하고 로그 창은 stdout/stderr와 종료 상태를 보존합니다.
 13. `Edit > Edit Typography Properties...`에서 글꼴과 지원 컨트롤의 텍스트 정렬·줄바꿈 편집
 14. `Edit > Edit Transform Properties...`에서 선택 컨트롤의 이동·회전·크기·기울기와 변환 기준점 편집
 15. `Edit > Edit Accessibility & Navigation...`에서 스크린리더 메타데이터와 키보드 포커스 순서 편집
@@ -449,6 +451,7 @@ dotnet run --project src/AvaloniaUIDesigner.App/AvaloniaUIDesigner.App.csproj
 75do. Project Explorer는 paired code-behind의 존재뿐 아니라 AXAML `x:Class`, C# namespace, `partial class` 이름을 함께 검사합니다. 세 identity가 맞으면 green `paired`, code-behind가 있지만 하나라도 다르면 amber `pair mismatch`와 tooltip을 표시하며, 외부 `.axaml.cs` 생성·삭제 후에도 watcher refresh에서 상태를 갱신합니다.
 75dp. 기존 Window/UserControl AXAML의 `Create Paired Code-behind...`는 기존 `x:Class` 또는 사용자가 입력한 dotted .NET type으로 AXAML attribute와 `.axaml.cs`를 함께 준비합니다. 현재 문서가 dirty하면 기존 보호 대화상자를 거치고, 기존 recovery backup을 보존하거나 없을 때 원본을 backup으로 남기며, 두 파일 중 하나라도 실패하면 AXAML·sidecar·새 backup을 rollback합니다.
 75dq. `Repair AXAML x:Class from Code-behind...`는 mismatch 상태의 AXAML과 sidecar를 다시 읽어 code-behind의 file-scoped/block namespace와 `partial class` identity를 검증하고, 해당 dotted .NET type을 AXAML root `x:Class`에 원자적으로 반영합니다. `.axaml.cs`는 쓰지 않으며, 기존 backup 보존·dirty 보호·실패 rollback·현재/백그라운드 문서 탭 동기화를 보장합니다.
+75dr. `Build Project Workspace...`는 현재 workspace 하위의 실제 `.csproj`·`.sln`·`.slnx`만 정렬해 선택 목록으로 제공하고, 생성 폴더를 제외한 뒤 `dotnet build --nologo`를 workspace 기준으로 실행합니다. 전용 로그 창은 표준 출력과 오류를 실시간으로 보여주고, 빌드 중 닫기를 차단하며, 취소 시 전체 프로세스 트리를 종료하고 최종 상태를 status bar에 남깁니다.
 76. `File > Load Component Pack...` 또는 `File > Load Toolbox Preset Pack...`으로 외부 Toolbox 팩을 추가하면 파일 경로가 세션에 등록되어 다음 실행 때 자동으로 다시 로드됩니다. 파일이 없어도 문서 탭 복원은 계속되며 상태바에 경고가 표시됩니다.
 77. 외부 프로젝트의 컨트롤은 Component Pack 항목에 `designOnly: true`, `avaloniaTypeName`, `previewText`, `defaultProperties`를 지정해 등록합니다. 디자이너에서는 타입명 플레이스홀더로 편집하고, 생성 AXAML에는 원래 커스텀 타입과 속성을 출력합니다. 예시는 [custom-component-pack.example.json](docs/custom-component-pack.example.json)을 참고하세요.
 78. `File > Load Component Pack Plugin...`에서 `IComponentPackPlugin`을 구현한 신뢰할 수 있는 DLL을 선택하면 플러그인이 제공한 Component Pack을 Toolbox에 등록합니다. DLL 경로는 세션 JSON의 `ComponentPluginPaths`에 저장되고, 앱 재시작 시 플러그인·JSON 팩·프리셋 팩 순서로 복원됩니다.
@@ -807,6 +810,7 @@ AXAML 소스 편집기의 `Validate`와 `Preview`는 현재 디자인과 Undo �
 - v2.90: Project Explorer paired AXAML/code-behind identity mismatch 진단 추가
 - v2.91: 기존 AXAML에 paired code-behind를 안전하게 연결하는 기능 추가
 - v2.92: code-behind identity를 기준으로 AXAML `x:Class` mismatch 복구 기능 추가
+- v2.93: Project Workspace `dotnet build` 선택·실시간 로그·취소 흐름 추가
 
 ## 컴포넌트 팩
 

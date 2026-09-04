@@ -174,6 +174,7 @@ public partial class MainWindow : Window
         Project Explorer attach code-behind  Add a matching x:Class and .axaml.cs to an existing AXAML file
         Project Explorer create paired file  Generate code-behind for an existing Window or UserControl AXAML
         Project Explorer repair pair  Restore AXAML x:Class from an existing code-behind identity
+        Project Workspace build  Run dotnet build and inspect compiler output for a project or solution
         Project Explorer Ctrl+Shift+N  Create a new folder
         Project Explorer Ctrl+Shift+D  Duplicate the selected AXAML file
         Project Explorer Ctrl+Shift+M  Move the selected AXAML file to another project folder
@@ -229,6 +230,15 @@ public partial class MainWindow : Window
         string Content,
         string? CodeBehindPath,
         string? CodeBehindContent);
+    private sealed record ProjectBuildTarget(string FullPath, string RelativePath)
+    {
+        public override string ToString() => RelativePath;
+    }
+    private sealed record ProjectBuildResult(
+        bool Succeeded,
+        bool Canceled,
+        int ExitCode,
+        string? Error);
     private sealed record ComponentPackManagementAction(string SourceId);
     private sealed record ExternalChangeDialogResult(
         ExternalDocumentChangeInfo Change,
@@ -984,6 +994,11 @@ public partial class MainWindow : Window
         Avalonia.Interactivity.RoutedEventArgs e)
         => await OpenProjectFileAsync();
 
+    private async void OnBuildProjectWorkspaceMenuClicked(
+        object? sender,
+        Avalonia.Interactivity.RoutedEventArgs e)
+        => await BuildProjectWorkspaceAsync();
+
     private void OnCloseProjectWorkspaceMenuClicked(
         object? sender,
         Avalonia.Interactivity.RoutedEventArgs e)
@@ -1024,6 +1039,407 @@ public partial class MainWindow : Window
         {
             return null;
         }
+    }
+
+    private async Task<ProjectBuildResult?> ShowProjectBuildOutputDialogAsync(
+        ProjectBuildTarget target)
+    {
+        var dialog = new Window
+        {
+            Title = $"Build Project - {target.RelativePath}",
+            Width = 820,
+            Height = 600,
+            MinWidth = 620,
+            MinHeight = 420,
+            CanResize = true,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner,
+        };
+        var output = new TextBox
+        {
+            IsReadOnly = true,
+            AcceptsReturn = true,
+            TextWrapping = TextWrapping.NoWrap,
+            MinHeight = 350,
+            FontFamily = new Avalonia.Media.FontFamily("Consolas"),
+        };
+        var stopButton = new Button { Content = "Cancel Build", MinWidth = 110 };
+        var isRunning = false;
+        var wasCanceled = false;
+        var dirtyDocumentCount = Vm?.DocumentTabs.Count(Vm.IsDocumentTabDirty) ?? 0;
+        var result = new ProjectBuildResult(
+            Succeeded: false,
+            Canceled: false,
+            ExitCode: -1,
+            Error: null);
+        Process? process = null;
+
+        async Task RunBuildAsync()
+        {
+            isRunning = true;
+            try
+            {
+                process = new Process
+                {
+                    StartInfo = new ProcessStartInfo
+                    {
+                        FileName = "dotnet",
+                        WorkingDirectory = System.IO.Path.GetDirectoryName(target.FullPath)
+                            ?? Vm?.ProjectWorkspacePath
+                            ?? Environment.CurrentDirectory,
+                        UseShellExecute = false,
+                        RedirectStandardOutput = true,
+                        RedirectStandardError = true,
+                        CreateNoWindow = true,
+                    },
+                };
+                process.StartInfo.ArgumentList.Add("build");
+                process.StartInfo.ArgumentList.Add(target.FullPath);
+                process.StartInfo.ArgumentList.Add("--nologo");
+                output.Text = $"$ dotnet build \"{target.RelativePath}\" --nologo{Environment.NewLine}{Environment.NewLine}";
+                if (dirtyDocumentCount > 0)
+                {
+                    output.Text += $"Warning: build uses saved files; {dirtyDocumentCount} open document(s) have unsaved designer changes.{Environment.NewLine}{Environment.NewLine}";
+                }
+                if (!process.Start())
+                {
+                    result = new ProjectBuildResult(false, false, -1, "dotnet could not be started.");
+                    return;
+                }
+
+                var standardOutputTask = AppendProjectBuildOutputAsync(
+                    process.StandardOutput,
+                    output,
+                    string.Empty);
+                var standardErrorTask = AppendProjectBuildOutputAsync(
+                    process.StandardError,
+                    output,
+                    "[stderr] ");
+                await Task.WhenAll(
+                    standardOutputTask,
+                    standardErrorTask,
+                    process.WaitForExitAsync());
+                result = new ProjectBuildResult(
+                    Succeeded: !wasCanceled && process.ExitCode == 0,
+                    Canceled: wasCanceled,
+                    ExitCode: process.ExitCode,
+                    Error: null);
+                output.Text += Environment.NewLine + (wasCanceled
+                    ? "Build canceled."
+                    : process.ExitCode == 0
+                        ? "Build succeeded."
+                        : $"Build failed with exit code {process.ExitCode}.") + Environment.NewLine;
+                output.CaretIndex = output.Text?.Length ?? 0;
+            }
+            catch (Exception exception) when (exception is InvalidOperationException
+                or System.ComponentModel.Win32Exception
+                or IOException
+                or UnauthorizedAccessException)
+            {
+                result = new ProjectBuildResult(
+                    Succeeded: false,
+                    Canceled: wasCanceled,
+                    ExitCode: -1,
+                    Error: exception.Message);
+                output.Text += Environment.NewLine
+                    + $"Build could not run: {exception.Message}{Environment.NewLine}";
+                output.CaretIndex = output.Text?.Length ?? 0;
+            }
+            finally
+            {
+                isRunning = false;
+                process?.Dispose();
+                process = null;
+                stopButton.Content = "Close";
+            }
+        }
+
+        stopButton.Click += (_, _) =>
+        {
+            if (!isRunning)
+            {
+                dialog.Close(result);
+                return;
+            }
+
+            wasCanceled = true;
+            try
+            {
+                process?.Kill(entireProcessTree: true);
+            }
+            catch (Exception exception) when (exception is InvalidOperationException
+                or System.ComponentModel.Win32Exception
+                or NotSupportedException)
+            {
+                output.Text += $"Could not stop dotnet: {exception.Message}{Environment.NewLine}";
+            }
+        };
+        dialog.Closing += (_, e) =>
+        {
+            if (isRunning)
+            {
+                e.Cancel = true;
+            }
+        };
+        dialog.Opened += async (_, _) => await RunBuildAsync();
+        dialog.Content = new DockPanel
+        {
+            Margin = new Thickness(16),
+            Children =
+            {
+                new Border
+                {
+                    [DockPanel.DockProperty] = Dock.Top,
+                    Padding = new Thickness(10, 8),
+                    Background = Brush.Parse("#F1F5F9"),
+                    Child = new TextBlock
+                    {
+                        Text = $"Target: {target.RelativePath}",
+                        Foreground = Brush.Parse("#334155"),
+                        TextWrapping = TextWrapping.Wrap,
+                    },
+                },
+                new ScrollViewer
+                {
+                    [DockPanel.DockProperty] = Dock.Top,
+                    Content = output,
+                    HorizontalScrollBarVisibility = Avalonia.Controls.Primitives.ScrollBarVisibility.Auto,
+                    VerticalScrollBarVisibility = Avalonia.Controls.Primitives.ScrollBarVisibility.Auto,
+                },
+                new StackPanel
+                {
+                    [DockPanel.DockProperty] = Dock.Bottom,
+                    Orientation = Orientation.Horizontal,
+                    HorizontalAlignment = HorizontalAlignment.Right,
+                    Spacing = 8,
+                    Children = { stopButton },
+                },
+            },
+        };
+
+        return await dialog.ShowDialog<ProjectBuildResult?>(this);
+    }
+
+    private async Task BuildProjectWorkspaceAsync()
+    {
+        if (Vm is null || !Vm.HasProjectWorkspace)
+        {
+            return;
+        }
+
+        var targets = FindProjectBuildTargets(Vm.ProjectWorkspacePath);
+        if (targets.Count == 0)
+        {
+            Vm.StatusText = "No .csproj, .sln, or .slnx build target was found in the project workspace.";
+            return;
+        }
+
+        var target = targets.Count == 1
+            ? targets[0]
+            : await ShowProjectBuildTargetDialogAsync(targets);
+        if (target is null)
+        {
+            return;
+        }
+
+        var dirtyDocumentCount = Vm.DocumentTabs.Count(Vm.IsDocumentTabDirty);
+        var result = await ShowProjectBuildOutputDialogAsync(target);
+        if (result is null)
+        {
+            return;
+        }
+
+        Vm.StatusText = result.Canceled
+            ? $"Build canceled: {target.RelativePath}"
+            : result.Succeeded
+                ? dirtyDocumentCount > 0
+                    ? $"Build succeeded: {target.RelativePath}. Saved files were built; {dirtyDocumentCount} open document(s) remain unsaved."
+                    : $"Build succeeded: {target.RelativePath}"
+                : string.IsNullOrWhiteSpace(result.Error)
+                    ? $"Build failed (exit code {result.ExitCode}): {target.RelativePath}"
+                    : $"Build could not run for {target.RelativePath}: {result.Error}";
+    }
+
+    private static IReadOnlyList<ProjectBuildTarget> FindProjectBuildTargets(string? workspacePath)
+    {
+        if (string.IsNullOrWhiteSpace(workspacePath))
+        {
+            return Array.Empty<ProjectBuildTarget>();
+        }
+
+        try
+        {
+            var rootPath = System.IO.Path.GetFullPath(workspacePath);
+            if (!Directory.Exists(rootPath))
+            {
+                return Array.Empty<ProjectBuildTarget>();
+            }
+
+            var targets = new List<ProjectBuildTarget>();
+            foreach (var fullPath in Directory.EnumerateFiles(
+                         rootPath,
+                         "*.*",
+                         SearchOption.AllDirectories))
+            {
+                var extension = System.IO.Path.GetExtension(fullPath);
+                if (!string.Equals(extension, ".csproj", StringComparison.OrdinalIgnoreCase)
+                    && !string.Equals(extension, ".sln", StringComparison.OrdinalIgnoreCase)
+                    && !string.Equals(extension, ".slnx", StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
+                var relativePath = System.IO.Path.GetRelativePath(rootPath, fullPath);
+                var segments = relativePath.Split(
+                    [System.IO.Path.DirectorySeparatorChar, System.IO.Path.AltDirectorySeparatorChar],
+                    StringSplitOptions.RemoveEmptyEntries);
+                if (segments.Any(segment => segment is "bin" or "obj" or ".git" or ".vs"))
+                {
+                    continue;
+                }
+
+                targets.Add(new ProjectBuildTarget(
+                    fullPath,
+                    relativePath.Replace(System.IO.Path.DirectorySeparatorChar, '/')));
+            }
+
+            return targets
+                .OrderBy(target => target.RelativePath, StringComparer.OrdinalIgnoreCase)
+                .ToList();
+        }
+        catch (Exception exception) when (exception is IOException
+            or UnauthorizedAccessException
+            or ArgumentException
+            or NotSupportedException)
+        {
+            return Array.Empty<ProjectBuildTarget>();
+        }
+    }
+
+    private static async Task AppendProjectBuildOutputAsync(
+        StreamReader reader,
+        TextBox output,
+        string prefix)
+    {
+        while (await reader.ReadLineAsync() is { } line)
+        {
+            await Dispatcher.UIThread.InvokeAsync(() =>
+            {
+                output.Text += $"{prefix}{line}{Environment.NewLine}";
+                output.CaretIndex = output.Text?.Length ?? 0;
+            });
+        }
+    }
+
+    private async Task<ProjectBuildTarget?> ShowProjectBuildTargetDialogAsync(
+        IReadOnlyList<ProjectBuildTarget> targets)
+    {
+        var dialog = new Window
+        {
+            Title = "Build Project Workspace",
+            Width = 620,
+            Height = 440,
+            MinWidth = 500,
+            MinHeight = 340,
+            CanResize = true,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner,
+        };
+        var search = new TextBox
+        {
+            Watermark = "Search project or solution file",
+            MinWidth = 420,
+        };
+        var matchSummary = new TextBlock
+        {
+            Foreground = Brush.Parse("#64748B"),
+        };
+        var list = new ListBox
+        {
+            MinHeight = 240,
+            SelectionMode = SelectionMode.Single,
+        };
+        var filteredTargets = new List<ProjectBuildTarget>();
+
+        void RefreshResults()
+        {
+            var query = search.Text?.Trim() ?? string.Empty;
+            filteredTargets = targets
+                .Where(target => string.IsNullOrWhiteSpace(query)
+                    || target.RelativePath.Contains(query, StringComparison.OrdinalIgnoreCase))
+                .ToList();
+            list.ItemsSource = filteredTargets;
+            list.SelectedIndex = filteredTargets.Count > 0 ? 0 : -1;
+            matchSummary.Text = filteredTargets.Count == 0
+                ? "No project or solution files found."
+                : $"{filteredTargets.Count} build target(s)";
+        }
+
+        void SelectCurrent()
+        {
+            if (list.SelectedItem is ProjectBuildTarget target)
+            {
+                dialog.Close(target);
+            }
+        }
+
+        var cancelButton = new Button { Content = "Cancel", MinWidth = 86 };
+        var buildButton = new Button { Content = "Build", MinWidth = 86 };
+        cancelButton.Click += (_, _) => dialog.Close(null);
+        buildButton.Click += (_, _) => SelectCurrent();
+        search.TextChanged += (_, _) => RefreshResults();
+        search.KeyDown += (_, e) =>
+        {
+            if (e.Key == Key.Enter)
+            {
+                SelectCurrent();
+                e.Handled = true;
+            }
+            else if (e.Key == Key.Escape)
+            {
+                dialog.Close(null);
+                e.Handled = true;
+            }
+        };
+        list.DoubleTapped += (_, _) => SelectCurrent();
+        list.KeyDown += (_, e) =>
+        {
+            if (e.Key == Key.Enter)
+            {
+                SelectCurrent();
+                e.Handled = true;
+            }
+            else if (e.Key == Key.Escape)
+            {
+                dialog.Close(null);
+                e.Handled = true;
+            }
+        };
+        dialog.Opened += (_, _) => search.Focus();
+        dialog.Content = new StackPanel
+        {
+            Margin = new Thickness(16),
+            Spacing = 10,
+            Children =
+            {
+                new TextBlock
+                {
+                    Text = "Choose a .csproj, .sln, or .slnx file to build with dotnet.",
+                    TextWrapping = TextWrapping.Wrap,
+                },
+                search,
+                matchSummary,
+                list,
+                new StackPanel
+                {
+                    Orientation = Orientation.Horizontal,
+                    HorizontalAlignment = HorizontalAlignment.Right,
+                    Spacing = 8,
+                    Children = { cancelButton, buildButton },
+                },
+            },
+        };
+
+        RefreshResults();
+        return await dialog.ShowDialog<ProjectBuildTarget?>(this);
     }
 
     private async Task OpenProjectFolderAsync()
