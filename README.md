@@ -153,7 +153,7 @@ dotnet run --project src/AvaloniaUIDesigner.App/AvaloniaUIDesigner.App.csproj
 - **Tab View Navigation**: `Ctrl+Tab`/`Ctrl+Shift+Tab`으로 문서 탭을 순환하고, `Ctrl+Shift+PageUp/PageDown` 또는 탭 컨텍스트 메뉴로 활성 탭을 좌우 이동하며, 탭별 캔버스 줌·스크롤 위치와 Object Tree 선택을 전환·세션 복원 때 보존합니다.
 - **Viewport 복원 우선순위**: 문서 탭을 복원하는 짧은 pending 구간에는 선택 컨트롤 자동 스크롤을 보류해 저장된 Canvas 위치가 Object Tree/Canvas 선택 추적에 의해 덮어써지지 않도록 합니다.
 - **Workspace Panels**: `View > Panels`에서 Toolbox·Object Tree·Property Inspector를 독립적으로 숨기거나 다시 표시하고, 패널 크기와 가시성·Object Tree 분할 위치를 세션에 저장합니다. `Reset Panel Layout`으로 기본 작업 공간을 복원합니다.
-- **Workspace Session Restore**: 앱을 정상적으로 닫으면 열린 탭 목록·활성 탭·현재 AXAML·저장 기준 스냅샷·줌·Canvas 스크롤 위치·Object Tree 선택·Property Inspector 탐색 상태를 로컬 세션에 저장하고, 다음 실행 시 dirty 문서를 포함해 복원합니다. 세션 JSON이 손상되면 현재 새 문서 상태를 유지하고 안전하게 시작합니다.
+- **Workspace Session Restore**: 앱을 정상적으로 닫으면 열린 탭 목록·활성 탭·현재 AXAML·저장 기준 스냅샷·줌·Canvas 스크롤 위치·Object Tree 선택·Property Inspector 탐색 상태를 로컬 세션에 저장하고, 다음 실행 시 dirty 문서를 포함해 복원합니다. 문서 변경 후 2초 debounce 자동 체크포인트도 같은 세션 JSON에 원자적으로 기록하므로 프로세스가 비정상 종료되어도 마지막 체크포인트까지의 편집을 복구할 수 있습니다. 세션 JSON이 손상되면 현재 새 문서 상태를 유지하고 안전하게 시작합니다.
 - **문서 탭별 Design Guide**: 가로·세로 ruler에서 만든 guide 좌표와 `Show Design Guides`·`Snap to Guides` 설정을 문서 탭마다 독립 보존해 탭 전환·앱 재시작·닫힌 탭 복원 후에도 되살리고, 새 문서·새 AXAML·명시적 `Clear Design Guides`에서는 해당 탭만 초기화합니다.
 - **선택 요소 AXAML 재사용**: 하나 이상의 선택 컨트롤을 하위 계층·리소스·스타일·바인딩·컨트롤 전용 선언과 함께 독립 UserControl AXAML로 클립보드 복사하거나 파일로 내보내며, 다중 선택은 bounding box 기준의 상대 Canvas 좌표를 보존
 - **AXAML Fragment Clipboard**: `Edit > Paste AXAML from Clipboard` 또는 `Ctrl+Alt+V`로 OS 클립보드의 Window/UserControl AXAML을 현재 문서에 새 컨트롤로 붙여넣고, 선택된 잠금 해제 지원 컨테이너가 있으면 해당 부모의 Grid·StackPanel·Canvas·Tab·Content 슬롯 규칙으로 배치하며 이름 충돌·색상 리소스·스타일 충돌을 자동으로 분리하고 하나의 Undo 작업으로 되돌림
@@ -555,7 +555,7 @@ Live Preview 하단의 `Interaction Log`는 위 이벤트 메타데이터를 안
 
 `Undo History Timeline`은 Edit 메뉴, Design Toolbar, Canvas Context Menu, `Ctrl+Alt+Shift+F`에서 같은 대화상자를 엽니다. Timeline 진입점은 현재 History가 있을 때만 활성화되고, 기존 `Undo`·`Redo`·`Ctrl+Z`·`Ctrl+Y` 동작과 `Ctrl+Alt+F` 효과 편집 및 `Ctrl+Shift+F` 선택 맞춤 단축키는 유지됩니다.
 
-Workspace Session Restore는 종료 시 각 문서 탭의 현재 스냅샷과 마지막 저장 기준 스냅샷을 함께 저장하므로, 저장하지 않은 디자인 변경도 다음 실행에서 dirty 상태로 복원합니다. 세션 파일은 앱의 로컬 설정 영역에만 저장되며, 손상되거나 일부 문서가 파싱되지 않으면 세션 전체를 적용하지 않고 기본 새 문서로 시작합니다.
+Workspace Session Restore는 종료 시 각 문서 탭의 현재 스냅샷과 마지막 저장 기준 스냅샷을 함께 저장하므로, 저장하지 않은 디자인 변경도 다음 실행에서 dirty 상태로 복원합니다. 문서 변경 이벤트 뒤 2초 동안 추가 변경이 없으면 종료를 기다리지 않고 같은 세션 JSON을 원자적으로 갱신합니다. 따라서 강제 종료나 프로세스 충돌이 발생해도 마지막 자동 체크포인트까지의 탭·undo/redo·dirty 상태를 복구할 수 있으며, 종료 승인 중에는 체크포인트 타이머를 멈추고 최종 세션을 한 번 저장합니다. 세션 파일은 앱의 로컬 설정 영역에만 저장되며, 손상되거나 일부 문서가 파싱되지 않으면 세션 전체를 적용하지 않고 기본 새 문서로 시작합니다.
 
 탭 전환은 문서 내용과 Undo/Redo history뿐 아니라 탭별 줌 배율·Canvas 스크롤 오프셋·Object Tree 선택 이름·Property Inspector 필터/카테고리/확장 상태도 저장합니다. 따라서 여러 화면을 번갈아 편집할 때 작업 위치와 속성 탐색 맥락을 잃지 않으며, `Ctrl+Tab` 순환 전환과 앱 재시작 후에도 같은 편집 맥락을 유지합니다.
 
@@ -766,6 +766,7 @@ AXAML 소스 편집기의 `Validate`와 `Preview`는 현재 디자인과 Undo �
 - v2.78: Project Workspace 닫기와 열린 문서 보존 추가
 - v2.79: 명령줄 시작 경로에서 AXAML·Project Workspace 자동 열기 추가
 - v2.80: 다중 명령줄 시작 경로와 부분 성공 상태 요약 추가
+- v2.81: 문서 변경 후 debounce 자동 세션 체크포인트와 충돌 복구 안정성 추가
 
 ## 컴포넌트 팩
 

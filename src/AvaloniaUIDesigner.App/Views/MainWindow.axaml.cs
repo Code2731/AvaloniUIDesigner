@@ -190,6 +190,8 @@ public partial class MainWindow : Window
         UI framework: Avalonia 11.3.12
         """;
 
+    private static readonly TimeSpan SessionCheckpointDelay = TimeSpan.FromSeconds(2);
+
     private const string NewProjectExplorerUserControlAxaml = """
         <UserControl xmlns="https://github.com/avaloniaui"
                      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
@@ -422,6 +424,7 @@ public partial class MainWindow : Window
 
     private readonly DispatcherTimer _propertyEditTimer;
     private readonly DispatcherTimer _projectWorkspaceRefreshTimer;
+    private readonly DispatcherTimer _sessionCheckpointTimer;
     private readonly Dictionary<string, DateTime> _knownProjectFileWriteTimes = new(StringComparer.OrdinalIgnoreCase);
     private FileSystemWatcher? _projectWorkspaceWatcher;
     private bool _hasPendingPropertyEdit;
@@ -447,6 +450,11 @@ public partial class MainWindow : Window
             Interval = TimeSpan.FromMilliseconds(350),
         };
         _projectWorkspaceRefreshTimer.Tick += OnProjectWorkspaceRefreshTimerTick;
+        _sessionCheckpointTimer = new DispatcherTimer
+        {
+            Interval = SessionCheckpointDelay,
+        };
+        _sessionCheckpointTimer.Tick += OnSessionCheckpointTimerTick;
 
         DataContextChanged += OnDataContextChanged;
         OnDataContextChanged(this, EventArgs.Empty);
@@ -9958,9 +9966,30 @@ public partial class MainWindow : Window
 
     private void OnDocumentChanged(object? sender, EventArgs e)
     {
+        ScheduleSessionCheckpoint();
         if (Vm is not null && _previewWindow is not null)
         {
             _previewWindow.RefreshDocument(Vm.CreatePreviewDocument());
+        }
+    }
+
+    private void ScheduleSessionCheckpoint()
+    {
+        if (_allowCloseWithoutPrompt || Vm is null)
+        {
+            return;
+        }
+
+        _sessionCheckpointTimer.Stop();
+        _sessionCheckpointTimer.Start();
+    }
+
+    private void OnSessionCheckpointTimerTick(object? sender, EventArgs e)
+    {
+        _sessionCheckpointTimer.Stop();
+        if (!_allowCloseWithoutPrompt)
+        {
+            Vm?.SaveSession();
         }
     }
 
@@ -19174,6 +19203,7 @@ public partial class MainWindow : Window
     {
         if (_allowCloseWithoutPrompt)
         {
+            _sessionCheckpointTimer.Stop();
             DisposeProjectWorkspaceWatcher();
             return;
         }
@@ -19185,6 +19215,7 @@ public partial class MainWindow : Window
     private async Task RequestCloseAsync()
     {
         FlushPendingPropertyHistory();
+        _sessionCheckpointTimer.Stop();
         if (Vm is null)
         {
             return;
@@ -19205,6 +19236,7 @@ public partial class MainWindow : Window
                     Vm.ActivateDocumentTab(originalTab);
                 }
 
+                ScheduleSessionCheckpoint();
                 return;
             }
         }
