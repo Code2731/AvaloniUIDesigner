@@ -15468,6 +15468,178 @@ public partial class MainWindowViewModel : ViewModelBase
         return removedCount + (currentPathWasDeleted ? 1 : 0);
     }
 
+    public bool UpdateDocumentPathsAfterDirectoryRename(string oldPath, string newPath)
+    {
+        if (string.IsNullOrWhiteSpace(oldPath)
+            || string.IsNullOrWhiteSpace(newPath))
+        {
+            return false;
+        }
+
+        string oldFullPath;
+        string newFullPath;
+        try
+        {
+            oldFullPath = Path.GetFullPath(oldPath.Trim());
+            newFullPath = Path.GetFullPath(newPath.Trim());
+        }
+        catch (Exception exception) when (exception is ArgumentException or IOException or NotSupportedException)
+        {
+            return false;
+        }
+
+        if (string.Equals(oldFullPath, newFullPath, StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        var oldPrefix = oldFullPath.TrimEnd(
+                Path.DirectorySeparatorChar,
+                Path.AltDirectorySeparatorChar)
+            + Path.DirectorySeparatorChar;
+
+        string? RewritePath(string? path)
+        {
+            if (string.IsNullOrWhiteSpace(path))
+            {
+                return path;
+            }
+
+            if (string.Equals(path, oldFullPath, StringComparison.OrdinalIgnoreCase))
+            {
+                return newFullPath;
+            }
+
+            return path.StartsWith(oldPrefix, StringComparison.OrdinalIgnoreCase)
+                ? newFullPath + path[(oldPrefix.Length - 1)..]
+                : path;
+        }
+
+        var changed = false;
+        foreach (var state in _documentTabStates.Values.Concat(_closedDocumentTabs))
+        {
+            var rewrittenPath = RewritePath(state.DocumentPath);
+            if (string.Equals(state.DocumentPath, rewrittenPath, StringComparison.Ordinal))
+            {
+                continue;
+            }
+
+            state.DocumentPath = rewrittenPath;
+            changed = true;
+        }
+
+        var recentFilesChanged = false;
+        for (var index = 0; index < RecentFiles.Count; index++)
+        {
+            var rewrittenPath = RewritePath(RecentFiles[index]);
+            if (string.Equals(RecentFiles[index], rewrittenPath, StringComparison.Ordinal))
+            {
+                continue;
+            }
+
+            RecentFiles[index] = rewrittenPath!;
+            recentFilesChanged = true;
+            changed = true;
+        }
+
+        var currentPathChanged = !string.Equals(
+            _currentDocumentPath,
+            RewritePath(_currentDocumentPath),
+            StringComparison.Ordinal);
+        if (currentPathChanged)
+        {
+            _currentDocumentPath = RewritePath(_currentDocumentPath);
+            changed = true;
+        }
+
+        var externalPathChanged = !string.Equals(
+            _externalDocumentChangePath,
+            RewritePath(_externalDocumentChangePath),
+            StringComparison.Ordinal);
+        if (externalPathChanged)
+        {
+            _externalDocumentChangePath = RewritePath(_externalDocumentChangePath);
+            changed = true;
+        }
+
+        if (!changed)
+        {
+            return false;
+        }
+
+        if (recentFilesChanged)
+        {
+            OnPropertyChanged(nameof(HasRecentFiles));
+            SaveRecentFilesToDisk();
+        }
+
+        UpdateDocumentTabPresentations();
+        if (currentPathChanged)
+        {
+            OnPropertyChanged(nameof(CurrentDocumentPath));
+            OnPropertyChanged(nameof(CanReloadCurrentFile));
+            OnPropertyChanged(nameof(WindowTitle));
+        }
+
+        if (externalPathChanged && !currentPathChanged)
+        {
+            OnPropertyChanged(nameof(CanReloadCurrentFile));
+        }
+
+        return true;
+    }
+
+    public bool UpdateProjectWorkspaceCollapsedFoldersAfterRename(
+        string oldRelativePath,
+        string newRelativePath)
+    {
+        var oldPath = oldRelativePath
+            .Trim()
+            .Replace('\\', '/')
+            .Trim('/');
+        var newPath = newRelativePath
+            .Trim()
+            .Replace('\\', '/')
+            .Trim('/');
+        if (string.IsNullOrWhiteSpace(oldPath)
+            || string.IsNullOrWhiteSpace(newPath)
+            || string.Equals(oldPath, newPath, StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        var oldPrefix = oldPath + "/";
+        var rewrittenPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var changed = false;
+        foreach (var path in _projectWorkspaceCollapsedFolders)
+        {
+            if (string.Equals(path, oldPath, StringComparison.OrdinalIgnoreCase))
+            {
+                rewrittenPaths.Add(newPath);
+                changed = true;
+            }
+            else if (path.StartsWith(oldPrefix, StringComparison.OrdinalIgnoreCase))
+            {
+                rewrittenPaths.Add(newPath + path[oldPath.Length..]);
+                changed = true;
+            }
+            else
+            {
+                rewrittenPaths.Add(path);
+            }
+        }
+
+        if (!changed)
+        {
+            return false;
+        }
+
+        _projectWorkspaceCollapsedFolders.Clear();
+        _projectWorkspaceCollapsedFolders.UnionWith(rewrittenPaths);
+        SaveProjectWorkspaceToDisk();
+        return true;
+    }
+
     public void SetProjectWorkspaceCollapsedFolders(IEnumerable<string> relativePaths)
     {
         var normalizedPaths = NormalizeProjectWorkspaceFolders(relativePaths);
