@@ -6,6 +6,7 @@ using System.Globalization;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Collections.ObjectModel;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using System.Xml.Linq;
@@ -175,6 +176,7 @@ public partial class MainWindow : Window
         Project Explorer create paired file  Generate code-behind for an existing Window or UserControl AXAML
         Project Explorer repair pair  Restore AXAML x:Class from an existing code-behind identity
         Project Workspace build  Run dotnet build and inspect compiler output for a project or solution
+        Project build diagnostics  Double-click a compiler diagnostic to open its AXAML or source file
         Project Explorer Ctrl+Shift+N  Create a new folder
         Project Explorer Ctrl+Shift+D  Duplicate the selected AXAML file
         Project Explorer Ctrl+Shift+M  Move the selected AXAML file to another project folder
@@ -239,6 +241,18 @@ public partial class MainWindow : Window
         bool Canceled,
         int ExitCode,
         string? Error);
+    private sealed record ProjectBuildDiagnostic(
+        string FilePath,
+        string RelativePath,
+        int Line,
+        int Column,
+        string Severity,
+        string Code,
+        string Message)
+    {
+        public override string ToString()
+            => $"{Severity} {Code} - {RelativePath}({Line},{Column}): {Message}";
+    }
     private sealed record ComponentPackManagementAction(string SourceId);
     private sealed record ExternalChangeDialogResult(
         ExternalDocumentChangeInfo Change,
@@ -1066,6 +1080,27 @@ public partial class MainWindow : Window
         var isRunning = false;
         var wasCanceled = false;
         var dirtyDocumentCount = Vm?.DocumentTabs.Count(Vm.IsDocumentTabDirty) ?? 0;
+        var workingDirectory = System.IO.Path.GetDirectoryName(target.FullPath)
+            ?? Vm?.ProjectWorkspacePath
+            ?? Environment.CurrentDirectory;
+        var diagnostics = new ObservableCollection<ProjectBuildDiagnostic>();
+        var diagnosticsSummary = new TextBlock
+        {
+            Text = "No compiler diagnostics captured.",
+            Foreground = Brush.Parse("#64748B"),
+        };
+        var diagnosticsList = new ListBox
+        {
+            Height = 132,
+            SelectionMode = SelectionMode.Single,
+            ItemsSource = diagnostics,
+        };
+        diagnostics.CollectionChanged += (_, _) =>
+        {
+            diagnosticsSummary.Text = diagnostics.Count == 0
+                ? "No compiler diagnostics captured."
+                : $"{diagnostics.Count} compiler diagnostic(s). Double-click to open the file.";
+        };
         var result = new ProjectBuildResult(
             Succeeded: false,
             Canceled: false,
@@ -1083,9 +1118,7 @@ public partial class MainWindow : Window
                     StartInfo = new ProcessStartInfo
                     {
                         FileName = "dotnet",
-                        WorkingDirectory = System.IO.Path.GetDirectoryName(target.FullPath)
-                            ?? Vm?.ProjectWorkspacePath
-                            ?? Environment.CurrentDirectory,
+                        WorkingDirectory = workingDirectory,
                         UseShellExecute = false,
                         RedirectStandardOutput = true,
                         RedirectStandardError = true,
@@ -1109,11 +1142,15 @@ public partial class MainWindow : Window
                 var standardOutputTask = AppendProjectBuildOutputAsync(
                     process.StandardOutput,
                     output,
-                    string.Empty);
+                    string.Empty,
+                    workingDirectory,
+                    diagnostics);
                 var standardErrorTask = AppendProjectBuildOutputAsync(
                     process.StandardError,
                     output,
-                    "[stderr] ");
+                    "[stderr] ",
+                    workingDirectory,
+                    diagnostics);
                 await Task.WhenAll(
                     standardOutputTask,
                     standardErrorTask,
@@ -1173,6 +1210,22 @@ public partial class MainWindow : Window
                 output.Text += $"Could not stop dotnet: {exception.Message}{Environment.NewLine}";
             }
         };
+        diagnosticsList.DoubleTapped += async (_, _) =>
+        {
+            if (diagnosticsList.SelectedItem is ProjectBuildDiagnostic diagnostic)
+            {
+                await OpenProjectBuildDiagnosticAsync(diagnostic);
+            }
+        };
+        diagnosticsList.KeyDown += async (_, e) =>
+        {
+            if (e.Key == Key.Enter
+                && diagnosticsList.SelectedItem is ProjectBuildDiagnostic diagnostic)
+            {
+                await OpenProjectBuildDiagnosticAsync(diagnostic);
+                e.Handled = true;
+            }
+        };
         dialog.Closing += (_, e) =>
         {
             if (isRunning)
@@ -1197,6 +1250,12 @@ public partial class MainWindow : Window
                         Foreground = Brush.Parse("#334155"),
                         TextWrapping = TextWrapping.Wrap,
                     },
+                },
+                new StackPanel
+                {
+                    [DockPanel.DockProperty] = Dock.Top,
+                    Spacing = 6,
+                    Children = { diagnosticsSummary, diagnosticsList },
                 },
                 new ScrollViewer
                 {
@@ -1259,6 +1318,97 @@ public partial class MainWindow : Window
                     : $"Build could not run for {target.RelativePath}: {result.Error}";
     }
 
+    private async Task OpenProjectBuildDiagnosticAsync(ProjectBuildDiagnostic diagnostic)
+    {
+        if (Vm is null || !File.Exists(diagnostic.FilePath))
+        {
+            Vm?.StatusText = $"Build diagnostic file is no longer available: {diagnostic.FilePath}";
+            return;
+        }
+
+        var extension = System.IO.Path.GetExtension(diagnostic.FilePath);
+        if (string.Equals(extension, ".axaml", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(extension, ".xaml", StringComparison.OrdinalIgnoreCase))
+        {
+            FlushPendingPropertyHistory();
+            try
+            {
+                var content = await File.ReadAllTextAsync(diagnostic.FilePath);
+                if (!Vm.TryOpenDocumentTab(content, diagnostic.FilePath, out var error, out var warning))
+                {
+                    Vm.StatusText = $"Open failed: {error}";
+                    return;
+                }
+
+                ClearDesignGuides();
+                Vm.StatusText = string.IsNullOrWhiteSpace(warning)
+                    ? $"Opened {diagnostic.RelativePath} at line {diagnostic.Line}, column {diagnostic.Column}."
+                    : $"Opened {diagnostic.RelativePath} at line {diagnostic.Line}, column {diagnostic.Column}. {warning}";
+            }
+            catch (Exception exception) when (exception is IOException
+                or UnauthorizedAccessException
+                or ArgumentException
+                or NotSupportedException)
+            {
+                Vm.StatusText = $"Could not open build diagnostic file: {exception.Message}";
+            }
+
+            return;
+        }
+
+        if (!TryOpenProjectExplorerFileManager(diagnostic.FilePath))
+        {
+            Vm.StatusText = $"Could not open build diagnostic file: {diagnostic.FilePath}";
+            return;
+        }
+
+        Vm.StatusText = $"Opened {diagnostic.RelativePath} at line {diagnostic.Line}, column {diagnostic.Column}.";
+    }
+
+    private static bool TryParseProjectBuildDiagnostic(
+        string outputLine,
+        string workingDirectory,
+        out ProjectBuildDiagnostic diagnostic)
+    {
+        diagnostic = null!;
+        var match = Regex.Match(
+            outputLine.Trim(),
+            @"^(?<path>.+)\((?<line>\d+),(?<column>\d+)\):\s*(?<severity>error|warning)\b\s*(?<code>[A-Za-z]+\d+)?\s*:?\s*(?<message>.*?)(?:\s+\[[^\]]+\])?$",
+            RegexOptions.IgnoreCase);
+        if (!match.Success
+            || !int.TryParse(match.Groups["line"].Value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var line)
+            || !int.TryParse(match.Groups["column"].Value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var column)
+            || line <= 0
+            || column <= 0)
+        {
+            return false;
+        }
+
+        try
+        {
+            var normalizedWorkingDirectory = System.IO.Path.GetFullPath(workingDirectory);
+            var rawPath = match.Groups["path"].Value.Trim().Trim('"');
+            var fullPath = System.IO.Path.IsPathRooted(rawPath)
+                ? System.IO.Path.GetFullPath(rawPath)
+                : System.IO.Path.GetFullPath(System.IO.Path.Combine(normalizedWorkingDirectory, rawPath));
+            var relativePath = System.IO.Path.GetRelativePath(normalizedWorkingDirectory, fullPath)
+                .Replace(System.IO.Path.DirectorySeparatorChar, '/');
+            diagnostic = new ProjectBuildDiagnostic(
+                fullPath,
+                relativePath,
+                line,
+                column,
+                match.Groups["severity"].Value.ToUpperInvariant(),
+                match.Groups["code"].Value,
+                match.Groups["message"].Value.Trim());
+            return true;
+        }
+        catch (ArgumentException)
+        {
+            return false;
+        }
+    }
+
     private static IReadOnlyList<ProjectBuildTarget> FindProjectBuildTargets(string? workspacePath)
     {
         if (string.IsNullOrWhiteSpace(workspacePath))
@@ -1292,7 +1442,11 @@ public partial class MainWindow : Window
                 var segments = relativePath.Split(
                     [System.IO.Path.DirectorySeparatorChar, System.IO.Path.AltDirectorySeparatorChar],
                     StringSplitOptions.RemoveEmptyEntries);
-                if (segments.Any(segment => segment is "bin" or "obj" or ".git" or ".vs"))
+                if (segments.Any(segment =>
+                        string.Equals(segment, "bin", StringComparison.OrdinalIgnoreCase)
+                        || string.Equals(segment, "obj", StringComparison.OrdinalIgnoreCase)
+                        || string.Equals(segment, ".git", StringComparison.OrdinalIgnoreCase)
+                        || string.Equals(segment, ".vs", StringComparison.OrdinalIgnoreCase)))
                 {
                     continue;
                 }
@@ -1318,12 +1472,25 @@ public partial class MainWindow : Window
     private static async Task AppendProjectBuildOutputAsync(
         StreamReader reader,
         TextBox output,
-        string prefix)
+        string prefix,
+        string workingDirectory,
+        ObservableCollection<ProjectBuildDiagnostic> diagnostics)
     {
         while (await reader.ReadLineAsync() is { } line)
         {
+            var diagnostic = TryParseProjectBuildDiagnostic(
+                line,
+                workingDirectory,
+                out var parsedDiagnostic)
+                ? parsedDiagnostic
+                : null;
             await Dispatcher.UIThread.InvokeAsync(() =>
             {
+                if (diagnostic is not null)
+                {
+                    diagnostics.Add(diagnostic);
+                }
+
                 output.Text += $"{prefix}{line}{Environment.NewLine}";
                 output.CaretIndex = output.Text?.Length ?? 0;
             });
