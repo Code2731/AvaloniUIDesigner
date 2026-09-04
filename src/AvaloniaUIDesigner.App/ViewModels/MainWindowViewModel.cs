@@ -606,6 +606,7 @@ public partial class MainWindowViewModel : ViewModelBase
     ];
 
     private readonly IComponentCatalog _componentCatalog;
+    private readonly IControlRenderer _renderer;
     private readonly IDesignerSerializer _serializer;
     private readonly ComponentPackLoader _componentPackLoader = new();
     private readonly ComponentPackPluginLoader _componentPackPluginLoader = new();
@@ -665,6 +666,7 @@ public partial class MainWindowViewModel : ViewModelBase
         IDesignerSerializer serializer)
     {
         _componentCatalog = componentCatalog;
+        _renderer = renderer;
         _serializer = serializer;
 
         Toolbox = new ToolboxViewModel(componentCatalog);
@@ -9995,6 +9997,15 @@ public partial class MainWindowViewModel : ViewModelBase
 
         ClearDocumentTabsForSessionRestore();
         _workspacePanelState = workspacePanelState;
+        foreach (var restoredDocument in restoredDocuments.Concat(restoredClosedDocuments))
+        {
+            if (TryNormalizeDocumentPath(restoredDocument.DocumentPath, out var path)
+                && HasExternalDocumentChangedSinceSavedSnapshot(restoredDocument, path))
+            {
+                _externalDocumentChangePaths.Add(path);
+            }
+        }
+
         var restoredTabs = new List<DocumentTabViewModel>();
         foreach (var restoredDocument in restoredDocuments)
         {
@@ -10043,8 +10054,41 @@ public partial class MainWindowViewModel : ViewModelBase
         OnPropertyChanged(nameof(CanReopenClosedDocumentTab));
         UpdateDocumentTabPresentations();
         StatusText = $"Restored {restoredTabs.Count} document tab(s) from the previous session."
+            + (_externalDocumentChangePaths.Count == 0
+                ? string.Empty
+                : $" {_externalDocumentChangePaths.Count} document file(s) changed outside the designer; use Reload Current File.")
             + (packWarnings.Count == 0 ? string.Empty : $" {string.Join(" ", packWarnings)}");
         return true;
+    }
+
+    private bool HasExternalDocumentChangedSinceSavedSnapshot(
+        RestoredDocumentTab restoredDocument,
+        string path)
+    {
+        if (!File.Exists(path))
+        {
+            return true;
+        }
+
+        try
+        {
+            var diskDocument = ParseDraftDocument(
+                File.ReadAllText(path),
+                new List<string>());
+            var normalizedDiskDocument = new MainWindowViewModel(
+                _componentCatalog,
+                _renderer,
+                _serializer);
+            normalizedDiskDocument.ApplyDocument(diskDocument);
+            return !string.Equals(
+                normalizedDiskDocument.ExportDraftAxaml(),
+                _serializer.Serialize(restoredDocument.SavedDocument),
+                StringComparison.Ordinal);
+        }
+        catch (Exception)
+        {
+            return true;
+        }
     }
 
     private RestoredDocumentTab ParseRestoredDocumentTab(PersistedDocumentTab persistedTab)
