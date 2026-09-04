@@ -57,6 +57,11 @@
                           Header="Open Recent Files... (Ctrl+Shift+O)"
                           Click="OnOpenRecentFilesMenuClicked"
                           IsEnabled="{Binding HasRecentFiles}"/>
+                <MenuItem Header="Open Recent Projects" x:Name="OpenRecentProjectsMenu"/>
+                <MenuItem Name="OpenRecentProjectsDialogMenu"
+                          Header="Open Recent Projects... (Ctrl+Shift+L)"
+                          Click="OnOpenRecentProjectsMenuClicked"
+                          IsEnabled="{Binding HasRecentProjectWorkspaces}"/>
                 <MenuItem Header="Open Project Folder..."
                           Click="OnOpenProjectFolderMenuClicked"/>
                 <MenuItem Header="Open Project or Solution... (Ctrl+Shift+J)"
@@ -507,6 +512,12 @@
                             Content="Project File"
                             Click="OnOpenProjectFileMenuClicked"
                             ToolTip.Tip="Open an Avalonia .csproj or solution file (Ctrl+Shift+J)"
+                            Padding="8,3"/>
+                    <Button Name="OpenRecentProjectsToolbar"
+                            Content="Recent Projects"
+                            Click="OnOpenRecentProjectsMenuClicked"
+                            IsEnabled="{Binding HasRecentProjectWorkspaces}"
+                            ToolTip.Tip="Switch to a recently opened project workspace (Ctrl+Shift+L)"
                             Padding="8,3"/>
                     <Button Name="ProjectExplorerToolbar"
                             Content="Explorer"

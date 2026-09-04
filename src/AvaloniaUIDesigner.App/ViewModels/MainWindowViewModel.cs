@@ -672,6 +672,7 @@ public partial class MainWindowViewModel : ViewModelBase
         ObjectTree = new ObjectTreeViewModel();
         PropertyInspector = new PropertyInspectorViewModel();
         RecentFiles = new ObservableCollection<string>();
+        RecentProjectWorkspaces = new ObservableCollection<string>();
         ProjectFiles = new ObservableCollection<ProjectWorkspaceFile>();
         ProjectWorkspaceFolders = new ObservableCollection<ProjectWorkspaceFolder>();
         StylePreviewOptions = new ObservableCollection<StylePreviewOption>();
@@ -695,6 +696,7 @@ public partial class MainWindowViewModel : ViewModelBase
     public ObjectTreeViewModel ObjectTree { get; }
     public PropertyInspectorViewModel PropertyInspector { get; }
     public ObservableCollection<string> RecentFiles { get; }
+    public ObservableCollection<string> RecentProjectWorkspaces { get; }
     public ObservableCollection<ProjectWorkspaceFile> ProjectFiles { get; }
     public ObservableCollection<ProjectWorkspaceFolder> ProjectWorkspaceFolders { get; }
     public ObservableCollection<StylePreviewOption> StylePreviewOptions { get; }
@@ -724,6 +726,7 @@ public partial class MainWindowViewModel : ViewModelBase
     public string WindowTitle => $"Avalonia UI Designer - {GetDisplayDocumentName()}{(IsDirty ? "*" : string.Empty)}";
     public DocumentTabViewModel? SelectedDocumentTab => _selectedDocumentTab;
     public bool HasRecentFiles => RecentFiles.Count > 0;
+    public bool HasRecentProjectWorkspaces => RecentProjectWorkspaces.Count > 0;
     public string? ProjectWorkspacePath => _projectWorkspacePath;
     public string ProjectWorkspaceName => string.IsNullOrWhiteSpace(_projectWorkspacePath)
         ? "No project folder"
@@ -15222,6 +15225,7 @@ public partial class MainWindowViewModel : ViewModelBase
             _projectWorkspaceCollapsedFolders.Clear();
         }
 
+        RegisterRecentProjectWorkspace(normalizedPath);
         LoadProjectWorkspaceFiles(normalizedPath);
         OnPropertyChanged(nameof(ProjectWorkspacePath));
         OnPropertyChanged(nameof(ProjectWorkspaceName));
@@ -15683,6 +15687,28 @@ public partial class MainWindowViewModel : ViewModelBase
         SaveProjectWorkspaceToDisk();
     }
 
+    public void RemoveRecentProjectWorkspace(string path)
+    {
+        if (!TryNormalizeProjectWorkspacePath(path, out var normalizedPath))
+        {
+            return;
+        }
+
+        for (var index = RecentProjectWorkspaces.Count - 1; index >= 0; index--)
+        {
+            if (string.Equals(
+                    RecentProjectWorkspaces[index],
+                    normalizedPath,
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                RecentProjectWorkspaces.RemoveAt(index);
+            }
+        }
+
+        OnPropertyChanged(nameof(HasRecentProjectWorkspaces));
+        SaveProjectWorkspaceToDisk();
+    }
+
     public void MarkExternalDocumentChanged(string path)
     {
         if (string.IsNullOrWhiteSpace(path)
@@ -15847,16 +15873,24 @@ public partial class MainWindowViewModel : ViewModelBase
             var json = File.ReadAllText(path);
             string? rootPath;
             IEnumerable<string>? collapsedFolders;
+            IEnumerable<string>? recentPaths;
             try
             {
                 var state = JsonSerializer.Deserialize<PersistedProjectWorkspace>(json);
                 rootPath = state?.RootPath;
                 collapsedFolders = state?.CollapsedFolders;
+                recentPaths = state?.RecentPaths;
             }
             catch (JsonException)
             {
                 rootPath = JsonSerializer.Deserialize<string>(json);
                 collapsedFolders = null;
+                recentPaths = null;
+            }
+
+            foreach (var recentPath in (recentPaths ?? Enumerable.Empty<string>()).Reverse())
+            {
+                RegisterRecentProjectWorkspace(recentPath, persist: false);
             }
 
             if (!string.IsNullOrWhiteSpace(rootPath)
@@ -15864,6 +15898,7 @@ public partial class MainWindowViewModel : ViewModelBase
                 && Path.IsPathFullyQualified(rootPath))
             {
                 _projectWorkspacePath = Path.GetFullPath(rootPath);
+                RegisterRecentProjectWorkspace(_projectWorkspacePath, persist: false);
                 _projectWorkspaceCollapsedFolders.Clear();
                 _projectWorkspaceCollapsedFolders.UnionWith(
                     NormalizeProjectWorkspaceFolders(collapsedFolders));
@@ -15891,7 +15926,8 @@ public partial class MainWindowViewModel : ViewModelBase
                 _projectWorkspacePath,
                 _projectWorkspaceCollapsedFolders
                     .OrderBy(folder => folder, StringComparer.OrdinalIgnoreCase)
-                    .ToList());
+                    .ToList(),
+                RecentProjectWorkspaces.ToList());
             File.WriteAllText(path, JsonSerializer.Serialize(state));
         }
         catch
@@ -15904,6 +15940,58 @@ public partial class MainWindowViewModel : ViewModelBase
     {
         var trimmedPath = path.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
         return Path.GetFileName(trimmedPath) ?? trimmedPath;
+    }
+
+    private bool RegisterRecentProjectWorkspace(string path, bool persist = true)
+    {
+        if (!TryNormalizeProjectWorkspacePath(path, out var normalizedPath))
+        {
+            return false;
+        }
+
+        for (var index = RecentProjectWorkspaces.Count - 1; index >= 0; index--)
+        {
+            if (string.Equals(
+                    RecentProjectWorkspaces[index],
+                    normalizedPath,
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                RecentProjectWorkspaces.RemoveAt(index);
+            }
+        }
+
+        RecentProjectWorkspaces.Insert(0, normalizedPath);
+        while (RecentProjectWorkspaces.Count > 8)
+        {
+            RecentProjectWorkspaces.RemoveAt(RecentProjectWorkspaces.Count - 1);
+        }
+
+        OnPropertyChanged(nameof(HasRecentProjectWorkspaces));
+        if (persist)
+        {
+            SaveProjectWorkspaceToDisk();
+        }
+
+        return true;
+    }
+
+    private static bool TryNormalizeProjectWorkspacePath(string? rawPath, out string normalizedPath)
+    {
+        normalizedPath = string.Empty;
+        if (string.IsNullOrWhiteSpace(rawPath))
+        {
+            return false;
+        }
+
+        try
+        {
+            normalizedPath = Path.GetFullPath(rawPath.Trim());
+            return Path.IsPathFullyQualified(normalizedPath);
+        }
+        catch (Exception exception) when (exception is ArgumentException or IOException or NotSupportedException)
+        {
+            return false;
+        }
     }
 
     private static HashSet<string> NormalizeProjectWorkspaceFolders(
@@ -18835,7 +18923,8 @@ public partial class MainWindowViewModel : ViewModelBase
 
     private sealed record PersistedProjectWorkspace(
         string? RootPath,
-        List<string>? CollapsedFolders = null);
+        List<string>? CollapsedFolders = null,
+        List<string>? RecentPaths = null);
 
     private sealed record PersistedDocumentTab(
         string? DocumentPath,

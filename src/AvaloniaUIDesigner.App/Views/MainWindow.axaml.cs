@@ -34,6 +34,7 @@ public partial class MainWindow : Window
         Ctrl+O              Open AXAML document
         Ctrl+Shift+O        Open recent AXAML files
         Ctrl+Shift+J        Open an Avalonia project or solution file
+        Ctrl+Shift+L        Open recent project workspaces
         Ctrl+Shift+P        Open project explorer
         Ctrl+Shift+R        Reload current file after an external change
         Ctrl+S              Save document
@@ -256,6 +257,25 @@ public partial class MainWindow : Window
             => $"{Index}. {DisplayName} - {Path} [{StatusLabel}]";
     }
 
+    private sealed record RecentProjectSwitcherItem(string Path, int Index, bool Exists)
+    {
+        public string DisplayName
+        {
+            get
+            {
+                var trimmedPath = Path.TrimEnd(
+                    System.IO.Path.DirectorySeparatorChar,
+                    System.IO.Path.AltDirectorySeparatorChar);
+                return System.IO.Path.GetFileName(trimmedPath) ?? trimmedPath;
+            }
+        }
+
+        public string StatusLabel => Exists ? "Available" : "Missing";
+
+        public override string ToString()
+            => $"{Index}. {DisplayName} - {Path} [{StatusLabel}]";
+    }
+
     private sealed record ProjectFileSwitcherItem(ProjectWorkspaceFile File, int Index)
     {
         public string DisplayName => File.DisplayName;
@@ -462,6 +482,223 @@ public partial class MainWindow : Window
         {
             await OpenRecentFileAsync(selectedPath);
         }
+    }
+
+    private async void OnOpenRecentProjectsMenuClicked(
+        object? sender,
+        Avalonia.Interactivity.RoutedEventArgs e)
+        => await OpenRecentProjectsAsync();
+
+    private async Task OpenRecentProjectsAsync()
+    {
+        if (Vm is null)
+        {
+            return;
+        }
+
+        if (!Vm.HasRecentProjectWorkspaces)
+        {
+            Vm.StatusText = "No recent project workspaces are available.";
+            return;
+        }
+
+        var selectedPath = await ShowRecentProjectsAsync();
+        if (selectedPath is not null)
+        {
+            OpenRecentProjectWorkspace(selectedPath);
+        }
+    }
+
+    private static List<RecentProjectSwitcherItem> FilterRecentProjectSwitcherItems(
+        IReadOnlyList<string> paths,
+        string? query)
+    {
+        var normalizedQuery = query?.Trim() ?? string.Empty;
+        return paths
+            .Select((path, index) => new RecentProjectSwitcherItem(
+                path,
+                index + 1,
+                Directory.Exists(path)))
+            .Where(item => string.IsNullOrWhiteSpace(normalizedQuery)
+                || item.DisplayName.Contains(normalizedQuery, StringComparison.OrdinalIgnoreCase)
+                || item.Path.Contains(normalizedQuery, StringComparison.OrdinalIgnoreCase))
+            .ToList();
+    }
+
+    private async Task<string?> ShowRecentProjectsAsync()
+    {
+        if (Vm is null)
+        {
+            return null;
+        }
+
+        var paths = Vm.RecentProjectWorkspaces.ToList();
+        var dialog = new Window
+        {
+            Title = "Open Recent Project Workspaces",
+            Width = 760,
+            Height = 470,
+            MinWidth = 560,
+            MinHeight = 360,
+            CanResize = false,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner,
+        };
+        var search = new TextBox
+        {
+            Watermark = "Search project name or path",
+            MinWidth = 500,
+        };
+        var matchSummary = new TextBlock
+        {
+            Foreground = Brush.Parse("#64748B"),
+        };
+        var list = new ListBox
+        {
+            MinHeight = 280,
+            MaxHeight = 330,
+            SelectionMode = SelectionMode.Single,
+        };
+        var filteredItems = new List<RecentProjectSwitcherItem>();
+
+        void RefreshResults()
+        {
+            filteredItems = FilterRecentProjectSwitcherItems(paths, search.Text);
+            list.ItemsSource = filteredItems;
+            list.SelectedIndex = filteredItems.Count > 0 ? 0 : -1;
+            matchSummary.Text = filteredItems.Count == 0
+                ? "No matching recent project workspaces."
+                : $"{filteredItems.Count} recent project workspace(s)";
+        }
+
+        void MoveSelection(int offset)
+        {
+            if (filteredItems.Count == 0)
+            {
+                return;
+            }
+
+            list.SelectedIndex = MoveRecentFileSwitcherSelection(
+                list.SelectedIndex,
+                offset,
+                filteredItems.Count);
+        }
+
+        void SelectCurrent()
+        {
+            if (list.SelectedItem is RecentProjectSwitcherItem item)
+            {
+                dialog.Close(item.Path);
+            }
+        }
+
+        var cancelButton = new Button { Content = "Cancel", MinWidth = 86 };
+        var openButton = new Button { Content = "Open", MinWidth = 86 };
+        cancelButton.Click += (_, _) => dialog.Close(null);
+        openButton.Click += (_, _) => SelectCurrent();
+        search.TextChanged += (_, _) => RefreshResults();
+        search.KeyDown += (_, e) =>
+        {
+            if (e.Key == Key.Enter)
+            {
+                SelectCurrent();
+                e.Handled = true;
+            }
+            else if (e.Key == Key.Escape)
+            {
+                dialog.Close(null);
+                e.Handled = true;
+            }
+            else if (e.Key == Key.Down)
+            {
+                MoveSelection(1);
+                list.Focus();
+                e.Handled = true;
+            }
+            else if (e.Key == Key.Up)
+            {
+                MoveSelection(-1);
+                list.Focus();
+                e.Handled = true;
+            }
+        };
+        list.KeyDown += (_, e) =>
+        {
+            if (e.Key == Key.Enter)
+            {
+                SelectCurrent();
+                e.Handled = true;
+            }
+            else if (e.Key == Key.Escape)
+            {
+                dialog.Close(null);
+                e.Handled = true;
+            }
+            else if (e.Key == Key.Down)
+            {
+                MoveSelection(1);
+                e.Handled = true;
+            }
+            else if (e.Key == Key.Up)
+            {
+                MoveSelection(-1);
+                e.Handled = true;
+            }
+        };
+        dialog.Opened += (_, _) =>
+        {
+            search.Focus();
+            search.SelectAll();
+        };
+
+        dialog.Content = new StackPanel
+        {
+            Margin = new Thickness(16),
+            Spacing = 10,
+            Children =
+            {
+                new TextBlock
+                {
+                    Text = "Search recently opened project workspaces by name or path.",
+                    TextWrapping = TextWrapping.Wrap,
+                },
+                search,
+                matchSummary,
+                list,
+                new StackPanel
+                {
+                    Orientation = Orientation.Horizontal,
+                    HorizontalAlignment = HorizontalAlignment.Right,
+                    Spacing = 8,
+                    Children = { cancelButton, openButton },
+                },
+            },
+        };
+
+        RefreshResults();
+        return await dialog.ShowDialog<string?>(this);
+    }
+
+    private void OpenRecentProjectWorkspace(string path)
+    {
+        if (Vm is null)
+        {
+            return;
+        }
+
+        if (!Directory.Exists(path))
+        {
+            Vm.RemoveRecentProjectWorkspace(path);
+            Vm.StatusText = $"Recent project folder not found: {path}";
+            return;
+        }
+
+        if (!Vm.TryOpenProjectWorkspace(path, out var error))
+        {
+            Vm.StatusText = $"Could not open recent project workspace: {error}";
+            return;
+        }
+
+        Vm.StatusText = $"Opened recent project {Vm.ProjectWorkspaceName} ({Vm.ProjectFiles.Count} AXAML file(s)).";
     }
 
     private static List<RecentFileSwitcherItem> FilterRecentFileSwitcherItems(
@@ -9390,6 +9627,13 @@ public partial class MainWindow : Window
             return;
         }
 
+        if (ctrl && shift && !alt && e.Key == Key.L)
+        {
+            await OpenRecentProjectsAsync();
+            e.Handled = true;
+            return;
+        }
+
         if (ctrl && shift && !alt && e.Key == Key.R)
         {
             if (Vm?.CanReloadCurrentFile == true)
@@ -9596,6 +9840,7 @@ public partial class MainWindow : Window
         if (_boundVm is not null)
         {
             _boundVm.RecentFiles.CollectionChanged -= OnRecentFilesChanged;
+            _boundVm.RecentProjectWorkspaces.CollectionChanged -= OnRecentProjectWorkspacesChanged;
             _boundVm.PropertyChanged -= OnViewModelPropertyChanged;
             _boundVm.DocumentChanged -= OnDocumentChanged;
         }
@@ -9620,12 +9865,14 @@ public partial class MainWindow : Window
         if (_boundVm is not null)
         {
             _boundVm.RecentFiles.CollectionChanged += OnRecentFilesChanged;
+            _boundVm.RecentProjectWorkspaces.CollectionChanged += OnRecentProjectWorkspacesChanged;
             _boundVm.PropertyChanged += OnViewModelPropertyChanged;
             _boundVm.DocumentChanged += OnDocumentChanged;
         }
 
         ConfigureProjectWorkspaceWatcher();
         RebuildRecentFilesMenu();
+        RebuildRecentProjectWorkspacesMenu();
         UpdateProjectWorkspaceMenuStates();
         UpdateDocumentBackupMenu();
         ApplyWorkspacePanelState();
@@ -9637,6 +9884,14 @@ public partial class MainWindow : Window
     private void OnRecentFilesChanged(object? sender, NotifyCollectionChangedEventArgs e)
     {
         RebuildRecentFilesMenu();
+    }
+
+    private void OnRecentProjectWorkspacesChanged(
+        object? sender,
+        NotifyCollectionChangedEventArgs e)
+    {
+        RebuildRecentProjectWorkspacesMenu();
+        UpdateProjectWorkspaceMenuStates();
     }
 
     private void OnViewModelPropertyChanged(object? sender, PropertyChangedEventArgs e)
@@ -9670,6 +9925,7 @@ public partial class MainWindow : Window
         }
 
         if (e.PropertyName is nameof(MainWindowViewModel.ProjectWorkspacePath)
+            or nameof(MainWindowViewModel.HasRecentProjectWorkspaces)
             or nameof(MainWindowViewModel.CanReloadCurrentFile))
         {
             UpdateProjectWorkspaceMenuStates();
@@ -9710,6 +9966,7 @@ public partial class MainWindow : Window
         RefreshProjectFilesMenu.IsEnabled = hasProjectWorkspace;
         ProjectExplorerContextMenu.IsEnabled = hasProjectWorkspace;
         RefreshProjectFilesContextMenu.IsEnabled = hasProjectWorkspace;
+        OpenRecentProjectsDialogMenu.IsEnabled = Vm?.HasRecentProjectWorkspaces == true;
 
         var canReloadCurrentFile = Vm?.CanReloadCurrentFile == true;
         ReloadCurrentFileMenu.IsEnabled = canReloadCurrentFile;
@@ -9753,6 +10010,32 @@ public partial class MainWindow : Window
         OpenRecentMenu.ItemsSource = items;
     }
 
+    private void RebuildRecentProjectWorkspacesMenu()
+    {
+        if (_boundVm is null || _boundVm.RecentProjectWorkspaces.Count == 0)
+        {
+            OpenRecentProjectsMenu.IsEnabled = false;
+            OpenRecentProjectsMenu.ItemsSource = null;
+            return;
+        }
+
+        OpenRecentProjectsMenu.IsEnabled = true;
+        var items = new List<MenuItem>();
+        for (var index = 0; index < _boundVm.RecentProjectWorkspaces.Count; index++)
+        {
+            var path = _boundVm.RecentProjectWorkspaces[index];
+            var item = new MenuItem
+            {
+                Header = $"{index + 1}. {path}",
+                Tag = path,
+            };
+            item.Click += OnOpenRecentProjectMenuItemClicked;
+            items.Add(item);
+        }
+
+        OpenRecentProjectsMenu.ItemsSource = items;
+    }
+
     private async void OnOpenRecentMenuItemClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
         if (Vm is null || sender is not MenuItem { Tag: string path })
@@ -9761,6 +10044,16 @@ public partial class MainWindow : Window
         }
 
         await OpenRecentFileAsync(path);
+    }
+
+    private void OnOpenRecentProjectMenuItemClicked(
+        object? sender,
+        Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        if (sender is MenuItem { Tag: string path })
+        {
+            OpenRecentProjectWorkspace(path);
+        }
     }
 
     private void OnCanvasPropertyChanged(object? sender, PropertyChangedEventArgs e)
