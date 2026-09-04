@@ -155,6 +155,7 @@ dotnet run --project src/AvaloniaUIDesigner.App/AvaloniaUIDesigner.App.csproj
 - **Paired AXAML Code-behind Creation**: Project Explorer의 새 AXAML 파일 대화상자에서 선택적인 `x:Class`와 `.axaml.cs` paired file을 함께 생성하고, Window/UserControl base type·namespace·`InitializeComponent()`를 일치시킵니다. paired file 충돌이나 쓰기 실패 시 부분 생성물을 정리합니다.
 - **Paired AXAML Code-behind Management**: Project Explorer의 AXAML 행에 `paired` 상태를 표시하고, rename·move·delete 시 같은 이름의 `.axaml.cs`와 함께 처리합니다. duplicate에서는 새 파일명에 맞춰 AXAML `x:Class`와 code-behind partial class·constructor를 함께 재작성해 동일한 타입 충돌을 피합니다.
 - **Paired Code-behind Quick Open**: Project Explorer에서 `paired` 상태의 AXAML을 우클릭해 `Open Paired Code-behind`를 실행하면 연결된 `.axaml.cs`를 OS 기본 편집기로 바로 엽니다. 파일이 외부에서 사라진 경우 메뉴를 비활성화하고 상태바에 안내합니다.
+- **Paired Identity Diagnostics**: AXAML `x:Class`와 `.axaml.cs`의 namespace·partial class를 비교해 일치하면 `paired`, 누락·불일치하면 amber `pair mismatch`로 표시하고 hover tooltip으로 원인을 설명합니다. 파일 존재만으로 유효한 pairing으로 오인하지 않도록 합니다.
 - **Command-line Startup Paths**: 파일 탐색기나 터미널에서 하나 이상의 `.axaml`·`.xaml` 문서, 폴더, `.csproj`·`.sln`·`.slnx` 경로를 인수로 전달해 실행하면 세션 복원 후 해당 문서 탭과 Project Workspace를 바로 엽니다. 지원하지 않는 경로와 읽기 실패는 성공한 경로와 기존 세션을 유지한 채 상태바에 안내합니다.
 - **Tab View Navigation**: `Ctrl+Tab`/`Ctrl+Shift+Tab`으로 문서 탭을 순환하고, `Ctrl+Shift+PageUp/PageDown` 또는 탭 컨텍스트 메뉴로 활성 탭을 좌우 이동하며, 탭별 캔버스 줌·스크롤 위치와 Object Tree 선택을 전환·세션 복원 때 보존합니다.
 - **Viewport 복원 우선순위**: 문서 탭을 복원하는 짧은 pending 구간에는 선택 컨트롤 자동 스크롤을 보류해 저장된 Canvas 위치가 Object Tree/Canvas 선택 추적에 의해 덮어써지지 않도록 합니다.
@@ -259,6 +260,7 @@ dotnet run --project src/AvaloniaUIDesigner.App/AvaloniaUIDesigner.App.csproj
 12ae. Project Explorer에서 `New AXAML File...`을 실행하면 기본적으로 `x:Class`가 들어간 AXAML과 같은 이름의 `.axaml.cs`를 함께 생성합니다. `UserControl`/`Window` 선택, `Views.NewView` 타입명, paired file 충돌 검사를 적용하며 checkbox를 해제하면 순수 AXAML만 만들 수 있습니다.
 12af. Project Explorer의 AXAML 행에 `paired` 표시가 있으면 같은 이름의 `.axaml.cs`가 연결된 상태입니다. `F2` rename, `Move`, `Duplicate`, `Delete`는 paired file을 함께 보호·이동·복제·삭제하며, duplicate는 새 파일명 기준으로 `x:Class`와 partial class/constructor 이름을 갱신합니다.
 12b0. Project Explorer에서 `paired` AXAML을 우클릭하고 `Open Paired Code-behind`를 선택하면 연결된 `.axaml.cs`를 OS 기본 편집기로 엽니다. code-behind가 삭제되거나 접근할 수 없으면 메뉴를 사용할 수 없고 상태바에 원인을 표시합니다.
+12b1. AXAML에 `.axaml.cs`가 있어도 `x:Class`가 없거나 namespace·partial class가 일치하지 않으면 Explorer 상태가 `pair mismatch`로 표시됩니다. 일치하는 경우에만 `paired`로 표시되며, 상태 chip에 마우스를 올리면 진단 설명을 확인할 수 있습니다.
 13. `Edit > Edit Typography Properties...`에서 글꼴과 지원 컨트롤의 텍스트 정렬·줄바꿈 편집
 14. `Edit > Edit Transform Properties...`에서 선택 컨트롤의 이동·회전·크기·기울기와 변환 기준점 편집
 15. `Edit > Edit Accessibility & Navigation...`에서 스크린리더 메타데이터와 키보드 포커스 순서 편집
@@ -440,6 +442,7 @@ dotnet run --project src/AvaloniaUIDesigner.App/AvaloniaUIDesigner.App.csproj
 75dl. Project Explorer 새 AXAML 파일 생성은 선택한 root template와 dotted `x:Class`를 바탕으로 `.axaml`/`.xaml`과 `.axaml.cs` paired file을 원자적으로 준비합니다. code-behind를 생성할 때 namespace·partial class·Window/UserControl base type·`InitializeComponent()`가 서로 일치하며, 두 번째 파일 생성이 실패하면 이미 생성한 첫 번째 파일을 rollback합니다.
 75dm. Project Explorer는 AXAML 옆에 존재하는 `.axaml.cs`를 `paired` 상태로 표시하고, AXAML rename·move·delete 작업에서 backup과 함께 code-behind를 동반 처리합니다. paired AXAML duplicate는 새 파일명으로 `x:Class`, partial class, constructor를 함께 바꾸며 대상 AXAML·backup·code-behind 충돌을 사전에 차단하고 부분 작업을 rollback합니다.
 75dn. `Open Paired Code-behind` context menu는 선택한 paired AXAML의 `.axaml.cs`를 OS 기본 연결 프로그램으로 엽니다. 메뉴 활성 상태는 현재 파일 존재 여부를 다시 확인하며, 실행 실패나 외부 삭제는 디자이너 상태를 바꾸지 않고 상태바에 안내합니다.
+75do. Project Explorer는 paired code-behind의 존재뿐 아니라 AXAML `x:Class`, C# namespace, `partial class` 이름을 함께 검사합니다. 세 identity가 맞으면 green `paired`, code-behind가 있지만 하나라도 다르면 amber `pair mismatch`와 tooltip을 표시하며, 외부 `.axaml.cs` 생성·삭제 후에도 watcher refresh에서 상태를 갱신합니다.
 76. `File > Load Component Pack...` 또는 `File > Load Toolbox Preset Pack...`으로 외부 Toolbox 팩을 추가하면 파일 경로가 세션에 등록되어 다음 실행 때 자동으로 다시 로드됩니다. 파일이 없어도 문서 탭 복원은 계속되며 상태바에 경고가 표시됩니다.
 77. 외부 프로젝트의 컨트롤은 Component Pack 항목에 `designOnly: true`, `avaloniaTypeName`, `previewText`, `defaultProperties`를 지정해 등록합니다. 디자이너에서는 타입명 플레이스홀더로 편집하고, 생성 AXAML에는 원래 커스텀 타입과 속성을 출력합니다. 예시는 [custom-component-pack.example.json](docs/custom-component-pack.example.json)을 참고하세요.
 78. `File > Load Component Pack Plugin...`에서 `IComponentPackPlugin`을 구현한 신뢰할 수 있는 DLL을 선택하면 플러그인이 제공한 Component Pack을 Toolbox에 등록합니다. DLL 경로는 세션 JSON의 `ComponentPluginPaths`에 저장되고, 앱 재시작 시 플러그인·JSON 팩·프리셋 팩 순서로 복원됩니다.
@@ -795,6 +798,7 @@ AXAML 소스 편집기의 `Validate`와 `Preview`는 현재 디자인과 Undo �
 - v2.87: Project Explorer 새 AXAML paired code-behind 생성과 rollback 보호 추가
 - v2.88: Project Explorer paired AXAML code-behind 상태 표시와 파일 작업 동기화 추가
 - v2.89: Project Explorer paired code-behind 빠른 열기 메뉴 추가
+- v2.90: Project Explorer paired AXAML/code-behind identity mismatch 진단 추가
 
 ## 컴포넌트 팩
 

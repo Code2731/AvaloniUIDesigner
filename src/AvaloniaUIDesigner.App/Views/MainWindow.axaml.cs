@@ -170,6 +170,7 @@ public partial class MainWindow : Window
         Project Explorer Ctrl+N  Create a new AXAML file from a UserControl or Window template
         Project Explorer paired file  Create a matching x:Class and .axaml.cs with a new AXAML file
         Project Explorer paired code-behind  Open the paired .axaml.cs in the OS default editor
+        Project Explorer pair status  Distinguish matching and mismatched AXAML/code-behind identities
         Project Explorer Ctrl+Shift+N  Create a new folder
         Project Explorer Ctrl+Shift+D  Duplicate the selected AXAML file
         Project Explorer Ctrl+Shift+M  Move the selected AXAML file to another project folder
@@ -315,6 +316,13 @@ public partial class MainWindow : Window
                 : RelativePath;
     }
 
+    private enum ProjectExplorerCodeBehindStatus
+    {
+        None,
+        Paired,
+        Mismatch,
+    }
+
     private sealed class ProjectExplorerNode
     {
         public ProjectExplorerNode(
@@ -324,7 +332,8 @@ public partial class MainWindow : Window
             int depth,
             IReadOnlyList<ProjectExplorerNode>? children = null,
             bool isExpanded = true,
-            bool hasCodeBehind = false)
+            bool hasCodeBehind = false,
+            bool hasCodeBehindMismatch = false)
         {
             DisplayName = displayName;
             RelativePath = relativePath;
@@ -333,6 +342,7 @@ public partial class MainWindow : Window
             Children = children ?? Array.Empty<ProjectExplorerNode>();
             IsExpanded = isExpanded;
             HasCodeBehind = hasCodeBehind;
+            HasCodeBehindMismatch = hasCodeBehindMismatch;
         }
 
         public string DisplayName { get; }
@@ -343,6 +353,7 @@ public partial class MainWindow : Window
         public bool IsFile => FullPath is not null;
         public bool IsExpanded { get; set; }
         public bool HasCodeBehind { get; }
+        public bool HasCodeBehindMismatch { get; }
 
         public override string ToString()
         {
@@ -350,7 +361,9 @@ public partial class MainWindow : Window
             var marker = IsFile ? "[F]" : IsExpanded ? "[-]" : "[+]";
             return IsFile
                 ? HasCodeBehind
-                    ? $"{indentation}{marker} {DisplayName} - {RelativePath} [paired]"
+                    ? HasCodeBehindMismatch
+                        ? $"{indentation}{marker} {DisplayName} - {RelativePath} [pair mismatch]"
+                        : $"{indentation}{marker} {DisplayName} - {RelativePath} [paired]"
                     : $"{indentation}{marker} {DisplayName} - {RelativePath}"
                 : $"{indentation}{marker} {DisplayName}/";
         }
@@ -1728,13 +1741,17 @@ public partial class MainWindow : Window
                 if (node is null)
                 {
                     var children = new List<ProjectExplorerNode>();
+                    var codeBehindStatus = isFile
+                        ? GetProjectExplorerCodeBehindStatus(file.FullPath)
+                        : ProjectExplorerCodeBehindStatus.None;
                     node = new ProjectExplorerNode(
                         segment,
                         relativePath,
                         isFile ? file.FullPath : null,
                         index,
                         children,
-                        hasCodeBehind: isFile && file.HasCodeBehind);
+                        hasCodeBehind: codeBehindStatus != ProjectExplorerCodeBehindStatus.None,
+                        hasCodeBehindMismatch: codeBehindStatus == ProjectExplorerCodeBehindStatus.Mismatch);
                     siblings.Add(node);
                 }
 
@@ -2131,6 +2148,66 @@ public partial class MainWindow : Window
 
     private static string GetProjectExplorerCodeBehindPath(string axamlPath)
         => axamlPath + ".cs";
+
+    private static ProjectExplorerCodeBehindStatus GetProjectExplorerCodeBehindStatus(string? axamlPath)
+    {
+        if (string.IsNullOrWhiteSpace(axamlPath))
+        {
+            return ProjectExplorerCodeBehindStatus.None;
+        }
+
+        var codeBehindPath = GetProjectExplorerCodeBehindPath(axamlPath);
+        if (!File.Exists(codeBehindPath))
+        {
+            return ProjectExplorerCodeBehindStatus.None;
+        }
+
+        try
+        {
+            var document = XDocument.Parse(File.ReadAllText(axamlPath));
+            var xClassName = XNamespace.Get("http://schemas.microsoft.com/winfx/2006/xaml") + "Class";
+            var className = document.Root?.Attribute(xClassName)?.Value.Trim();
+            if (!MainWindowViewModel.TryNormalizeRootClassName(className, out var normalizedClassName)
+                || normalizedClassName.Length == 0)
+            {
+                return ProjectExplorerCodeBehindStatus.Mismatch;
+            }
+
+            var sourceCodeBehind = File.ReadAllText(codeBehindPath);
+            var separator = normalizedClassName.LastIndexOf('.');
+            var namespaceName = separator > 0
+                ? normalizedClassName[..separator]
+                : string.Empty;
+            var typeName = separator > 0
+                ? normalizedClassName[(separator + 1)..]
+                : normalizedClassName;
+            var classPattern = $@"\bpartial\s+class\s+{Regex.Escape(typeName)}\b";
+            if (!Regex.IsMatch(sourceCodeBehind, classPattern))
+            {
+                return ProjectExplorerCodeBehindStatus.Mismatch;
+            }
+
+            if (namespaceName.Length == 0)
+            {
+                return Regex.IsMatch(sourceCodeBehind, @"\bnamespace\s+[\w.]+")
+                    ? ProjectExplorerCodeBehindStatus.Mismatch
+                    : ProjectExplorerCodeBehindStatus.Paired;
+            }
+
+            var namespacePattern = $@"\bnamespace\s+{Regex.Escape(namespaceName)}\s*(?:;|\{{)";
+            return Regex.IsMatch(sourceCodeBehind, namespacePattern)
+                ? ProjectExplorerCodeBehindStatus.Paired
+                : ProjectExplorerCodeBehindStatus.Mismatch;
+        }
+        catch (Exception exception) when (exception is IOException
+            or UnauthorizedAccessException
+            or ArgumentException
+            or NotSupportedException
+            or System.Xml.XmlException)
+        {
+            return ProjectExplorerCodeBehindStatus.Mismatch;
+        }
+    }
 
     private static bool TryPrepareProjectExplorerDuplicate(
         string sourceAxamlPath,
@@ -2707,7 +2784,8 @@ public partial class MainWindow : Window
                 node.Depth,
                 children,
                 isExpanded: true,
-                hasCodeBehind: node.HasCodeBehind);
+                hasCodeBehind: node.HasCodeBehind,
+                hasCodeBehindMismatch: node.HasCodeBehindMismatch);
     }
 
     private static List<ProjectExplorerNode> SortProjectExplorerNodes(
@@ -2722,7 +2800,8 @@ public partial class MainWindow : Window
                 node.Depth,
                 SortProjectExplorerNodes(node.Children),
                 node.IsExpanded,
-                node.HasCodeBehind))
+                node.HasCodeBehind,
+                node.HasCodeBehindMismatch))
             .ToList();
 
     private static List<ProjectExplorerNode> FlattenProjectExplorerTree(
@@ -2765,6 +2844,21 @@ public partial class MainWindow : Window
             var pathText = node.IsFile
                 ? node.RelativePath
                 : $"{node.RelativePath}/";
+            var pairedStatus = new TextBlock
+            {
+                Text = node.HasCodeBehindMismatch
+                    ? "pair mismatch"
+                    : node.HasCodeBehind ? "paired" : string.Empty,
+                Foreground = node.HasCodeBehindMismatch
+                    ? Brush.Parse("#FBBF24")
+                    : Brush.Parse("#86EFAC"),
+                IsVisible = node.HasCodeBehind,
+            };
+            ToolTip.SetTip(
+                pairedStatus,
+                node.HasCodeBehindMismatch
+                    ? "AXAML x:Class does not match the paired code-behind type."
+                    : "A matching .axaml.cs code-behind file is present.");
             return new Border
             {
                 HorizontalAlignment = HorizontalAlignment.Stretch,
@@ -2792,12 +2886,7 @@ public partial class MainWindow : Window
                             Foreground = Brush.Parse("#94A3B8"),
                             TextTrimming = TextTrimming.CharacterEllipsis,
                         },
-                        new TextBlock
-                        {
-                            Text = node.HasCodeBehind ? "paired" : string.Empty,
-                            Foreground = Brush.Parse("#86EFAC"),
-                            IsVisible = node.HasCodeBehind,
-                        },
+                        pairedStatus,
                     },
                 },
             };
@@ -5069,8 +5158,9 @@ public partial class MainWindow : Window
             openCodeBehindMenu.IsEnabled = list.SelectedItem is ProjectExplorerNode
                 {
                     IsFile: true,
-                    HasCodeBehind: true,
-                };
+                    FullPath: { } axamlPath,
+                }
+                && File.Exists(GetProjectExplorerCodeBehindPath(axamlPath));
         };
         list.ContextMenu = projectExplorerContextMenu;
         DragDrop.SetAllowDrop(list, true);
