@@ -20,6 +20,8 @@ redo branch with a new edit. These call editor commands rather than OS input.
 The same suite verifies that design-only custom controls retain interaction
 and explicitly edited accessibility state through Draft AXAML and Undo/Redo
 without exporting placeholder-only chrome or keyboard defaults.
+Custom-control checks also cover transforms and visual effects across two-step
+Undo/Redo and Draft re-import, allowing normal matrix and color quantization.
 
 Persistence checks cover initial UTF-8 saves, replacement backups, repeated
 backup rotation, invalid backup paths, temporary-file cleanup, and retry after

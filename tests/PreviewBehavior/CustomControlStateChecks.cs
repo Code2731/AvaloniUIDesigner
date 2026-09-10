@@ -100,6 +100,44 @@ internal static class CustomControlStateChecks
             && accessibility.IsTabStop
             && accessibility.Focusable,
             "Custom-control accessibility values must survive draft import.");
+        editor.SelectElement(editor.Canvas.Elements.Single());
+        Assert(editor.SetSelectedTransformProperties(
+            "12", "-4", "30", "1.25", "0.75", "3", "-2", "40", "60"), editor.StatusText);
+        Assert(editor.SetSelectedEffectProperties(
+            "Drop Shadow", "5", "3", "4", "8", "#112233", "0.65"), editor.StatusText);
+        editor.Undo();
+        var afterEffectUndo = editor.Canvas.Elements.Single().Visual;
+        var readUndoneEffect = DesignerEffectRuntime.TryRead(afterEffectUndo, out var undoneEffect, out var undoneEffectError);
+        var readRetainedTransform = DesignerTransformRuntime.TryRead(
+            afterEffectUndo, out var retainedTransform, out var retainedTransformError);
+        var expectedTransform = new DesignerTransformValues(12, -4, 30, 1.25, 0.75, 3, -2, 40, 60);
+        Assert(readUndoneEffect && undoneEffect.Kind == DesignerEffectKind.None
+            && readRetainedTransform && DesignerTransformRuntime.AreEquivalent(retainedTransform, expectedTransform),
+            $"Undoing the effect must retain the preceding custom-control transform. "
+            + $"Effect={undoneEffect?.Kind}, EffectError={undoneEffectError}, "
+            + $"Rotation={retainedTransform?.Rotation}, TransformError={retainedTransformError}");
+        editor.Undo();
+        var afterTransformUndo = editor.Canvas.Elements.Single().Visual;
+        Assert(DesignerTransformRuntime.TryRead(afterTransformUndo, out var undoneTransform, out _)
+            && DesignerTransformRuntime.AreEquivalent(undoneTransform, DesignerTransformValues.Default),
+            "The second Undo must restore the default custom-control transform.");
+        editor.Redo();
+        editor.Redo();
+        source = editor.ExportDraftAxaml();
+        Assert(source.Contains("RenderTransform=") && source.Contains("RenderTransformOrigin=")
+            && source.Contains("Effect="),
+            "Draft AXAML must include edited custom-control transform and effect values.");
+        Assert(editor.TryImportDraftAxaml(source, out importError, out _), importError);
+        imported = editor.Canvas.Elements.Single().Visual;
+        Assert(DesignerTransformRuntime.TryRead(imported, out var transform, out var transformError), transformError);
+        Assert(DesignerTransformRuntime.AreEquivalent(transform, expectedTransform),
+            "Custom-control transform values must survive draft import.");
+        Assert(DesignerEffectRuntime.TryRead(imported, out var effect, out var effectError), effectError);
+        Assert(effect.Kind == DesignerEffectKind.DropShadow
+            && effect.OffsetX == 3 && effect.OffsetY == 4 && effect.ShadowBlurRadius == 8
+            && Avalonia.Media.Color.Parse(effect.ShadowColor) == Avalonia.Media.Color.Parse("#112233")
+            && Math.Abs(effect.ShadowOpacity - 0.65) <= 1d / byte.MaxValue,
+            $"Custom-control effect values must survive draft import: {effect}");
         var snapshot = editor.CreatePreviewDocument().Elements.Single();
         Assert(snapshot.VisualProperties!["Caption"] == "Ready"
             && snapshot.VisualProperties["Opacity"] == "0.85",
