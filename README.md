@@ -18,6 +18,8 @@ dotnet run --project src/AvaloniaUIDesigner.App/AvaloniaUIDesigner.App.csproj
 
 ## 현재 상태
 
+Preview 동작 회귀 검증: `dotnet run --project tests/PreviewBehavior -p:UsedAvaloniaProducts=`. Avalonia Headless에서 실제 PreviewWindow를 생성해 Reset 버튼, 최신 디자인 반영, 로그 패널 분리·펼치기, 창 크기·테마 유지와 원본 snapshot 보호를 확인합니다. 화면 렌더링 품질과 OS 입력 검증은 별도로 수행해야 합니다.
+
 - 4-Pane 레이아웃 (Toolbox / Canvas / Object Tree / Property Inspector)
 - **Toolbox**: 내장 컨트롤, 복합 프리셋, JSON 컴포넌트 팩. 외부 팩 파일 경로도 워크스페이스 세션에 기록해 재시작 후 자동 복원
 - **Toolbox 카테고리 UX**: 내장 컨트롤을 Layout·Containers·Input·Display·Shapes로 자동 분류하고, 우선순위별로 정렬한 접기/펼치기 그룹과 카드의 카테고리 칩·Avalonia 타입 힌트를 표시하며, Component Pack의 선택적 `category` 메타데이터와 이름/타입 검색을 함께 적용
