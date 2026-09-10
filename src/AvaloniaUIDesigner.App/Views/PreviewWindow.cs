@@ -25,6 +25,7 @@ public sealed class PreviewWindow : Window
     private readonly Border _previewSurface;
     private readonly ScrollViewer _previewScrollViewer;
     private readonly Border _interactionPanel;
+    private readonly Expander _interactionExpander;
     private readonly TextBlock _interactionLog;
     private readonly List<string> _interactionEntries = new();
 
@@ -78,7 +79,7 @@ public sealed class PreviewWindow : Window
         DockPanel.SetDock(clearLog, Dock.Top);
         logContent.Children.Add(clearLog);
         logContent.Children.Add(_interactionPanel);
-        var logExpander = new Expander
+        _interactionExpander = new Expander
         {
             Header = "Interaction Log",
             IsExpanded = true,
@@ -87,15 +88,18 @@ public sealed class PreviewWindow : Window
             Content = logContent,
         };
         var layout = new Grid { RowDefinitions = new RowDefinitions("*,Auto") };
-        Grid.SetRow(logExpander, 1);
+        Grid.SetRow(_interactionExpander, 1);
         layout.Children.Add(_previewSurface);
-        layout.Children.Add(logExpander);
+        layout.Children.Add(_interactionExpander);
         Content = layout;
         RefreshDocument(document, resizeWindow: true);
     }
 
     public void SetThemeVariant(ThemeVariant requestedThemeVariant)
         => RequestedThemeVariant = requestedThemeVariant;
+
+    public void ShowInteractionLog()
+        => _interactionExpander.IsExpanded = true;
 
     public void RefreshDocument(DesignerCanvasDocument document)
         => RefreshDocument(document, resizeWindow: false);

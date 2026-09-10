@@ -838,6 +838,7 @@ AXAML 소스 편집기의 `Validate`와 `Preview`는 현재 디자인과 Undo �
 - v3.01: Content·TabControl·SplitView의 중복 자식 슬롯 진단 추가. `dotnet run --project tests/LayoutValidation`으로 슬롯 충돌과 정상 배치를 검증합니다.
 - v3.02: 순환 계층 진단에 실제 부모 연결 순서와 닫히는 경로를 표시하고, 이미 검사한 계층의 중복 탐색을 제거했습니다.
 - v3.03: Preview Interaction Log를 Canvas 밖의 접이식 하단 패널로 분리했습니다. 로그 스크롤과 Clear 버튼을 지원하며 하단 디자인 컨트롤을 가리지 않습니다.
+- v3.04: Interaction Log 명령과 단축키가 접힌 로그 패널을 다시 펼치도록 연결했습니다. 기존 기록은 유지됩니다.
 
 ## 컴포넌트 팩
 

@@ -10320,6 +10320,10 @@ public partial class MainWindow : Window
             {
                 _previewWindow.RefreshDocument(Vm.CreatePreviewDocument());
             }
+            else
+            {
+                _previewWindow.ShowInteractionLog();
+            }
 
             _previewWindow.Activate();
             Vm.StatusText = refreshDocument
