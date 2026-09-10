@@ -4073,10 +4073,19 @@ public partial class CanvasViewModel : ViewModelBase
             && !string.IsNullOrWhiteSpace(persistedPreviewText)
                 ? persistedPreviewText
                 : metadata.PreviewText;
+        var declaredProperties = properties.TryGetValue(
+                DesignerCustomPropertyRuntime.DeclaredPropertiesMetadataKey,
+                out var declaredPropertiesJson)
+            && DesignerCustomPropertyRuntime.TryDeserializeDeclaredPropertyNames(
+                declaredPropertiesJson,
+                out var persistedDeclaredProperties)
+                ? persistedDeclaredProperties
+                : metadata.DeclaredProperties;
         visual.Tag = metadata with
         {
             PreviewText = previewText,
             DefaultProperties = defaultProperties,
+            DeclaredProperties = declaredProperties,
         };
     }
 

@@ -702,7 +702,8 @@ public sealed class PreviewWindow : Window
             _ => DesignerCustomControlRuntime.CreatePlaceholder(
                 snapshot.TypeName,
                 ReadDesignOnlyPreviewText(snapshot),
-                ReadDesignOnlyProperties(snapshot.VisualProperties)),
+                ReadDesignOnlyProperties(snapshot.VisualProperties),
+                ReadDesignOnlyDeclaredProperties(snapshot.VisualProperties)),
         };
 
         ApplyProperties(control, snapshot.VisualProperties, colorResources);
@@ -725,6 +726,18 @@ public sealed class PreviewWindow : Window
             : properties
                 .Where(pair => !pair.Key.StartsWith("__", StringComparison.Ordinal))
                 .ToDictionary(pair => pair.Key, pair => pair.Value, StringComparer.Ordinal);
+
+    private static IReadOnlyList<string>? ReadDesignOnlyDeclaredProperties(
+        IReadOnlyDictionary<string, string>? properties)
+        => properties is not null
+            && properties.TryGetValue(
+                DesignerCustomPropertyRuntime.DeclaredPropertiesMetadataKey,
+                out var declaredPropertiesJson)
+            && DesignerCustomPropertyRuntime.TryDeserializeDeclaredPropertyNames(
+                declaredPropertiesJson,
+                out var declaredProperties)
+                ? declaredProperties
+                : null;
 
     private static void WireInteractiveStyleStates(
         Control control,

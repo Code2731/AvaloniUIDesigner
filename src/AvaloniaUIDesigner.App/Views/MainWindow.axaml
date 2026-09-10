@@ -155,6 +155,7 @@
                 <MenuItem Header="Edit Items / Columns..." Click="OnEditItemsMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
                 <MenuItem Header="Edit DataGrid Behavior... (Ctrl+Alt+Shift+E)" Click="OnEditDataGridBehaviorPropertiesMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
                 <MenuItem Header="Edit Bindings..." Click="OnEditBindingsMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
+                <MenuItem Header="Edit Declared Custom Properties..." Click="OnEditCustomPropertiesMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
                 <MenuItem Header="Edit Common Properties... (Ctrl+Alt+M)" Click="OnEditCommonPropertiesMenuClicked" IsEnabled="{Binding Canvas.HasMultipleSelection}"/>
                 <MenuItem Header="Edit Layout Properties... (Ctrl+Alt+L)" Click="OnEditLayoutPropertiesMenuClicked" IsEnabled="{Binding Canvas.IsSelectionActive}"/>
                 <MenuItem Header="Edit Selection Bounds... (Ctrl+Alt+B)" Click="OnEditSelectionBoundsMenuClicked" IsEnabled="{Binding Canvas.HasMultipleSelection}"/>
@@ -1806,6 +1807,7 @@
                                                     <MenuItem Header="Edit Appearance..." Click="OnEditAppearanceMenuClicked"/>
                                                     <MenuItem Header="Edit DataGrid Behavior... (Ctrl+Alt+Shift+E)" Click="OnEditDataGridBehaviorPropertiesMenuClicked"/>
                                                     <MenuItem Header="Edit Bindings..." Click="OnEditBindingsMenuClicked"/>
+                                                    <MenuItem Header="Edit Declared Custom Properties..." Click="OnEditCustomPropertiesMenuClicked"/>
                                                     <MenuItem Header="Edit Layout Properties..." Click="OnEditLayoutPropertiesMenuClicked"/>
                                                     <MenuItem Header="Edit Typography Properties..." Click="OnEditTypographyPropertiesMenuClicked"/>
                                                     <MenuItem Header="Edit Transform Properties..." Click="OnEditTransformPropertiesMenuClicked"/>

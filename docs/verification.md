@@ -42,6 +42,13 @@ original Avalonia type rather than the placeholder type. Regression coverage
 includes local-default conflict removal, pseudo-class simulation, Undo/Redo,
 Draft re-import, live disabled-state changes in Headless Preview, and Preview
 Reset without serializing style-managed values as local attributes.
+The declared custom-property editor is covered for common-property filtering,
+case-insensitive canonical names, undeclared-property rejection, value edits
+and removal, selective binding replacement, Undo/Redo, Draft re-import, and
+Headless Preview metadata preservation. Binding choices continue to come from
+the component declaration even when a style removes a local value, and an
+in-use placeholder retains those declarations after its component pack is
+removed and its history is rebuilt.
 
 Persistence checks cover initial UTF-8 saves, replacement backups, repeated
 backup rotation, invalid backup paths, temporary-file cleanup, and retry after

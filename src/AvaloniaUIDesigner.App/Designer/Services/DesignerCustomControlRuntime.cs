@@ -11,8 +11,15 @@ public static class DesignerCustomControlRuntime
     public static Control CreatePlaceholder(
         string typeName,
         string previewText,
-        IReadOnlyDictionary<string, string>? defaultProperties = null)
-        => new Border
+        IReadOnlyDictionary<string, string>? defaultProperties = null,
+        IEnumerable<string>? declaredProperties = null)
+    {
+        var properties = new Dictionary<string, string>(
+            defaultProperties ?? new Dictionary<string, string>(),
+            System.StringComparer.Ordinal);
+        var declarations = DesignerCustomPropertyRuntime.NormalizeDeclaredPropertyNames(
+            declaredProperties ?? properties.Keys);
+        return new Border
         {
             Background = Brush.Parse("#E0F2FE"),
             BorderBrush = Brush.Parse("#0284C7"),
@@ -22,9 +29,8 @@ public static class DesignerCustomControlRuntime
             Tag = new DesignerCustomControlMetadata(
                 typeName,
                 previewText,
-                new Dictionary<string, string>(
-                    defaultProperties ?? new Dictionary<string, string>(),
-                    System.StringComparer.Ordinal)),
+                properties,
+                declarations),
             Child = new StackPanel
             {
                 Spacing = 3,
@@ -46,4 +52,5 @@ public static class DesignerCustomControlRuntime
                 },
             },
         };
+    }
 }

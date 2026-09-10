@@ -387,8 +387,111 @@ internal static class CustomControlStateChecks
             preview.Close();
         }
 
+        RunCustomPropertyEditorChecks();
         RunCustomStyleChecks();
         Console.WriteLine("Custom control state checks passed.");
+    }
+
+    private static void RunCustomPropertyEditorChecks()
+    {
+        var editor = new MainWindowViewModel();
+        Assert(editor.TryLoadComponentPack(ComponentPack, out var result), result);
+        var item = editor.Toolbox.FindItemByDisplayName("Status Gauge")
+            ?? throw new Exception("Loaded custom control was not added to Toolbox.");
+        editor.PlaceToolboxItem(item, 32, 48);
+        Assert(editor.TryGetSelectedCustomProperties(out var state), editor.StatusText);
+        Assert(state.TargetType == "Acme.Controls.StatusGauge"
+            && state.EditableProperties.SequenceEqual(["Caption"])
+            && state.Lines.SequenceEqual(["Caption = Ready"]),
+            "The custom-property editor must expose declared external properties and leave common properties to their dedicated editors.");
+
+        var unchangedSource = editor.ExportDraftAxaml();
+        Assert(!editor.SetSelectedCustomProperties(["Unknown = value"])
+            && editor.ExportDraftAxaml() == unchangedSource,
+            "An undeclared custom property must be rejected without changing the document.");
+        Assert(editor.SetSelectedCustomProperties(["caption = Attention"]), editor.StatusText);
+        var custom = editor.Canvas.Elements.Single();
+        Assert(custom.Visual.Tag is DesignerCustomControlMetadata metadata
+            && metadata.DefaultProperties["Caption"] == "Attention",
+            "The custom-property editor must preserve canonical declaration casing and update its value.");
+        editor.Undo();
+        Assert(editor.Canvas.Elements.Single().Visual.Tag is DesignerCustomControlMetadata undoneMetadata
+            && undoneMetadata.DefaultProperties["Caption"] == "Ready",
+            "Undo must restore the preceding declared custom-property value.");
+        editor.Redo();
+        Assert(editor.Canvas.Elements.Single().Visual.Tag is DesignerCustomControlMetadata redoneMetadata
+            && redoneMetadata.DefaultProperties["Caption"] == "Attention",
+            "Redo must restore the edited declared custom-property value.");
+
+        editor.SelectElement(editor.Canvas.Elements.Single());
+        Assert(editor.SetSelectedBindings(
+        [
+            "Caption | Preview.Caption | OneWay | Standby",
+            "Opacity | Preview.Opacity | OneWay | 0.35",
+        ]), editor.StatusText);
+        Assert(editor.TryGetSelectedCustomProperties(out state)
+            && state.EditableProperties.SequenceEqual(["Caption"])
+            && state.Lines.Count == 0,
+            "A bound custom property must remain declared but must not appear as an effective local value.");
+        Assert(editor.SetSelectedCustomProperties(["Caption = Alert"]), editor.StatusText);
+        var bindings = DesignerBindingRuntime.ReadBindings(editor.Canvas.Elements.Single().Visual);
+        Assert(bindings is [{ PropertyName: "Opacity" }],
+            "Setting a custom local value must replace only that property's binding.");
+        editor.Undo();
+        Assert(DesignerBindingRuntime.ReadBindings(editor.Canvas.Elements.Single().Visual).Count == 2,
+            "Undo must restore the custom binding replaced by a local value.");
+        editor.Redo();
+        custom = editor.Canvas.Elements.Single();
+        Assert(custom.Visual.Tag is DesignerCustomControlMetadata alertMetadata
+            && alertMetadata.DefaultProperties["Caption"] == "Alert"
+            && DesignerBindingRuntime.ReadBindings(custom.Visual) is [{ PropertyName: "Opacity" }],
+            "Redo must restore the local custom value while retaining unrelated bindings.");
+
+        var source = editor.ExportDraftAxaml();
+        Assert(source.Contains("Caption=\"Alert\"")
+            && source.Contains("Opacity=\"{ReflectionBinding Preview.Opacity")
+            && !source.Contains("Caption=\"{ReflectionBinding"),
+            "Draft AXAML must serialize the edited custom value and only the retained binding.");
+        Assert(editor.TryImportDraftAxaml(source, out var importError, out _), importError);
+        custom = editor.Canvas.Elements.Single();
+        Assert(custom.Visual.Tag is DesignerCustomControlMetadata importedMetadata
+            && importedMetadata.DefaultProperties["Caption"] == "Alert",
+            "A declared custom-property edit must survive Draft re-import.");
+        var preview = new PreviewWindow(editor.CreatePreviewDocument());
+        try
+        {
+            var previewLayout = (Grid)preview.Content!;
+            var previewSurface = previewLayout.Children.OfType<Border>().Single();
+            var previewViewport = (ScrollViewer)previewSurface.Child!;
+            var previewCanvas = (Canvas)previewViewport.Content!;
+            Assert(previewCanvas.Children.Single().Tag is DesignerCustomControlMetadata previewMetadata
+                && previewMetadata.DefaultProperties["Caption"] == "Alert"
+                && previewMetadata.DeclaredProperties.Contains("Caption")
+                && previewMetadata.DeclaredProperties.Contains("Opacity"),
+                "Preview must retain the edited declared custom-property value for the external control.");
+        }
+        finally
+        {
+            preview.Close();
+        }
+
+        editor.SelectElement(editor.Canvas.Elements.Single());
+        Assert(editor.SetSelectedCustomProperties([]), editor.StatusText);
+        Assert(!editor.ExportDraftAxaml().Contains("Caption=\"", StringComparison.Ordinal)
+            && DesignerBindingRuntime.ReadBindings(editor.Canvas.Elements.Single().Visual) is
+                [{ PropertyName: "Opacity" }],
+            "Removing a custom-property line must omit its local AXAML value without removing unrelated bindings.");
+        var sourceId = editor.ComponentPacks.Single().SourceId;
+        Assert(editor.TryRemoveComponentPack(sourceId, out var removeResult), removeResult);
+        Assert(editor.TryGetSelectedCustomProperties(out state)
+            && state.EditableProperties.SequenceEqual(["Caption"])
+            && state.Lines.Count == 0,
+            "A removed component pack must not erase declarations retained by an in-use placeholder.");
+        editor.Undo();
+        Assert(editor.ExportDraftAxaml().Contains("Caption=\"Alert\"")
+            && editor.Canvas.Elements.Single().Visual.Tag is DesignerCustomControlMetadata restoredMetadata
+            && restoredMetadata.DeclaredProperties.Contains("Caption"),
+            "Undo must restore a removed declared custom-property value and its declaration after pack removal.");
     }
 
     private static void RunCustomStyleChecks()
@@ -434,6 +537,11 @@ internal static class CustomControlStateChecks
         Assert(CanvasViewModel.GetUserStyleClasses(custom.Visual).SequenceEqual(["styled"])
             && Math.Abs(custom.Visual.Opacity - 0.6) < 0.001,
             "Redo must restore the custom-control style without reviving its local override.");
+        editor.SelectElement(custom);
+        Assert(editor.TryGetSelectedBindings(out var bindingState)
+            && bindingState.SupportedProperties.Contains("Caption")
+            && bindingState.SupportedProperties.Contains("Opacity"),
+            "Declared binding properties must remain available after a style clears their local values.");
 
         var source = editor.ExportDraftAxaml();
         Assert(source.Contains("Selector=\"StatusGauge.styled\"")

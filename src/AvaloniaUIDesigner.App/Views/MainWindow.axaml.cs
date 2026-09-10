@@ -9382,6 +9382,23 @@ public partial class MainWindow : Window
         }
     }
 
+    private async void OnEditCustomPropertiesMenuClicked(
+        object? sender,
+        Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        FlushPendingPropertyHistory();
+        if (Vm is null || !Vm.TryGetSelectedCustomProperties(out var state))
+        {
+            return;
+        }
+
+        var updatedProperties = await ShowCustomPropertyEditorDialogAsync(state);
+        if (updatedProperties is not null)
+        {
+            Vm.SetSelectedCustomProperties(updatedProperties);
+        }
+    }
+
     private async void OnEditCommonPropertiesMenuClicked(
         object? sender,
         Avalonia.Interactivity.RoutedEventArgs e)
@@ -20680,6 +20697,97 @@ public partial class MainWindow : Window
                 new TextBlock
                 {
                     Text = $"Supported: {string.Join(", ", state.SupportedProperties)}",
+                    Foreground = Avalonia.Media.Brushes.SlateGray,
+                    TextWrapping = Avalonia.Media.TextWrapping.Wrap,
+                },
+                editor,
+                errorText,
+                buttons,
+            },
+        };
+        Grid.SetRow(content.Children[1], 1);
+        Grid.SetRow(editor, 2);
+        Grid.SetRow(errorText, 3);
+        Grid.SetRow(buttons, 4);
+        dialog.Content = content;
+        return await dialog.ShowDialog<IReadOnlyList<string>?>(this);
+    }
+
+    private async Task<IReadOnlyList<string>?> ShowCustomPropertyEditorDialogAsync(
+        CustomPropertyEditorState state)
+    {
+        var editor = new TextBox
+        {
+            Text = string.Join(Environment.NewLine, state.Lines),
+            AcceptsReturn = true,
+            MinHeight = 220,
+        };
+        var errorText = new TextBlock
+        {
+            Foreground = Avalonia.Media.Brushes.IndianRed,
+            TextWrapping = Avalonia.Media.TextWrapping.Wrap,
+        };
+        var dialog = new Window
+        {
+            Title = $"Edit Declared Custom Properties - {state.ControlName}",
+            Width = 720,
+            Height = 470,
+            MinWidth = 520,
+            MinHeight = 340,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner,
+        };
+        var applyButton = new Button { Content = "Apply", MinWidth = 84 };
+        void ApplyProperties()
+        {
+            var lines = (editor.Text ?? string.Empty)
+                .Replace("\r\n", "\n", StringComparison.Ordinal)
+                .Split('\n', StringSplitOptions.None)
+                .ToList();
+            if (!DesignerCustomPropertyRuntime.TryParseEditorLines(
+                    lines,
+                    state.EditableProperties,
+                    out _,
+                    out var error))
+            {
+                errorText.Text = error;
+                return;
+            }
+
+            dialog.Close(lines);
+        }
+
+        applyButton.Click += (_, _) => ApplyProperties();
+        editor.KeyDown += (_, e) =>
+        {
+            HandleTextEditorShortcut(
+                e,
+                () => dialog.Close(null),
+                ApplyProperties);
+        };
+        var cancelButton = new Button { Content = "Cancel", MinWidth = 84 };
+        cancelButton.Click += (_, _) => dialog.Close(null);
+        var buttons = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            Spacing = 8,
+            HorizontalAlignment = HorizontalAlignment.Right,
+            Children = { cancelButton, applyButton },
+        };
+        var content = new Grid
+        {
+            Margin = new Thickness(16),
+            RowDefinitions = new RowDefinitions("Auto,Auto,*,Auto,Auto"),
+            RowSpacing = 10,
+            Children =
+            {
+                new TextBlock
+                {
+                    Text = "One local AXAML value per line: Property = Value. Remove a line to unset it. Setting a bound property replaces that binding.",
+                    TextWrapping = Avalonia.Media.TextWrapping.Wrap,
+                },
+                new TextBlock
+                {
+                    Text = $"Declared by {state.TargetType}: {string.Join(", ", state.EditableProperties)}",
                     Foreground = Avalonia.Media.Brushes.SlateGray,
                     TextWrapping = Avalonia.Media.TextWrapping.Wrap,
                 },

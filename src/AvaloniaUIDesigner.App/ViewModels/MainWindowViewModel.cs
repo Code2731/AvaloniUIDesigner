@@ -168,6 +168,12 @@ public sealed record BindingEditorState(
     IReadOnlyList<string> Lines,
     IReadOnlyList<string> SupportedProperties);
 
+public sealed record CustomPropertyEditorState(
+    string ControlName,
+    string TargetType,
+    IReadOnlyList<string> Lines,
+    IReadOnlyList<string> EditableProperties);
+
 public sealed record LayoutEditorState(
     string ControlName,
     string Margin,
@@ -4982,7 +4988,7 @@ public partial class MainWindowViewModel : ViewModelBase
         var targetType = target.Visual.Tag is DesignerCustomControlMetadata
             ? target.TypeName
             : target.Visual.GetType().Name;
-        var additionalProperties = GetCustomBindingProperties(target.Visual);
+        var additionalProperties = GetCustomBindingProperties(target);
         var supportedProperties = DesignerBindingRuntime.GetSupportedProperties(
             targetType,
             additionalProperties);
@@ -5006,7 +5012,7 @@ public partial class MainWindowViewModel : ViewModelBase
         var targetType = target.Visual.Tag is DesignerCustomControlMetadata
             ? target.TypeName
             : target.Visual.GetType().Name;
-        var additionalProperties = GetCustomBindingProperties(target.Visual);
+        var additionalProperties = GetCustomBindingProperties(target);
         if (!DesignerBindingRuntime.TryParseEditorLines(
                 targetType,
                 lines,
@@ -5041,21 +5047,129 @@ public partial class MainWindowViewModel : ViewModelBase
         return true;
     }
 
-    private static IReadOnlyList<string> GetCustomBindingProperties(Control visual)
+    private IReadOnlyList<string> GetCustomBindingProperties(DesignElement target)
     {
-        if (visual.Tag is not DesignerCustomControlMetadata metadata)
+        if (target.Visual.Tag is not DesignerCustomControlMetadata metadata)
         {
             return [];
         }
 
-        return metadata.DefaultProperties.Keys
-            .Concat(DesignerBindingRuntime.ReadBindings(visual)
+        var declaredProperties = GetDeclaredCustomPropertyNames(target, metadata);
+        return declaredProperties
+            .Concat(DesignerBindingRuntime.ReadBindings(target.Visual)
                 .Select(binding => binding.PropertyName))
             .Where(propertyName => !propertyName.StartsWith("__", StringComparison.Ordinal)
                 && !string.Equals(propertyName, "Classes", StringComparison.Ordinal))
             .Distinct(StringComparer.Ordinal)
             .ToList();
     }
+
+    public bool TryGetSelectedCustomProperties(out CustomPropertyEditorState state)
+    {
+        var target = Canvas.SelectedElement;
+        if (target is null)
+        {
+            state = new CustomPropertyEditorState(string.Empty, string.Empty, [], []);
+            StatusText = "Select a custom control before editing its declared properties.";
+            return false;
+        }
+
+        if (target.IsLocked)
+        {
+            state = new CustomPropertyEditorState(string.Empty, string.Empty, [], []);
+            StatusText = "Unlock the selected custom control before editing its declared properties.";
+            return false;
+        }
+
+        if (target.Visual.Tag is not DesignerCustomControlMetadata metadata)
+        {
+            state = new CustomPropertyEditorState(string.Empty, string.Empty, [], []);
+            StatusText = "Declared custom properties are available for design-only controls.";
+            return false;
+        }
+
+        var declaredProperties = GetDeclaredCustomPropertyNames(target, metadata);
+        var editableProperties = DesignerCustomPropertyRuntime.GetEditablePropertyNames(
+            target.Visual,
+            declaredProperties);
+        if (editableProperties.Count == 0)
+        {
+            state = new CustomPropertyEditorState(string.Empty, string.Empty, [], []);
+            StatusText = $"{target.DisplayName} does not declare custom properties outside the common editors.";
+            return false;
+        }
+
+        state = new CustomPropertyEditorState(
+            target.DisplayName,
+            target.TypeName,
+            DesignerCustomPropertyRuntime.FormatEditorLines(target.Visual, editableProperties),
+            editableProperties);
+        return true;
+    }
+
+    public bool SetSelectedCustomProperties(IEnumerable<string> lines)
+    {
+        if (!TryGetSelectedCustomProperties(out var state)
+            || Canvas.SelectedElement is not { } target)
+        {
+            return false;
+        }
+
+        if (!DesignerCustomPropertyRuntime.TryParseEditorLines(
+                lines,
+                state.EditableProperties,
+                out var properties,
+                out var error))
+        {
+            StatusText = $"Custom properties were not changed. {error}";
+            return false;
+        }
+
+        var currentProperties = DesignerCustomPropertyRuntime.ReadEditorValues(
+            target.Visual,
+            state.EditableProperties);
+        var currentBindings = DesignerBindingRuntime.ReadBindings(target.Visual);
+        var replacedBindingProperties = properties.Keys.ToHashSet(StringComparer.Ordinal);
+        var retainedBindings = currentBindings
+            .Where(binding => !replacedBindingProperties.Contains(binding.PropertyName))
+            .ToList();
+        if (DictionaryEquals(currentProperties, properties)
+            && retainedBindings.Count == currentBindings.Count)
+        {
+            StatusText = "Custom properties are unchanged.";
+            return true;
+        }
+
+        BeginCanvasMutation(HistoryActionType.EditProperty, "Updated declared custom properties.");
+        DesignerCustomPropertyRuntime.ReplaceValues(
+            target.Visual,
+            state.EditableProperties,
+            properties);
+        if (retainedBindings.Count != currentBindings.Count)
+        {
+            DesignerBindingRuntime.ReplaceBindings(
+                target.Visual,
+                retainedBindings,
+                GetCustomBindingProperties(target));
+        }
+
+        RefreshSampleDataPreview();
+        CommitCanvasMutation();
+        StatusText = properties.Count == 0
+            ? $"Cleared declared custom properties from {target.DisplayName}."
+            : $"Updated {properties.Count} declared custom property value(s) on {target.DisplayName}.";
+        return true;
+    }
+
+    private IEnumerable<string> GetDeclaredCustomPropertyNames(
+        DesignElement target,
+        DesignerCustomControlMetadata metadata)
+        => _componentCatalog.TryGet(target.TypeName, out var definition)
+            && definition.DefaultProperties is { } defaultProperties
+                ? defaultProperties.Keys
+                : metadata.DeclaredProperties.Count > 0
+                    ? metadata.DeclaredProperties
+                    : metadata.DefaultProperties.Keys;
 
     public bool TryGetSelectedLayoutProperties(out LayoutEditorState state)
     {
@@ -12053,6 +12167,13 @@ public partial class MainWindowViewModel : ViewModelBase
             }
 
             customProperties["__designPreviewText"] = customMetadata.PreviewText;
+            if (customMetadata.DeclaredProperties.Count > 0)
+            {
+                customProperties[DesignerCustomPropertyRuntime.DeclaredPropertiesMetadataKey]
+                    = DesignerCustomPropertyRuntime.SerializeDeclaredPropertyNames(
+                        customMetadata.DeclaredProperties);
+            }
+
             DesignerEventHandlerRuntime.Capture(visual, customProperties);
             DesignerAccessibilityRuntime.CaptureLocallySet(visual, customProperties);
             DesignerInteractionRuntime.Capture(visual, customProperties);
