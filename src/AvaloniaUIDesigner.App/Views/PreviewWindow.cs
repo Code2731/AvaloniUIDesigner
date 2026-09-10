@@ -189,6 +189,7 @@ public sealed class PreviewWindow : Window
     {
         var settings = document.Settings ?? new DesignerCanvasSettings();
         var rootSettings = document.RootSettings ?? new DesignerRootSettings();
+        ValidateRootDimensions(rootSettings);
         var background = Brush.Parse(settings.Background);
         var preparedInteractions = new List<DesignerPreviewInteraction>();
         var committed = false;
@@ -238,6 +239,21 @@ public sealed class PreviewWindow : Window
         _interactionLog.Text = _interactionEntries.Count == 0
             ? "Preview interactions will appear here."
             : string.Join(Environment.NewLine, _interactionEntries);
+    }
+
+    private static void ValidateRootDimensions(DesignerRootSettings settings)
+    {
+        static void ValidateRange(double minimum, double maximum, string dimension)
+        {
+            if (!double.IsFinite(minimum) || minimum < 0
+                || double.IsNaN(maximum) || maximum < minimum)
+            {
+                throw new ArgumentException($"Preview {dimension} limits require a finite, nonnegative minimum and a maximum at least as large.");
+            }
+        }
+
+        ValidateRange(settings.MinWidth, settings.MaxWidth, "width");
+        ValidateRange(settings.MinHeight, settings.MaxHeight, "height");
     }
 
     private void ApplyRootSettings(

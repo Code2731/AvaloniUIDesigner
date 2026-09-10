@@ -80,6 +80,30 @@ try
         "Failed preparation must preserve title and background.");
     window.ResetPreview();
     Assert(Input().Text == "Latest design", "Failed preparation must not replace the reset snapshot.");
+    foreach (var invalidRoot in new[]
+    {
+        new DesignerRootSettings(Title: "Invalid width", MinWidth: -1),
+        new DesignerRootSettings(Title: "Invalid height", MinHeight: double.NaN),
+        new DesignerRootSettings(MinWidth: double.PositiveInfinity),
+        new DesignerRootSettings(MaxWidth: double.NaN),
+        new DesignerRootSettings(MinHeight: 200, MaxHeight: 100),
+        new DesignerRootSettings(MaxHeight: double.NegativeInfinity),
+    })
+    {
+        var retainedCanvas = Canvas();
+        var retainedLimits = (window.MinWidth, window.MinHeight, window.MaxWidth, window.MaxHeight);
+        Input().Text = "Retain on invalid limits";
+        var rejected = false;
+        try { window.RefreshDocument(document with { RootSettings = invalidRoot }); }
+        catch (ArgumentException) { rejected = true; }
+        Assert(rejected, "Invalid root size limits must be rejected.");
+        Assert(ReferenceEquals(Canvas(), retainedCanvas) && Input().Text == "Retain on invalid limits"
+            && window.Title == stableTitle
+            && retainedLimits == (window.MinWidth, window.MinHeight, window.MaxWidth, window.MaxHeight),
+            "Invalid limits must not partially update the preview window or discard input.");
+        window.ResetPreview();
+        Assert(Input().Text == "Latest design", "Invalid limits must not replace the reset snapshot.");
+    }
     liveUpdates.IsChecked = false;
     Input().Text = "Paused interaction";
     var pending = document with { Elements = [input with
