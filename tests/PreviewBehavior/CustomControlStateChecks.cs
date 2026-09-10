@@ -1,5 +1,6 @@
 using Avalonia;
 using Avalonia.Input;
+using AvaloniaUIDesigner.App.Designer.Services;
 using AvaloniaUIDesigner.App.ViewModels;
 
 internal static class CustomControlStateChecks
@@ -38,6 +39,30 @@ internal static class CustomControlStateChecks
         custom.Visual.FlowDirection = Avalonia.Media.FlowDirection.RightToLeft;
         custom.Visual.Cursor = new Cursor(StandardCursorType.Help);
 
+        var sourceWithoutAccessibilityEdits = editor.ExportDraftAxaml();
+        Assert(!sourceWithoutAccessibilityEdits.Contains("TabIndex=")
+            && !sourceWithoutAccessibilityEdits.Contains("IsTabStop=")
+            && !sourceWithoutAccessibilityEdits.Contains("Focusable="),
+            "Unedited placeholder keyboard defaults must not leak into custom-control AXAML.");
+        Assert(editor.SetSelectedAccessibilityProperties(
+            "Current gauge value",
+            "System status",
+            "status-gauge",
+            "Shows the current system status",
+            "Content",
+            "2",
+            "Polite",
+            true,
+            "7",
+            true,
+            true), editor.StatusText);
+        editor.Undo();
+        var undoneSource = editor.ExportDraftAxaml();
+        Assert(!undoneSource.Contains("ToolTip.Tip=") && !undoneSource.Contains("TabIndex=\"7\"")
+            && undoneSource.Contains("IsVisible=\"False\""),
+            "Undo must remove the accessibility edit without changing custom-control interaction state.");
+        editor.Redo();
+
         var source = editor.ExportDraftAxaml();
         Assert(source.Contains("IsVisible=\"False\"")
             && source.Contains("IsEnabled=\"False\"")
@@ -45,6 +70,13 @@ internal static class CustomControlStateChecks
             && source.Contains("FlowDirection=\"RightToLeft\"")
             && source.Contains("Cursor=\"Help\""),
             "Draft AXAML must persist custom-control interaction state.");
+        Assert(source.Contains("ToolTip.Tip=\"Current gauge value\"")
+            && source.Contains("AutomationProperties.Name=\"System status\"")
+            && source.Contains("AutomationProperties.AutomationId=\"status-gauge\"")
+            && source.Contains("TabIndex=\"7\"")
+            && source.Contains("IsTabStop=\"True\"")
+            && source.Contains("Focusable=\"True\""),
+            "Draft AXAML must persist accessibility values explicitly edited on a custom control.");
         Assert(!source.Contains("Background=\"#FFE0F2FE\"")
             && !source.Contains("Padding=\"10"),
             "Draft AXAML must not leak design-placeholder chrome.");
@@ -55,6 +87,19 @@ internal static class CustomControlStateChecks
             && imported.FlowDirection == Avalonia.Media.FlowDirection.RightToLeft
             && imported.Cursor?.ToString() == StandardCursorType.Help.ToString(),
             "Custom-control interaction state must survive draft import.");
+        var accessibility = DesignerAccessibilityRuntime.Read(imported);
+        Assert(accessibility.ToolTip == "Current gauge value"
+            && accessibility.AccessibleName == "System status"
+            && accessibility.AutomationId == "status-gauge"
+            && accessibility.HelpText == "Shows the current system status"
+            && accessibility.AccessibilityView.ToString() == "Content"
+            && accessibility.HeadingLevel == 2
+            && accessibility.LiveSetting.ToString() == "Polite"
+            && accessibility.IsRequiredForForm
+            && accessibility.TabIndex == 7
+            && accessibility.IsTabStop
+            && accessibility.Focusable,
+            "Custom-control accessibility values must survive draft import.");
         var snapshot = editor.CreatePreviewDocument().Elements.Single();
         Assert(snapshot.VisualProperties!["Caption"] == "Ready"
             && snapshot.VisualProperties["Opacity"] == "0.85",

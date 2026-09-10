@@ -87,6 +87,32 @@ public static class DesignerAccessibilityRuntime
         }
     }
 
+    public static void CaptureLocallySet(Control control, IDictionary<string, string> properties)
+    {
+        var captured = new Dictionary<string, string>(StringComparer.Ordinal);
+        Capture(control, captured);
+        CopyIfSet(ToolTipKey, ToolTip.TipProperty);
+        CopyIfSet(NameKey, AutomationProperties.NameProperty);
+        CopyIfSet(AutomationIdKey, AutomationProperties.AutomationIdProperty);
+        CopyIfSet(HelpTextKey, AutomationProperties.HelpTextProperty);
+        CopyIfSet(AccessibilityViewKey, AutomationProperties.AccessibilityViewProperty);
+        CopyIfSet(HeadingLevelKey, AutomationProperties.HeadingLevelProperty);
+        CopyIfSet(LiveSettingKey, AutomationProperties.LiveSettingProperty);
+        CopyIfSet(IsRequiredForFormKey, AutomationProperties.IsRequiredForFormProperty);
+        CopyIfSet(TabIndexKey, InputElement.TabIndexProperty);
+        CopyIfSet(IsTabStopKey, InputElement.IsTabStopProperty);
+        CopyIfSet(FocusableKey, InputElement.FocusableProperty);
+        return;
+
+        void CopyIfSet(string key, AvaloniaProperty property)
+        {
+            if (control.IsSet(property) && captured.TryGetValue(key, out var value))
+            {
+                properties[key] = value;
+            }
+        }
+    }
+
     public static void Apply(Control control, IReadOnlyDictionary<string, string> properties)
     {
         if (TryGetValue(properties, ToolTipKey, out var toolTip))

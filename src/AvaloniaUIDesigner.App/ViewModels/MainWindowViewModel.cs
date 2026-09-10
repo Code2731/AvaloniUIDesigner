@@ -12007,6 +12007,7 @@ public partial class MainWindowViewModel : ViewModelBase
             }
 
             customProperties["__designPreviewText"] = customMetadata.PreviewText;
+            DesignerAccessibilityRuntime.CaptureLocallySet(visual, customProperties);
             DesignerInteractionRuntime.Capture(visual, customProperties);
             return customProperties;
         }

@@ -18,7 +18,8 @@ preflight, session serialization, and movement undo/redo history. History
 checks include redo after session restoration, no-op edits, and replacing a
 redo branch with a new edit. These call editor commands rather than OS input.
 The same suite verifies that design-only custom controls retain interaction
-state through Draft AXAML without exporting placeholder-only chrome.
+and explicitly edited accessibility state through Draft AXAML and Undo/Redo
+without exporting placeholder-only chrome or keyboard defaults.
 
 Persistence checks cover initial UTF-8 saves, replacement backups, repeated
 backup rotation, invalid backup paths, temporary-file cleanup, and retry after
