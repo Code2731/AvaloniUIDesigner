@@ -9,6 +9,7 @@ using AvaloniaUIDesigner.App.Views;
 AppBuilder.Configure<Application>().UseHeadless(new AvaloniaHeadlessPlatformOptions()).SetupWithoutStarting();
 AxamlRoundTripChecks.Run();
 EditingHistoryChecks.Run();
+CustomControlStateChecks.Run();
 var input = new DesignerElementSnapshot("Input", "Avalonia.Controls.TextBox", 10, 10, 120, 32,
     new Dictionary<string, string> { ["Text"] = "Original" });
 var toggle = new DesignerElementSnapshot("Choice", "Avalonia.Controls.CheckBox", 10, 60, 120, 32,
