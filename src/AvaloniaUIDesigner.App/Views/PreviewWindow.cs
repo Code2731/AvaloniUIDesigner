@@ -47,19 +47,50 @@ public sealed class PreviewWindow : Window
         };
         _interactionPanel = new Border
         {
-            IsHitTestVisible = false,
             Padding = new Thickness(10, 8),
             Background = Brush.Parse("#F8FAFC"),
             BorderBrush = Brush.Parse("#CBD5E1"),
             BorderThickness = new Thickness(1),
-            Child = _interactionLog,
+            Child = new ScrollViewer
+            {
+                MaxHeight = 120,
+                VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+                Content = _interactionLog,
+            },
         };
         _previewSurface = new Border
         {
             Padding = new Thickness(16),
             Child = _previewScrollViewer,
         };
-        Content = _previewSurface;
+        var clearLog = new Button
+        {
+            Content = "Clear",
+            Focusable = false,
+            HorizontalAlignment = HorizontalAlignment.Right,
+        };
+        clearLog.Click += (_, _) =>
+        {
+            _interactionEntries.Clear();
+            UpdateInteractionLog();
+        };
+        var logContent = new DockPanel();
+        DockPanel.SetDock(clearLog, Dock.Top);
+        logContent.Children.Add(clearLog);
+        logContent.Children.Add(_interactionPanel);
+        var logExpander = new Expander
+        {
+            Header = "Interaction Log",
+            IsExpanded = true,
+            Focusable = false,
+            HorizontalContentAlignment = HorizontalAlignment.Stretch,
+            Content = logContent,
+        };
+        var layout = new Grid { RowDefinitions = new RowDefinitions("*,Auto") };
+        Grid.SetRow(logExpander, 1);
+        layout.Children.Add(_previewSurface);
+        layout.Children.Add(logExpander);
+        Content = layout;
         RefreshDocument(document, resizeWindow: true);
     }
 
@@ -77,18 +108,7 @@ public sealed class PreviewWindow : Window
         _previewSurface.Background = Brush.Parse(settings.Background);
         _interactionEntries.Clear();
         UpdateInteractionLog();
-        if (_interactionPanel.Parent is Panel previousParent)
-        {
-            previousParent.Children.Remove(_interactionPanel);
-        }
-
         var previewCanvas = CreatePreviewCanvasWithInteractions(document, ReportInteraction);
-        Canvas.SetLeft(_interactionPanel, 0);
-        Canvas.SetTop(_interactionPanel, Math.Max(0, previewCanvas.Height - 56));
-        _interactionPanel.Width = previewCanvas.Width;
-        _interactionPanel.Height = 52;
-        _interactionPanel.ZIndex = int.MaxValue;
-        previewCanvas.Children.Add(_interactionPanel);
         _previewScrollViewer.Content = previewCanvas;
     }
 
