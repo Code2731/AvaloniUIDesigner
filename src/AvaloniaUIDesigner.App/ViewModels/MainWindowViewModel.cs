@@ -8656,6 +8656,12 @@ public partial class MainWindowViewModel : ViewModelBase
 
     public void MoveSelectedElement(double deltaX, double deltaY)
     {
+        if (!double.IsFinite(deltaX) || !double.IsFinite(deltaY))
+        {
+            StatusText = "Controls were not moved because the requested distance is invalid.";
+            return;
+        }
+
         var targets = Canvas.SelectedElements
             .Where(element => !element.IsLocked && !element.IsContainerChild)
             .ToList();
@@ -8667,9 +8673,21 @@ public partial class MainWindowViewModel : ViewModelBase
             return;
         }
 
+        if (deltaX == 0 && deltaY == 0)
+        {
+            StatusText = "Controls were not moved because the requested distance is zero.";
+            return;
+        }
+
         // Clamp the group displacement, not each control, to preserve relative spacing.
         deltaX = Math.Max(deltaX, -targets.Min(element => element.X));
         deltaY = Math.Max(deltaY, -targets.Min(element => element.Y));
+        if (deltaX == 0 && deltaY == 0)
+        {
+            StatusText = "Selected controls are already at the canvas boundary.";
+            return;
+        }
+
         BeginCanvasMutation(HistoryActionType.TransformElement, "Moved control with keyboard.");
         foreach (var target in targets)
         {

@@ -29,7 +29,9 @@ internal static class EditingHistoryChecks
         restored.Undo();
         restored.SelectElement(restored.Canvas.Elements.Single());
         restored.MoveSelectedElement(0, 0);
-        Assert(!restored.CanUndo && restored.CanRedo, "No-op movement must not invalidate redo.");
+        Assert(!restored.CanUndo && restored.CanRedo
+            && restored.StatusText.Contains("zero", StringComparison.OrdinalIgnoreCase),
+            "No-op movement must not invalidate redo and must explain the zero distance.");
         restored.MoveSelectedElement(8, 0);
         Assert(Position(restored) == (48, 50) && !restored.CanRedo,
             "A new edit after Undo must discard the old redo branch.");
@@ -56,6 +58,25 @@ internal static class EditingHistoryChecks
         editor.Redo();
         Assert(editor.CreatePreviewDocument().Elements.Single(element => element.DisplayName == "Second") is { X: 90, Y: 60 },
             "Group movement must redo without compressing the layout.");
+        editor.SelectElements(editor.Canvas.Elements.ToList());
+        var documentChangeCount = 0;
+        editor.DocumentChanged += (_, _) => documentChangeCount++;
+        var boundaryState = editor.ExportDraftAxaml();
+        editor.MoveSelectedElement(-10, -10);
+        Assert(editor.ExportDraftAxaml() == boundaryState
+            && documentChangeCount == 0
+            && editor.StatusText.Contains("canvas boundary", StringComparison.OrdinalIgnoreCase),
+            $"A fully clamped movement must not create history or announce a successful move. "
+            + $"Changes={documentChangeCount}, Status={editor.StatusText}, "
+            + $"Selection={string.Join(",", editor.Canvas.SelectedElements.Select(element => element.DisplayName))}");
+        foreach (var invalidDistance in new[] { double.NaN, double.PositiveInfinity, double.NegativeInfinity })
+        {
+            editor.MoveSelectedElement(invalidDistance, 0);
+            Assert(editor.ExportDraftAxaml() == boundaryState
+                && documentChangeCount == 0
+                && editor.StatusText.Contains("invalid", StringComparison.OrdinalIgnoreCase),
+                "An invalid movement distance must not corrupt geometry or emit a document change.");
+        }
         Console.WriteLine("Editing history checks passed.");
     }
 

@@ -17,6 +17,8 @@ The Headless suite also exercises the editor's AXAML round trips, save
 preflight, session serialization, and movement undo/redo history. History
 checks include redo after session restoration, no-op edits, and replacing a
 redo branch with a new edit. These call editor commands rather than OS input.
+Movement checks reject non-finite distances and distinguish zero-distance and
+canvas-boundary no-ops without adding history or document-change events.
 The same suite verifies that design-only custom controls retain interaction
 and explicitly edited accessibility state through Draft AXAML and Undo/Redo
 without exporting placeholder-only chrome or keyboard defaults.
