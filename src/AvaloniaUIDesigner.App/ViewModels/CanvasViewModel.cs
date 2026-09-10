@@ -3512,7 +3512,12 @@ public partial class CanvasViewModel : ViewModelBase
         if (properties.TryGetValue("__bindings", out var bindingsJson)
             && DesignerBindingRuntime.TryDeserialize(bindingsJson, out var bindings))
         {
-            DesignerBindingRuntime.ReplaceBindings(visual, bindings);
+            DesignerBindingRuntime.ReplaceBindings(
+                visual,
+                bindings,
+                visual.Tag is DesignerCustomControlMetadata
+                    ? bindings.Select(binding => binding.PropertyName)
+                    : null);
         }
 
         if (properties.TryGetValue("Classes", out var classes))

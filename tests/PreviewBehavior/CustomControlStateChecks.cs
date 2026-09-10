@@ -311,6 +311,82 @@ internal static class CustomControlStateChecks
             preview.Close();
         }
 
+        editor.SelectElement(editor.Canvas.Elements.Single());
+        Assert(editor.TryGetSelectedBindings(out var bindingState), editor.StatusText);
+        Assert(bindingState.TargetType == "Acme.Controls.StatusGauge"
+            && bindingState.SupportedProperties.Contains("Caption")
+            && bindingState.SupportedProperties.Contains("Opacity"),
+            "The binding editor must identify a design-only type and expose its declared properties.");
+        var bindingsBeforeRejection = DesignerBindingRuntime.Serialize(
+            DesignerBindingRuntime.ReadBindings(editor.Canvas.Elements.Single().Visual));
+        Assert(!editor.SetSelectedBindings(["UnknownProperty | Preview.Unknown | OneWay"])
+            && DesignerBindingRuntime.Serialize(
+                DesignerBindingRuntime.ReadBindings(editor.Canvas.Elements.Single().Visual))
+                == bindingsBeforeRejection,
+            "The binding editor must reject undeclared custom properties without changing existing bindings.");
+        Assert(editor.SetSelectedBindings(
+        [
+            "Caption | Preview.Caption | OneWay | Standby",
+            "Opacity | Preview.Opacity | OneWay | 0.35",
+        ]), editor.StatusText);
+        var customBindings = DesignerBindingRuntime.ReadBindings(editor.Canvas.Elements.Single().Visual);
+        Assert(customBindings.Count == 2
+            && customBindings.Any(binding => binding is
+            {
+                PropertyName: "Caption",
+                Path: "Preview.Caption",
+                Mode: DesignerBindingMode.OneWay,
+                FallbackValue: "Standby",
+            }), "The binding editor must retain a declared custom-property binding.");
+        editor.Undo();
+        Assert(DesignerBindingRuntime.ReadBindings(editor.Canvas.Elements.Single().Visual) is
+            [{ PropertyName: "Opacity" }],
+            "Undo must remove only the newly added custom-property binding.");
+        editor.Redo();
+        customBindings = DesignerBindingRuntime.ReadBindings(editor.Canvas.Elements.Single().Visual);
+        Assert(customBindings.Count == 2
+            && customBindings.Any(binding => binding.PropertyName == "Caption"),
+            "Redo must restore the custom-property binding.");
+        source = editor.ExportDraftAxaml();
+        Assert(source.Contains(
+                "Caption=\"{ReflectionBinding Preview.Caption, Mode=OneWay, FallbackValue='Standby'}\"")
+            && !source.Contains("Caption=\"Attention\""),
+            "Draft AXAML must serialize the custom-property binding instead of its previous static value.");
+        Assert(editor.TryImportDraftAxaml(source, out importError, out _), importError);
+        imported = editor.Canvas.Elements.Single().Visual;
+        customBindings = DesignerBindingRuntime.ReadBindings(imported);
+        Assert(customBindings.Count == 2
+            && customBindings.Any(binding => binding is
+            {
+                PropertyName: "Caption",
+                Path: "Preview.Caption",
+                FallbackValue: "Standby",
+            }), "A custom-property binding must survive Draft re-import.");
+        previewDocument = editor.CreatePreviewDocument();
+        preview = new PreviewWindow(previewDocument);
+        try
+        {
+            var previewLayout = (Grid)preview.Content!;
+            var previewSurface = previewLayout.Children.OfType<Border>().Single();
+            var previewViewport = (ScrollViewer)previewSurface.Child!;
+            var previewCanvas = (Canvas)previewViewport.Content!;
+            var previewControl = previewCanvas.Children.Single();
+            Assert(DesignerBindingRuntime.ReadBindings(previewControl).Count == 2
+                && Math.Abs(previewControl.Opacity - 0.42) < 0.001,
+                "Preview must retain the custom binding while applying supported common bindings.");
+            preview.ResetPreview();
+            previewCanvas = (Canvas)previewViewport.Content!;
+            previewControl = previewCanvas.Children.Single();
+            Assert(DesignerBindingRuntime.ReadBindings(previewControl).Any(binding =>
+                    binding.PropertyName == "Caption")
+                && Math.Abs(previewControl.Opacity - 0.42) < 0.001,
+                "Reset Preview must retain custom bindings and reapply supported sample values.");
+        }
+        finally
+        {
+            preview.Close();
+        }
+
         Console.WriteLine("Custom control state checks passed.");
     }
 

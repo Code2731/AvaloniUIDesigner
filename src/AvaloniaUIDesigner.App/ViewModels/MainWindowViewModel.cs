@@ -4979,8 +4979,13 @@ public partial class MainWindowViewModel : ViewModelBase
             return false;
         }
 
-        var targetType = target.Visual.GetType().Name;
-        var supportedProperties = DesignerBindingRuntime.GetSupportedProperties(targetType);
+        var targetType = target.Visual.Tag is DesignerCustomControlMetadata
+            ? target.TypeName
+            : target.Visual.GetType().Name;
+        var additionalProperties = GetCustomBindingProperties(target.Visual);
+        var supportedProperties = DesignerBindingRuntime.GetSupportedProperties(
+            targetType,
+            additionalProperties);
         state = new BindingEditorState(
             target.DisplayName,
             targetType,
@@ -4998,12 +5003,16 @@ public partial class MainWindowViewModel : ViewModelBase
             return false;
         }
 
-        var targetType = target.Visual.GetType().Name;
+        var targetType = target.Visual.Tag is DesignerCustomControlMetadata
+            ? target.TypeName
+            : target.Visual.GetType().Name;
+        var additionalProperties = GetCustomBindingProperties(target.Visual);
         if (!DesignerBindingRuntime.TryParseEditorLines(
                 targetType,
                 lines,
                 out var definitions,
-                out var error))
+                out var error,
+                additionalProperties))
         {
             StatusText = $"Bindings were not changed. {error}";
             return false;
@@ -5020,13 +5029,32 @@ public partial class MainWindowViewModel : ViewModelBase
         }
 
         BeginCanvasMutation(HistoryActionType.EditProperty, "Updated control bindings.");
-        DesignerBindingRuntime.ReplaceBindings(target.Visual, definitions);
+        DesignerBindingRuntime.ReplaceBindings(
+            target.Visual,
+            definitions,
+            additionalProperties);
         RefreshSampleDataPreview();
         CommitCanvasMutation();
         StatusText = definitions.Count == 0
             ? $"Cleared bindings from {target.DisplayName}."
             : $"Updated {definitions.Count} binding(s) on {target.DisplayName}.";
         return true;
+    }
+
+    private static IReadOnlyList<string> GetCustomBindingProperties(Control visual)
+    {
+        if (visual.Tag is not DesignerCustomControlMetadata metadata)
+        {
+            return [];
+        }
+
+        return metadata.DefaultProperties.Keys
+            .Concat(DesignerBindingRuntime.ReadBindings(visual)
+                .Select(binding => binding.PropertyName))
+            .Where(propertyName => !propertyName.StartsWith("__", StringComparison.Ordinal)
+                && !string.Equals(propertyName, "Classes", StringComparison.Ordinal))
+            .Distinct(StringComparer.Ordinal)
+            .ToList();
     }
 
     public bool TryGetSelectedLayoutProperties(out LayoutEditorState state)
@@ -13754,7 +13782,7 @@ public partial class MainWindowViewModel : ViewModelBase
             var name = attr.Name.LocalName;
             if (DesignerBindingRuntime.IsBindingExpression(attr.Value))
             {
-                if (!DesignerBindingRuntime.IsSupportedProperty(tagName, name))
+                if (!isDesignOnly && !DesignerBindingRuntime.IsSupportedProperty(tagName, name))
                 {
                     warnings.Add($"Ignored unsupported binding property {tagName}.{name}.");
                 }

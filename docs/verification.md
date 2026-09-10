@@ -33,6 +33,10 @@ Custom-control declared properties, style classes, and explicit color-resource
 references are also covered through Undo/Redo, Draft re-import, Headless
 Preview, and Preview Reset while excluding the design placeholder's default
 background.
+Declared design-only properties are exposed by the binding editor and their
+binding expressions are retained through rejection safety, Undo/Redo, Draft
+re-import, Headless Preview, and Preview Reset. The placeholder does not claim
+to execute properties that require the external custom-control assembly.
 
 Persistence checks cover initial UTF-8 saves, replacement backups, repeated
 backup rotation, invalid backup paths, temporary-file cleanup, and retry after

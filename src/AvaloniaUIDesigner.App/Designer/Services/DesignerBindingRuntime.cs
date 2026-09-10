@@ -26,7 +26,9 @@ public static class DesignerBindingRuntime
 {
     private static readonly ConditionalWeakTable<Control, List<DesignerBindingDefinition>> Bindings = new();
 
-    public static IReadOnlyList<string> GetSupportedProperties(string targetType)
+    public static IReadOnlyList<string> GetSupportedProperties(
+        string targetType,
+        IEnumerable<string>? additionalProperties = null)
     {
         var properties = new List<string> { "IsEnabled", "IsVisible", "Opacity" };
         properties.AddRange(targetType switch
@@ -91,11 +93,22 @@ public static class DesignerBindingRuntime
             ],
             _ => [],
         });
+        if (additionalProperties is not null)
+        {
+            properties.AddRange(additionalProperties
+                .Select(propertyName => propertyName.Trim())
+                .Where(IsValidPropertyName));
+        }
+
         return properties.Distinct(StringComparer.Ordinal).OrderBy(name => name, StringComparer.Ordinal).ToList();
     }
 
-    public static bool IsSupportedProperty(string targetType, string propertyName)
-        => GetSupportedProperties(targetType).Contains(propertyName, StringComparer.Ordinal);
+    public static bool IsSupportedProperty(
+        string targetType,
+        string propertyName,
+        IEnumerable<string>? additionalProperties = null)
+        => GetSupportedProperties(targetType, additionalProperties)
+            .Contains(propertyName, StringComparer.Ordinal);
 
     public static List<DesignerBindingDefinition> ReadBindings(Control control)
         => Bindings.TryGetValue(control, out var definitions)
@@ -109,12 +122,16 @@ public static class DesignerBindingRuntime
 
     public static void ReplaceBindings(
         Control control,
-        IReadOnlyList<DesignerBindingDefinition> definitions)
+        IReadOnlyList<DesignerBindingDefinition> definitions,
+        IEnumerable<string>? additionalProperties = null)
     {
         var targetType = control.GetType().Name;
         var normalized = definitions
             .Select(Normalize)
-            .Where(definition => IsSupportedProperty(targetType, definition.PropertyName))
+            .Where(definition => IsSupportedProperty(
+                targetType,
+                definition.PropertyName,
+                additionalProperties))
             .ToList();
         Bindings.Remove(control);
         if (normalized.Count > 0)
@@ -171,11 +188,12 @@ public static class DesignerBindingRuntime
         string targetType,
         IEnumerable<string> lines,
         out List<DesignerBindingDefinition> definitions,
-        out string error)
+        out string error,
+        IEnumerable<string>? additionalProperties = null)
     {
         definitions = [];
         error = string.Empty;
-        var supported = GetSupportedProperties(targetType);
+        var supported = GetSupportedProperties(targetType, additionalProperties);
         var lineNumber = 0;
 
         foreach (var sourceLine in lines)
@@ -337,7 +355,7 @@ public static class DesignerBindingRuntime
         out DesignerBindingDefinition normalized)
     {
         if (definition is null
-            || string.IsNullOrWhiteSpace(definition.PropertyName)
+            || !IsValidPropertyName(definition.PropertyName)
             || !IsValidPath(definition.Path)
             || !Enum.IsDefined(definition.Mode)
             || !IsValidFallback(definition.FallbackValue))
@@ -367,6 +385,17 @@ public static class DesignerBindingRuntime
 
     private static DesignerBindingDefinition EmptyDefinition()
         => new(string.Empty, string.Empty, DesignerBindingMode.Default, null);
+
+    private static bool IsValidPropertyName(string? value)
+    {
+        var normalized = value?.Trim();
+        return !string.IsNullOrEmpty(normalized)
+            && !normalized.StartsWith("__", StringComparison.Ordinal)
+            && !string.Equals(normalized, "Classes", StringComparison.Ordinal)
+            && (char.IsLetter(normalized[0]) || normalized[0] == '_')
+            && normalized.Skip(1).All(character =>
+                char.IsLetterOrDigit(character) || character == '_');
+    }
 
     private static bool IsValidPath(string? value)
     {

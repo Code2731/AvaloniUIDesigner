@@ -762,7 +762,12 @@ public sealed class PreviewWindow : Window
         if (properties.TryGetValue("__bindings", out var bindingsJson)
             && DesignerBindingRuntime.TryDeserialize(bindingsJson, out var bindings))
         {
-            DesignerBindingRuntime.ReplaceBindings(control, bindings);
+            DesignerBindingRuntime.ReplaceBindings(
+                control,
+                bindings,
+                control.Tag is DesignerCustomControlMetadata
+                    ? bindings.Select(binding => binding.PropertyName)
+                    : null);
         }
 
         if (properties.TryGetValue("Classes", out var classes))

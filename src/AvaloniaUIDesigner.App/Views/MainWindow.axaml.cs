@@ -20639,7 +20639,8 @@ public partial class MainWindow : Window
                     state.TargetType,
                     lines,
                     out _,
-                    out var error))
+                    out var error,
+                    state.SupportedProperties))
             {
                 errorText.Text = error;
                 return;
