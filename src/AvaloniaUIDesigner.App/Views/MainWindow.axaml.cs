@@ -11,6 +11,7 @@ using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using System.Xml.Linq;
 using Avalonia;
+using Avalonia.Automation;
 using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
 using Avalonia.Controls.Shapes;
@@ -21125,6 +21126,77 @@ public partial class MainWindow : Window
         CustomPropertyEditorState state)
     {
         var editor = new DesignerCustomPropertyEditorPanel(state.ValueStates);
+        var searchEditor = new TextBox
+        {
+            Watermark = "Filter by name, category, value, or source",
+            MinWidth = 280,
+        };
+        AutomationProperties.SetName(searchEditor, "Filter declared custom properties");
+        var localOnlyToggle = new CheckBox
+        {
+            Content = "Local only",
+            VerticalAlignment = VerticalAlignment.Center,
+        };
+        AutomationProperties.SetName(localOnlyToggle, "Show local custom properties only");
+        var resultText = new TextBlock
+        {
+            VerticalAlignment = VerticalAlignment.Center,
+            Foreground = Avalonia.Media.Brushes.SlateGray,
+        };
+        void ApplyFilter()
+        {
+            editor.SetFilter(searchEditor.Text, localOnlyToggle.IsChecked == true);
+            resultText.Text = editor.VisibleRowCount == 1
+                ? "1 property"
+                : $"{editor.VisibleRowCount} properties";
+        }
+
+        searchEditor.TextChanged += (_, _) => ApplyFilter();
+        localOnlyToggle.IsCheckedChanged += (_, _) => ApplyFilter();
+        editor.FilterResultChanged += (_, _) =>
+        {
+            resultText.Text = editor.VisibleRowCount == 1
+                ? "1 property"
+                : $"{editor.VisibleRowCount} properties";
+        };
+        var clearFilterButton = new Button
+        {
+            Content = "Clear filter",
+            MinWidth = 88,
+        };
+        AutomationProperties.SetName(clearFilterButton, "Clear custom property filter");
+        clearFilterButton.Click += (_, _) =>
+        {
+            searchEditor.Text = string.Empty;
+            localOnlyToggle.IsChecked = false;
+            searchEditor.Focus();
+        };
+        searchEditor.KeyDown += (_, e) =>
+        {
+            if (e.Key == Key.Escape
+                && (!string.IsNullOrEmpty(searchEditor.Text)
+                    || localOnlyToggle.IsChecked == true))
+            {
+                searchEditor.Text = string.Empty;
+                localOnlyToggle.IsChecked = false;
+                e.Handled = true;
+            }
+        };
+        var filterOptions = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            Spacing = 10,
+            VerticalAlignment = VerticalAlignment.Center,
+            Children = { localOnlyToggle, resultText, clearFilterButton },
+        };
+        var filterBar = new Grid
+        {
+            ColumnDefinitions = new ColumnDefinitions("*,Auto"),
+            ColumnSpacing = 12,
+            Children = { searchEditor, filterOptions },
+        };
+        Grid.SetColumn(filterOptions, 1);
+        ApplyFilter();
         var errorText = new TextBlock
         {
             Foreground = Avalonia.Media.Brushes.IndianRed,
@@ -21157,6 +21229,16 @@ public partial class MainWindow : Window
             dialog,
             () => dialog.Close(null),
             ApplyProperties);
+        dialog.KeyDown += (_, e) =>
+        {
+            if (e.Key == Key.F && e.KeyModifiers.HasFlag(KeyModifiers.Control))
+            {
+                searchEditor.Focus();
+                searchEditor.SelectAll();
+                e.Handled = true;
+            }
+        };
+        dialog.Opened += (_, _) => searchEditor.Focus();
         var cancelButton = new Button { Content = "Cancel", MinWidth = 84 };
         cancelButton.Click += (_, _) => dialog.Close(null);
         var clearButton = new Button { Content = "Clear local", MinWidth = 96 };
@@ -21176,7 +21258,7 @@ public partial class MainWindow : Window
         var content = new Grid
         {
             Margin = new Thickness(16),
-            RowDefinitions = new RowDefinitions("Auto,Auto,*,Auto,Auto"),
+            RowDefinitions = new RowDefinitions("Auto,Auto,Auto,*,Auto,Auto"),
             RowSpacing = 10,
             Children =
             {
@@ -21187,19 +21269,21 @@ public partial class MainWindow : Window
                 },
                 new TextBlock
                 {
-                    Text = $"Declared by {state.TargetType}. Values are grouped by category and use their Component Pack editor type.",
+                    Text = $"Declared by {state.TargetType}. Values are grouped by category and use their Component Pack editor type. Press Ctrl+F to filter.",
                     Foreground = Avalonia.Media.Brushes.SlateGray,
                     TextWrapping = Avalonia.Media.TextWrapping.Wrap,
                 },
+                filterBar,
                 editor,
                 errorText,
                 buttons,
             },
         };
         Grid.SetRow(content.Children[1], 1);
-        Grid.SetRow(editor, 2);
-        Grid.SetRow(errorText, 3);
-        Grid.SetRow(buttons, 4);
+        Grid.SetRow(filterBar, 2);
+        Grid.SetRow(editor, 3);
+        Grid.SetRow(errorText, 4);
+        Grid.SetRow(buttons, 5);
         dialog.Content = content;
         return await dialog.ShowDialog<IReadOnlyList<string>?>(this);
     }

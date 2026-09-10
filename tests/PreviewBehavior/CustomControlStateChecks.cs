@@ -1464,7 +1464,17 @@ internal static class CustomControlStateChecks
             .OfType<CheckBox>()
             .Where(toggle => toggle.Classes.Contains("custom-property-local-toggle"))
             .ToList();
+        var propertyRows = panel.GetLogicalDescendants()
+            .OfType<Border>()
+            .Where(row => row.Classes.Contains("custom-property-editor-row"))
+            .ToList();
+        var categoryHeaderBorders = panel.GetLogicalDescendants()
+            .OfType<Border>()
+            .Where(header => header.Classes.Contains("custom-property-category-header"))
+            .ToList();
         var countToggle = localToggles.Single(toggle => Equals(toggle.Tag, "Count"));
+        var ratioToggle = localToggles.Single(toggle => Equals(toggle.Tag, "Ratio"));
+        var ratioRow = propertyRows.Single(row => Equals(row.Tag, "Ratio"));
         var countEditor = panel.GetLogicalDescendants()
             .OfType<NumericUpDown>()
             .Single(control => Equals(control.Tag, "Count"));
@@ -1479,6 +1489,9 @@ internal static class CustomControlStateChecks
             .Single(control => Equals(control.Tag, "Note"));
         Assert(categoryHeaders.SequenceEqual(["Appearance", "Behavior", "Data", "Custom"])
             && localToggles.Count == 6
+            && propertyRows.Count == 6
+            && categoryHeaderBorders.Count == 4
+            && panel.VisibleRowCount == 6
             && localToggles.All(toggle => toggle.IsChecked == true)
             && countEditor.IsEnabled
             && countEditor.Value == 2
@@ -1491,6 +1504,38 @@ internal static class CustomControlStateChecks
             && noteEditor.Text == "Ready",
             "The structured editor must render grouped, enabled, type-specific controls for local values.");
 
+        panel.SetFilter("data", false);
+        Assert(panel.VisibleRowCount == 2
+            && propertyRows.Where(row => row.IsVisible)
+                .Select(row => row.Tag?.ToString())
+                .OrderBy(name => name, StringComparer.Ordinal)
+                .SequenceEqual(["Count", "Ratio"])
+            && categoryHeaderBorders.Single(header => Equals(header.Tag, "Data")).IsVisible
+            && categoryHeaderBorders.Count(header => header.IsVisible) == 1,
+            "Category filtering must show matching rows and recalculate category-header visibility.");
+        Assert(panel.TryCreateEditorLines(out var filteredLines, out var filteredError)
+            && filteredLines.Count == 6,
+            $"Filtering must not discard hidden local values: {filteredError}");
+        panel.SetFilter("gauge highlight", false);
+        Assert(panel.VisibleRowCount == 1
+            && propertyRows.Single(row => row.IsVisible).Tag?.ToString() == "Accent"
+            && categoryHeaderBorders.Single(header => Equals(header.Tag, "Appearance")).IsVisible,
+            "Description metadata must participate in structured-editor filtering.");
+        panel.SetFilter("no property matches", false);
+        Assert(panel.VisibleRowCount == 0
+            && categoryHeaderBorders.All(header => !header.IsVisible),
+            "An empty filter result must hide every orphaned category header.");
+        panel.SetFilter(string.Empty, true);
+        ratioToggle.IsChecked = false;
+        Assert(panel.VisibleRowCount == 5 && !ratioRow.IsVisible,
+            "Local-only filtering must immediately hide a row whose local override is unchecked.");
+        panel.SetFilter("reset", false);
+        Assert(panel.VisibleRowCount == 1 && ratioRow.IsVisible,
+            "Filtering by the pending source label must find a local value marked for reset.");
+        panel.SetFilter(string.Empty, false);
+        Assert(panel.VisibleRowCount == 6 && ratioRow.IsVisible,
+            "Clearing the filter must restore all rows without changing their local-override state.");
+
         countEditor.Value = 2.5m;
         Assert(!panel.TryCreateEditorLines(out _, out var invalidError)
             && invalidError.Contains("whole number", StringComparison.OrdinalIgnoreCase),
@@ -1499,8 +1544,6 @@ internal static class CustomControlStateChecks
         stateEditor.SelectedItem = "Busy";
         accentEditor.Color = Avalonia.Media.Color.Parse("#803B82F6");
         noteEditor.Text = "Updated";
-        var ratioToggle = localToggles.Single(toggle => Equals(toggle.Tag, "Ratio"));
-        ratioToggle.IsChecked = false;
         var ratioSource = panel.GetLogicalDescendants()
             .OfType<TextBlock>()
             .Single(text => text.Classes.Contains("custom-property-source-label")

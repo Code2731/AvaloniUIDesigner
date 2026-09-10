@@ -219,6 +219,7 @@ Preview 동작 회귀 검증: `dotnet run --project tests/PreviewBehavior -p:Use
 - **PropertyGrid 연동**: 선택된 컨트롤의 속성을 bodong PropertyGrid로 실시간 편집
 - **Property Inspector 탐색**: 선택 컨트롤 타입을 헤더에 표시하고 `Categories`/`Flat`, `Expand`/`Collapse`로 속성 그룹과 표시 밀도를 즉시 전환하며, 내장 카테고리 순서·알파벳 속성 정렬을 함께 제공
 - **Property Inspector 검색**: 전용 필터 입력창과 Clear·Escape 초기화, `Ctrl+Alt+I` 포커스를 제공하고 선택 컨트롤·문서 탭이 바뀌어도 필터를 유지해 속성 이름을 즉시 좁히며, Escape 후 PropertyGrid 포커스로 속성 편집을 바로 이어감
+- **커스텀 속성 일괄 검색**: 선언형 사용자 정의 속성 편집기에서 이름·표시 이름·카테고리·설명·값·타입·출처를 검색하고 `Local only`·결과 수·카테고리 헤더 재계산·`Ctrl+F` 포커스를 지원
 - **Appearance 편집**: 배경·전경·테두리·두께·모서리를 편집하고 Undo/Redo, 미리보기, AXAML 왕복에 보존
 - **색상 리소스**: 문서 단위 SolidColorBrush를 편집하고 DynamicResource로 컨트롤에 적용
 - **클래스·상태 스타일**: `[Button.primary:pointerover]` 형식의 Setter, 선택 컨트롤별 상태 선택기와 캔버스 배지, 대화형 미리보기, 로컬 속성 우선순위 지원
@@ -876,6 +877,7 @@ AXAML 소스 편집기의 `Validate`와 `Preview`는 현재 디자인과 Undo �
 - v3.29: Property Inspector의 Integer·Double에 범위 기반 스핀 편집기, Color에 유효 값 스와치와 전용 ColorView 선택 창을 추가하고 잘못된 숫자 복구·Undo/Redo를 보강합니다.
 - v3.30: Component Pack 사용자 정의 속성에 `displayName`·`category`·`description` 메타데이터를 추가하고 Property Inspector 카테고리 헤더·표시 이름 정렬·설명 툴팁·메타데이터 검색과 전체 보존 경로를 지원합니다.
 - v3.31: 선언형 사용자 정의 속성 일괄 창을 카테고리형 typed editor로 교체하고 `Local` override·`Clear local`·예정 출처 배지·원자적 검증과 Undo를 지원하며, 유지되는 바인딩 아래의 로컬 값도 보존합니다.
+- v3.32: 구조화된 사용자 정의 속성 편집기에 메타데이터·값·출처 검색, `Local only`, 실시간 결과 수와 카테고리 헤더 재계산, `Ctrl+F`·Escape·Clear filter 흐름을 추가하고 필터로 숨긴 값도 안전하게 함께 적용합니다.
 
 ## 컴포넌트 팩
 
@@ -885,7 +887,7 @@ AXAML 소스 편집기의 `Validate`와 `Preview`는 현재 디자인과 Undo �
 
 선택적 `propertyDefinitions`는 이름만 있는 `declaredProperties`를 타입과 Inspector 표시 정보로 확장하며, 정의된 이름은 별도 선언 없이도 자동으로 사용자 정의 속성에 포함됩니다. `type`은 `String`(생략 시 기본값), `Boolean`, `Integer`, `Double`, `Color`, `Enum`을 지원합니다. `Integer`와 `Double`은 `minimum`·`maximum`, `Enum`은 중복 없는 `options`를 사용할 수 있습니다. 선택적 `displayName`은 읽기 쉬운 표시 이름, `category`는 Inspector 그룹, `description`은 상세 툴팁을 지정합니다. 표시 이름과 카테고리는 한 줄이어야 하며 빈 메타데이터는 각각 CLR 속성명·`Custom` 그룹·빈 설명으로 호환됩니다. 팩 기본값, Inspector 인라인/일괄 값, 문서 스타일 setter, 바인딩 fallback은 같은 규칙으로 검증되고 Boolean·숫자·색상·Enum 대소문자는 안정적인 AXAML 값으로 정규화됩니다. 잘못된 정의나 기본값은 팩 전체를 등록하기 전에 거부하며, 잘못된 외부 AXAML 속성은 경고 후 해당 값만 제외합니다. 기존 `declaredProperties` 팩은 모두 `String` 정의로 호환됩니다.
 
-디자인 전용 컨트롤을 선택한 뒤 `Edit > Edit Declared Custom Properties...`에서 `declaredProperties` 또는 외부 전용 `defaultProperties`로 선언된 속성을 한 번에 편집할 수 있습니다. 창은 Inspector와 같은 카테고리·표시 이름·설명을 사용하며 String은 텍스트, Boolean·Enum은 선택 목록, Integer·Double은 범위형 스핀 입력, Color는 알파 지원 ColorPicker로 표시합니다. 각 행의 `Local`을 체크하면 로컬 AXAML override를 쓰고 해제하면 해당 로컬 값을 제거하며, `Clear local`은 모든 행을 적용 전 해제합니다. 기존 LOCAL 행을 해제하면 출처 배지가 `RESET`, 바인딩·스타일·unset 행을 체크하면 `LOCAL`로 바뀌어 적용 결과를 미리 알 수 있습니다. 바인딩 행은 체크하지 않으면 바인딩과 그 아래 보존된 로컬 값을 모두 유지하고, 체크하면 해당 바인딩만 새 로컬 값으로 대체합니다. 모든 값은 적용 전에 함께 검증되고 성공 시 하나의 Undo/Redo 작업으로 반영됩니다. `Opacity`처럼 공통 편집기가 직접 지원하는 속성은 중복 표시하지 않습니다. 선언과 메타데이터는 스냅샷에 보존되어 사용 중인 컴포넌트 팩을 제거한 뒤에도 편집을 이어갈 수 있으며, 외부 assembly의 실제 시각 효과는 실행하지 않고 AXAML 및 Preview 메타데이터로 보존합니다.
+디자인 전용 컨트롤을 선택한 뒤 `Edit > Edit Declared Custom Properties...`에서 `declaredProperties` 또는 외부 전용 `defaultProperties`로 선언된 속성을 한 번에 편집할 수 있습니다. 창은 Inspector와 같은 카테고리·표시 이름·설명을 사용하며 String은 텍스트, Boolean·Enum은 선택 목록, Integer·Double은 범위형 스핀 입력, Color는 알파 지원 ColorPicker로 표시합니다. 검색은 CLR 이름·표시 이름·카테고리·설명·현재 값·타입·출처에 적용되고, `Local only`는 현재 로컬 override만 표시합니다. 결과 수와 카테고리 헤더는 실시간으로 갱신되며 `Ctrl+F`로 검색창에 이동하고 Escape 또는 `Clear filter`로 초기화할 수 있습니다. 필터는 표시만 좁히므로 숨겨진 체크 행도 적용 시 함께 검증·보존됩니다. 각 행의 `Local`을 체크하면 로컬 AXAML override를 쓰고 해제하면 해당 로컬 값을 제거하며, `Clear local`은 모든 행을 적용 전 해제합니다. 기존 LOCAL 행을 해제하면 출처 배지가 `RESET`, 바인딩·스타일·unset 행을 체크하면 `LOCAL`로 바뀌어 적용 결과를 미리 알 수 있습니다. 바인딩 행은 체크하지 않으면 바인딩과 그 아래 보존된 로컬 값을 모두 유지하고, 체크하면 해당 바인딩만 새 로컬 값으로 대체합니다. 모든 값은 적용 전에 함께 검증되고 성공 시 하나의 Undo/Redo 작업으로 반영됩니다. `Opacity`처럼 공통 편집기가 직접 지원하는 속성은 중복 표시하지 않습니다. 선언과 메타데이터는 스냅샷에 보존되어 사용 중인 컴포넌트 팩을 제거한 뒤에도 편집을 이어갈 수 있으며, 외부 assembly의 실제 시각 효과는 실행하지 않고 AXAML 및 Preview 메타데이터로 보존합니다.
 
 문서 스타일 편집기에서도 선언된 외부 속성을 `Unit = percent`처럼 사용할 수 있습니다. 디자인 전용 placeholder는 기본 스타일과 활성 pseudo-class의 계산값을 별도 메타데이터로 유지해 Draft AXAML에 로컬 값으로 잘못 출력하지 않으며, 같은 속성의 명시 값이나 바인딩이 있으면 이를 우선합니다. 실제 외부 assembly의 렌더링은 실행하지 않지만 Design Surface와 Headless Preview는 계산 상태를 동일하게 보존합니다.
 

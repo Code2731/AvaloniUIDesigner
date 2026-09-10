@@ -16,19 +16,30 @@ namespace AvaloniaUIDesigner.App.Designer.Controls;
 public sealed class DesignerCustomPropertyEditorPanel : Border
 {
     private readonly List<EditorRow> _rows = [];
+    private string _filterText = string.Empty;
+    private bool _localOnly;
+    private bool _isUpdatingLocalOverrides;
+
+    public event EventHandler? FilterResultChanged;
+
+    public int VisibleRowCount { get; private set; }
 
     public DesignerCustomPropertyEditorPanel(
         IEnumerable<DesignerCustomPropertyValueState> valueStates)
     {
         var rows = new StackPanel { Spacing = 6 };
+        Border? categoryHeader = null;
         foreach (var state in DesignerCustomPropertyRuntime.ApplyCategoryHeaders(valueStates))
         {
             if (state.ShowsCategoryHeader)
             {
-                rows.Children.Add(CreateCategoryHeader(state.CategoryLabel));
+                categoryHeader = CreateCategoryHeader(state.CategoryLabel);
+                rows.Children.Add(categoryHeader);
             }
 
-            rows.Children.Add(CreatePropertyRow(state));
+            rows.Children.Add(CreatePropertyRow(
+                state,
+                categoryHeader ?? throw new InvalidOperationException("A property category header is required.")));
         }
 
         Padding = new Thickness(1);
@@ -41,14 +52,32 @@ public sealed class DesignerCustomPropertyEditorPanel : Border
             Padding = new Thickness(8),
             VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
         };
+        ApplyFilter();
+    }
+
+    public void SetFilter(string? text, bool localOnly)
+    {
+        _filterText = text?.Trim() ?? string.Empty;
+        _localOnly = localOnly;
+        ApplyFilter();
     }
 
     public void ClearLocalValues()
     {
-        foreach (var row in _rows)
+        _isUpdatingLocalOverrides = true;
+        try
         {
-            row.LocalOverride.IsChecked = false;
+            foreach (var row in _rows)
+            {
+                row.LocalOverride.IsChecked = false;
+            }
         }
+        finally
+        {
+            _isUpdatingLocalOverrides = false;
+        }
+
+        ApplyFilter();
     }
 
     public bool TryCreateEditorLines(
@@ -83,7 +112,9 @@ public sealed class DesignerCustomPropertyEditorPanel : Border
         return true;
     }
 
-    private Control CreatePropertyRow(DesignerCustomPropertyValueState state)
+    private Control CreatePropertyRow(
+        DesignerCustomPropertyValueState state,
+        Border categoryHeader)
     {
         var localOverride = new CheckBox
         {
@@ -150,6 +181,10 @@ public sealed class DesignerCustomPropertyEditorPanel : Border
                 : state.Source == DesignerCustomPropertyValueSource.Local
                     ? "RESET"
                     : state.SourceLabel;
+            if (!_isUpdatingLocalOverrides)
+            {
+                ApplyFilter();
+            }
         };
 
         var fields = new Grid
@@ -163,14 +198,61 @@ public sealed class DesignerCustomPropertyEditorPanel : Border
         Grid.SetColumn(source, 3);
         var row = new Border
         {
+            Tag = state.PropertyName,
             Padding = new Thickness(8, 6),
             Background = new SolidColorBrush(Color.Parse("#1F2937")),
             CornerRadius = new CornerRadius(3),
             Child = fields,
         };
-        _rows.Add(new EditorRow(state, localOverride, editor));
+        row.Classes.Add("custom-property-editor-row");
+        _rows.Add(new EditorRow(
+            state,
+            localOverride,
+            editor,
+            sourceLabel,
+            row,
+            categoryHeader));
         return row;
     }
+
+    private void ApplyFilter()
+    {
+        foreach (var row in _rows)
+        {
+            row.Container.IsVisible = (!_localOnly || row.LocalOverride.IsChecked == true)
+                && MatchesFilter(row);
+        }
+
+        foreach (var categoryHeader in _rows.Select(row => row.CategoryHeader).Distinct())
+        {
+            categoryHeader.IsVisible = _rows.Any(row => ReferenceEquals(
+                row.CategoryHeader,
+                categoryHeader) && row.Container.IsVisible);
+        }
+
+        VisibleRowCount = _rows.Count(row => row.Container.IsVisible);
+        FilterResultChanged?.Invoke(this, EventArgs.Empty);
+    }
+
+    private bool MatchesFilter(EditorRow row)
+    {
+        if (_filterText.Length == 0)
+        {
+            return true;
+        }
+
+        var state = row.State;
+        return ContainsFilter(state.PropertyName)
+            || ContainsFilter(state.DisplayName)
+            || ContainsFilter(state.CategoryLabel)
+            || ContainsFilter(state.Description)
+            || ContainsFilter(state.TypeLabel)
+            || ContainsFilter(state.DisplayValue)
+            || ContainsFilter(row.SourceLabel.Text);
+    }
+
+    private bool ContainsFilter(string? value)
+        => value?.Contains(_filterText, StringComparison.OrdinalIgnoreCase) == true;
 
     private static Control CreateValueEditor(DesignerCustomPropertyValueState state)
     {
@@ -292,8 +374,10 @@ public sealed class DesignerCustomPropertyEditorPanel : Border
     }
 
     private static Border CreateCategoryHeader(string category)
-        => new()
+    {
+        var header = new Border
         {
+            Tag = category,
             Margin = new Thickness(0, 6, 0, 0),
             Padding = new Thickness(8, 4),
             Background = new SolidColorBrush(Color.Parse("#263241")),
@@ -306,9 +390,15 @@ public sealed class DesignerCustomPropertyEditorPanel : Border
                 Foreground = new SolidColorBrush(Color.Parse("#93C5FD")),
             },
         };
+        header.Classes.Add("custom-property-category-header");
+        return header;
+    }
 
     private sealed record EditorRow(
         DesignerCustomPropertyValueState State,
         CheckBox LocalOverride,
-        Control Editor);
+        Control Editor,
+        TextBlock SourceLabel,
+        Border Container,
+        Border CategoryHeader);
 }
