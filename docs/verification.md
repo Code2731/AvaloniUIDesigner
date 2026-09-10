@@ -24,6 +24,8 @@ and explicitly edited accessibility state through Draft AXAML and Undo/Redo
 without exporting placeholder-only chrome or keyboard defaults.
 Custom-control checks also cover transforms and visual effects across two-step
 Undo/Redo and Draft re-import, allowing normal matrix and color quantization.
+Common event handlers are verified through edit, Undo/Redo, Draft re-import,
+Preview wiring, and an actual Avalonia routed focus event.
 
 Persistence checks cover initial UTF-8 saves, replacement backups, repeated
 backup rotation, invalid backup paths, temporary-file cleanup, and retry after

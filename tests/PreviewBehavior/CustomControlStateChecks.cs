@@ -138,6 +138,29 @@ internal static class CustomControlStateChecks
             && Avalonia.Media.Color.Parse(effect.ShadowColor) == Avalonia.Media.Color.Parse("#112233")
             && Math.Abs(effect.ShadowOpacity - 0.65) <= 1d / byte.MaxValue,
             $"Custom-control effect values must survive draft import: {effect}");
+        editor.SelectElement(editor.Canvas.Elements.Single());
+        var customName = editor.Canvas.Elements.Single().DisplayName;
+        Assert(editor.SetEventHandlerMapFromText($"{customName} | GotFocus | OnGaugeFocus"), editor.StatusText);
+        editor.Undo();
+        Assert(!editor.ExportDraftAxaml().Contains("GotFocus=\"OnGaugeFocus\""),
+            "Undo must remove a custom-control event handler.");
+        editor.Redo();
+        source = editor.ExportDraftAxaml();
+        Assert(source.Contains("GotFocus=\"OnGaugeFocus\""),
+            "Draft AXAML must include custom-control common event handlers.");
+        Assert(editor.TryImportDraftAxaml(source, out importError, out _), importError);
+        imported = editor.Canvas.Elements.Single().Visual;
+        Assert(DesignerEventHandlerRuntime.Read(imported).TryGetValue("GotFocus", out var handlerName)
+            && handlerName == "OnGaugeFocus",
+            "Custom-control event handlers must survive draft import.");
+        var previewInteractions = new List<DesignerPreviewInteraction>();
+        Assert(DesignerPreviewInteractionRuntime.Wire(
+            imported, customName, previewInteractions.Add) == 1,
+            "Preview must wire the restored custom-control event handler.");
+        imported.RaiseEvent(new GotFocusEventArgs { RoutedEvent = InputElement.GotFocusEvent });
+        Assert(previewInteractions.SingleOrDefault() is
+            { EventName: "GotFocus", HandlerName: "OnGaugeFocus" },
+            "Preview must report the restored custom-control event handler.");
         var snapshot = editor.CreatePreviewDocument().Elements.Single();
         Assert(snapshot.VisualProperties!["Caption"] == "Ready"
             && snapshot.VisualProperties["Opacity"] == "0.85",
