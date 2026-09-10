@@ -119,6 +119,21 @@ try
     reset.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
     Assert(Input().Text == "Resumed design" && string.IsNullOrEmpty(errorText.Text),
         "Reset retry must apply corrected data and clear the failure message.");
+    var action = new DesignerElementSnapshot("Action", "Avalonia.Controls.Button", 10, 10, 120, 32,
+        new Dictionary<string, string> { ["__eventHandlers"] = "{\"Click\":\"OnAction\"}" });
+    window.RefreshDocument(new DesignerCanvasDocument([action]));
+    var oldButton = Canvas().Children.OfType<Button>().Single();
+    var logContent = (DockPanel)log.Content!;
+    var logPanel = logContent.Children.OfType<Border>().Single();
+    var logText = (TextBlock)((ScrollViewer)logPanel.Child!).Content!;
+    oldButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+    Assert(logText.Text!.Contains("Action.Click"), "Current preview events must be logged.");
+    window.ResetPreview();
+    var cleanLog = logText.Text;
+    oldButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+    Assert(logText.Text == cleanLog, "Events from replaced controls must not pollute the new preview log.");
+    Canvas().Children.OfType<Button>().Single().RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+    Assert(logText.Text!.Contains("Action.Click"), "New controls must keep logging after Reset.");
     Console.WriteLine("Preview behavior checks passed.");
 }
 finally

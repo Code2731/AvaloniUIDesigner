@@ -30,6 +30,7 @@ public sealed class PreviewWindow : Window
     private readonly List<string> _interactionEntries = new();
     private DesignerCanvasDocument _latestDocument;
     private DesignerCanvasDocument? _pendingDocument;
+    private object? _activeInteractionSource;
     private readonly CheckBox _liveUpdates;
     private readonly TextBlock _updateError = new() { TextWrapping = TextWrapping.Wrap };
 
@@ -191,10 +192,14 @@ public sealed class PreviewWindow : Window
         var background = Brush.Parse(settings.Background);
         var preparedInteractions = new List<DesignerPreviewInteraction>();
         var committed = false;
+        var interactionSource = new object();
         var previewCanvas = CreatePreviewCanvasWithInteractions(document, interaction =>
         {
             if (committed)
-                ReportInteraction(interaction);
+            {
+                if (ReferenceEquals(_activeInteractionSource, interactionSource))
+                    ReportInteraction(interaction);
+            }
             else
                 preparedInteractions.Add(interaction);
         });
@@ -202,6 +207,7 @@ public sealed class PreviewWindow : Window
         _previewSurface.Background = background;
         _interactionEntries.Clear();
         UpdateInteractionLog();
+        _activeInteractionSource = interactionSource;
         _previewScrollViewer.Content = previewCanvas;
         _latestDocument = document;
         _pendingDocument = null;
