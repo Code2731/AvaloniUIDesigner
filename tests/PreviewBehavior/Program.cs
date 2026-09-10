@@ -96,7 +96,12 @@ try
     window.ResetPreview();
     Assert(Input().Text == "Original" && liveUpdates.IsChecked == false,
         "Explicit reset must apply pending design without resuming automatic updates.");
-    var errorText = toolbar.Children.OfType<TextBlock>().Single();
+    var errorViewer = layout.Children.OfType<ScrollViewer>().Single();
+    var errorText = (TextBlock)errorViewer.Content!;
+    Assert(errorViewer.MaxHeight == 96
+        && errorViewer.HorizontalScrollBarVisibility == Avalonia.Controls.Primitives.ScrollBarVisibility.Disabled
+        && Grid.GetRow(errorViewer) != Grid.GetRow(surface),
+        "Error messages must have a bounded separate row with horizontal wrapping.");
     Input().Text = "Keep paused input";
     window.UpdateLiveDocument(document with
     {
@@ -108,6 +113,8 @@ try
     liveUpdates.IsChecked = true;
     Assert(liveUpdates.IsChecked == false && !string.IsNullOrEmpty(errorText.Text),
         "Failed resume must remain paused and show the failure.");
+    window.RefreshDocument(document);
+    Assert(string.IsNullOrEmpty(errorText.Text), "A successful manual refresh must clear stale error messages.");
     window.UpdateLiveDocument(pending);
     reset.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
     Assert(Input().Text == "Resumed design" && string.IsNullOrEmpty(errorText.Text),

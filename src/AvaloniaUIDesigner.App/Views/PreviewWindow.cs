@@ -31,6 +31,7 @@ public sealed class PreviewWindow : Window
     private DesignerCanvasDocument _latestDocument;
     private DesignerCanvasDocument? _pendingDocument;
     private readonly CheckBox _liveUpdates;
+    private readonly TextBlock _updateError = new() { TextWrapping = TextWrapping.Wrap };
 
     public PreviewWindow(
         DesignerCanvasDocument document,
@@ -106,7 +107,7 @@ public sealed class PreviewWindow : Window
             Focusable = false,
             VerticalAlignment = VerticalAlignment.Center,
         };
-        var updateError = new TextBlock { TextWrapping = TextWrapping.Wrap };
+        var updateError = _updateError;
         resetPreview.Click += (_, _) =>
         {
             try
@@ -136,12 +137,21 @@ public sealed class PreviewWindow : Window
         {
             Orientation = Orientation.Horizontal,
             Spacing = 8,
-            Children = { resetPreview, _liveUpdates, updateError },
+            Children = { resetPreview, _liveUpdates },
         };
-        var layout = new Grid { RowDefinitions = new RowDefinitions("Auto,*,Auto") };
-        Grid.SetRow(_previewSurface, 1);
-        Grid.SetRow(_interactionExpander, 2);
+        var errorViewer = new ScrollViewer
+        {
+            MaxHeight = 96,
+            HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled,
+            VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+            Content = updateError,
+        };
+        var layout = new Grid { RowDefinitions = new RowDefinitions("Auto,Auto,*,Auto") };
+        Grid.SetRow(errorViewer, 1);
+        Grid.SetRow(_previewSurface, 2);
+        Grid.SetRow(_interactionExpander, 3);
         layout.Children.Add(toolbar);
+        layout.Children.Add(errorViewer);
         layout.Children.Add(_previewSurface);
         layout.Children.Add(_interactionExpander);
         Content = layout;
@@ -195,6 +205,7 @@ public sealed class PreviewWindow : Window
         _previewScrollViewer.Content = previewCanvas;
         _latestDocument = document;
         _pendingDocument = null;
+        _updateError.Text = string.Empty;
         committed = true;
         foreach (var interaction in preparedInteractions)
             ReportInteraction(interaction);
