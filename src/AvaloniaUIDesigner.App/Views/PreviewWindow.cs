@@ -28,11 +28,13 @@ public sealed class PreviewWindow : Window
     private readonly Expander _interactionExpander;
     private readonly TextBlock _interactionLog;
     private readonly List<string> _interactionEntries = new();
+    private DesignerCanvasDocument _latestDocument;
 
     public PreviewWindow(
         DesignerCanvasDocument document,
         ThemeVariant? requestedThemeVariant = null)
     {
+        _latestDocument = document;
         RequestedThemeVariant = requestedThemeVariant ?? ThemeVariant.Default;
         _previewScrollViewer = new ScrollViewer
         {
@@ -87,8 +89,19 @@ public sealed class PreviewWindow : Window
             HorizontalContentAlignment = HorizontalAlignment.Stretch,
             Content = logContent,
         };
-        var layout = new Grid { RowDefinitions = new RowDefinitions("*,Auto") };
-        Grid.SetRow(_interactionExpander, 1);
+        var resetPreview = new Button
+        {
+            Content = "Reset Preview",
+            Focusable = false,
+            Margin = new Thickness(8, 4),
+            HorizontalAlignment = HorizontalAlignment.Left,
+        };
+        ToolTip.SetTip(resetPreview, "Restart interactions using the latest design values and sample data.");
+        resetPreview.Click += (_, _) => ResetPreview();
+        var layout = new Grid { RowDefinitions = new RowDefinitions("Auto,*,Auto") };
+        Grid.SetRow(_previewSurface, 1);
+        Grid.SetRow(_interactionExpander, 2);
+        layout.Children.Add(resetPreview);
         layout.Children.Add(_previewSurface);
         layout.Children.Add(_interactionExpander);
         Content = layout;
@@ -104,6 +117,12 @@ public sealed class PreviewWindow : Window
     public void RefreshDocument(DesignerCanvasDocument document)
         => RefreshDocument(document, resizeWindow: false);
 
+    public void ResetPreview()
+    {
+        RefreshDocument(_latestDocument, resizeWindow: false);
+        _previewScrollViewer.Offset = default;
+    }
+
     private void RefreshDocument(DesignerCanvasDocument document, bool resizeWindow)
     {
         var settings = document.Settings ?? new DesignerCanvasSettings();
@@ -114,6 +133,7 @@ public sealed class PreviewWindow : Window
         UpdateInteractionLog();
         var previewCanvas = CreatePreviewCanvasWithInteractions(document, ReportInteraction);
         _previewScrollViewer.Content = previewCanvas;
+        _latestDocument = document;
     }
 
     private void ReportInteraction(DesignerPreviewInteraction interaction)
