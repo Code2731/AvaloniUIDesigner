@@ -12030,6 +12030,12 @@ public partial class MainWindowViewModel : ViewModelBase
             DesignerInteractionRuntime.Capture(visual, customProperties);
             DesignerTransformRuntime.Capture(visual, customProperties);
             DesignerEffectRuntime.Capture(visual, customProperties);
+            var customBindings = DesignerBindingRuntime.ReadBindings(visual);
+            if (customBindings.Count > 0)
+            {
+                customProperties["__bindings"] = DesignerBindingRuntime.Serialize(customBindings);
+            }
+
             return customProperties;
         }
 

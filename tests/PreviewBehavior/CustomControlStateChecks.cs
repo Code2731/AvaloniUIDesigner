@@ -1,7 +1,9 @@
 using Avalonia;
+using Avalonia.Controls;
 using Avalonia.Input;
 using AvaloniaUIDesigner.App.Designer.Services;
 using AvaloniaUIDesigner.App.ViewModels;
+using AvaloniaUIDesigner.App.Views;
 
 internal static class CustomControlStateChecks
 {
@@ -165,6 +167,68 @@ internal static class CustomControlStateChecks
         Assert(snapshot.VisualProperties!["Caption"] == "Ready"
             && snapshot.VisualProperties["Opacity"] == "0.85",
             "Capturing interaction state must retain declared custom properties.");
+        editor.SelectElement(editor.Canvas.Elements.Single());
+        Assert(editor.SetSelectedBindings(["Opacity | Preview.Opacity | OneWay | 0.35"]), editor.StatusText);
+        Assert(DesignerBindingRuntime.ReadBindings(editor.Canvas.Elements.Single().Visual).SingleOrDefault() is
+            {
+                PropertyName: "Opacity",
+                Path: "Preview.Opacity",
+                Mode: DesignerBindingMode.OneWay,
+                FallbackValue: "0.35",
+            }, "The binding editor must apply a common-property binding to a custom control.");
+        editor.Undo();
+        Assert(DesignerBindingRuntime.ReadBindings(editor.Canvas.Elements.Single().Visual).Count == 0,
+            "Undo must remove a custom-control binding.");
+        editor.Redo();
+        Assert(DesignerBindingRuntime.ReadBindings(editor.Canvas.Elements.Single().Visual).Count == 1,
+            "Redo must restore a custom-control binding.");
+        Assert(editor.TrySetSampleDataJson("""
+            {
+              "Preview": {
+                "Opacity": 0.42
+              }
+            }
+            """, out var sampleResult), sampleResult);
+        Assert(Math.Abs(editor.Canvas.Elements.Single().Visual.Opacity - 0.42) < 0.001,
+            "Sample data must apply the custom-control binding on the design surface.");
+        source = editor.ExportDraftAxaml();
+        Assert(source.Contains(
+                "Opacity=\"{ReflectionBinding Preview.Opacity, Mode=OneWay, FallbackValue='0.35'}\""),
+            "Draft AXAML must serialize a custom-control binding instead of its sampled value.");
+        Assert(editor.TryImportDraftAxaml(source, out importError, out _), importError);
+        imported = editor.Canvas.Elements.Single().Visual;
+        Assert(DesignerBindingRuntime.ReadBindings(imported).SingleOrDefault() is
+            {
+                PropertyName: "Opacity",
+                Path: "Preview.Opacity",
+                Mode: DesignerBindingMode.OneWay,
+                FallbackValue: "0.35",
+            } && Math.Abs(imported.Opacity - 0.42) < 0.001,
+            "A custom-control binding and its sample value must survive Draft re-import.");
+        var previewDocument = editor.CreatePreviewDocument();
+        Assert(previewDocument.Elements.Single().VisualProperties!.ContainsKey("__bindings"),
+            "The Preview snapshot must retain custom-control binding metadata.");
+        var preview = new PreviewWindow(previewDocument);
+        try
+        {
+            var previewLayout = (Grid)preview.Content!;
+            var previewSurface = previewLayout.Children.OfType<Border>().Single();
+            var previewViewport = (ScrollViewer)previewSurface.Child!;
+            var previewCanvas = (Canvas)previewViewport.Content!;
+            var previewControl = previewCanvas.Children.Single();
+            Assert(Math.Abs(previewControl.Opacity - 0.42) < 0.001,
+                "Preview must apply sample data through the restored custom-control binding.");
+            previewControl.Opacity = 0.1;
+            preview.ResetPreview();
+            previewCanvas = (Canvas)previewViewport.Content!;
+            Assert(Math.Abs(previewCanvas.Children.Single().Opacity - 0.42) < 0.001,
+                "Reset Preview must reapply the custom-control binding and sample data.");
+        }
+        finally
+        {
+            preview.Close();
+        }
+
         Console.WriteLine("Custom control state checks passed.");
     }
 

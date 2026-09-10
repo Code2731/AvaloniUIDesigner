@@ -26,6 +26,9 @@ Custom-control checks also cover transforms and visual effects across two-step
 Undo/Redo and Draft re-import, allowing normal matrix and color quantization.
 Common event handlers are verified through edit, Undo/Redo, Draft re-import,
 Preview wiring, and an actual Avalonia routed focus event.
+Common-property bindings on design-only custom controls are verified through
+edit, Undo/Redo, sample-data application, Draft re-import, Headless Preview,
+and Preview Reset without serializing the temporary sampled value.
 
 Persistence checks cover initial UTF-8 saves, replacement backups, repeated
 backup rotation, invalid backup paths, temporary-file cleanup, and retry after
