@@ -20,7 +20,9 @@ try
     var surface = layout.Children.OfType<Border>().Single();
     var viewport = (ScrollViewer)surface.Child!;
     var log = layout.Children.OfType<Expander>().Single();
-    var reset = layout.Children.OfType<Button>().Single();
+    var toolbar = layout.Children.OfType<StackPanel>().Single();
+    var reset = toolbar.Children.OfType<Button>().Single(button => Equals(button.Content, "Reset Preview"));
+    var liveUpdates = toolbar.Children.OfType<CheckBox>().Single();
     Canvas Canvas() => (Canvas)viewport.Content!;
     TextBox Input() => Canvas().Children.OfType<TextBox>().Single();
     CheckBox Choice() => Canvas().Children.OfType<CheckBox>().Single();
@@ -78,6 +80,22 @@ try
         "Failed preparation must preserve title and background.");
     window.ResetPreview();
     Assert(Input().Text == "Latest design", "Failed preparation must not replace the reset snapshot.");
+    liveUpdates.IsChecked = false;
+    Input().Text = "Paused interaction";
+    var pending = document with { Elements = [input with
+    {
+        VisualProperties = new Dictionary<string, string> { ["Text"] = "Resumed design" },
+    }, toggle] };
+    window.UpdateLiveDocument(document);
+    window.UpdateLiveDocument(pending);
+    Assert(Input().Text == "Paused interaction", "Paused live updates must preserve runtime input.");
+    liveUpdates.IsChecked = true;
+    Assert(Input().Text == "Resumed design", "Resume must apply only the latest pending design.");
+    liveUpdates.IsChecked = false;
+    window.UpdateLiveDocument(document);
+    window.ResetPreview();
+    Assert(Input().Text == "Original" && liveUpdates.IsChecked == false,
+        "Explicit reset must apply pending design without resuming automatic updates.");
     Console.WriteLine("Preview behavior checks passed.");
 }
 finally

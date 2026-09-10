@@ -12875,7 +12875,7 @@ public partial class MainWindow : Window
         ScheduleSessionCheckpoint();
         if (Vm is not null && _previewWindow is not null)
         {
-            RunPreviewAction(() => _previewWindow.RefreshDocument(Vm.CreatePreviewDocument()));
+            RunPreviewAction(() => _previewWindow.UpdateLiveDocument(Vm.CreatePreviewDocument()));
         }
     }
 

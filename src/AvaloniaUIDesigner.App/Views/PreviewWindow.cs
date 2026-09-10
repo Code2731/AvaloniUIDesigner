@@ -29,6 +29,8 @@ public sealed class PreviewWindow : Window
     private readonly TextBlock _interactionLog;
     private readonly List<string> _interactionEntries = new();
     private DesignerCanvasDocument _latestDocument;
+    private DesignerCanvasDocument? _pendingDocument;
+    private readonly CheckBox _liveUpdates;
 
     public PreviewWindow(
         DesignerCanvasDocument document,
@@ -98,10 +100,37 @@ public sealed class PreviewWindow : Window
         };
         ToolTip.SetTip(resetPreview, "Restart interactions using the latest design values and sample data.");
         resetPreview.Click += (_, _) => ResetPreview();
+        _liveUpdates = new CheckBox
+        {
+            Content = "Live updates",
+            IsChecked = true,
+            Focusable = false,
+            VerticalAlignment = VerticalAlignment.Center,
+        };
+        var updateError = new TextBlock { TextWrapping = TextWrapping.Wrap };
+        _liveUpdates.IsCheckedChanged += (_, _) =>
+        {
+            updateError.Text = string.Empty;
+            if (_liveUpdates.IsChecked == true && _pendingDocument is { } pending)
+            {
+                try { RefreshDocument(pending); }
+                catch (Exception exception)
+                {
+                    _liveUpdates.IsChecked = false;
+                    updateError.Text = $"Preview could not update: {exception.Message}";
+                }
+            }
+        };
+        var toolbar = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            Spacing = 8,
+            Children = { resetPreview, _liveUpdates, updateError },
+        };
         var layout = new Grid { RowDefinitions = new RowDefinitions("Auto,*,Auto") };
         Grid.SetRow(_previewSurface, 1);
         Grid.SetRow(_interactionExpander, 2);
-        layout.Children.Add(resetPreview);
+        layout.Children.Add(toolbar);
         layout.Children.Add(_previewSurface);
         layout.Children.Add(_interactionExpander);
         Content = layout;
@@ -117,9 +146,20 @@ public sealed class PreviewWindow : Window
     public void RefreshDocument(DesignerCanvasDocument document)
         => RefreshDocument(document, resizeWindow: false);
 
+    public void UpdateLiveDocument(DesignerCanvasDocument document)
+    {
+        if (_liveUpdates.IsChecked != true)
+        {
+            _pendingDocument = document;
+            return;
+        }
+
+        RefreshDocument(document);
+    }
+
     public void ResetPreview()
     {
-        RefreshDocument(_latestDocument, resizeWindow: false);
+        RefreshDocument(_pendingDocument ?? _latestDocument, resizeWindow: false);
         _previewScrollViewer.Offset = default;
     }
 
@@ -143,6 +183,7 @@ public sealed class PreviewWindow : Window
         UpdateInteractionLog();
         _previewScrollViewer.Content = previewCanvas;
         _latestDocument = document;
+        _pendingDocument = null;
         committed = true;
         foreach (var interaction in preparedInteractions)
             ReportInteraction(interaction);
