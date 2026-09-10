@@ -127,13 +127,25 @@ public sealed class PreviewWindow : Window
     {
         var settings = document.Settings ?? new DesignerCanvasSettings();
         var rootSettings = document.RootSettings ?? new DesignerRootSettings();
+        var background = Brush.Parse(settings.Background);
+        var preparedInteractions = new List<DesignerPreviewInteraction>();
+        var committed = false;
+        var previewCanvas = CreatePreviewCanvasWithInteractions(document, interaction =>
+        {
+            if (committed)
+                ReportInteraction(interaction);
+            else
+                preparedInteractions.Add(interaction);
+        });
         ApplyRootSettings(rootSettings, settings, resizeWindow);
-        _previewSurface.Background = Brush.Parse(settings.Background);
+        _previewSurface.Background = background;
         _interactionEntries.Clear();
         UpdateInteractionLog();
-        var previewCanvas = CreatePreviewCanvasWithInteractions(document, ReportInteraction);
         _previewScrollViewer.Content = previewCanvas;
         _latestDocument = document;
+        committed = true;
+        foreach (var interaction in preparedInteractions)
+            ReportInteraction(interaction);
     }
 
     private void ReportInteraction(DesignerPreviewInteraction interaction)

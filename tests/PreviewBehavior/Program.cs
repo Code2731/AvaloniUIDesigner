@@ -53,6 +53,31 @@ try
     window.ShowInteractionLog();
     Assert(log.IsExpanded, "Interaction Log command must reveal a collapsed panel.");
     Assert(input.VisualProperties!["Text"] == "Original", "Preview interactions must not modify source snapshots.");
+    var stableCanvas = Canvas();
+    var stableTitle = window.Title;
+    var stableBackground = surface.Background;
+    Input().Text = "Keep this test input";
+    var failed = false;
+    try
+    {
+        window.RefreshDocument(document with
+        {
+            RootSettings = new DesignerRootSettings(Title: "Failed document"),
+            Settings = new DesignerCanvasSettings(Background: "#112233"),
+            ColorResources = new Dictionary<string, string> { ["Broken"] = "not-a-color" },
+        });
+    }
+    catch (FormatException)
+    {
+        failed = true;
+    }
+    Assert(failed, "Invalid resources must fail preview preparation.");
+    Assert(ReferenceEquals(Canvas(), stableCanvas) && Input().Text == "Keep this test input",
+        "Failed preparation must retain the existing controls and interaction state.");
+    Assert(window.Title == stableTitle && Equals(surface.Background, stableBackground),
+        "Failed preparation must preserve title and background.");
+    window.ResetPreview();
+    Assert(Input().Text == "Latest design", "Failed preparation must not replace the reset snapshot.");
     Console.WriteLine("Preview behavior checks passed.");
 }
 finally
