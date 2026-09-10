@@ -4,6 +4,7 @@ using System.Globalization;
 using System.Linq;
 using System.Text;
 using System.Text.Json;
+using System.Xml;
 using AvaloniaUIDesigner.App.Designer.Contracts;
 using AvaloniaUIDesigner.App.Designer.Core;
 
@@ -861,6 +862,7 @@ public sealed class AxamlDocumentSerializer : IDesignerSerializer
             return string.Empty;
         }
 
+        XmlConvert.VerifyXmlChars(value);
         return value
             .Replace("&", "&amp;")
             .Replace("\"", "&quot;")

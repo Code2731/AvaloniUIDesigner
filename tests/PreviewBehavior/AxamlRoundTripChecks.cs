@@ -45,6 +45,22 @@ internal static class AxamlRoundTripChecks
             Assert(loaded.RootSettings == document.RootSettings, "Round trip must retain root settings.");
             source = serializer.Serialize(loaded);
         }
+        foreach (var invalidText in new[] { "before\0after", "\u0001", "\uD800", "\uFFFF" })
+        {
+            var rejected = false;
+            try
+            {
+                serializer.Serialize(document with
+                {
+                    Elements = [new("Invalid", "Avalonia.Controls.TextBox", 0, 0, 100, 30,
+                        new Dictionary<string, string> { ["Text"] = invalidText })],
+                });
+            }
+            catch (System.Xml.XmlException) { rejected = true; }
+            Assert(rejected, "XML-invalid text must fail serialization rather than produce an unreadable document.");
+        }
+        Assert(editor.TryCreatePreviewDocumentFromAxaml(serializer.Serialize(document), out _, out _),
+            "A rejected value must not prevent a later valid serialization.");
         Console.WriteLine("AXAML round-trip checks passed.");
     }
 
