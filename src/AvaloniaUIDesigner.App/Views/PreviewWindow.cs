@@ -733,7 +733,10 @@ public sealed class PreviewWindow : Window
     {
         if (!styles.Any(style =>
                 style.PseudoClass is not null
-                && string.Equals(style.TargetType, control.GetType().Name, StringComparison.Ordinal)
+                && string.Equals(
+                    style.TargetType,
+                    DesignerStyleRuntime.GetTargetType(control),
+                    StringComparison.Ordinal)
                 && control.Classes.Contains(style.ClassName)))
         {
             return;

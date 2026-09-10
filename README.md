@@ -36,6 +36,7 @@ Preview 동작 회귀 검증: `dotnet run --project tests/PreviewBehavior -p:Use
 - **Component Pack Plugins**: `IComponentPackPlugin`을 구현한 외부 DLL을 `File > Load Component Pack Plugin...`에서 로드하고, 플러그인 경로를 세션에 저장해 Toolbox 정의를 재사용
 - **Component Pack 관리**: `File > Manage Component Packs...`에서 JSON/DLL 팩의 출처·컴포넌트 목록을 확인하고 Toolbox에서 제거하며, 현재 문서가 사용하는 타입은 디자인 전용 placeholder로 보존
 - **Custom Control Metadata**: `DesignOnly: true` 컴포넌트 팩으로 외부 Avalonia 타입을 디자인 타임 플레이스홀더로 등록하고, 커스텀 기본 속성·Preview 문구·AXAML 타입명을 보존
+- **Custom Control Style Preview**: 디자인 전용 플레이스홀더에서도 원래 Avalonia 타입을 기준으로 문서 스타일과 pseudo-class를 매칭하고, 스타일과 충돌하는 로컬 기본값을 정리해 Design Surface·Undo/Redo·Draft AXAML·Preview Reset에서 같은 결과를 유지
 - **선택 영역 Toolbox 프리셋**: 여러 root 컨트롤을 상대 좌표·현재 속성과 함께 Toolbox에 등록하고 JSON 팩으로 저장·불러오기
 - **배치**: 클릭-투-플레이스와 드래그 앤 드롭으로 실제 Avalonia 컨트롤 생성
 - **캔버스 뷰포트**: 큰 아트보드와 확대 상태를 양축 자동 스크롤로 탐색하고, Desktop·Tablet·Mobile·사용자 지정 아트보드 크기와 회전, Zoom In/Out·Actual Size·Fit to View·Fit Selected to View·25~200% Zoom Presets와 스크롤 콘텐츠 크기를 동기화하며 `Ctrl+=`/`Ctrl+-`/`Ctrl+0`/`F`/`Ctrl+Shift+F` 단축키, `Ctrl+Alt+Arrow` 키보드 팬, 중간 마우스 드래그 팬, Ctrl+휠 포인터 중심 줌, 키보드·View 메뉴·Zoom Preset viewport 중심 줌, 아트보드 크기 변경 시 문서 중심 보존을 지원
@@ -857,6 +858,7 @@ AXAML 소스 편집기의 `Validate`와 `Preview`는 현재 디자인과 Undo �
 - v3.18: Design-only 커스텀 컨트롤의 공통 속성 바인딩을 Undo/Redo와 Draft AXAML에 보존하고 샘플 데이터를 Design Surface 및 Preview Reset에 다시 적용합니다.
 - v3.19: Design-only 커스텀 컨트롤의 선언 속성, 스타일 클래스, 명시적 색상 리소스 참조를 Undo/Redo, Draft AXAML, Preview Reset 전 구간에 보존합니다.
 - v3.20: Design-only 커스텀 컨트롤의 선언 속성을 바인딩 편집기에 노출하고 커스텀 바인딩 식을 Undo/Redo, Draft AXAML, Preview Reset까지 보존합니다.
+- v3.21: Design-only 커스텀 컨트롤의 원래 타입으로 문서 스타일과 pseudo-class를 매칭하고 로컬 기본값 충돌을 제거해 Design Surface, Undo/Redo, Draft 재가져오기, Preview 상태 전환과 Reset에서 동일한 스타일을 유지합니다.
 
 ## 컴포넌트 팩
 

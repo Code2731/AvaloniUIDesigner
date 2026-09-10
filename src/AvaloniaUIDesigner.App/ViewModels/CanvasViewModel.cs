@@ -219,14 +219,30 @@ public partial class CanvasViewModel : ViewModelBase
         if (clearNewStyleConflicts)
         {
             var addedClasses = normalized.Except(existing, StringComparer.Ordinal).ToHashSet(StringComparer.Ordinal);
-            foreach (var style in _documentStyles.Where(style =>
-                         addedClasses.Contains(style.ClassName)
-                         && string.Equals(style.TargetType, visual.GetType().Name, StringComparison.Ordinal)))
+            var targetType = DesignerStyleRuntime.GetTargetType(visual);
+            var conflictingProperties = _documentStyles
+                .Where(style =>
+                    addedClasses.Contains(style.ClassName)
+                    && string.Equals(style.TargetType, targetType, StringComparison.Ordinal))
+                .SelectMany(style => style.Setters.Keys)
+                .Distinct(StringComparer.Ordinal)
+                .ToList();
+            foreach (var propertyName in conflictingProperties)
             {
-                foreach (var propertyName in style.Setters.Keys)
+                DesignerStyleRuntime.ClearLocalValue(visual, propertyName);
+            }
+
+            if (visual.Tag is DesignerCustomControlMetadata metadata && conflictingProperties.Count > 0)
+            {
+                var defaultProperties = new Dictionary<string, string>(
+                    metadata.DefaultProperties,
+                    StringComparer.Ordinal);
+                foreach (var propertyName in conflictingProperties)
                 {
-                    DesignerStyleRuntime.ClearLocalValue(visual, propertyName);
+                    defaultProperties.Remove(propertyName);
                 }
+
+                visual.Tag = metadata with { DefaultProperties = defaultProperties };
             }
         }
 
@@ -4039,15 +4055,18 @@ public partial class CanvasViewModel : ViewModelBase
             return;
         }
 
-        var defaultProperties = new Dictionary<string, string>(
-            metadata.DefaultProperties,
-            StringComparer.Ordinal);
+        var defaultProperties = new Dictionary<string, string>(StringComparer.Ordinal);
         foreach (var pair in properties)
         {
             if (!pair.Key.StartsWith("__", StringComparison.Ordinal))
             {
                 defaultProperties[pair.Key] = pair.Value;
             }
+        }
+
+        foreach (var propertyName in metadata.DefaultProperties.Keys.Except(defaultProperties.Keys))
+        {
+            DesignerStyleRuntime.ClearLocalValue(visual, propertyName);
         }
 
         var previewText = properties.TryGetValue("__designPreviewText", out var persistedPreviewText)

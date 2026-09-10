@@ -20,6 +20,7 @@ public static class DesignerCustomControlRuntime
             CornerRadius = new CornerRadius(6),
             Padding = new Thickness(10),
             Tag = new DesignerCustomControlMetadata(
+                typeName,
                 previewText,
                 new Dictionary<string, string>(
                     defaultProperties ?? new Dictionary<string, string>(),

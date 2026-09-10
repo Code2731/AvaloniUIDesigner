@@ -37,6 +37,11 @@ Declared design-only properties are exposed by the binding editor and their
 binding expressions are retained through rejection safety, Undo/Redo, Draft
 re-import, Headless Preview, and Preview Reset. The placeholder does not claim
 to execute properties that require the external custom-control assembly.
+Document styles for design-only custom controls are matched against the
+original Avalonia type rather than the placeholder type. Regression coverage
+includes local-default conflict removal, pseudo-class simulation, Undo/Redo,
+Draft re-import, live disabled-state changes in Headless Preview, and Preview
+Reset without serializing style-managed values as local attributes.
 
 Persistence checks cover initial UTF-8 saves, replacement backups, repeated
 backup rotation, invalid backup paths, temporary-file cleanup, and retry after

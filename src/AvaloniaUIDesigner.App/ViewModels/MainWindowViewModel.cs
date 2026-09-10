@@ -3263,7 +3263,7 @@ public partial class MainWindowViewModel : ViewModelBase
         }
 
         var normalizedPseudoClass = pseudoClass.Trim().TrimStart(':').ToLowerInvariant();
-        var targetType = target.Visual.GetType().Name;
+        var targetType = DesignerStyleRuntime.GetTargetType(target.Visual);
         if (!DesignerStyleRuntime.IsSupportedPseudoClass(targetType, normalizedPseudoClass))
         {
             StatusText = $"{targetType} does not support :{normalizedPseudoClass} preview.";
@@ -11385,7 +11385,7 @@ public partial class MainWindowViewModel : ViewModelBase
 
     private IReadOnlyList<string> GetMatchingStylePreviewStates(DesignElement element)
     {
-        var targetType = element.Visual.GetType().Name;
+        var targetType = DesignerStyleRuntime.GetTargetType(element.Visual);
         var classes = CanvasViewModel.GetUserStyleClasses(element.Visual).ToHashSet(StringComparer.Ordinal);
         return _documentStyles
             .Where(style =>
@@ -12063,6 +12063,19 @@ public partial class MainWindowViewModel : ViewModelBase
                 customProperties[pair.Key] = DesignerResourceReferenceMetadata.FormatExpression(pair.Value);
             }
 
+            foreach (var propertyName in DesignerStyleApplicationMetadata.GetAppliedProperties(visual))
+            {
+                customProperties.Remove(propertyName);
+            }
+
+            foreach (var propertyName in GetStyleManagedPropertyNames(visual))
+            {
+                if (!DesignerStyleRuntime.HasLocalValue(visual, propertyName))
+                {
+                    customProperties.Remove(propertyName);
+                }
+            }
+
             var customClasses = CanvasViewModel.GetUserStyleClasses(visual);
             if (customClasses.Count > 0)
             {
@@ -12178,7 +12191,7 @@ public partial class MainWindowViewModel : ViewModelBase
 
     private IReadOnlyCollection<string> GetStyleManagedPropertyNames(Control visual)
     {
-        var targetType = visual.GetType().Name;
+        var targetType = DesignerStyleRuntime.GetTargetType(visual);
         var classes = CanvasViewModel.GetUserStyleClasses(visual).ToHashSet(StringComparer.Ordinal);
         return _documentStyles
             .Where(style =>

@@ -51,6 +51,17 @@ public static class DesignerStyleRuntime
             && control.IsSet(property)
             && !DesignerStyleApplicationMetadata.IsApplied(control, propertyName);
 
+    public static string GetTargetType(Control control)
+    {
+        var typeName = control.Tag is DesignerCustomControlMetadata metadata
+            ? metadata.TypeName
+            : control.GetType().Name;
+        var separator = typeName.LastIndexOf('.');
+        return separator >= 0 && separator < typeName.Length - 1
+            ? typeName[(separator + 1)..]
+            : typeName;
+    }
+
     public static bool IsSupportedPseudoClass(string targetType, string pseudoClass)
         => pseudoClass switch
         {
@@ -158,7 +169,7 @@ public static class DesignerStyleRuntime
         Control control,
         DesignerStyleDefinition style,
         IReadOnlySet<string> activePseudoClasses)
-        => string.Equals(control.GetType().Name, style.TargetType, StringComparison.Ordinal)
+        => string.Equals(GetTargetType(control), style.TargetType, StringComparison.Ordinal)
             && control.Classes.Contains(style.ClassName)
             && (style.PseudoClass is null || activePseudoClasses.Contains(style.PseudoClass));
 

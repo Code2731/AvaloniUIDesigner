@@ -387,7 +387,91 @@ internal static class CustomControlStateChecks
             preview.Close();
         }
 
+        RunCustomStyleChecks();
         Console.WriteLine("Custom control state checks passed.");
+    }
+
+    private static void RunCustomStyleChecks()
+    {
+        var editor = new MainWindowViewModel();
+        Assert(editor.TryLoadComponentPack(ComponentPack, out var result), result);
+        var item = editor.Toolbox.FindItemByDisplayName("Status Gauge")
+            ?? throw new Exception("Loaded custom control was not added to Toolbox.");
+        editor.PlaceToolboxItem(item, 32, 48);
+        var custom = editor.Canvas.Elements.Single();
+        Assert(custom.Visual.Tag is DesignerCustomControlMetadata
+            {
+                TypeName: "Acme.Controls.StatusGauge",
+            }, "A design-only placeholder must retain its original Avalonia type name.");
+        Assert(editor.SetDocumentStylesFromText("""
+            [StatusGauge.styled]
+            Opacity = 0.6
+
+            [StatusGauge.styled:disabled]
+            Opacity = 0.3
+            """), editor.StatusText);
+        Assert(editor.SetSelectedStyleClassesFromText("styled"), editor.StatusText);
+        custom = editor.Canvas.Elements.Single();
+        Assert(Math.Abs(custom.Visual.Opacity - 0.6) < 0.001,
+            "A custom-control style must match the original type on the Design Surface.");
+        Assert(custom.Visual.Tag is DesignerCustomControlMetadata metadata
+            && !metadata.DefaultProperties.ContainsKey("Opacity"),
+            "Applying a custom-control style must clear the conflicting local default value.");
+        Assert(editor.SetSelectedStylePreviewState("disabled"), editor.StatusText);
+        Assert(Math.Abs(custom.Visual.Opacity - 0.3) < 0.001,
+            "A custom-control pseudo-class must be available in the style-state preview.");
+        Assert(editor.SetSelectedStylePreviewState(null), editor.StatusText);
+        Assert(Math.Abs(custom.Visual.Opacity - 0.6) < 0.001,
+            "Resetting the style-state preview must restore the custom-control base style.");
+
+        editor.Undo();
+        custom = editor.Canvas.Elements.Single();
+        Assert(CanvasViewModel.GetUserStyleClasses(custom.Visual).Count == 0
+            && Math.Abs(custom.Visual.Opacity - 0.85) < 0.001,
+            "Undo must restore the custom-control local value that preceded its style class.");
+        editor.Redo();
+        custom = editor.Canvas.Elements.Single();
+        Assert(CanvasViewModel.GetUserStyleClasses(custom.Visual).SequenceEqual(["styled"])
+            && Math.Abs(custom.Visual.Opacity - 0.6) < 0.001,
+            "Redo must restore the custom-control style without reviving its local override.");
+
+        var source = editor.ExportDraftAxaml();
+        Assert(source.Contains("Selector=\"StatusGauge.styled\"")
+            && source.Contains("Selector=\"StatusGauge.styled:disabled\"")
+            && source.Contains("Classes=\"styled\""),
+            "Draft AXAML must retain custom-control style selectors and classes.");
+        Assert(!source.Contains("Opacity=\"0.85\"") && !source.Contains("Opacity=\"0.6\""),
+            "Draft AXAML must not serialize a style-managed custom-control opacity as a local value.");
+        Assert(editor.TryImportDraftAxaml(source, out var importError, out _), importError);
+        custom = editor.Canvas.Elements.Single();
+        Assert(Math.Abs(custom.Visual.Opacity - 0.6) < 0.001
+            && custom.Visual.Tag is DesignerCustomControlMetadata importedMetadata
+            && importedMetadata.TypeName == "Acme.Controls.StatusGauge"
+            && !importedMetadata.DefaultProperties.ContainsKey("Opacity"),
+            "Draft re-import must reapply the custom style using the preserved original type.");
+
+        var preview = new PreviewWindow(editor.CreatePreviewDocument());
+        try
+        {
+            var previewLayout = (Grid)preview.Content!;
+            var previewSurface = previewLayout.Children.OfType<Border>().Single();
+            var previewViewport = (ScrollViewer)previewSurface.Child!;
+            var previewCanvas = (Canvas)previewViewport.Content!;
+            var previewControl = previewCanvas.Children.Single();
+            Assert(Math.Abs(previewControl.Opacity - 0.6) < 0.001,
+                "Preview must apply a custom-control style using its original type.");
+            previewControl.IsEnabled = false;
+            Assert(Math.Abs(previewControl.Opacity - 0.3) < 0.001,
+                "Preview must react to a custom-control pseudo-class state change.");
+            preview.ResetPreview();
+            previewCanvas = (Canvas)previewViewport.Content!;
+            Assert(Math.Abs(previewCanvas.Children.Single().Opacity - 0.6) < 0.001,
+                "Reset Preview must restore the custom-control base style.");
+        }
+        finally
+        {
+            preview.Close();
+        }
     }
 
     private static void Assert(bool condition, string message)
