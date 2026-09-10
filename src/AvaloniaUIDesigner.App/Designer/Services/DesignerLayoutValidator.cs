@@ -222,7 +222,7 @@ public static class DesignerLayoutValidator
         IReadOnlyDictionary<string, DesignerElementSnapshot> elementsByName,
         ICollection<DesignerLayoutDiagnostic> diagnostics)
     {
-        var reportedCycles = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var visited = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (var element in elements)
         {
             var path = new List<string>();
@@ -238,20 +238,25 @@ public static class DesignerLayoutValidator
 
                 if (indexes.TryGetValue(currentName, out var cycleStart))
                 {
-                    var cycle = path
-                        .Skip(cycleStart)
-                        .OrderBy(name => name, StringComparer.OrdinalIgnoreCase)
-                        .ToList();
-                    var signature = string.Join("|", cycle);
-                    if (cycle.Count > 0 && reportedCycles.Add(signature))
-                    {
-                        diagnostics.Add(new(
-                            DesignerLayoutDiagnosticSeverity.Error,
-                            "PARENT_CYCLE",
-                            cycle[0],
-                            $"Parent relationship forms a cycle: {string.Join(" -> ", cycle)}."));
-                    }
+                    var cycle = path.Skip(cycleStart).ToList();
+                    var firstIndex = 0;
+                    for (var index = 1; index < cycle.Count; index++)
+                        if (StringComparer.OrdinalIgnoreCase.Compare(cycle[index], cycle[firstIndex]) < 0)
+                            firstIndex = index;
 
+                    // Rotate the cycle without changing its actual parent edges.
+                    var ordered = cycle.Skip(firstIndex).Concat(cycle.Take(firstIndex)).ToList();
+                    diagnostics.Add(new(
+                        DesignerLayoutDiagnosticSeverity.Error,
+                        "PARENT_CYCLE",
+                        ordered[0],
+                        $"Parent relationship forms a cycle: {string.Join(" -> ", ordered.Append(ordered[0]))}."));
+
+                    break;
+                }
+
+                if (visited.Contains(currentName))
+                {
                     break;
                 }
 
@@ -266,6 +271,8 @@ public static class DesignerLayoutValidator
 
                 current = parent;
             }
+
+            visited.UnionWith(path);
         }
     }
 

@@ -32,4 +32,29 @@ var a = new DesignerElementSnapshot("A", "Avalonia.Controls.Button", 0, 0, 40, 2
     ParentName: "Grid", ParentLayout: DesignerParentLayoutKind.Grid);
 if (DesignerLayoutValidator.Validate(new([grid, a, a with { DisplayName = "B" }])).Count != 0)
     throw new Exception("Grid permits multiple children in the same cell.");
+var cycleA = grid with { DisplayName = "A", ParentName = "C", ParentLayout = DesignerParentLayoutKind.Grid };
+var cycleB = cycleA with { DisplayName = "B", ParentName = "A" };
+var cycleC = cycleA with { DisplayName = "C", ParentName = "B" };
+var descendant = cycleA with { DisplayName = "Descendant", ParentName = "C" };
+foreach (var elements in new[]
+{
+    new[] { cycleA, cycleB, cycleC, descendant },
+    new[] { descendant, cycleC, cycleB, cycleA },
+})
+{
+    var cycles = DesignerLayoutValidator.Validate(new(elements)).Where(d => d.Code == "PARENT_CYCLE").ToList();
+    if (cycles.Count != 1 || !cycles[0].Message.Contains("A -> C -> B -> A", StringComparison.Ordinal))
+        throw new Exception("Cycle diagnostics must preserve parent edges and report each cycle once.");
+}
+var self = cycleA with { ParentName = "A" };
+if (!DesignerLayoutValidator.Validate(new([self])).Single(d => d.Code == "PARENT_CYCLE").Message.Contains("A -> A"))
+    throw new Exception("Self-parent cycles must show the closing edge.");
+var chain = Enumerable.Range(0, 10000).Select(index => grid with
+{
+    DisplayName = $"Node{index}",
+    ParentName = index == 9999 ? null : $"Node{index + 1}",
+    ParentLayout = index == 9999 ? DesignerParentLayoutKind.None : DesignerParentLayoutKind.Grid,
+}).ToArray();
+if (DesignerLayoutValidator.Validate(new(chain)).Count != 0)
+    throw new Exception("Deep acyclic hierarchies must pass without recursive traversal.");
 Console.WriteLine("Layout validation regression checks passed.");
