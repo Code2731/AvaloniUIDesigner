@@ -9231,6 +9231,108 @@ public partial class MainWindow : Window
         await dialog.ShowDialog(this);
     }
 
+    private async void OnDeclaredCustomPropertyFourValueClicked(
+        object? sender,
+        Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        if (_isApplyingDeclaredCustomPropertyEdit
+            || sender is not Button { Tag: string propertyName }
+            || GetDeclaredCustomPropertyState(propertyName) is not
+                { UsesFourValueEditor: true } state)
+        {
+            return;
+        }
+
+        await ShowDeclaredCustomPropertyFourValueDialogAsync(state);
+        QueueDeclaredCustomPropertySummaryRefresh();
+    }
+
+    private async Task ShowDeclaredCustomPropertyFourValueDialogAsync(
+        DesignerCustomPropertyValueState state)
+    {
+        if (Vm is null)
+        {
+            return;
+        }
+
+        var valueEditor = new DesignerCustomPropertyFourValueEditor(state);
+        var errorText = new TextBlock
+        {
+            Foreground = Brushes.IndianRed,
+            TextWrapping = TextWrapping.Wrap,
+        };
+        var dialog = new Window
+        {
+            Title = $"Edit {state.PropertyName}",
+            Width = 660,
+            Height = 300,
+            MinWidth = 560,
+            MinHeight = 260,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner,
+        };
+        void ApplyValue()
+        {
+            if (!valueEditor.TryGetValue(out var value, out var error))
+            {
+                errorText.Text = error;
+                return;
+            }
+
+            if (!Vm.SetSelectedCustomPropertyValue(state.PropertyName, value))
+            {
+                errorText.Text = Vm.StatusText;
+                return;
+            }
+
+            dialog.Close();
+        }
+
+        var applyButton = new Button { Content = "Apply", MinWidth = 84 };
+        applyButton.Click += (_, _) => ApplyValue();
+        var cancelButton = new Button { Content = "Cancel", MinWidth = 84 };
+        cancelButton.Click += (_, _) => dialog.Close();
+        WireEditorDialogShortcuts(dialog, () => dialog.Close(), ApplyValue);
+        var buttons = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            Spacing = 8,
+            HorizontalAlignment = HorizontalAlignment.Right,
+            Children = { cancelButton, applyButton },
+        };
+        var directionHint = state.Type == DesignerCustomPropertyType.Thickness
+            ? "Left, Top, Right, Bottom"
+            : "Top-left, Top-right, Bottom-right, Bottom-left";
+        var content = new Grid
+        {
+            Margin = new Thickness(16),
+            RowDefinitions = new RowDefinitions("Auto,Auto,*,Auto,Auto"),
+            RowSpacing = 10,
+            Children =
+            {
+                new TextBlock
+                {
+                    Text = $"Choose a local {state.TypeLabel} value for {state.DisplayName}.",
+                    FontWeight = FontWeight.SemiBold,
+                },
+                new TextBlock
+                {
+                    Text = $"Order: {directionHint}. Current effective value: {state.DisplayValue}",
+                    Foreground = Brushes.SlateGray,
+                    TextWrapping = TextWrapping.Wrap,
+                },
+                valueEditor,
+                errorText,
+                buttons,
+            },
+        };
+        Grid.SetRow(content.Children[1], 1);
+        Grid.SetRow(valueEditor, 2);
+        Grid.SetRow(errorText, 3);
+        Grid.SetRow(buttons, 4);
+        dialog.Content = content;
+        await dialog.ShowDialog(this);
+    }
+
     private void OnDeclaredCustomPropertyResetClicked(
         object? sender,
         Avalonia.Interactivity.RoutedEventArgs e)
@@ -21408,7 +21510,7 @@ public partial class MainWindow : Window
                 fields,
                 new TextBlock
                 {
-                    Text = "Use a dotted CLR path such as Order.Total. Fallback cannot contain commas, braces, quotes, or pipes.",
+                    Text = "Use a dotted CLR path such as Order.Total. Fallback cannot contain braces, quotes, or pipes.",
                     Foreground = Avalonia.Media.Brushes.SlateGray,
                     TextWrapping = Avalonia.Media.TextWrapping.Wrap,
                 },

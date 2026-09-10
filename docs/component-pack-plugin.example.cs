@@ -48,12 +48,28 @@ public sealed class AcmeComponentPackPlugin : IComponentPackPlugin
                             Description = "Controls the trend indicator direction.",
                             Options = ["Up", "Flat", "Down"],
                         },
+                        new()
+                        {
+                            Name = "ContentPadding",
+                            Type = "Thickness",
+                            DisplayName = "Content padding",
+                            Category = "Layout",
+                        },
+                        new()
+                        {
+                            Name = "CardCorners",
+                            Type = "CornerRadius",
+                            DisplayName = "Card corners",
+                            Category = "Appearance",
+                        },
                     ],
                     DefaultProperties = new Dictionary<string, string?>
                     {
                         ["Header"] = "Revenue",
                         ["Value"] = "$42K",
                         ["Trend"] = "Up",
+                        ["ContentPadding"] = "16,12",
+                        ["CardCorners"] = "8",
                     },
                 },
             ],

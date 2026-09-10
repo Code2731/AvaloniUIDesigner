@@ -10,6 +10,8 @@ public enum DesignerCustomPropertyType
     Double,
     Color,
     Enum,
+    Thickness,
+    CornerRadius,
 }
 
 public sealed record DesignerCustomPropertyDefinition(

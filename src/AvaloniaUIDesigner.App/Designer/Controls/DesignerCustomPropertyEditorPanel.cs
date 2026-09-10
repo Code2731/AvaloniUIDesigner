@@ -294,6 +294,14 @@ public sealed class DesignerCustomPropertyEditorPanel : Border
             };
         }
 
+        if (state.UsesFourValueEditor)
+        {
+            return new DesignerCustomPropertyFourValueEditor(state)
+            {
+                HorizontalAlignment = HorizontalAlignment.Stretch,
+            };
+        }
+
         return new TextBox
         {
             Text = state.Source is DesignerCustomPropertyValueSource.Local
@@ -362,6 +370,14 @@ public sealed class DesignerCustomPropertyEditorPanel : Border
                 break;
             case ColorPicker color:
                 value = $"#{color.Color.A:x2}{color.Color.R:x2}{color.Color.G:x2}{color.Color.B:x2}";
+                break;
+            case DesignerCustomPropertyFourValueEditor fourValueEditor:
+                if (!fourValueEditor.TryGetValue(out value, out error))
+                {
+                    error = $"{row.State.DisplayName} ({row.State.PropertyName}) {error}";
+                    return false;
+                }
+
                 break;
             default:
                 value = string.Empty;

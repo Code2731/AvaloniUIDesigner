@@ -75,6 +75,20 @@ internal static class CustomControlStateChecks
                   "description": "Primary gauge highlight color."
                 },
                 {
+                  "name": "Corners",
+                  "type": "CornerRadius",
+                  "displayName": "Corner shape",
+                  "category": "Appearance",
+                  "description": "Four preview corner radii."
+                },
+                {
+                  "name": "Insets",
+                  "type": "Thickness",
+                  "displayName": "Content inset",
+                  "category": "Layout",
+                  "description": "Spacing around the gauge content."
+                },
+                {
                   "name": "State",
                   "type": "Enum",
                   "displayName": "Operating mode",
@@ -88,6 +102,8 @@ internal static class CustomControlStateChecks
                 "Count": "02",
                 "Ratio": ".5",
                 "Accent": "#3B82F6",
+                "Corners": "3,4,5,6",
+                "Insets": "1, 2",
                 "State": "idle",
                 "Note": "Ready"
               }
@@ -1026,6 +1042,23 @@ internal static class CustomControlStateChecks
             """, out var invalidMetadataResult)
             && invalidMetadataResult.Contains("single line", StringComparison.OrdinalIgnoreCase),
             "A custom-property category containing a line break must reject the component pack.");
+        Assert(!invalidEditor.TryLoadComponentPack("""
+            {
+              "components": [
+                {
+                  "displayName": "Invalid Corner Default",
+                  "avaloniaTypeName": "Acme.Controls.InvalidCornerDefault",
+                  "designOnly": true,
+                  "propertyDefinitions": [
+                    { "name": "Corners", "type": "CornerRadius" }
+                  ],
+                  "defaultProperties": { "Corners": "2,-1" }
+                }
+              ]
+            }
+            """, out var invalidCornerResult)
+            && invalidCornerResult.Contains("not negative", StringComparison.OrdinalIgnoreCase),
+            "A CornerRadius default containing a negative value must reject the component pack.");
 
         var editor = new MainWindowViewModel();
         Assert(editor.TryLoadComponentPack(TypedComponentPack, out var result), result);
@@ -1034,12 +1067,14 @@ internal static class CustomControlStateChecks
         editor.PlaceToolboxItem(item, 40, 56);
         var custom = editor.Canvas.Elements.Single();
         Assert(custom.Visual.Tag is DesignerCustomControlMetadata metadata
-            && metadata.DeclaredProperties.Count == 6
-            && metadata.PropertyDefinitions is { Count: 6 }
+            && metadata.DeclaredProperties.Count == 8
+            && metadata.PropertyDefinitions is { Count: 8 }
             && metadata.DefaultProperties["IsActive"] == "True"
             && metadata.DefaultProperties["Count"] == "2"
             && metadata.DefaultProperties["Ratio"] == "0.5"
             && metadata.DefaultProperties["Accent"] == "#ff3b82f6"
+            && metadata.DefaultProperties["Corners"] == "3,4,5,6"
+            && metadata.DefaultProperties["Insets"] == "1,2,1,2"
             && metadata.DefaultProperties["State"] == "Idle"
             && metadata.PropertyDefinitions.Single(definition => definition.Name == "Count") is
             {
@@ -1054,8 +1089,8 @@ internal static class CustomControlStateChecks
             .Select(state => state.CategoryLabel)
             .ToList();
         Assert(orderedPropertyNames.SequenceEqual(
-                ["Accent", "IsActive", "State", "Ratio", "Count", "Note"])
-            && categoryHeaders.SequenceEqual(["Appearance", "Behavior", "Data", "Custom"]),
+                ["Accent", "Corners", "IsActive", "State", "Ratio", "Count", "Insets", "Note"])
+            && categoryHeaders.SequenceEqual(["Appearance", "Behavior", "Data", "Layout", "Custom"]),
             $"Typed custom properties must be grouped by explicit category with uncategorized values last. Got {string.Join(", ", states.Select(state => $"{state.PropertyName}:{state.CategoryLabel}:{state.ShowsCategoryHeader}"))}.");
         Assert(states.Single(state => state.PropertyName == "IsActive") is
             {
@@ -1121,6 +1156,36 @@ internal static class CustomControlStateChecks
             {
                 Color: { A: 255, R: 59, G: 130, B: 246 },
             }, "A Color declaration must expose a canonical preview brush and color editor.");
+        Assert(states.Single(state => state.PropertyName == "Insets") is
+            {
+                Type: DesignerCustomPropertyType.Thickness,
+                DisplayName: "Content inset",
+                CategoryLabel: "Layout",
+                UsesFourValueEditor: true,
+                UsesTextEditor: false,
+            } thicknessState
+            && DesignerCustomPropertyRuntime.TryGetFourValueComponents(
+                thicknessState.Type,
+                thicknessState.Value,
+                out var thicknessValues,
+                out _)
+            && thicknessValues.SequenceEqual([1d, 2d, 1d, 2d]),
+            "A Thickness declaration must expand Avalonia horizontal/vertical shorthand for four-value editing.");
+        Assert(states.Single(state => state.PropertyName == "Corners") is
+            {
+                Type: DesignerCustomPropertyType.CornerRadius,
+                DisplayName: "Corner shape",
+                CategoryLabel: "Appearance",
+                UsesFourValueEditor: true,
+                UsesTextEditor: false,
+            } cornerState
+            && DesignerCustomPropertyRuntime.TryGetFourValueComponents(
+                cornerState.Type,
+                "2,3",
+                out var cornerValues,
+                out _)
+            && cornerValues.SequenceEqual([2d, 2d, 3d, 3d]),
+            "A CornerRadius declaration must expand Avalonia top/bottom shorthand for four-value editing.");
         Assert(states.Single(state => state.PropertyName == "Note") is
             {
                 DisplayName: "Note",
@@ -1144,17 +1209,23 @@ internal static class CustomControlStateChecks
         Assert(!editor.SetSelectedCustomProperties(["Accent = not-a-color"])
             && editor.ExportDraftAxaml() == beforeInvalidEdit,
             "The bulk custom-property editor must enforce typed color validation.");
+        Assert(!editor.SetSelectedCustomPropertyValue("Corners", "1,-1,2,3")
+            && editor.ExportDraftAxaml() == beforeInvalidEdit,
+            "A negative CornerRadius edit must leave the document unchanged.");
         Assert(editor.SetSelectedCustomPropertyValue("Count", "07"), editor.StatusText);
         Assert(editor.SetSelectedCustomPropertyValue("State", "busy"), editor.StatusText);
         Assert(editor.SetSelectedCustomPropertyValue("IsActive", "false"), editor.StatusText);
+        Assert(editor.SetSelectedCustomPropertyValue("Insets", "5, 10"), editor.StatusText);
         custom = editor.Canvas.Elements.Single();
         Assert(custom.Visual.Tag is DesignerCustomControlMetadata editedMetadata
             && editedMetadata.DefaultProperties["Count"] == "7"
             && editedMetadata.DefaultProperties["State"] == "Busy"
-            && editedMetadata.DefaultProperties["IsActive"] == "False",
+            && editedMetadata.DefaultProperties["IsActive"] == "False"
+            && editedMetadata.DefaultProperties["Insets"] == "5,10,5,10",
             "Typed inline edits must store canonical AXAML values.");
 
         Assert(editor.ResetSelectedCustomPropertyValue("Count"), editor.StatusText);
+        Assert(editor.ResetSelectedCustomPropertyValue("Corners"), editor.StatusText);
         var beforeInvalidStyle = editor.ExportDraftAxaml();
         Assert(!editor.SetDocumentStylesFromText("""
             [TypedGauge.limit]
@@ -1164,6 +1235,7 @@ internal static class CustomControlStateChecks
         Assert(editor.SetDocumentStylesFromText("""
             [TypedGauge.limit]
             Count = 04
+            Corners = 2,3
             """), editor.StatusText);
         Assert(editor.SetSelectedStyleClassesFromText("limit"), editor.StatusText);
         Assert(editor.GetSelectedCustomPropertyValueStates().Single(state => state.PropertyName == "Count") is
@@ -1171,7 +1243,14 @@ internal static class CustomControlStateChecks
                 Value: "4",
                 Source: DesignerCustomPropertyValueSource.Style,
                 Type: DesignerCustomPropertyType.Integer,
-            }, "A valid typed custom setter must be normalized and exposed as a style value.");
+            }
+            && editor.GetSelectedCustomPropertyValueStates().Single(state =>
+                state.PropertyName == "Corners") is
+                {
+                    Value: "2,2,3,3",
+                    Source: DesignerCustomPropertyValueSource.Style,
+                    Type: DesignerCustomPropertyType.CornerRadius,
+                }, "Valid typed custom setters must be normalized and exposed as style values.");
 
         var beforeInvalidFallback = editor.ExportDraftAxaml();
         Assert(!editor.SetSelectedCustomPropertyBinding(
@@ -1193,11 +1272,40 @@ internal static class CustomControlStateChecks
         Assert(editor.GetSelectedCustomPropertyValueStates().Single(state => state.PropertyName == "Count") is
             { Value: "4", Source: DesignerCustomPropertyValueSource.Style },
             "Removing a typed binding must reveal the validated style value.");
+        Assert(editor.SetSelectedCustomPropertyBinding(
+            "Insets",
+            "Preview.Insets",
+            nameof(DesignerBindingMode.OneWay),
+            "4,6"), editor.StatusText);
+        Assert(DesignerBindingRuntime.ReadBindings(editor.Canvas.Elements.Single().Visual).Single(binding =>
+                binding.PropertyName == "Insets") is { FallbackValue: "4,6,4,6" },
+            "A Thickness binding fallback must be expanded to a canonical four-value form.");
+        var boundInsetsSource = editor.ExportDraftAxaml();
+        Assert(boundInsetsSource.Contains("FallbackValue='4,6,4,6'", StringComparison.Ordinal),
+            "A comma-containing four-value fallback must be quoted in generated AXAML.");
+        var boundInsetsImportEditor = new MainWindowViewModel();
+        Assert(boundInsetsImportEditor.TryLoadComponentPack(
+            TypedComponentPack,
+            out var boundInsetsPackResult), boundInsetsPackResult);
+        Assert(boundInsetsImportEditor.TryImportDraftAxaml(
+            boundInsetsSource,
+            out var boundInsetsImportError,
+            out _), boundInsetsImportError);
+        Assert(DesignerBindingRuntime.ReadBindings(
+                boundInsetsImportEditor.Canvas.Elements.Single().Visual).Single(binding =>
+                binding.PropertyName == "Insets") is { FallbackValue: "4,6,4,6" },
+            "Draft import must parse commas inside a quoted four-value binding fallback.");
+        Assert(editor.RemoveSelectedCustomPropertyBinding("Insets"), editor.StatusText);
+        Assert(editor.GetSelectedCustomPropertyValueStates().Single(state => state.PropertyName == "Insets") is
+            { Value: "5,10,5,10", Source: DesignerCustomPropertyValueSource.Local },
+            "Removing a Thickness binding must reveal its preserved local four-value state.");
 
         var source = editor.ExportDraftAxaml();
         Assert(source.Contains("IsActive=\"False\"")
             && source.Contains("State=\"Busy\"")
-            && source.Contains("<Setter Property=\"Count\" Value=\"4\" />"),
+            && source.Contains("Insets=\"5,10,5,10\"")
+            && source.Contains("<Setter Property=\"Count\" Value=\"4\" />")
+            && source.Contains("<Setter Property=\"Corners\" Value=\"2,2,3,3\" />"),
             "Draft AXAML must use canonical typed values for local attributes and style setters.");
         var invalidImportEditor = new MainWindowViewModel();
         Assert(invalidImportEditor.TryLoadComponentPack(TypedComponentPack, out var importPackResult),
@@ -1241,7 +1349,10 @@ internal static class CustomControlStateChecks
                 DisplayName: "Item count",
                 Category: "Data",
                 Description: "Number of visible items.",
-            }, "Draft re-import with the component pack must restore typed property and Inspector metadata.");
+            }
+            && importedMetadata.DefaultProperties["Insets"] == "5,10,5,10"
+            && importedMetadata.StyleProperties["Corners"] == "2,2,3,3",
+            "Draft re-import with the component pack must restore typed property values and Inspector metadata.");
         var preview = new PreviewWindow(editor.CreatePreviewDocument());
         try
         {
@@ -1256,8 +1367,10 @@ internal static class CustomControlStateChecks
                         DisplayName: "Operating mode",
                         Category: "Behavior",
                     } previewStateDefinition
-                && previewStateDefinition.Options?.SequenceEqual(["Idle", "Busy"]) == true,
-                "Headless Preview must retain typed custom-property definitions and Inspector metadata.");
+                && previewStateDefinition.Options?.SequenceEqual(["Idle", "Busy"]) == true
+                && previewMetadata.DefaultProperties["Insets"] == "5,10,5,10"
+                && previewMetadata.StyleProperties["Corners"] == "2,2,3,3",
+                "Headless Preview must retain typed custom-property definitions, values, and Inspector metadata.");
         }
         finally
         {
@@ -1286,8 +1399,10 @@ internal static class CustomControlStateChecks
                 Description: "Number of visible items.",
             }
             && exportedDefinitions.Single(definition => definition.Name == "State").Options?
-                .SequenceEqual(["Idle", "Busy"]) == true,
-            "Selected Component Pack export must retain typed ranges, Enum options, and Inspector metadata.");
+                .SequenceEqual(["Idle", "Busy"]) == true
+            && exportedDefinitions.Single(definition => definition.Name == "Insets").Type == "Thickness"
+            && exportedDefinitions.Single(definition => definition.Name == "Corners").Type == "CornerRadius",
+            "Selected Component Pack export must retain typed ranges, Enum options, four-value types, and Inspector metadata.");
 
         var sourceId = editor.ComponentPacks.Single().SourceId;
         Assert(editor.TryRemoveComponentPack(sourceId, out var removeResult), removeResult);
@@ -1413,6 +1528,18 @@ internal static class CustomControlStateChecks
                 {
                     Color: { A: 255, R: 59, G: 130, B: 246 },
                 }, "The actual Inspector template must render the effective Color as an editable swatch.");
+            var insetsRow = BuildTypedRow("Insets");
+            var fourValueButton = insetsRow.GetVisualDescendants().OfType<Button>().Single(button =>
+                Equals(button.Tag, "Insets") && button.Content is StackPanel);
+            var insetsTemplateState = (DesignerCustomPropertyValueState)insetsRow.DataContext!;
+            var fourValueContent = (StackPanel)fourValueButton.Content!;
+            Assert(fourValueButton.IsVisible
+                && insetsTemplateState is
+                    { Type: DesignerCustomPropertyType.Thickness, UsesFourValueEditor: true }
+                && !insetsRow.GetVisualDescendants().OfType<TextBox>().Single().IsVisible
+                && fourValueContent.Children.OfType<TextBlock>().Any(text =>
+                    Equals(text.Text, "5,10,5,10")),
+                "The actual Inspector template must expose a dedicated four-value action for Thickness properties.");
 
             choiceEditor.SelectedItem = "True";
             Avalonia.Threading.Dispatcher.UIThread.RunJobs(Avalonia.Threading.DispatcherPriority.Background);
@@ -1451,14 +1578,14 @@ internal static class CustomControlStateChecks
             ?? throw new Exception("The structured editor test component was not added to Toolbox.");
         editor.PlaceToolboxItem(item, 40, 56);
         Assert(editor.TryGetSelectedCustomProperties(out var state)
-            && state.ValueStates.Count == 6,
+            && state.ValueStates.Count == 8,
             "The bulk custom-property state must include source-aware typed rows.");
 
         var panel = new DesignerCustomPropertyEditorPanel(state.ValueStates);
         var categoryHeaders = panel.GetLogicalDescendants()
             .OfType<TextBlock>()
             .Select(text => text.Text)
-            .Where(text => text is "Appearance" or "Behavior" or "Data" or "Custom")
+            .Where(text => text is "Appearance" or "Behavior" or "Data" or "Layout" or "Custom")
             .ToList();
         var localToggles = panel.GetLogicalDescendants()
             .OfType<CheckBox>()
@@ -1487,11 +1614,17 @@ internal static class CustomControlStateChecks
         var noteEditor = panel.GetLogicalDescendants()
             .OfType<TextBox>()
             .Single(control => Equals(control.Tag, "Note"));
-        Assert(categoryHeaders.SequenceEqual(["Appearance", "Behavior", "Data", "Custom"])
-            && localToggles.Count == 6
-            && propertyRows.Count == 6
-            && categoryHeaderBorders.Count == 4
-            && panel.VisibleRowCount == 6
+        var insetsEditor = panel.GetLogicalDescendants()
+            .OfType<DesignerCustomPropertyFourValueEditor>()
+            .Single(control => Equals(control.Tag, "Insets"));
+        var cornersEditor = panel.GetLogicalDescendants()
+            .OfType<DesignerCustomPropertyFourValueEditor>()
+            .Single(control => Equals(control.Tag, "Corners"));
+        Assert(categoryHeaders.SequenceEqual(["Appearance", "Behavior", "Data", "Layout", "Custom"])
+            && localToggles.Count == 8
+            && propertyRows.Count == 8
+            && categoryHeaderBorders.Count == 5
+            && panel.VisibleRowCount == 8
             && localToggles.All(toggle => toggle.IsChecked == true)
             && countEditor.IsEnabled
             && countEditor.Value == 2
@@ -1501,7 +1634,15 @@ internal static class CustomControlStateChecks
             && AutomationProperties.GetName(countEditor) == "Item count value"
             && stateEditor.SelectedItem?.ToString() == "Idle"
             && accentEditor.Color == Avalonia.Media.Color.Parse("#FF3B82F6")
-            && noteEditor.Text == "Ready",
+            && noteEditor.Text == "Ready"
+            && insetsEditor.TryGetValue(out var initialInsets, out _)
+            && initialInsets == "1,2,1,2"
+            && cornersEditor.TryGetValue(out var initialCorners, out _)
+            && initialCorners == "3,4,5,6"
+            && AutomationProperties.GetName(insetsEditor.ValueEditors[0])
+                == "Content inset left value"
+            && AutomationProperties.GetName(cornersEditor.ValueEditors[3])
+                == "Corner shape bottom-left value",
             "The structured editor must render grouped, enabled, type-specific controls for local values.");
 
         panel.SetFilter("data", false);
@@ -1514,7 +1655,7 @@ internal static class CustomControlStateChecks
             && categoryHeaderBorders.Count(header => header.IsVisible) == 1,
             "Category filtering must show matching rows and recalculate category-header visibility.");
         Assert(panel.TryCreateEditorLines(out var filteredLines, out var filteredError)
-            && filteredLines.Count == 6,
+            && filteredLines.Count == 8,
             $"Filtering must not discard hidden local values: {filteredError}");
         panel.SetFilter("gauge highlight", false);
         Assert(panel.VisibleRowCount == 1
@@ -1527,13 +1668,13 @@ internal static class CustomControlStateChecks
             "An empty filter result must hide every orphaned category header.");
         panel.SetFilter(string.Empty, true);
         ratioToggle.IsChecked = false;
-        Assert(panel.VisibleRowCount == 5 && !ratioRow.IsVisible,
+        Assert(panel.VisibleRowCount == 7 && !ratioRow.IsVisible,
             "Local-only filtering must immediately hide a row whose local override is unchecked.");
         panel.SetFilter("reset", false);
         Assert(panel.VisibleRowCount == 1 && ratioRow.IsVisible,
             "Filtering by the pending source label must find a local value marked for reset.");
         panel.SetFilter(string.Empty, false);
-        Assert(panel.VisibleRowCount == 6 && ratioRow.IsVisible,
+        Assert(panel.VisibleRowCount == 8 && ratioRow.IsVisible,
             "Clearing the filter must restore all rows without changing their local-override state.");
 
         countEditor.Value = 2.5m;
@@ -1544,6 +1685,8 @@ internal static class CustomControlStateChecks
         stateEditor.SelectedItem = "Busy";
         accentEditor.Color = Avalonia.Media.Color.Parse("#803B82F6");
         noteEditor.Text = "Updated";
+        insetsEditor.SetValues(8, 10, 12, 14);
+        cornersEditor.SetValues(4, 5, 6, 7);
         var ratioSource = panel.GetLogicalDescendants()
             .OfType<TextBlock>()
             .Single(text => text.Classes.Contains("custom-property-source-label")
@@ -1565,6 +1708,8 @@ internal static class CustomControlStateChecks
             && updatedValues["Count"] == "3"
             && updatedValues["State"] == "Busy"
             && updatedValues["Accent"] == "#803b82f6"
+            && updatedValues["Insets"] == "8,10,12,14"
+            && updatedValues["Corners"] == "4,5,6,7"
             && updatedValues["Note"] == "Updated",
             "The structured editor must emit canonical lines only for checked local overrides.");
         Assert(editor.SetSelectedCustomProperties(updatedLines), editor.StatusText);
@@ -1574,7 +1719,11 @@ internal static class CustomControlStateChecks
             && updatedStates.Single(value => value.PropertyName == "Count") is
                 { Value: "3", Source: DesignerCustomPropertyValueSource.Local }
             && updatedStates.Single(value => value.PropertyName == "Accent") is
-                { Value: "#803b82f6", Source: DesignerCustomPropertyValueSource.Local },
+                { Value: "#803b82f6", Source: DesignerCustomPropertyValueSource.Local }
+            && updatedStates.Single(value => value.PropertyName == "Insets") is
+                { Value: "8,10,12,14", Source: DesignerCustomPropertyValueSource.Local }
+            && updatedStates.Single(value => value.PropertyName == "Corners") is
+                { Value: "4,5,6,7", Source: DesignerCustomPropertyValueSource.Local },
             "Applying structured values must update and unset all rows atomically.");
         editor.Undo();
         editor.SelectElement(editor.Canvas.Elements.Single());

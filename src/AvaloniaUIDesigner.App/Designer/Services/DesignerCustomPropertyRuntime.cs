@@ -75,7 +75,22 @@ public sealed record DesignerCustomPropertyValueState(
 
     public bool UsesColorEditor => Type == DesignerCustomPropertyType.Color;
 
-    public bool UsesTextEditor => !UsesChoiceEditor && !UsesNumericEditor && !UsesColorEditor;
+    public bool UsesFourValueEditor => Type is DesignerCustomPropertyType.Thickness
+            or DesignerCustomPropertyType.CornerRadius
+        && (Source is DesignerCustomPropertyValueSource.Binding
+                or DesignerCustomPropertyValueSource.Unset
+            || DesignerCustomPropertyRuntime.TryGetFourValueComponents(
+                Type,
+                Value,
+                out var values,
+                out _)
+            && values.All(value => value >= (double)decimal.MinValue
+                && value <= (double)decimal.MaxValue));
+
+    public bool UsesTextEditor => !UsesChoiceEditor
+        && !UsesNumericEditor
+        && !UsesColorEditor
+        && !UsesFourValueEditor;
 
     public decimal? NumericEditorValue
         => UsesNumericEditor
@@ -492,11 +507,81 @@ public static class DesignerCustomPropertyRuntime
                 normalizedValue = string.Empty;
                 error = $"value must be one of: {string.Join(", ", definition.Options ?? [])}.";
                 return false;
+            case DesignerCustomPropertyType.Thickness:
+            case DesignerCustomPropertyType.CornerRadius:
+                if (TryGetFourValueComponents(
+                        definition.Type,
+                        value,
+                        out var components,
+                        out error))
+                {
+                    normalizedValue = string.Join(",", components.Select(component =>
+                        component.ToString("G", CultureInfo.InvariantCulture)));
+                    return true;
+                }
+
+                normalizedValue = string.Empty;
+                return false;
             default:
                 normalizedValue = string.Empty;
                 error = "value uses an unsupported custom property type.";
                 return false;
         }
+    }
+
+    public static bool TryGetFourValueComponents(
+        DesignerCustomPropertyType type,
+        string rawValue,
+        out IReadOnlyList<double> components,
+        out string error)
+    {
+        if (type is not DesignerCustomPropertyType.Thickness
+            and not DesignerCustomPropertyType.CornerRadius)
+        {
+            components = [];
+            error = "value does not use a four-direction custom property type.";
+            return false;
+        }
+
+        var parts = rawValue.Split(',', StringSplitOptions.TrimEntries);
+        if (parts.Length is not 1 and not 2 and not 4
+            || parts.Any(part => !double.TryParse(
+                part,
+                NumberStyles.Float,
+                CultureInfo.InvariantCulture,
+                out _)))
+        {
+            components = [];
+            error = type == DesignerCustomPropertyType.Thickness
+                ? "value must use 1, 2, or 4 finite numbers for left, top, right, and bottom."
+                : "value must use 1, 2, or 4 non-negative finite numbers for top-left, top-right, bottom-right, and bottom-left.";
+            return false;
+        }
+
+        var values = parts
+            .Select(part => double.Parse(part, NumberStyles.Float, CultureInfo.InvariantCulture))
+            .ToArray();
+        if (values.Any(value => !double.IsFinite(value))
+            || type == DesignerCustomPropertyType.CornerRadius
+                && values.Any(value => value < 0))
+        {
+            components = [];
+            error = type == DesignerCustomPropertyType.Thickness
+                ? "value must use finite thickness numbers."
+                : "value must use finite corner radii that are not negative.";
+            return false;
+        }
+
+        components = values.Length switch
+        {
+            1 => [values[0], values[0], values[0], values[0]],
+            2 when type == DesignerCustomPropertyType.Thickness
+                => [values[0], values[1], values[0], values[1]],
+            2 => [values[0], values[0], values[1], values[1]],
+            _ => values,
+        };
+        error = string.Empty;
+        return true;
     }
 
     public static string SerializePropertyDefinitions(

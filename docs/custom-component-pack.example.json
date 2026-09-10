@@ -37,6 +37,18 @@
           "displayName": "Target value",
           "category": "Data",
           "minimum": 0
+        },
+        {
+          "name": "ContentPadding",
+          "type": "Thickness",
+          "displayName": "Content padding",
+          "category": "Layout"
+        },
+        {
+          "name": "CardCorners",
+          "type": "CornerRadius",
+          "displayName": "Card corners",
+          "category": "Appearance"
         }
       ],
       "defaultProperties": {
@@ -44,6 +56,8 @@
         "Value": "$42K",
         "Trend": "Up",
         "Target": "50000",
+        "ContentPadding": "16,12",
+        "CardCorners": "8",
         "Opacity": "0.85"
       }
     }

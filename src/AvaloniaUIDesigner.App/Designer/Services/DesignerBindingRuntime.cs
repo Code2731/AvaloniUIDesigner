@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.CompilerServices;
+using System.Text;
 using System.Text.Json;
 using Avalonia.Controls;
 
@@ -249,7 +250,7 @@ public static class DesignerBindingRuntime
             var fallback = parts.Length == 4 && parts[3].Length > 0 ? parts[3] : null;
             if (!IsValidFallback(fallback))
             {
-                error = $"Line {lineNumber}: Fallback cannot contain comma, braces, quotes, or a pipe.";
+                error = $"Line {lineNumber}: Fallback cannot contain braces, quotes, or a pipe.";
                 definitions = [];
                 return false;
             }
@@ -301,12 +302,8 @@ public static class DesignerBindingRuntime
             return false;
         }
 
-        var parts = value[prefix.Length..^1]
-            .Split(',')
-            .Select(part => part.Trim())
-            .Where(part => part.Length > 0)
-            .ToList();
-        if (parts.Count == 0)
+        var parts = SplitExpressionParts(value[prefix.Length..^1]);
+        if (parts is null || parts.Count == 0)
         {
             definition = EmptyDefinition();
             return false;
@@ -422,5 +419,59 @@ public static class DesignerBindingRuntime
 
     private static bool IsValidFallback(string? value)
         => string.IsNullOrWhiteSpace(value)
-            || value.IndexOfAny([',', '{', '}', '\'', '"', '|']) < 0;
+            || value.IndexOfAny(['{', '}', '\'', '"', '|']) < 0;
+
+    private static IReadOnlyList<string>? SplitExpressionParts(string value)
+    {
+        var parts = new List<string>();
+        var current = new StringBuilder();
+        char? quote = null;
+        foreach (var character in value)
+        {
+            if (quote.HasValue)
+            {
+                current.Append(character);
+                if (character == quote.Value)
+                {
+                    quote = null;
+                }
+
+                continue;
+            }
+
+            if (character is '\'' or '"')
+            {
+                quote = character;
+                current.Append(character);
+                continue;
+            }
+
+            if (character == ',')
+            {
+                var part = current.ToString().Trim();
+                if (part.Length > 0)
+                {
+                    parts.Add(part);
+                }
+
+                current.Clear();
+                continue;
+            }
+
+            current.Append(character);
+        }
+
+        if (quote.HasValue)
+        {
+            return null;
+        }
+
+        var finalPart = current.ToString().Trim();
+        if (finalPart.Length > 0)
+        {
+            parts.Add(finalPart);
+        }
+
+        return parts;
+    }
 }

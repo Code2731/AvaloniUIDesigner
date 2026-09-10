@@ -77,14 +77,16 @@ They also verify that removing only a binding reveals its preserved local value
 while unrelated bindings remain untouched. The actual Inspector row template
 must expose a Bind action beside the independent Reset action.
 Typed custom-property checks load a backward-compatible Component Pack with
-String, Boolean, Integer, Double, Color, and Enum definitions. They reject
-invalid Enum definitions and out-of-range defaults, normalize every default,
+String, Boolean, Integer, Double, Color, Enum, Thickness, and CornerRadius
+definitions. They reject invalid Enum definitions, out-of-range defaults, and
+negative corner radii; normalize every default and 1/2/4-value shorthand;
 enforce the same validation for inline and bulk local edits, style setters, and
-binding fallbacks, and preserve ranges/options through Draft re-import,
-Headless Preview, selected-pack export, and in-use pack removal. The actual
-Inspector template is built to verify that Boolean values use a choice editor,
-Integer and Double values use their declared ranges and increments in spin
-editors, and Color values expose their effective color as a swatch. Event-level
+binding fallbacks; parse quoted comma-containing fallbacks; and preserve all
+type metadata through Draft re-import, Headless Preview, selected-pack export,
+and in-use pack removal. The actual Inspector template is built to verify that
+Boolean values use a choice editor, Integer and Double values use their declared
+ranges and increments in spin editors, Color values expose their effective color
+as a swatch, and four-direction values expose a dedicated action. Event-level
 checks cover canonical numeric commits, fractional Integer rejection and
 restoration, Undo back to a style value, render-time no-op behavior, and the
 text-editor fallback for Double values outside the decimal editor range.
@@ -96,7 +98,7 @@ category headers, technical-name/type labels, and display-name, category, and
 description filtering with header recomputation.
 The structured bulk custom-property editor is exercised as a real Avalonia
 control tree. Checks cover category headers, Local toggles, String, choice,
-numeric, and alpha-color editors, per-property accessibility names, invalid
+numeric, alpha-color, and accessible four-direction editors, invalid
 Integer rejection, canonical result generation, multi-value apply and unset in
 one Undo action, metadata/category/source filtering, Local-only live filtering,
 result counts, category-header recomputation, hidden-value preservation,
