@@ -73,7 +73,6 @@ public sealed class PreviewWindow : Window
         var clearLog = new Button
         {
             Content = "Clear",
-            Focusable = false,
             HorizontalAlignment = HorizontalAlignment.Right,
         };
         clearLog.Click += (_, _) =>
@@ -96,7 +95,6 @@ public sealed class PreviewWindow : Window
         var resetPreview = new Button
         {
             Content = "Reset Preview",
-            Focusable = false,
             Margin = new Thickness(8, 4),
             HorizontalAlignment = HorizontalAlignment.Left,
         };
@@ -105,7 +103,6 @@ public sealed class PreviewWindow : Window
         {
             Content = "Live updates",
             IsChecked = true,
-            Focusable = false,
             VerticalAlignment = VerticalAlignment.Center,
         };
         var updateError = _updateError;

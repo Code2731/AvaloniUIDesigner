@@ -33,6 +33,11 @@ try
 
     Assert(Grid.GetRow(surface) != Grid.GetRow(log), "Log must occupy a separate row from the design surface.");
     Assert(Canvas().Children.Count == 2, "Preview chrome must not enter the document canvas.");
+    Assert(reset.Focus() && reset.IsFocused, "Reset must be reachable by keyboard focus.");
+    Assert(liveUpdates.Focus() && liveUpdates.IsFocused, "Live updates must be reachable by keyboard focus.");
+    var clearLogButton = ((DockPanel)log.Content!).Children.OfType<Button>().Single();
+    Assert(clearLogButton.Focus() && clearLogButton.IsFocused, "Clear log must be reachable by keyboard focus.");
+    Assert(Input().Focus() && Input().IsFocused, "Focus must be able to return to the form being tested.");
     var previousInput = Input();
     previousInput.Text = "User input";
     Choice().IsChecked = true;
