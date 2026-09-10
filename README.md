@@ -835,6 +835,7 @@ AXAML 소스 편집기의 `Validate`와 `Preview`는 현재 디자인과 Undo �
 - v2.98: Project build configuration session 저장·복원 추가
 - v2.99: Project build diagnostic filter·copy workflow 추가
 - v3.00: Design layout diagnostics 검사·필터·Canvas 선택 workflow 추가
+- v3.01: Content·TabControl·SplitView의 중복 자식 슬롯 진단 추가. `dotnet run --project tests/LayoutValidation`으로 슬롯 충돌과 정상 배치를 검증합니다.
 
 ## 컴포넌트 팩
 

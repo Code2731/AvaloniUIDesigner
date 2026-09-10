@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="../../src/AvaloniaUIDesigner.App/Designer/Core/DesignerCanvasDocument.cs" Link="DesignerCanvasDocument.cs" />
+    <Compile Include="../../src/AvaloniaUIDesigner.App/Designer/Services/DesignerLayoutValidator.cs" Link="DesignerLayoutValidator.cs" />
+  </ItemGroup>
+</Project>

@@ -57,6 +57,7 @@ public static class DesignerLayoutValidator
         }
 
         ValidateParentCycles(elements, elementsByName, diagnostics);
+        ValidateOccupiedSlots(elements, elementsByName, diagnostics);
 
         return diagnostics
             .OrderBy(diagnostic => diagnostic.Severity)
@@ -264,6 +265,50 @@ public static class DesignerLayoutValidator
                 }
 
                 current = parent;
+            }
+        }
+    }
+
+    private static void ValidateOccupiedSlots(
+        IReadOnlyList<DesignerElementSnapshot> elements,
+        IReadOnlyDictionary<string, DesignerElementSnapshot> elementsByName,
+        ICollection<DesignerLayoutDiagnostic> diagnostics)
+    {
+        foreach (var siblings in elements.Where(element => NormalizeName(element.ParentName) is not null)
+                     .GroupBy(element => NormalizeName(element.ParentName)!, StringComparer.OrdinalIgnoreCase))
+        {
+            if (!elementsByName.TryGetValue(siblings.Key, out var parent))
+            {
+                continue;
+            }
+
+            var layout = GetExpectedParentLayout(parent.TypeName);
+            if (layout is not (DesignerParentLayoutKind.Content
+                or DesignerParentLayoutKind.TabControl or DesignerParentLayoutKind.SplitView))
+            {
+                continue;
+            }
+
+            foreach (var slot in siblings.GroupBy(element => layout switch
+                     {
+                         DesignerParentLayoutKind.TabControl => $"Tab {element.TabIndex}",
+                         DesignerParentLayoutKind.SplitView => element.SplitViewSlot.ToString(),
+                         _ => "Content",
+                     }))
+            {
+                if (slot.Count() < 2)
+                {
+                    continue;
+                }
+
+                foreach (var child in slot)
+                {
+                    diagnostics.Add(new(
+                        DesignerLayoutDiagnosticSeverity.Error,
+                        "OCCUPIED_SLOT",
+                        child.DisplayName,
+                        $"Parent '{parent.DisplayName}' slot '{slot.Key}' has {slot.Count()} children; only one can be displayed."));
+                }
             }
         }
     }
