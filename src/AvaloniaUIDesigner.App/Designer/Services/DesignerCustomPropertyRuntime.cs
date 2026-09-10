@@ -51,7 +51,48 @@ public sealed record DesignerCustomPropertyValueState(
     public bool UsesChoiceEditor => Type is DesignerCustomPropertyType.Boolean
         or DesignerCustomPropertyType.Enum;
 
-    public bool UsesTextEditor => !UsesChoiceEditor;
+    public bool UsesNumericEditor => TryGetNumericEditorSettings(out _, out _, out _);
+
+    public bool UsesColorEditor => Type == DesignerCustomPropertyType.Color;
+
+    public bool UsesTextEditor => !UsesChoiceEditor && !UsesNumericEditor && !UsesColorEditor;
+
+    public decimal? NumericEditorValue
+        => UsesNumericEditor
+            && Source == DesignerCustomPropertyValueSource.Local
+            && decimal.TryParse(
+                Value,
+                NumberStyles.Float,
+                CultureInfo.InvariantCulture,
+                out var numericValue)
+                ? numericValue
+                : null;
+
+    public decimal NumericEditorMinimum
+        => TryGetNumericEditorSettings(out var minimum, out _, out _)
+            ? minimum
+            : decimal.MinValue;
+
+    public decimal NumericEditorMaximum
+        => TryGetNumericEditorSettings(out _, out var maximum, out _)
+            ? maximum
+            : decimal.MaxValue;
+
+    public decimal NumericEditorIncrement
+        => TryGetNumericEditorSettings(out _, out _, out var increment)
+            ? increment
+            : 1m;
+
+    public string NumericEditorFormatString => Type == DesignerCustomPropertyType.Integer
+        ? "0"
+        : "0.###############";
+
+    public bool HasColorPreview => Type == DesignerCustomPropertyType.Color
+        && Color.TryParse(Value, out _);
+
+    public IBrush ColorPreviewBrush => Color.TryParse(Value, out var color)
+        ? new SolidColorBrush(color)
+        : Brushes.Transparent;
 
     public IReadOnlyList<string> EditorChoices => Type switch
     {
@@ -72,6 +113,80 @@ public sealed record DesignerCustomPropertyValueState(
         : "Bind";
 
     public string SourceLabel => Source.ToString().ToUpperInvariant();
+
+    private bool TryGetNumericEditorSettings(
+        out decimal minimum,
+        out decimal maximum,
+        out decimal increment)
+    {
+        minimum = decimal.MinValue;
+        maximum = decimal.MaxValue;
+        increment = Type == DesignerCustomPropertyType.Integer ? 1m : 0.1m;
+        if (Type is not DesignerCustomPropertyType.Integer
+            and not DesignerCustomPropertyType.Double)
+        {
+            return false;
+        }
+
+        if (Definition?.Minimum is { } declaredMinimum)
+        {
+            if (!TryConvertNumericBoundary(declaredMinimum, isMinimum: true, out minimum))
+            {
+                return false;
+            }
+        }
+
+        if (Definition?.Maximum is { } declaredMaximum)
+        {
+            if (!TryConvertNumericBoundary(declaredMaximum, isMinimum: false, out maximum))
+            {
+                return false;
+            }
+        }
+
+        if (minimum > maximum)
+        {
+            return false;
+        }
+
+        return Source != DesignerCustomPropertyValueSource.Local
+            || decimal.TryParse(
+                Value,
+                NumberStyles.Float,
+                CultureInfo.InvariantCulture,
+                out var localValue)
+            && localValue >= minimum
+            && localValue <= maximum;
+    }
+
+    private static bool TryConvertNumericBoundary(
+        double value,
+        bool isMinimum,
+        out decimal boundary)
+    {
+        try
+        {
+            boundary = (decimal)value;
+            return true;
+        }
+        catch (OverflowException)
+        {
+            if (isMinimum && value < 0)
+            {
+                boundary = decimal.MinValue;
+                return true;
+            }
+
+            if (!isMinimum && value > 0)
+            {
+                boundary = decimal.MaxValue;
+                return true;
+            }
+
+            boundary = default;
+            return false;
+        }
+    }
 }
 
 public static class DesignerCustomPropertyRuntime

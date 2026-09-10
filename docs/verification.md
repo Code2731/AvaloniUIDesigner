@@ -82,8 +82,12 @@ invalid Enum definitions and out-of-range defaults, normalize every default,
 enforce the same validation for inline and bulk local edits, style setters, and
 binding fallbacks, and preserve ranges/options through Draft re-import,
 Headless Preview, selected-pack export, and in-use pack removal. The actual
-Inspector template is built to verify that Boolean values use a choice editor
-and that a selection event commits the canonical value.
+Inspector template is built to verify that Boolean values use a choice editor,
+Integer and Double values use their declared ranges and increments in spin
+editors, and Color values expose their effective color as a swatch. Event-level
+checks cover canonical numeric commits, fractional Integer rejection and
+restoration, Undo back to a style value, render-time no-op behavior, and the
+text-editor fallback for Double values outside the decimal editor range.
 
 Persistence checks cover initial UTF-8 saves, replacement backups, repeated
 backup rotation, invalid backup paths, temporary-file cleanup, and retry after

@@ -1010,9 +1010,40 @@ internal static class CustomControlStateChecks
         Assert(states.Single(state => state.PropertyName == "Count") is
             {
                 Type: DesignerCustomPropertyType.Integer,
-                UsesTextEditor: true,
-                EditorValue: "2",
-            }, "A numeric declaration must use the typed text editor state.");
+                UsesNumericEditor: true,
+                UsesTextEditor: false,
+                NumericEditorValue: 2,
+                NumericEditorMinimum: 0,
+                NumericEditorMaximum: 10,
+                NumericEditorIncrement: 1,
+            }, "An Integer declaration must expose its value and range to a spin editor.");
+        Assert(states.Single(state => state.PropertyName == "Ratio") is
+            {
+                Type: DesignerCustomPropertyType.Double,
+                UsesNumericEditor: true,
+                NumericEditorValue: 0.5m,
+                NumericEditorMinimum: 0,
+                NumericEditorMaximum: 1,
+                NumericEditorIncrement: 0.1m,
+            }, "A Double declaration must expose fractional spin-editor settings.");
+        Assert(states.Single(state => state.PropertyName == "Accent") is
+            {
+                Type: DesignerCustomPropertyType.Color,
+                UsesColorEditor: true,
+                UsesTextEditor: false,
+                HasColorPreview: true,
+            } colorState
+            && colorState.ColorPreviewBrush is Avalonia.Media.SolidColorBrush
+            {
+                Color: { A: 255, R: 59, G: 130, B: 246 },
+            }, "A Color declaration must expose a canonical preview brush and color editor.");
+        var extremeDoubleState = new DesignerCustomPropertyValueState(
+            "Huge",
+            "1E+100",
+            DesignerCustomPropertyValueSource.Local,
+            new DesignerCustomPropertyDefinition("Huge", DesignerCustomPropertyType.Double));
+        Assert(!extremeDoubleState.UsesNumericEditor && extremeDoubleState.UsesTextEditor,
+            "A valid Double outside decimal range must fall back to text editing without data loss.");
 
         var beforeInvalidEdit = editor.ExportDraftAxaml();
         Assert(!editor.SetSelectedCustomPropertyValue("Count", "11")
@@ -1158,6 +1189,7 @@ internal static class CustomControlStateChecks
             { Type: DesignerCustomPropertyType.Boolean, EditorChoiceValue: "False" },
             "An in-use placeholder must retain typed editor metadata after its pack is removed.");
 
+        var sourceBeforeInspectorRendering = editor.ExportDraftAxaml();
         var window = new MainWindow { DataContext = editor };
         window.Show();
         window.Measure(new Size(window.Width, window.Height));
@@ -1175,20 +1207,76 @@ internal static class CustomControlStateChecks
                 "Property Inspector filtering must include typed custom-property labels.");
             filter.Text = string.Empty;
             filter.RaiseEvent(new TextChangedEventArgs(TextBox.TextChangedEvent));
-            var activeState = items.ItemsSource?.Cast<DesignerCustomPropertyValueState>()
-                .Single(state => state.PropertyName == "IsActive")
-                ?? throw new Exception("Typed Boolean state was not shown in the Inspector.");
-            var row = items.ItemTemplate?.Build(activeState) as Grid
-                ?? throw new Exception("Typed custom-property Inspector row could not be built.");
-            row.DataContext = activeState;
-            var textEditor = row.GetVisualDescendants().OfType<TextBox>().Single();
-            var choiceEditor = row.GetVisualDescendants().OfType<ComboBox>().Single();
+            Assert(editor.ExportDraftAxaml() == sourceBeforeInspectorRendering,
+                "Rendering typed Inspector editors must not create a document edit.");
+            Grid BuildTypedRow(string propertyName)
+            {
+                var state = items.ItemsSource?.Cast<DesignerCustomPropertyValueState>()
+                    .Single(candidate => candidate.PropertyName == propertyName)
+                    ?? throw new Exception($"Typed {propertyName} state was not shown in the Inspector.");
+                var typedRow = items.ItemTemplate?.Build(state) as Grid
+                    ?? throw new Exception("Typed custom-property Inspector row could not be built.");
+                typedRow.DataContext = state;
+                return typedRow;
+            }
+
+            var activeRow = BuildTypedRow("IsActive");
+            var textEditor = activeRow.GetVisualDescendants().OfType<TextBox>().Single();
+            var choiceEditor = activeRow.GetVisualDescendants().OfType<ComboBox>().Single();
             Assert(!textEditor.IsVisible
                 && choiceEditor.IsVisible
-                && row.GetVisualDescendants().OfType<TextBlock>().Any(text =>
+                && activeRow.GetVisualDescendants().OfType<TextBlock>().Any(text =>
                     Equals(text.Text, "Boolean"))
                 && choiceEditor.ItemsSource?.Cast<string>().SequenceEqual(["False", "True"]) == true,
                 "The actual Inspector template must show the type and use a choice editor for Boolean properties.");
+
+            var countRow = BuildTypedRow("Count");
+            var countEditor = countRow.GetVisualDescendants().OfType<NumericUpDown>().Single();
+            Assert(countEditor.IsVisible
+                && !countRow.GetVisualDescendants().OfType<TextBox>().Single().IsVisible
+                && countEditor.Value is null
+                && countEditor.Minimum == 0
+                && countEditor.Maximum == 10
+                && countEditor.Increment == 1,
+                "The actual Inspector template must use the declared Integer range and show style values as a watermark.");
+            countEditor.Value = 6.5m;
+            Assert(editor.GetSelectedCustomPropertyValueStates().Single(state =>
+                    state.PropertyName == "Count") is
+                { Value: "4", Source: DesignerCustomPropertyValueSource.Style }
+                && countEditor.Value is null,
+                "An invalid fractional Integer spinner value must be rejected and restored without changing the document.");
+            countEditor.Value = 6;
+            Avalonia.Threading.Dispatcher.UIThread.RunJobs(Avalonia.Threading.DispatcherPriority.Background);
+            Assert(editor.GetSelectedCustomPropertyValueStates().Single(state =>
+                    state.PropertyName == "Count") is
+                { Value: "6", Source: DesignerCustomPropertyValueSource.Local },
+                "Changing an Integer spinner in the Inspector must commit a canonical local value.");
+            editor.Undo();
+            editor.SelectElement(editor.Canvas.Elements.Single());
+            Assert(editor.GetSelectedCustomPropertyValueStates().Single(state =>
+                    state.PropertyName == "Count") is
+                { Value: "4", Source: DesignerCustomPropertyValueSource.Style },
+                "Undoing an Integer spinner edit must reveal its previous style value.");
+
+            var ratioRow = BuildTypedRow("Ratio");
+            var ratioEditor = ratioRow.GetVisualDescendants().OfType<NumericUpDown>().Single();
+            Assert(ratioEditor.IsVisible
+                && ratioEditor.Value == 0.5m
+                && ratioEditor.Minimum == 0
+                && ratioEditor.Maximum == 1
+                && ratioEditor.Increment == 0.1m,
+                "The actual Inspector template must use fractional Double spinner settings.");
+
+            var accentRow = BuildTypedRow("Accent");
+            var colorEditor = accentRow.GetVisualDescendants().OfType<Button>().Single(button =>
+                Equals(button.Tag, "Accent") && button.Content is Grid);
+            var swatch = ((Grid)colorEditor.Content!).Children.OfType<Border>().Single();
+            Assert(colorEditor.IsVisible
+                && swatch.Background is Avalonia.Media.SolidColorBrush
+                {
+                    Color: { A: 255, R: 59, G: 130, B: 246 },
+                }, "The actual Inspector template must render the effective Color as an editable swatch.");
+
             choiceEditor.SelectedItem = "True";
             Avalonia.Threading.Dispatcher.UIThread.RunJobs(Avalonia.Threading.DispatcherPriority.Background);
             Assert(editor.GetSelectedCustomPropertyValueStates().Single(state =>

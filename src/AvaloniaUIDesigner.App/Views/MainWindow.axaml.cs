@@ -9056,6 +9056,175 @@ public partial class MainWindow : Window
         e.Handled = true;
     }
 
+    private void OnDeclaredCustomPropertyNumberChanged(
+        object? sender,
+        Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        if (_isApplyingDeclaredCustomPropertyEdit
+            || sender is not NumericUpDown
+            {
+                Tag: string propertyName,
+                Value: decimal numericValue,
+            } editor
+            || Vm is null)
+        {
+            return;
+        }
+
+        var state = GetDeclaredCustomPropertyState(propertyName);
+        var value = numericValue.ToString(CultureInfo.InvariantCulture);
+        if (state is null
+            || state.Source == DesignerCustomPropertyValueSource.Local
+            && DesignerCustomPropertyRuntime.TryNormalizeValue(
+                state.Definition,
+                value,
+                out var normalizedValue,
+                out _)
+            && string.Equals(state.EditorValue, normalizedValue, StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        _isApplyingDeclaredCustomPropertyEdit = true;
+        try
+        {
+            if (Vm.SetSelectedCustomPropertyValue(propertyName, value))
+            {
+                QueueDeclaredCustomPropertySummaryRefresh();
+            }
+            else
+            {
+                editor.Value = state.NumericEditorValue;
+            }
+        }
+        finally
+        {
+            _isApplyingDeclaredCustomPropertyEdit = false;
+        }
+    }
+
+    private void OnDeclaredCustomPropertyNumberKeyDown(object? sender, KeyEventArgs e)
+    {
+        if (e.Key != Key.Escape
+            || sender is not NumericUpDown { Tag: string propertyName } editor)
+        {
+            return;
+        }
+
+        var state = GetDeclaredCustomPropertyState(propertyName);
+        _isApplyingDeclaredCustomPropertyEdit = true;
+        try
+        {
+            editor.Value = state?.NumericEditorValue;
+        }
+        finally
+        {
+            _isApplyingDeclaredCustomPropertyEdit = false;
+        }
+
+        PropGrid.Focus();
+        Vm?.StatusText = state is null
+            ? "Custom property edit was canceled."
+            : $"Canceled editing {state.PropertyName}.";
+        e.Handled = true;
+    }
+
+    private async void OnDeclaredCustomPropertyColorClicked(
+        object? sender,
+        Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        if (_isApplyingDeclaredCustomPropertyEdit
+            || sender is not Button { Tag: string propertyName }
+            || GetDeclaredCustomPropertyState(propertyName) is not
+                { Type: DesignerCustomPropertyType.Color } state)
+        {
+            return;
+        }
+
+        await ShowDeclaredCustomPropertyColorDialogAsync(state);
+        QueueDeclaredCustomPropertySummaryRefresh();
+    }
+
+    private async Task ShowDeclaredCustomPropertyColorDialogAsync(
+        DesignerCustomPropertyValueState state)
+    {
+        if (Vm is null)
+        {
+            return;
+        }
+
+        var initialColor = Color.TryParse(state.Value, out var parsedColor)
+            ? parsedColor
+            : Colors.DodgerBlue;
+        var colorEditor = new ColorView
+        {
+            Color = initialColor,
+            IsAlphaEnabled = true,
+            IsAlphaVisible = true,
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+            VerticalAlignment = VerticalAlignment.Stretch,
+        };
+        var errorText = new TextBlock
+        {
+            Foreground = Brushes.IndianRed,
+            TextWrapping = TextWrapping.Wrap,
+        };
+        var dialog = new Window
+        {
+            Title = $"Choose {state.PropertyName}",
+            Width = 560,
+            Height = 620,
+            MinWidth = 480,
+            MinHeight = 520,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner,
+        };
+        var applyButton = new Button { Content = "Apply", MinWidth = 84 };
+        applyButton.Click += (_, _) =>
+        {
+            var color = colorEditor.Color;
+            var value = $"#{color.A:x2}{color.R:x2}{color.G:x2}{color.B:x2}";
+            if (!Vm.SetSelectedCustomPropertyValue(state.PropertyName, value))
+            {
+                errorText.Text = Vm.StatusText;
+                return;
+            }
+
+            dialog.Close();
+        };
+        WireEditorDialogShortcuts(dialog, applyButton);
+        var cancelButton = new Button { Content = "Cancel", MinWidth = 84 };
+        cancelButton.Click += (_, _) => dialog.Close();
+        var buttons = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            Spacing = 8,
+            HorizontalAlignment = HorizontalAlignment.Right,
+            Children = { cancelButton, applyButton },
+        };
+        var content = new Grid
+        {
+            Margin = new Thickness(16),
+            RowDefinitions = new RowDefinitions("Auto,*,Auto,Auto"),
+            RowSpacing = 12,
+            Children =
+            {
+                new TextBlock
+                {
+                    Text = $"Choose a local Color value for {state.PropertyName}. The current effective value is {state.DisplayValue}.",
+                    TextWrapping = TextWrapping.Wrap,
+                },
+                colorEditor,
+                errorText,
+                buttons,
+            },
+        };
+        Grid.SetRow(colorEditor, 1);
+        Grid.SetRow(errorText, 2);
+        Grid.SetRow(buttons, 3);
+        dialog.Content = content;
+        await dialog.ShowDialog(this);
+    }
+
     private void OnDeclaredCustomPropertyResetClicked(
         object? sender,
         Avalonia.Interactivity.RoutedEventArgs e)

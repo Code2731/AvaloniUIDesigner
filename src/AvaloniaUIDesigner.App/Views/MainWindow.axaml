@@ -2340,6 +2340,41 @@
                                                                   ToolTip.Tip="{Binding DisplayValue}"
                                                                   SelectionChanged="OnDeclaredCustomPropertyChoiceChanged"
                                                                   KeyDown="OnDeclaredCustomPropertyChoiceKeyDown"/>
+                                                        <NumericUpDown Minimum="{Binding NumericEditorMinimum}"
+                                                                       Maximum="{Binding NumericEditorMaximum}"
+                                                                       Increment="{Binding NumericEditorIncrement}"
+                                                                       FormatString="{Binding NumericEditorFormatString}"
+                                                                       Value="{Binding NumericEditorValue, Mode=OneTime}"
+                                                                       Watermark="{Binding EditorWatermark}"
+                                                                       Tag="{Binding PropertyName}"
+                                                                       IsVisible="{Binding UsesNumericEditor}"
+                                                                       MinHeight="24"
+                                                                       FontSize="10"
+                                                                       ToolTip.Tip="Use the spinner or type a local number. Escape cancels."
+                                                                       ValueChanged="OnDeclaredCustomPropertyNumberChanged"
+                                                                       KeyDown="OnDeclaredCustomPropertyNumberKeyDown"/>
+                                                        <Button Tag="{Binding PropertyName}"
+                                                                IsVisible="{Binding UsesColorEditor}"
+                                                                Padding="4,1"
+                                                                MinHeight="24"
+                                                                HorizontalContentAlignment="Stretch"
+                                                                ToolTip.Tip="Choose a local color"
+                                                                Click="OnDeclaredCustomPropertyColorClicked">
+                                                            <Grid ColumnDefinitions="20,*" ColumnSpacing="6">
+                                                                <Border Width="18"
+                                                                        Height="18"
+                                                                        Background="{Binding ColorPreviewBrush}"
+                                                                        BorderBrush="#64748B"
+                                                                        BorderThickness="1"
+                                                                        CornerRadius="3"
+                                                                        ToolTip.Tip="{Binding DisplayValue}"/>
+                                                                <TextBlock Grid.Column="1"
+                                                                           Text="{Binding DisplayValue}"
+                                                                           FontSize="10"
+                                                                           VerticalAlignment="Center"
+                                                                           TextTrimming="CharacterEllipsis"/>
+                                                            </Grid>
+                                                        </Button>
                                                     </Grid>
                                                     <Border Grid.Column="2"
                                                             Padding="4,1"
