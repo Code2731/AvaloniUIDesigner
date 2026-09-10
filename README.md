@@ -855,6 +855,7 @@ AXAML 소스 편집기의 `Validate`와 `Preview`는 현재 디자인과 Undo �
 - v3.16: 캔버스 경계에 막힌 키보드 이동과 0px·비정상 숫자 이동 요청이 좌표·Undo/Redo·문서 변경 이벤트를 건드리지 않고 정확한 상태를 안내합니다.
 - v3.17: Design-only 커스텀 컨트롤의 공통 이벤트 핸들러를 Draft AXAML과 Undo/Redo에 보존하고 Preview 상호작용 로그에 연결합니다.
 - v3.18: Design-only 커스텀 컨트롤의 공통 속성 바인딩을 Undo/Redo와 Draft AXAML에 보존하고 샘플 데이터를 Design Surface 및 Preview Reset에 다시 적용합니다.
+- v3.19: Design-only 커스텀 컨트롤의 선언 속성, 스타일 클래스, 명시적 색상 리소스 참조를 Undo/Redo, Draft AXAML, Preview Reset 전 구간에 보존합니다.
 
 ## 컴포넌트 팩
 

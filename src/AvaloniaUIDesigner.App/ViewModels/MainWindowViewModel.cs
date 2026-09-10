@@ -12030,6 +12030,17 @@ public partial class MainWindowViewModel : ViewModelBase
             DesignerInteractionRuntime.Capture(visual, customProperties);
             DesignerTransformRuntime.Capture(visual, customProperties);
             DesignerEffectRuntime.Capture(visual, customProperties);
+            foreach (var pair in DesignerResourceReferenceMetadata.GetReferences(visual))
+            {
+                customProperties[pair.Key] = DesignerResourceReferenceMetadata.FormatExpression(pair.Value);
+            }
+
+            var customClasses = CanvasViewModel.GetUserStyleClasses(visual);
+            if (customClasses.Count > 0)
+            {
+                customProperties["Classes"] = string.Join(" ", customClasses);
+            }
+
             var customBindings = DesignerBindingRuntime.ReadBindings(visual);
             if (customBindings.Count > 0)
             {
@@ -13099,7 +13110,7 @@ public partial class MainWindowViewModel : ViewModelBase
                     ReadDouble(child, "Canvas.Top", 0),
                     width,
                     height,
-                    ReadVisualProperties(child, warnings),
+                    ReadVisualProperties(child, typeName, warnings),
                     nextIsLocked,
                     parent?.DisplayName,
                     ReadInt(child, "Grid.Row", 0),
@@ -13726,10 +13737,15 @@ public partial class MainWindowViewModel : ViewModelBase
     private static bool IsIgnoredContainerTag(string tagName)
         => tagName is "Styles" or "Resources" || tagName.Contains('.', StringComparison.Ordinal);
 
-    private static IReadOnlyDictionary<string, string>? ReadVisualProperties(XElement element, ICollection<string> warnings)
+    private IReadOnlyDictionary<string, string>? ReadVisualProperties(
+        XElement element,
+        string typeName,
+        ICollection<string> warnings)
     {
         var map = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         var tagName = element.Name.LocalName;
+        var isDesignOnly = _componentCatalog.TryGet(typeName, out var componentDefinition)
+            && componentDefinition.IsDesignOnly;
         var bindings = new List<DesignerBindingDefinition>();
         var eventHandlers = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
 
@@ -14241,7 +14257,7 @@ public partial class MainWindowViewModel : ViewModelBase
                 continue;
             }
 
-            if (IsSupportedVisualProperty(tagName, name))
+            if (IsSupportedVisualProperty(tagName, name) || isDesignOnly)
             {
                 map[name] = attr.Value;
             }

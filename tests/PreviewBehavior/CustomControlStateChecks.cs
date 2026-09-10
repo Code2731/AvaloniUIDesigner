@@ -2,6 +2,7 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
 using AvaloniaUIDesigner.App.Designer.Services;
+using AvaloniaUIDesigner.App.Models;
 using AvaloniaUIDesigner.App.ViewModels;
 using AvaloniaUIDesigner.App.Views;
 
@@ -223,6 +224,87 @@ internal static class CustomControlStateChecks
             previewCanvas = (Canvas)previewViewport.Content!;
             Assert(Math.Abs(previewCanvas.Children.Single().Opacity - 0.42) < 0.001,
                 "Reset Preview must reapply the custom-control binding and sample data.");
+        }
+        finally
+        {
+            preview.Close();
+        }
+
+        editor.SelectElement(editor.Canvas.Elements.Single());
+        Assert(editor.SetColorResourcesFromText("GaugeAccent = #345678"), editor.StatusText);
+        Assert(editor.ApplyColorResource("GaugeAccent", "Background"), editor.StatusText);
+        Assert(DesignerResourceReferenceMetadata.TryGetReference(
+                editor.Canvas.Elements.Single().Visual, "Background", out var resourceKey)
+            && resourceKey == "GaugeAccent",
+            "Applying a color resource must attach it to a custom-control brush property.");
+        editor.Undo();
+        Assert(!DesignerResourceReferenceMetadata.TryGetReference(
+                editor.Canvas.Elements.Single().Visual, "Background", out _),
+            "Undo must remove a custom-control resource reference.");
+        editor.Redo();
+        Assert(DesignerResourceReferenceMetadata.TryGetReference(
+                editor.Canvas.Elements.Single().Visual, "Background", out resourceKey)
+            && resourceKey == "GaugeAccent",
+            "Redo must restore a custom-control resource reference.");
+        editor.SelectElement(editor.Canvas.Elements.Single());
+        Assert(editor.SetSelectedStyleClassesFromText("status-primary focus-ring"), editor.StatusText);
+        editor.Undo();
+        Assert(CanvasViewModel.GetUserStyleClasses(editor.Canvas.Elements.Single().Visual).Count == 0,
+            "Undo must remove custom-control style classes without losing its resource reference.");
+        Assert(DesignerResourceReferenceMetadata.TryGetReference(
+                editor.Canvas.Elements.Single().Visual, "Background", out resourceKey)
+            && resourceKey == "GaugeAccent",
+            "Undoing style classes must retain the preceding custom-control resource reference.");
+        editor.Redo();
+        Assert(CanvasViewModel.GetUserStyleClasses(editor.Canvas.Elements.Single().Visual)
+                .SequenceEqual(["status-primary", "focus-ring"]),
+            "Redo must restore custom-control style classes in editor order.");
+        source = editor.ExportDraftAxaml();
+        Assert(source.Contains("Classes=\"status-primary focus-ring\"")
+            && source.Contains("Background=\"{DynamicResource GaugeAccent}\""),
+            "Draft AXAML must include custom-control style classes and explicit resource references.");
+        Assert(source.Contains("Caption=\"Ready\""),
+            "Draft AXAML must include declared custom-control properties.");
+        Assert(!source.Contains("Background=\"#FFE0F2FE\""),
+            "Persisting an explicit resource must not reintroduce placeholder-only background values.");
+        source = source.Replace("Caption=\"Ready\"", "Caption=\"Attention\"", StringComparison.Ordinal);
+        Assert(editor.TryImportDraftAxaml(source, out importError, out _), importError);
+        imported = editor.Canvas.Elements.Single().Visual;
+        Assert(CanvasViewModel.GetUserStyleClasses(imported)
+                .SequenceEqual(["status-primary", "focus-ring"]),
+            "Custom-control style classes must survive Draft re-import.");
+        Assert(DesignerResourceReferenceMetadata.TryGetReference(
+                imported, "Background", out resourceKey)
+            && resourceKey == "GaugeAccent",
+            "A custom-control resource reference must survive Draft re-import.");
+        previewDocument = editor.CreatePreviewDocument();
+        Assert(previewDocument.Elements.Single().VisualProperties!["Caption"] == "Attention",
+            "An edited custom-control property must survive Draft re-import and snapshot capture.");
+        preview = new PreviewWindow(previewDocument);
+        try
+        {
+            var previewLayout = (Grid)preview.Content!;
+            var previewSurface = previewLayout.Children.OfType<Border>().Single();
+            var previewViewport = (ScrollViewer)previewSurface.Child!;
+            var previewCanvas = (Canvas)previewViewport.Content!;
+            var previewControl = previewCanvas.Children.Single();
+            var previewClasses = CanvasViewModel.GetUserStyleClasses(previewControl);
+            Assert(previewClasses.SequenceEqual(["status-primary", "focus-ring"]),
+                $"Preview must restore custom-control classes. Actual: {string.Join(", ", previewClasses)}");
+            Assert(previewControl is Border { Background: { } previewBrush }
+                && Avalonia.Media.Color.Parse(previewBrush.ToString()!) == Avalonia.Media.Color.Parse("#345678"),
+                $"Preview must resolve the custom-control color resource. Actual: "
+                + $"{(previewControl as Border)?.Background}");
+            preview.ResetPreview();
+            previewCanvas = (Canvas)previewViewport.Content!;
+            previewControl = previewCanvas.Children.Single();
+            var resetClasses = CanvasViewModel.GetUserStyleClasses(previewControl);
+            Assert(resetClasses.SequenceEqual(["status-primary", "focus-ring"]),
+                $"Reset Preview must restore custom-control classes. Actual: {string.Join(", ", resetClasses)}");
+            Assert(previewControl is Border { Background: { } resetBrush }
+                && Avalonia.Media.Color.Parse(resetBrush.ToString()!) == Avalonia.Media.Color.Parse("#345678"),
+                $"Reset Preview must resolve the custom-control color resource. Actual: "
+                + $"{(previewControl as Border)?.Background}");
         }
         finally
         {
