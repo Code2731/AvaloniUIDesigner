@@ -35,6 +35,26 @@ internal static class EditingHistoryChecks
             "A new edit after Undo must discard the old redo branch.");
         restored.Undo();
         Assert(Position(restored) == (40, 50), "Undo on the new branch must return to the original state.");
+        var groupSource = new AxamlDocumentSerializer().Serialize(new DesignerCanvasDocument(
+            [new("First", "Avalonia.Controls.Button", 10, 20, 80, 30),
+             new("Second", "Avalonia.Controls.Button", 100, 80, 80, 30),
+             new("Locked", "Avalonia.Controls.Button", 0, 0, 80, 30, IsLocked: true)]));
+        Assert(editor.TryImportDraftAxaml(groupSource, out error, out _), error);
+        editor.Canvas.Elements.Single(element => element.DisplayName == "Locked").IsLocked = true;
+        editor.SelectElements(editor.Canvas.Elements.ToList());
+        editor.MoveSelectedElement(-50, -50);
+        var moved = editor.CreatePreviewDocument().Elements;
+        Assert(moved.Single(element => element.DisplayName == "First") is { X: 0, Y: 0 }
+            && moved.Single(element => element.DisplayName == "Second") is { X: 90, Y: 60 }
+            && moved.Single(element => element.DisplayName == "Locked") is { X: 0, Y: 0 },
+            "Boundary movement must preserve group spacing and ignore locked controls: "
+            + string.Join("; ", moved.Select(element => $"{element.DisplayName}: {element.X},{element.Y}, locked={element.IsLocked}")));
+        editor.Undo();
+        Assert(editor.CreatePreviewDocument().Elements.Single(element => element.DisplayName == "First") is { X: 10, Y: 20 },
+            "Group movement must undo in a single step.");
+        editor.Redo();
+        Assert(editor.CreatePreviewDocument().Elements.Single(element => element.DisplayName == "Second") is { X: 90, Y: 60 },
+            "Group movement must redo without compressing the layout.");
         Console.WriteLine("Editing history checks passed.");
     }
 
