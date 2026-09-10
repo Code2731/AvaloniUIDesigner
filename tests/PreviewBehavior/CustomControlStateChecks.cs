@@ -391,6 +391,7 @@ internal static class CustomControlStateChecks
 
         RunCustomPropertyEditorChecks();
         RunCustomStyleChecks();
+        RunCustomDeclaredStyleChecks();
         Console.WriteLine("Custom control state checks passed.");
     }
 
@@ -634,6 +635,122 @@ internal static class CustomControlStateChecks
         {
             preview.Close();
         }
+    }
+
+    private static void RunCustomDeclaredStyleChecks()
+    {
+        var editor = new MainWindowViewModel();
+        Assert(editor.TryLoadComponentPack(ComponentPack, out var result), result);
+        var item = editor.Toolbox.FindItemByDisplayName("Status Gauge")
+            ?? throw new Exception("Loaded custom control was not added to Toolbox.");
+        editor.PlaceToolboxItem(item, 32, 48);
+        var unchangedSource = editor.ExportDraftAxaml();
+        Assert(!editor.SetDocumentStylesFromText("""
+            [StatusGauge.invalid]
+            Unknown = value
+            """) && editor.ExportDraftAxaml() == unchangedSource,
+            "The style editor must reject undeclared custom setters without changing the document.");
+        Assert(editor.SetDocumentStylesFromText("""
+            [StatusGauge.units]
+            Unit = percent
+
+            [StatusGauge.units:disabled]
+            Unit = unavailable
+            """), editor.StatusText);
+        Assert(editor.SetSelectedStyleClassesFromText("units"), editor.StatusText);
+        var custom = editor.Canvas.Elements.Single();
+        Assert(custom.Visual.Tag is DesignerCustomControlMetadata baseMetadata
+            && baseMetadata.StyleProperties.TryGetValue("Unit", out var baseUnit)
+            && baseUnit == "percent"
+            && !baseMetadata.DefaultProperties.ContainsKey("Unit"),
+            "A declared custom setter must be calculated separately from local values.");
+        Assert(editor.SetSelectedStylePreviewState("disabled"), editor.StatusText);
+        Assert(custom.Visual.Tag is DesignerCustomControlMetadata disabledMetadata
+            && disabledMetadata.StyleProperties.TryGetValue("Unit", out var disabledUnit)
+            && disabledUnit == "unavailable",
+            "A simulated pseudo-class must override the base custom setter.");
+        Assert(editor.SetSelectedStylePreviewState(null), editor.StatusText);
+        Assert(custom.Visual.Tag is DesignerCustomControlMetadata resetMetadata
+            && resetMetadata.StyleProperties.TryGetValue("Unit", out var resetUnit)
+            && resetUnit == "percent",
+            "Resetting style-state preview must restore the base custom setter.");
+
+        var source = editor.ExportDraftAxaml();
+        Assert(source.Contains("<Setter Property=\"Unit\" Value=\"percent\" />")
+            && source.Contains("<Setter Property=\"Unit\" Value=\"unavailable\" />")
+            && !source.Contains(" Unit=\"percent\"", StringComparison.Ordinal),
+            "Draft AXAML must retain custom setters without writing their calculated values locally.");
+        Assert(editor.TryImportDraftAxaml(source, out var importError, out _), importError);
+        custom = editor.Canvas.Elements.Single();
+        Assert(custom.Visual.Tag is DesignerCustomControlMetadata importedMetadata
+            && importedMetadata.StyleProperties.TryGetValue("Unit", out var importedUnit)
+            && importedUnit == "percent",
+            "Draft re-import must restore a calculated declared custom setter.");
+
+        var preview = new PreviewWindow(editor.CreatePreviewDocument());
+        try
+        {
+            var previewLayout = (Grid)preview.Content!;
+            var previewSurface = previewLayout.Children.OfType<Border>().Single();
+            var previewViewport = (ScrollViewer)previewSurface.Child!;
+            var previewCanvas = (Canvas)previewViewport.Content!;
+            var previewControl = previewCanvas.Children.Single();
+            Assert(previewControl.Tag is DesignerCustomControlMetadata previewMetadata
+                && previewMetadata.StyleProperties.TryGetValue("Unit", out var previewUnit)
+                && previewUnit == "percent",
+                "Preview must calculate a declared custom setter.");
+            previewControl.IsEnabled = false;
+            Assert(previewControl.Tag is DesignerCustomControlMetadata previewDisabledMetadata
+                && previewDisabledMetadata.StyleProperties.TryGetValue("Unit", out var previewDisabledUnit)
+                && previewDisabledUnit == "unavailable",
+                "Preview must recalculate a declared custom setter after a pseudo-class state change.");
+            preview.ResetPreview();
+            previewCanvas = (Canvas)previewViewport.Content!;
+            Assert(previewCanvas.Children.Single().Tag is DesignerCustomControlMetadata previewResetMetadata
+                && previewResetMetadata.StyleProperties.TryGetValue("Unit", out var previewResetUnit)
+                && previewResetUnit == "percent",
+                "Reset Preview must restore the base declared custom setter.");
+        }
+        finally
+        {
+            preview.Close();
+        }
+
+        editor.SelectElement(custom);
+        Assert(editor.SetSelectedCustomProperties(["Caption = Ready", "Unit = ms"]), editor.StatusText);
+        custom = editor.Canvas.Elements.Single();
+        Assert(custom.Visual.Tag is DesignerCustomControlMetadata localMetadata
+            && localMetadata.DefaultProperties["Unit"] == "ms"
+            && !localMetadata.StyleProperties.ContainsKey("Unit"),
+            "A local custom value must override and hide the calculated style value.");
+        Assert(editor.ExportDraftAxaml().Contains("Unit=\"ms\""),
+            "A local custom value must remain in Draft AXAML even when a style targets the same property.");
+        editor.Undo();
+        custom = editor.Canvas.Elements.Single();
+        Assert(custom.Visual.Tag is DesignerCustomControlMetadata styleUndoMetadata
+            && styleUndoMetadata.StyleProperties.TryGetValue("Unit", out var styleUndoUnit)
+            && styleUndoUnit == "percent",
+            "Undo must restore the calculated style value after removing a local override.");
+        editor.Redo();
+        custom = editor.Canvas.Elements.Single();
+        Assert(custom.Visual.Tag is DesignerCustomControlMetadata styleRedoMetadata
+            && styleRedoMetadata.DefaultProperties["Unit"] == "ms"
+            && !styleRedoMetadata.StyleProperties.ContainsKey("Unit"),
+            "Redo must restore the local custom override.");
+
+        editor.SelectElement(custom);
+        Assert(editor.SetSelectedCustomProperties(["Caption = Ready"]), editor.StatusText);
+        Assert(editor.Canvas.Elements.Single().Visual.Tag is DesignerCustomControlMetadata clearedMetadata
+            && clearedMetadata.StyleProperties["Unit"] == "percent",
+            "Removing a local custom value must immediately reveal its style value.");
+        Assert(editor.SetSelectedBindings(["Unit | Preview.Unit | OneWay | percent"]), editor.StatusText);
+        Assert(editor.Canvas.Elements.Single().Visual.Tag is DesignerCustomControlMetadata boundMetadata
+            && !boundMetadata.StyleProperties.ContainsKey("Unit"),
+            "A custom binding must take precedence over a declared custom setter.");
+        source = editor.ExportDraftAxaml();
+        Assert(source.Contains("Unit=\"{ReflectionBinding Preview.Unit")
+            && source.Contains("<Setter Property=\"Unit\" Value=\"percent\" />"),
+            "Draft AXAML must retain both a custom binding and the lower-precedence custom style.");
     }
 
     private static void Assert(bool condition, string message)

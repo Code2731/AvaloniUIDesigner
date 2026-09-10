@@ -78,6 +78,9 @@ public static class DesignerStyleRuntime
         IReadOnlyDictionary<string, string>? colorResources,
         IEnumerable<string>? simulatedPseudoClasses = null)
     {
+        Dictionary<string, string>? customStyleProperties = control.Tag is DesignerCustomControlMetadata
+            ? new Dictionary<string, string>(StringComparer.Ordinal)
+            : null;
         DesignerStyleApplicationMetadata.BeginProgrammaticUpdate(control);
         try
         {
@@ -107,11 +110,22 @@ public static class DesignerStyleRuntime
                     {
                         DesignerStyleApplicationMetadata.MarkApplied(control, setter.Key);
                     }
+                    else if (customStyleProperties is not null
+                        && CanApplyCustomStyleValue(control, setter.Key))
+                    {
+                        customStyleProperties[setter.Key] = setter.Value;
+                    }
                 }
             }
         }
         finally
         {
+            if (customStyleProperties is not null
+                && control.Tag is DesignerCustomControlMetadata metadata)
+            {
+                control.Tag = metadata with { StyleProperties = customStyleProperties };
+            }
+
             DesignerStyleApplicationMetadata.EndProgrammaticUpdate(control);
         }
     }
@@ -172,6 +186,12 @@ public static class DesignerStyleRuntime
         => string.Equals(GetTargetType(control), style.TargetType, StringComparison.Ordinal)
             && control.Classes.Contains(style.ClassName)
             && (style.PseudoClass is null || activePseudoClasses.Contains(style.PseudoClass));
+
+    private static bool CanApplyCustomStyleValue(Control control, string propertyName)
+        => control.Tag is DesignerCustomControlMetadata metadata
+            && metadata.DeclaredProperties.Contains(propertyName, StringComparer.Ordinal)
+            && !metadata.DefaultProperties.ContainsKey(propertyName)
+            && !DesignerBindingRuntime.HasBinding(control, propertyName);
 
     private static IReadOnlySet<string> GetActivePseudoClasses(
         Control control,

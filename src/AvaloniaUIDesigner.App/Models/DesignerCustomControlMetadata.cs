@@ -6,4 +6,5 @@ public sealed record DesignerCustomControlMetadata(
     string TypeName,
     string PreviewText,
     IReadOnlyDictionary<string, string> DefaultProperties,
-    IReadOnlyList<string> DeclaredProperties);
+    IReadOnlyList<string> DeclaredProperties,
+    IReadOnlyDictionary<string, string> StyleProperties);

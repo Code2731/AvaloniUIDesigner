@@ -5044,6 +5044,7 @@ public partial class MainWindowViewModel : ViewModelBase
             definitions,
             additionalProperties);
         RefreshSampleDataPreview();
+        Canvas.RefreshDocumentStyles(target.Visual);
         CommitCanvasMutation();
         StatusText = definitions.Count == 0
             ? $"Cleared bindings from {target.DisplayName}."
@@ -5158,6 +5159,7 @@ public partial class MainWindowViewModel : ViewModelBase
         }
 
         RefreshSampleDataPreview();
+        Canvas.RefreshDocumentStyles(target.Visual);
         CommitCanvasMutation();
         StatusText = properties.Count == 0
             ? $"Cleared declared custom properties from {target.DisplayName}."
@@ -12195,7 +12197,8 @@ public partial class MainWindowViewModel : ViewModelBase
 
             foreach (var propertyName in GetStyleManagedPropertyNames(visual))
             {
-                if (!DesignerStyleRuntime.HasLocalValue(visual, propertyName))
+                if (!customMetadata.DefaultProperties.ContainsKey(propertyName)
+                    && !DesignerStyleRuntime.HasLocalValue(visual, propertyName))
                 {
                     customProperties.Remove(propertyName);
                 }
@@ -13430,7 +13433,11 @@ public partial class MainWindowViewModel : ViewModelBase
             {
                 var rawPropertyName = setterElement.Attribute("Property")?.Value.Trim() ?? string.Empty;
                 var rawValue = setterElement.Attribute("Value")?.Value.Trim() ?? string.Empty;
-                if (!TryGetCanonicalStylePropertyName(rawPropertyName, out var propertyName))
+                if (!TryResolveStylePropertyName(
+                        targetType,
+                        rawPropertyName,
+                        out var propertyName,
+                        out var isCustomProperty))
                 {
                     warnings.Add($"Ignored unsupported setter {selector}.{rawPropertyName}.");
                     continue;
@@ -13440,6 +13447,7 @@ public partial class MainWindowViewModel : ViewModelBase
                         targetType,
                         propertyName,
                         rawValue,
+                        isCustomProperty,
                         colorResources,
                         out var normalizedValue,
                         out var setterError))
@@ -16748,7 +16756,11 @@ public partial class MainWindowViewModel : ViewModelBase
 
             var rawPropertyName = line[..separator].Trim();
             var rawValue = line[(separator + 1)..].Trim();
-            if (!TryGetCanonicalStylePropertyName(rawPropertyName, out var propertyName))
+            if (!TryResolveStylePropertyName(
+                    currentTargetType,
+                    rawPropertyName,
+                    out var propertyName,
+                    out var isCustomProperty))
             {
                 styles = parsedStyles;
                 error = $"Style line {index + 1}: setter '{rawPropertyName}' is not supported.";
@@ -16759,6 +16771,7 @@ public partial class MainWindowViewModel : ViewModelBase
                     currentTargetType,
                     propertyName,
                     rawValue,
+                    isCustomProperty,
                     _colorResources,
                     out var normalizedValue,
                     out error))
@@ -16870,15 +16883,78 @@ public partial class MainWindowViewModel : ViewModelBase
         return propertyName.Length > 0;
     }
 
+    private bool TryResolveStylePropertyName(
+        string targetType,
+        string proposedName,
+        out string propertyName,
+        out bool isCustomProperty)
+    {
+        var hasCanonicalProperty = TryGetCanonicalStylePropertyName(proposedName, out propertyName);
+        if (hasCanonicalProperty && DesignerStyleRuntime.IsSupportedProperty(targetType, propertyName))
+        {
+            isCustomProperty = false;
+            return true;
+        }
+
+        var declaredProperty = _componentCatalog.GetAll()
+            .Where(definition => definition.IsDesignOnly
+                && string.Equals(
+                    GetStyleTargetType(definition.AvaloniaTypeName),
+                    targetType,
+                    StringComparison.Ordinal))
+            .SelectMany(definition =>
+                definition.DeclaredProperties
+                ?? definition.DefaultProperties?.Keys
+                ?? [])
+            .Concat(Canvas.Elements
+                .Where(element => string.Equals(
+                    GetStyleTargetType(element.TypeName),
+                    targetType,
+                    StringComparison.Ordinal))
+                .SelectMany(element => element.Visual.Tag is DesignerCustomControlMetadata metadata
+                    ? metadata.DeclaredProperties
+                    : []))
+            .FirstOrDefault(candidate => string.Equals(
+                candidate,
+                proposedName.Trim(),
+                StringComparison.OrdinalIgnoreCase));
+        if (declaredProperty is not null)
+        {
+            propertyName = declaredProperty;
+            isCustomProperty = true;
+            return true;
+        }
+
+        isCustomProperty = false;
+        return hasCanonicalProperty;
+    }
+
     private static bool TryNormalizeStyleSetter(
         string targetType,
         string propertyName,
         string rawValue,
+        bool isCustomProperty,
         IReadOnlyDictionary<string, string> colorResources,
         out string normalizedValue,
         out string error)
     {
         normalizedValue = string.Empty;
+        if (isCustomProperty)
+        {
+            try
+            {
+                System.Xml.XmlConvert.VerifyXmlChars(rawValue);
+                normalizedValue = rawValue;
+                error = string.Empty;
+                return true;
+            }
+            catch (System.Xml.XmlException)
+            {
+                error = $"{propertyName} contains an invalid XML character.";
+                return false;
+            }
+        }
+
         if (!DesignerStyleRuntime.IsSupportedProperty(targetType, propertyName))
         {
             error = $"{targetType}.{propertyName} is not supported by the designer style editor.";

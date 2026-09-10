@@ -30,7 +30,8 @@ public static class DesignerCustomControlRuntime
                 typeName,
                 previewText,
                 properties,
-                declarations),
+                declarations,
+                new Dictionary<string, string>(System.StringComparer.Ordinal)),
             Child = new StackPanel
             {
                 Spacing = 3,

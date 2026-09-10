@@ -39,6 +39,7 @@ Preview 동작 회귀 검증: `dotnet run --project tests/PreviewBehavior -p:Use
 - **Custom Control Style Preview**: 디자인 전용 플레이스홀더에서도 원래 Avalonia 타입을 기준으로 문서 스타일과 pseudo-class를 매칭하고, 스타일과 충돌하는 로컬 기본값을 정리해 Design Surface·Undo/Redo·Draft AXAML·Preview Reset에서 같은 결과를 유지
 - **Declared Custom Property Editor**: `Edit > Edit Declared Custom Properties...`와 요소 context menu에서 디자인 전용 컨트롤의 `Caption`, `Value` 같은 컴포넌트 팩 선언 속성을 `Property = Value` 형식으로 편집하고, 줄 삭제로 로컬 값을 해제하며 해당 속성의 바인딩만 선택적으로 대체
 - **Default-free Custom Properties**: 컴포넌트 팩의 선택적 `declaredProperties` 목록으로 초깃값 없는 외부 CLR 속성도 선언해 편집·바인딩하고, 선택 컨트롤을 다시 팩으로 내보내거나 팩을 제거한 뒤에도 선언을 보존
+- **Declared Custom Property Styles**: 문서 스타일에서 `declaredProperties` 속성을 setter로 사용하고 기본·pseudo-class 계산값을 로컬 값과 분리하며, 명시 값·바인딩 우선순위와 Draft/Preview/Undo/Redo를 일관되게 유지
 - **선택 영역 Toolbox 프리셋**: 여러 root 컨트롤을 상대 좌표·현재 속성과 함께 Toolbox에 등록하고 JSON 팩으로 저장·불러오기
 - **배치**: 클릭-투-플레이스와 드래그 앤 드롭으로 실제 Avalonia 컨트롤 생성
 - **캔버스 뷰포트**: 큰 아트보드와 확대 상태를 양축 자동 스크롤로 탐색하고, Desktop·Tablet·Mobile·사용자 지정 아트보드 크기와 회전, Zoom In/Out·Actual Size·Fit to View·Fit Selected to View·25~200% Zoom Presets와 스크롤 콘텐츠 크기를 동기화하며 `Ctrl+=`/`Ctrl+-`/`Ctrl+0`/`F`/`Ctrl+Shift+F` 단축키, `Ctrl+Alt+Arrow` 키보드 팬, 중간 마우스 드래그 팬, Ctrl+휠 포인터 중심 줌, 키보드·View 메뉴·Zoom Preset viewport 중심 줌, 아트보드 크기 변경 시 문서 중심 보존을 지원
@@ -863,6 +864,7 @@ AXAML 소스 편집기의 `Validate`와 `Preview`는 현재 디자인과 Undo �
 - v3.21: Design-only 커스텀 컨트롤의 원래 타입으로 문서 스타일과 pseudo-class를 매칭하고 로컬 기본값 충돌을 제거해 Design Surface, Undo/Redo, Draft 재가져오기, Preview 상태 전환과 Reset에서 동일한 스타일을 유지합니다.
 - v3.22: Design-only 커스텀 컨트롤의 선언 속성을 전용 대화상자에서 편집·해제하고 속성별 바인딩 대체, Undo/Redo, Draft 재가져오기와 Preview 보존을 지원하며 사용 중인 컴포넌트 팩 제거 뒤에도 선언 목록을 유지합니다.
 - v3.23: Component Pack의 `declaredProperties`로 초깃값 없는 커스텀 CLR 속성을 선언하고 편집·바인딩·선택 영역 팩 내보내기·재불러오기·팩 제거 후 이력 복원까지 보존합니다.
+- v3.24: 문서 스타일에서 선언형 커스텀 속성 setter를 지원하고 기본·pseudo-class 계산값, 로컬 값·바인딩 우선순위, Draft/Preview/Undo/Redo 보존을 추가합니다.
 
 ## 컴포넌트 팩
 
@@ -871,6 +873,8 @@ AXAML 소스 편집기의 `Validate`와 `Preview`는 현재 디자인과 Undo �
 외부 프로젝트의 커스텀 컨트롤은 `designOnly: true`를 사용해야 합니다. 디자이너는 실제 외부 assembly를 실행하지 않고 청색 플레이스홀더를 렌더링하며, 플레이스홀더에 표시할 문구는 `previewText`, 초깃값 없이 편집·바인딩할 CLR 속성 이름은 `declaredProperties`, 원래 컨트롤에 전달할 초기 AXAML 값은 `defaultProperties`, Toolbox 필터 이름은 `category`로 정의합니다. 단순한 기존 팩은 외부 전용 `defaultProperties` 이름을 선언으로 자동 추론합니다. 명시 선언은 점이나 공백이 없는 유효한 CLR 속성 이름이어야 합니다. `DesignOnly`가 없는 알 수 없는 타입은 팩 로드를 거부해 잘못된 AXAML 생성을 방지합니다. 예시는 [custom-component-pack.example.json](docs/custom-component-pack.example.json)을 참고하세요.
 
 디자인 전용 컨트롤을 선택한 뒤 `Edit > Edit Declared Custom Properties...`에서 `declaredProperties` 또는 외부 전용 `defaultProperties`로 선언된 속성을 편집할 수 있습니다. `Opacity`처럼 디자이너의 공통 편집기가 직접 지원하는 속성은 중복 표시하지 않으며, 목록에서 줄을 제거하면 해당 로컬 AXAML 값이 생략됩니다. 바인딩된 속성은 로컬 값 목록에서 숨겨지고 같은 속성에 값을 다시 입력하면 그 바인딩만 로컬 값으로 대체됩니다. 선언 이름은 현재 값과 별도로 스냅샷에 보존되어 사용 중인 컴포넌트 팩을 제거한 뒤에도 편집과 Undo/Redo를 이어갈 수 있습니다. 외부 assembly를 로드하지 않으므로 외부 전용 속성의 실제 시각 효과는 실행하지 않고 AXAML 및 Preview 메타데이터로 보존합니다.
+
+문서 스타일 편집기에서도 선언된 외부 속성을 `Unit = percent`처럼 사용할 수 있습니다. 디자인 전용 placeholder는 기본 스타일과 활성 pseudo-class의 계산값을 별도 메타데이터로 유지해 Draft AXAML에 로컬 값으로 잘못 출력하지 않으며, 같은 속성의 명시 값이나 바인딩이 있으면 이를 우선합니다. 실제 외부 assembly의 렌더링은 실행하지 않지만 Design Surface와 Headless Preview는 계산 상태를 동일하게 보존합니다.
 
 `File > Load Component Pack Plugin...`은 선택한 DLL에서 public parameterless `IComponentPackPlugin` 구현을 정확히 하나 찾아 `CreatePack()` 결과를 기존 Component Pack 검증기로 등록합니다. 플러그인 assembly는 로드 시 코드를 실행할 수 있으므로 신뢰할 수 있는 빌드만 불러와야 하며, 예제 구현은 [component-pack-plugin.example.cs](docs/component-pack-plugin.example.cs)을 참고하세요. 플러그인에서 제공하는 커스텀 타입은 `DesignOnly: true`와 `PreviewText`를 사용하면 외부 assembly의 실제 컨트롤을 디자이너 프로세스에서 실행하지 않고도 설계할 수 있습니다.
 

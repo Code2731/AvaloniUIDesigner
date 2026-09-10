@@ -53,6 +53,11 @@ Component Pack checks also cover explicit declarations without default values,
 invalid CLR property-name rejection, binding-to-local transitions, selected
 component export, and reloading the exported pack without turning unset
 declarations into default AXAML attributes.
+Declared custom-property style setters are verified for base and disabled
+pseudo-class calculation, undeclared-setter rejection, Draft re-import,
+Headless Preview and Reset, local-value and binding precedence, and Undo/Redo.
+Calculated values remain separate from local AXAML attributes while explicit
+local values survive style-aware history capture.
 
 Persistence checks cover initial UTF-8 saves, replacement backups, repeated
 backup rotation, invalid backup paths, temporary-file cleanup, and retry after
