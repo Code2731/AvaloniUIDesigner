@@ -43,7 +43,7 @@ Preview 동작 회귀 검증: `dotnet run --project tests/PreviewBehavior -p:Use
 - **Custom Property Value Sources**: Property Inspector에서 디자인 전용 속성의 현재 값과 `LOCAL`·`BINDING`·`STYLE`·`UNSET` 출처를 표시하고 검색·잠금 상태를 반영하며 전용 편집기로 바로 연결
 - **Inline Custom Property Editing**: Property Inspector에서 외부 CLR 속성을 직접 입력해 Enter·포커스 이동으로 적용하고 Escape로 취소하며, `Reset`으로 해당 로컬 값이나 바인딩만 제거해 하위 스타일 또는 unset 상태를 복원
 - **Per-property Custom Bindings**: 각 사용자 정의 속성 행의 `Bind`·`Edit`에서 Path·Mode·Fallback을 직접 편집하고, 바인딩만 제거해 보존된 로컬 값 또는 스타일 값을 다시 표시
-- **Typed Custom Properties**: Component Pack의 `propertyDefinitions`로 String·Boolean·Integer·Double·Color·Enum과 숫자 범위·Enum 옵션을 선언하고, Inspector 선택·스핀·색상 편집기와 로컬 값·스타일·fallback 공통 검증 및 정규화를 적용
+- **Typed Custom Properties**: Component Pack의 `propertyDefinitions`로 String·Boolean·Integer·Double·Color·Enum, 숫자 범위·Enum 옵션, 표시 이름·카테고리·설명을 선언하고 Inspector 카테고리 그룹·검색·선택·스핀·색상 편집기와 공통 검증을 적용
 - **선택 영역 Toolbox 프리셋**: 여러 root 컨트롤을 상대 좌표·현재 속성과 함께 Toolbox에 등록하고 JSON 팩으로 저장·불러오기
 - **배치**: 클릭-투-플레이스와 드래그 앤 드롭으로 실제 Avalonia 컨트롤 생성
 - **캔버스 뷰포트**: 큰 아트보드와 확대 상태를 양축 자동 스크롤로 탐색하고, Desktop·Tablet·Mobile·사용자 지정 아트보드 크기와 회전, Zoom In/Out·Actual Size·Fit to View·Fit Selected to View·25~200% Zoom Presets와 스크롤 콘텐츠 크기를 동기화하며 `Ctrl+=`/`Ctrl+-`/`Ctrl+0`/`F`/`Ctrl+Shift+F` 단축키, `Ctrl+Alt+Arrow` 키보드 팬, 중간 마우스 드래그 팬, Ctrl+휠 포인터 중심 줌, 키보드·View 메뉴·Zoom Preset viewport 중심 줌, 아트보드 크기 변경 시 문서 중심 보존을 지원
@@ -874,6 +874,7 @@ AXAML 소스 편집기의 `Validate`와 `Preview`는 현재 디자인과 Undo �
 - v3.27: Property Inspector의 커스텀 속성별 Bind·Edit 대화상자에서 Path·Mode·Fallback을 추가·수정하고, 다른 바인딩을 보존한 채 해당 바인딩만 제거해 하위 로컬·스타일 값을 복원합니다.
 - v3.28: Component Pack typed custom property 정의와 Boolean·Enum 선택형 Inspector, 숫자 범위·색상·Enum 검증, 로컬·스타일·binding fallback 정규화, Draft/Preview/팩 제거 후 메타데이터 보존을 추가합니다.
 - v3.29: Property Inspector의 Integer·Double에 범위 기반 스핀 편집기, Color에 유효 값 스와치와 전용 ColorView 선택 창을 추가하고 잘못된 숫자 복구·Undo/Redo를 보강합니다.
+- v3.30: Component Pack 사용자 정의 속성에 `displayName`·`category`·`description` 메타데이터를 추가하고 Property Inspector 카테고리 헤더·표시 이름 정렬·설명 툴팁·메타데이터 검색과 전체 보존 경로를 지원합니다.
 
 ## 컴포넌트 팩
 
@@ -881,13 +882,13 @@ AXAML 소스 편집기의 `Validate`와 `Preview`는 현재 디자인과 Undo �
 
 외부 프로젝트의 커스텀 컨트롤은 `designOnly: true`를 사용해야 합니다. 디자이너는 실제 외부 assembly를 실행하지 않고 청색 플레이스홀더를 렌더링하며, 플레이스홀더에 표시할 문구는 `previewText`, 초깃값 없이 편집·바인딩할 CLR 속성 이름은 `declaredProperties`, 원래 컨트롤에 전달할 초기 AXAML 값은 `defaultProperties`, Toolbox 필터 이름은 `category`로 정의합니다. 단순한 기존 팩은 외부 전용 `defaultProperties` 이름을 선언으로 자동 추론합니다. 명시 선언은 점이나 공백이 없는 유효한 CLR 속성 이름이어야 합니다. `DesignOnly`가 없는 알 수 없는 타입은 팩 로드를 거부해 잘못된 AXAML 생성을 방지합니다. 예시는 [custom-component-pack.example.json](docs/custom-component-pack.example.json)을 참고하세요.
 
-선택적 `propertyDefinitions`는 이름만 있는 `declaredProperties`를 타입 정보와 함께 확장하며, 정의된 이름은 별도 선언 없이도 자동으로 사용자 정의 속성에 포함됩니다. `type`은 `String`(생략 시 기본값), `Boolean`, `Integer`, `Double`, `Color`, `Enum`을 지원합니다. `Integer`와 `Double`은 `minimum`·`maximum`, `Enum`은 중복 없는 `options`를 사용할 수 있습니다. 팩 기본값, Inspector 인라인/일괄 값, 문서 스타일 setter, 바인딩 fallback은 같은 규칙으로 검증되고 Boolean·숫자·색상·Enum 대소문자는 안정적인 AXAML 값으로 정규화됩니다. 잘못된 정의나 기본값은 팩 전체를 등록하기 전에 거부하며, 잘못된 외부 AXAML 속성은 경고 후 해당 값만 제외합니다. 기존 `declaredProperties` 팩은 모두 `String` 정의로 호환됩니다.
+선택적 `propertyDefinitions`는 이름만 있는 `declaredProperties`를 타입과 Inspector 표시 정보로 확장하며, 정의된 이름은 별도 선언 없이도 자동으로 사용자 정의 속성에 포함됩니다. `type`은 `String`(생략 시 기본값), `Boolean`, `Integer`, `Double`, `Color`, `Enum`을 지원합니다. `Integer`와 `Double`은 `minimum`·`maximum`, `Enum`은 중복 없는 `options`를 사용할 수 있습니다. 선택적 `displayName`은 읽기 쉬운 표시 이름, `category`는 Inspector 그룹, `description`은 상세 툴팁을 지정합니다. 표시 이름과 카테고리는 한 줄이어야 하며 빈 메타데이터는 각각 CLR 속성명·`Custom` 그룹·빈 설명으로 호환됩니다. 팩 기본값, Inspector 인라인/일괄 값, 문서 스타일 setter, 바인딩 fallback은 같은 규칙으로 검증되고 Boolean·숫자·색상·Enum 대소문자는 안정적인 AXAML 값으로 정규화됩니다. 잘못된 정의나 기본값은 팩 전체를 등록하기 전에 거부하며, 잘못된 외부 AXAML 속성은 경고 후 해당 값만 제외합니다. 기존 `declaredProperties` 팩은 모두 `String` 정의로 호환됩니다.
 
 디자인 전용 컨트롤을 선택한 뒤 `Edit > Edit Declared Custom Properties...`에서 `declaredProperties` 또는 외부 전용 `defaultProperties`로 선언된 속성을 편집할 수 있습니다. `Opacity`처럼 디자이너의 공통 편집기가 직접 지원하는 속성은 중복 표시하지 않으며, 목록에서 줄을 제거하면 해당 로컬 AXAML 값이 생략됩니다. 바인딩된 속성은 로컬 값 목록에서 숨겨지고 같은 속성에 값을 다시 입력하면 그 바인딩만 로컬 값으로 대체됩니다. 선언 이름은 현재 값과 별도로 스냅샷에 보존되어 사용 중인 컴포넌트 팩을 제거한 뒤에도 편집과 Undo/Redo를 이어갈 수 있습니다. 외부 assembly를 로드하지 않으므로 외부 전용 속성의 실제 시각 효과는 실행하지 않고 AXAML 및 Preview 메타데이터로 보존합니다.
 
 문서 스타일 편집기에서도 선언된 외부 속성을 `Unit = percent`처럼 사용할 수 있습니다. 디자인 전용 placeholder는 기본 스타일과 활성 pseudo-class의 계산값을 별도 메타데이터로 유지해 Draft AXAML에 로컬 값으로 잘못 출력하지 않으며, 같은 속성의 명시 값이나 바인딩이 있으면 이를 우선합니다. 실제 외부 assembly의 렌더링은 실행하지 않지만 Design Surface와 Headless Preview는 계산 상태를 동일하게 보존합니다.
 
-디자인 전용 컨트롤을 선택하면 Property Inspector의 `Custom properties` 영역에서 각 외부 속성의 현재 표시값과 값 출처를 확인할 수 있습니다. `LOCAL`은 명시 AXAML 값, `BINDING`은 경로·모드·fallback, `STYLE`은 현재 클래스와 pseudo-class로 계산된 setter, `UNSET`은 아직 값이 없는 선언을 뜻합니다. Inspector 검색은 이 이름·값·출처에도 적용되고 `Edit...`은 기존 선언 속성 편집기로 연결되며, 잠긴 컨트롤에서는 편집만 비활성화하고 상태 확인은 유지합니다.
+디자인 전용 컨트롤을 선택하면 Property Inspector의 `Custom properties` 영역에서 외부 속성을 카테고리별로 확인할 수 있습니다. 명시 카테고리는 이름순, 속성은 표시 이름순으로 정렬되고 메타데이터가 없는 `Custom` 그룹은 마지막에 표시됩니다. 속성명 위에 표시 이름을 사용하고 원래 CLR 이름·타입과 설명은 보조 정보 및 툴팁으로 유지합니다. `LOCAL`은 명시 AXAML 값, `BINDING`은 경로·모드·fallback, `STYLE`은 현재 클래스와 pseudo-class로 계산된 setter, `UNSET`은 아직 값이 없는 선언을 뜻합니다. Inspector 검색은 CLR 이름·표시 이름·카테고리·설명·값·타입·출처에 적용되고 필터 결과의 첫 항목에 그룹 헤더를 다시 표시합니다. `Edit...`은 기존 선언 속성 편집기로 연결되며, 잠긴 컨트롤에서는 편집만 비활성화하고 상태 확인은 유지합니다.
 
 같은 Inspector 행의 입력칸에서 외부 속성을 바로 편집할 수 있습니다. `LOCAL` 값은 현재 입력값으로 보이고 `STYLE`·`BINDING`·`UNSET`은 원본을 덮어쓰지 않는 안내 문구로 표시됩니다. 새 값을 입력하면 해당 속성의 로컬 override가 되며 Enter 또는 포커스 이동으로 적용하고 Escape로 취소합니다. `Reset`은 해당 로컬 값 또는 바인딩만 제거해 스타일 계산값이나 unset 상태를 다시 표시하며, 다른 속성과 바인딩은 유지됩니다.
 

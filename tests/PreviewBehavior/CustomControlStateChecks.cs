@@ -40,11 +40,44 @@ internal static class CustomControlStateChecks
               "avaloniaTypeName": "Acme.Controls.TypedGauge",
               "designOnly": true,
               "propertyDefinitions": [
-                { "name": "IsActive", "type": "Boolean" },
-                { "name": "Count", "type": "Integer", "minimum": 0, "maximum": 10 },
-                { "name": "Ratio", "type": "Double", "minimum": 0, "maximum": 1 },
-                { "name": "Accent", "type": "Color" },
-                { "name": "State", "type": "Enum", "options": ["Idle", "Busy"] },
+                {
+                  "name": "IsActive",
+                  "type": "Boolean",
+                  "displayName": "Active",
+                  "category": "Behavior",
+                  "description": "Toggles the active visual state."
+                },
+                {
+                  "name": "Count",
+                  "type": "Integer",
+                  "displayName": " Item count ",
+                  "category": " Data ",
+                  "description": " Number of visible items. ",
+                  "minimum": 0,
+                  "maximum": 10
+                },
+                {
+                  "name": "Ratio",
+                  "type": "Double",
+                  "displayName": "Fill ratio",
+                  "category": "Data",
+                  "minimum": 0,
+                  "maximum": 1
+                },
+                {
+                  "name": "Accent",
+                  "type": "Color",
+                  "displayName": "Accent color",
+                  "category": "Appearance",
+                  "description": "Primary gauge highlight color."
+                },
+                {
+                  "name": "State",
+                  "type": "Enum",
+                  "displayName": "Operating mode",
+                  "category": "Behavior",
+                  "options": ["Idle", "Busy"]
+                },
                 { "name": "Note" }
               ],
               "defaultProperties": {
@@ -973,6 +1006,22 @@ internal static class CustomControlStateChecks
             """, out var invalidDefaultResult)
             && invalidDefaultResult.Contains("whole number", StringComparison.OrdinalIgnoreCase),
             "A typed default outside its declared range must reject the component pack.");
+        Assert(!invalidEditor.TryLoadComponentPack("""
+            {
+              "components": [
+                {
+                  "displayName": "Invalid Metadata",
+                  "avaloniaTypeName": "Acme.Controls.InvalidMetadata",
+                  "designOnly": true,
+                  "propertyDefinitions": [
+                    { "name": "Count", "category": "Data\nInput" }
+                  ]
+                }
+              ]
+            }
+            """, out var invalidMetadataResult)
+            && invalidMetadataResult.Contains("single line", StringComparison.OrdinalIgnoreCase),
+            "A custom-property category containing a line break must reject the component pack.");
 
         var editor = new MainWindowViewModel();
         Assert(editor.TryLoadComponentPack(TypedComponentPack, out var result), result);
@@ -987,13 +1036,31 @@ internal static class CustomControlStateChecks
             && metadata.DefaultProperties["Count"] == "2"
             && metadata.DefaultProperties["Ratio"] == "0.5"
             && metadata.DefaultProperties["Accent"] == "#ff3b82f6"
-            && metadata.DefaultProperties["State"] == "Idle",
-            "Loading a typed pack must normalize declarations and all typed defaults.");
+            && metadata.DefaultProperties["State"] == "Idle"
+            && metadata.PropertyDefinitions.Single(definition => definition.Name == "Count") is
+            {
+                DisplayName: "Item count",
+                Category: "Data",
+                Description: "Number of visible items.",
+            }, "Loading a typed pack must normalize declarations, defaults, and Inspector metadata.");
 
         var states = editor.GetSelectedCustomPropertyValueStates();
+        var orderedPropertyNames = states.Select(state => state.PropertyName).ToList();
+        var categoryHeaders = states.Where(state => state.ShowsCategoryHeader)
+            .Select(state => state.CategoryLabel)
+            .ToList();
+        Assert(orderedPropertyNames.SequenceEqual(
+                ["Accent", "IsActive", "State", "Ratio", "Count", "Note"])
+            && categoryHeaders.SequenceEqual(["Appearance", "Behavior", "Data", "Custom"]),
+            $"Typed custom properties must be grouped by explicit category with uncategorized values last. Got {string.Join(", ", states.Select(state => $"{state.PropertyName}:{state.CategoryLabel}:{state.ShowsCategoryHeader}"))}.");
         Assert(states.Single(state => state.PropertyName == "IsActive") is
             {
                 Type: DesignerCustomPropertyType.Boolean,
+                DisplayName: "Active",
+                CategoryLabel: "Behavior",
+                Description: "Toggles the active visual state.",
+                MetadataLabel: "IsActive | Boolean",
+                ShowsCategoryHeader: true,
                 UsesChoiceEditor: true,
                 EditorChoiceValue: "True",
             } booleanState
@@ -1002,6 +1069,9 @@ internal static class CustomControlStateChecks
         Assert(states.Single(state => state.PropertyName == "State") is
             {
                 Type: DesignerCustomPropertyType.Enum,
+                DisplayName: "Operating mode",
+                CategoryLabel: "Behavior",
+                ShowsCategoryHeader: false,
                 UsesChoiceEditor: true,
                 TypeLabel: "Enum",
             } enumState
@@ -1010,6 +1080,9 @@ internal static class CustomControlStateChecks
         Assert(states.Single(state => state.PropertyName == "Count") is
             {
                 Type: DesignerCustomPropertyType.Integer,
+                DisplayName: "Item count",
+                CategoryLabel: "Data",
+                ShowsCategoryHeader: false,
                 UsesNumericEditor: true,
                 UsesTextEditor: false,
                 NumericEditorValue: 2,
@@ -1020,6 +1093,9 @@ internal static class CustomControlStateChecks
         Assert(states.Single(state => state.PropertyName == "Ratio") is
             {
                 Type: DesignerCustomPropertyType.Double,
+                DisplayName: "Fill ratio",
+                CategoryLabel: "Data",
+                ShowsCategoryHeader: true,
                 UsesNumericEditor: true,
                 NumericEditorValue: 0.5m,
                 NumericEditorMinimum: 0,
@@ -1029,6 +1105,10 @@ internal static class CustomControlStateChecks
         Assert(states.Single(state => state.PropertyName == "Accent") is
             {
                 Type: DesignerCustomPropertyType.Color,
+                DisplayName: "Accent color",
+                CategoryLabel: "Appearance",
+                Description: "Primary gauge highlight color.",
+                ShowsCategoryHeader: true,
                 UsesColorEditor: true,
                 UsesTextEditor: false,
                 HasColorPreview: true,
@@ -1037,6 +1117,14 @@ internal static class CustomControlStateChecks
             {
                 Color: { A: 255, R: 59, G: 130, B: 246 },
             }, "A Color declaration must expose a canonical preview brush and color editor.");
+        Assert(states.Single(state => state.PropertyName == "Note") is
+            {
+                DisplayName: "Note",
+                CategoryLabel: "Custom",
+                Description: "",
+                MetadataLabel: "String",
+                ShowsCategoryHeader: true,
+            }, "A legacy declaration must retain its property name and use the final Custom category.");
         var extremeDoubleState = new DesignerCustomPropertyValueState(
             "Huge",
             "1E+100",
@@ -1146,7 +1234,10 @@ internal static class CustomControlStateChecks
                 Type: DesignerCustomPropertyType.Integer,
                 Minimum: 0,
                 Maximum: 10,
-            }, "Draft re-import with the component pack must restore typed property metadata.");
+                DisplayName: "Item count",
+                Category: "Data",
+                Description: "Number of visible items.",
+            }, "Draft re-import with the component pack must restore typed property and Inspector metadata.");
         var preview = new PreviewWindow(editor.CreatePreviewDocument());
         try
         {
@@ -1156,9 +1247,13 @@ internal static class CustomControlStateChecks
             var previewCanvas = (Canvas)previewViewport.Content!;
             Assert(previewCanvas.Children.Single().Tag is DesignerCustomControlMetadata previewMetadata
                 && previewMetadata.PropertyDefinitions?.Single(definition => definition.Name == "State") is
-                    { Type: DesignerCustomPropertyType.Enum } previewStateDefinition
+                    {
+                        Type: DesignerCustomPropertyType.Enum,
+                        DisplayName: "Operating mode",
+                        Category: "Behavior",
+                    } previewStateDefinition
                 && previewStateDefinition.Options?.SequenceEqual(["Idle", "Busy"]) == true,
-                "Headless Preview must retain typed custom-property definitions and Enum options.");
+                "Headless Preview must retain typed custom-property definitions and Inspector metadata.");
         }
         finally
         {
@@ -1178,16 +1273,28 @@ internal static class CustomControlStateChecks
         var exportedDefinitions = exportedPack?.Components.Single().PropertyDefinitions
             ?? throw new Exception("Typed definitions were not exported with the selected component.");
         Assert(exportedDefinitions.Single(definition => definition.Name == "Count") is
-            { Type: "Integer", Minimum: 0, Maximum: 10 }
+            {
+                Type: "Integer",
+                Minimum: 0,
+                Maximum: 10,
+                DisplayName: "Item count",
+                Category: "Data",
+                Description: "Number of visible items.",
+            }
             && exportedDefinitions.Single(definition => definition.Name == "State").Options?
                 .SequenceEqual(["Idle", "Busy"]) == true,
-            "Selected Component Pack export must retain typed ranges and Enum options.");
+            "Selected Component Pack export must retain typed ranges, Enum options, and Inspector metadata.");
 
         var sourceId = editor.ComponentPacks.Single().SourceId;
         Assert(editor.TryRemoveComponentPack(sourceId, out var removeResult), removeResult);
         Assert(editor.GetSelectedCustomPropertyValueStates().Single(state => state.PropertyName == "IsActive") is
-            { Type: DesignerCustomPropertyType.Boolean, EditorChoiceValue: "False" },
-            "An in-use placeholder must retain typed editor metadata after its pack is removed.");
+            {
+                Type: DesignerCustomPropertyType.Boolean,
+                DisplayName: "Active",
+                CategoryLabel: "Behavior",
+                Description: "Toggles the active visual state.",
+                EditorChoiceValue: "False",
+            }, "An in-use placeholder must retain typed Inspector metadata after its pack is removed.");
 
         var sourceBeforeInspectorRendering = editor.ExportDraftAxaml();
         var window = new MainWindow { DataContext = editor };
@@ -1205,6 +1312,24 @@ internal static class CustomControlStateChecks
             Assert(items.ItemsSource?.Cast<DesignerCustomPropertyValueState>().Single() is
                 { PropertyName: "IsActive", Type: DesignerCustomPropertyType.Boolean },
                 "Property Inspector filtering must include typed custom-property labels.");
+            filter.Text = "behavior";
+            filter.RaiseEvent(new TextChangedEventArgs(TextBox.TextChangedEvent));
+            var behaviorStates = items.ItemsSource?.Cast<DesignerCustomPropertyValueState>().ToList()
+                ?? [];
+            Assert(behaviorStates.Select(state => state.PropertyName).SequenceEqual(["IsActive", "State"])
+                && behaviorStates[0].ShowsCategoryHeader
+                && !behaviorStates[1].ShowsCategoryHeader,
+                "Property Inspector filtering must match categories and rebuild their visible header.");
+            filter.Text = "toggles";
+            filter.RaiseEvent(new TextChangedEventArgs(TextBox.TextChangedEvent));
+            Assert(items.ItemsSource?.Cast<DesignerCustomPropertyValueState>().Single() is
+                { PropertyName: "IsActive", ShowsCategoryHeader: true },
+                "Property Inspector filtering must match descriptions and keep a category header.");
+            filter.Text = "operating mode";
+            filter.RaiseEvent(new TextChangedEventArgs(TextBox.TextChangedEvent));
+            Assert(items.ItemsSource?.Cast<DesignerCustomPropertyValueState>().Single() is
+                { PropertyName: "State", ShowsCategoryHeader: true },
+                "Property Inspector filtering must match display names and promote a surviving row to category header.");
             filter.Text = string.Empty;
             filter.RaiseEvent(new TextChangedEventArgs(TextBox.TextChangedEvent));
             Assert(editor.ExportDraftAxaml() == sourceBeforeInspectorRendering,
@@ -1226,9 +1351,17 @@ internal static class CustomControlStateChecks
             Assert(!textEditor.IsVisible
                 && choiceEditor.IsVisible
                 && activeRow.GetVisualDescendants().OfType<TextBlock>().Any(text =>
-                    Equals(text.Text, "Boolean"))
+                    Equals(text.Text, "Active"))
+                && activeRow.GetVisualDescendants().OfType<TextBlock>().Any(text =>
+                    Equals(text.Text, "IsActive | Boolean"))
+                && activeRow.GetVisualDescendants().OfType<TextBlock>().Any(text =>
+                    Equals(text.Text, "Behavior"))
+                && activeRow.GetVisualDescendants().OfType<StackPanel>().Any(panel =>
+                    Equals(
+                        ToolTip.GetTip(panel),
+                        $"IsActive (Boolean){Environment.NewLine}Toggles the active visual state."))
                 && choiceEditor.ItemsSource?.Cast<string>().SequenceEqual(["False", "True"]) == true,
-                "The actual Inspector template must show the type and use a choice editor for Boolean properties.");
+                "The actual Inspector template must show category metadata and use a choice editor for Boolean properties.");
 
             var countRow = BuildTypedRow("Count");
             var countEditor = countRow.GetVisualDescendants().OfType<NumericUpDown>().Single();

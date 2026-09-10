@@ -1546,6 +1546,9 @@ public partial class MainWindowViewModel : ViewModelBase
                                 Options = definition.Options?.ToList(),
                                 Minimum = definition.Minimum,
                                 Maximum = definition.Maximum,
+                                DisplayName = definition.DisplayName,
+                                Category = definition.Category,
+                                Description = definition.Description,
                             })
                             .ToList()
                         : null,

@@ -24,12 +24,28 @@ public sealed class AcmeComponentPackPlugin : IComponentPackPlugin
                     DefaultHeight = 120,
                     PropertyDefinitions =
                     [
-                        new() { Name = "Header", Type = "String" },
-                        new() { Name = "Value", Type = "String" },
+                        new()
+                        {
+                            Name = "Header",
+                            Type = "String",
+                            DisplayName = "Card header",
+                            Category = "Content",
+                            Description = "Heading shown above the primary value.",
+                        },
+                        new()
+                        {
+                            Name = "Value",
+                            Type = "String",
+                            DisplayName = "Primary value",
+                            Category = "Content",
+                        },
                         new()
                         {
                             Name = "Trend",
                             Type = "Enum",
+                            DisplayName = "Trend direction",
+                            Category = "Data",
+                            Description = "Controls the trend indicator direction.",
                             Options = ["Up", "Flat", "Down"],
                         },
                     ],

@@ -88,6 +88,12 @@ editors, and Color values expose their effective color as a swatch. Event-level
 checks cover canonical numeric commits, fractional Integer rejection and
 restoration, Undo back to a style value, render-time no-op behavior, and the
 text-editor fallback for Double values outside the decimal editor range.
+Metadata checks reject multiline category labels and preserve display names,
+categories, and descriptions through Draft re-import, Headless Preview,
+selected-pack export, and in-use pack removal. Inspector-state and template
+checks cover category/display-name ordering, uncategorized fallback placement,
+category headers, technical-name/type labels, and display-name, category, and
+description filtering with header recomputation.
 
 Persistence checks cover initial UTF-8 saves, replacement backups, repeated
 backup rotation, invalid backup paths, temporary-file cleanup, and retry after

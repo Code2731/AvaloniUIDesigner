@@ -8937,12 +8937,16 @@ public partial class MainWindow : Window
         {
             states = states
                 .Where(state => state.PropertyName.Contains(_propertyInspectorFilterText, StringComparison.OrdinalIgnoreCase)
+                    || state.DisplayName.Contains(_propertyInspectorFilterText, StringComparison.OrdinalIgnoreCase)
+                    || state.CategoryLabel.Contains(_propertyInspectorFilterText, StringComparison.OrdinalIgnoreCase)
+                    || state.Description.Contains(_propertyInspectorFilterText, StringComparison.OrdinalIgnoreCase)
                     || state.DisplayValue.Contains(_propertyInspectorFilterText, StringComparison.OrdinalIgnoreCase)
                     || state.TypeLabel.Contains(_propertyInspectorFilterText, StringComparison.OrdinalIgnoreCase)
                     || state.SourceLabel.Contains(_propertyInspectorFilterText, StringComparison.OrdinalIgnoreCase))
                 .ToList();
         }
 
+        states = DesignerCustomPropertyRuntime.ApplyCategoryHeaders(states);
         DeclaredCustomPropertyItems.ItemsSource = states;
         DeclaredCustomPropertyPanel.IsVisible = states.Count > 0;
         var canEdit = _boundElement is { IsLocked: false };

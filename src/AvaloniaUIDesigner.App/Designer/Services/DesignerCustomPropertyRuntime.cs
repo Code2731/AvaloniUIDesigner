@@ -48,6 +48,26 @@ public sealed record DesignerCustomPropertyValueState(
 
     public string TypeLabel => Type.ToString();
 
+    public string DisplayName => string.IsNullOrWhiteSpace(Definition?.DisplayName)
+        ? PropertyName
+        : Definition.DisplayName;
+
+    public string CategoryLabel => string.IsNullOrWhiteSpace(Definition?.Category)
+        ? "Custom"
+        : Definition.Category;
+
+    public string Description => Definition?.Description ?? string.Empty;
+
+    public string MetadataLabel => string.Equals(DisplayName, PropertyName, StringComparison.Ordinal)
+        ? TypeLabel
+        : $"{PropertyName} | {TypeLabel}";
+
+    public string InspectorToolTip => Description.Length == 0
+        ? $"{PropertyName} ({TypeLabel})"
+        : $"{PropertyName} ({TypeLabel}){Environment.NewLine}{Description}";
+
+    public bool ShowsCategoryHeader { get; init; }
+
     public bool UsesChoiceEditor => Type is DesignerCustomPropertyType.Boolean
         or DesignerCustomPropertyType.Enum;
 
@@ -313,11 +333,74 @@ public static class DesignerCustomPropertyRuntime
             return false;
         }
 
+        if (!TryNormalizeDefinitionText(
+                definition.DisplayName,
+                "display name",
+                allowLineBreaks: false,
+                out var displayName,
+                out error)
+            || !TryNormalizeDefinitionText(
+                definition.Category,
+                "category",
+                allowLineBreaks: false,
+                out var category,
+                out error)
+            || !TryNormalizeDefinitionText(
+                definition.Description,
+                "description",
+                allowLineBreaks: true,
+                out var description,
+                out error))
+        {
+            normalized = new DesignerCustomPropertyDefinition(string.Empty);
+            error = $"Property '{definition.Name}' {error}";
+            return false;
+        }
+
         normalized = definition with
         {
             Name = normalizedName,
             Options = options,
+            DisplayName = displayName,
+            Category = category,
+            Description = description,
         };
+        error = string.Empty;
+        return true;
+    }
+
+    private static bool TryNormalizeDefinitionText(
+        string? value,
+        string fieldName,
+        bool allowLineBreaks,
+        out string? normalized,
+        out string error)
+    {
+        normalized = string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+        if (normalized is null)
+        {
+            error = string.Empty;
+            return true;
+        }
+
+        try
+        {
+            XmlConvert.VerifyXmlChars(normalized);
+        }
+        catch (XmlException)
+        {
+            normalized = null;
+            error = $"{fieldName} contains an invalid XML character.";
+            return false;
+        }
+
+        if (!allowLineBreaks && normalized.Any(char.IsControl))
+        {
+            normalized = null;
+            error = $"{fieldName} must use a single line.";
+            return false;
+        }
+
         error = string.Empty;
         return true;
     }
@@ -529,7 +612,7 @@ public static class DesignerCustomPropertyRuntime
             .ToDictionary(group => group.Key, group => group.Last(), StringComparer.Ordinal);
         var definitions = NormalizePropertyDefinitions(propertyDefinitions, editablePropertyNames)
             .ToDictionary(definition => definition.Name, StringComparer.OrdinalIgnoreCase);
-        return NormalizeDeclaredPropertyNames(editablePropertyNames)
+        var states = NormalizeDeclaredPropertyNames(editablePropertyNames)
             .Select(propertyName =>
             {
                 var definition = definitions[propertyName];
@@ -566,7 +649,33 @@ public static class DesignerCustomPropertyRuntime
                     DesignerCustomPropertyValueSource.Unset,
                     definition);
             })
+            .OrderBy(state => string.Equals(
+                state.CategoryLabel,
+                "Custom",
+                StringComparison.OrdinalIgnoreCase) ? 1 : 0)
+            .ThenBy(state => state.CategoryLabel, StringComparer.OrdinalIgnoreCase)
+            .ThenBy(state => state.DisplayName, StringComparer.OrdinalIgnoreCase)
+            .ThenBy(state => state.PropertyName, StringComparer.Ordinal)
             .ToList();
+        return ApplyCategoryHeaders(states);
+    }
+
+    public static IReadOnlyList<DesignerCustomPropertyValueState> ApplyCategoryHeaders(
+        IEnumerable<DesignerCustomPropertyValueState> states)
+    {
+        string? previousCategory = null;
+        var result = new List<DesignerCustomPropertyValueState>();
+        foreach (var state in states)
+        {
+            var showsCategoryHeader = !string.Equals(
+                state.CategoryLabel,
+                previousCategory,
+                StringComparison.OrdinalIgnoreCase);
+            result.Add(state with { ShowsCategoryHeader = showsCategoryHeader });
+            previousCategory = state.CategoryLabel;
+        }
+
+        return result;
     }
 
     public static bool TryParseEditorLines(

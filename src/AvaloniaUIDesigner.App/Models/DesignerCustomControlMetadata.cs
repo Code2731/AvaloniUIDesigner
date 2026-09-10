@@ -17,7 +17,14 @@ public sealed record DesignerCustomPropertyDefinition(
     DesignerCustomPropertyType Type = DesignerCustomPropertyType.String,
     IReadOnlyList<string>? Options = null,
     double? Minimum = null,
-    double? Maximum = null);
+    double? Maximum = null)
+{
+    public string? DisplayName { get; init; }
+
+    public string? Category { get; init; }
+
+    public string? Description { get; init; }
+}
 
 public sealed record DesignerCustomControlMetadata(
     string TypeName,

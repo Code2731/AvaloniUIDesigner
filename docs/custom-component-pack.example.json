@@ -10,16 +10,32 @@
       "defaultWidth": 320,
       "defaultHeight": 120,
       "propertyDefinitions": [
-        { "name": "Header", "type": "String" },
-        { "name": "Value", "type": "String" },
+        {
+          "name": "Header",
+          "type": "String",
+          "displayName": "Card header",
+          "category": "Content",
+          "description": "Heading shown above the primary value."
+        },
+        {
+          "name": "Value",
+          "type": "String",
+          "displayName": "Primary value",
+          "category": "Content"
+        },
         {
           "name": "Trend",
           "type": "Enum",
+          "displayName": "Trend direction",
+          "category": "Data",
+          "description": "Controls the trend indicator direction.",
           "options": ["Up", "Flat", "Down"]
         },
         {
           "name": "Target",
           "type": "Double",
+          "displayName": "Target value",
+          "category": "Data",
           "minimum": 0
         }
       ],

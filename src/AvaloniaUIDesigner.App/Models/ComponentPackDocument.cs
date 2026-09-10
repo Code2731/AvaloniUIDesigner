@@ -27,6 +27,9 @@ public sealed class ComponentPackPropertyDefinition
 {
     public string? Name { get; set; }
     public string? Type { get; set; }
+    public string? DisplayName { get; set; }
+    public string? Category { get; set; }
+    public string? Description { get; set; }
     public List<string>? Options { get; set; }
     public double? Minimum { get; set; }
     public double? Maximum { get; set; }

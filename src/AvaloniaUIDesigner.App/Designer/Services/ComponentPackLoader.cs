@@ -157,7 +157,12 @@ public sealed class ComponentPackLoader
                     propertyType,
                     propertyDefinition.Options,
                     propertyDefinition.Minimum,
-                    propertyDefinition.Maximum);
+                    propertyDefinition.Maximum)
+                {
+                    DisplayName = propertyDefinition.DisplayName,
+                    Category = propertyDefinition.Category,
+                    Description = propertyDefinition.Description,
+                };
                 if (!DesignerCustomPropertyRuntime.TryNormalizePropertyDefinition(
                         proposedDefinition,
                         out var normalizedDefinition,
