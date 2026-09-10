@@ -15,6 +15,7 @@ public sealed class ComponentPackComponent
     public string? NamePrefix { get; set; }
     public double? DefaultWidth { get; set; }
     public double? DefaultHeight { get; set; }
+    public List<string>? DeclaredProperties { get; set; }
     public Dictionary<string, string?>? DefaultProperties { get; set; }
     public bool DesignOnly { get; set; }
     public string? PreviewText { get; set; }

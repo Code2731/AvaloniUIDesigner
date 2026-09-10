@@ -9,6 +9,11 @@
       "previewText": "Analytics Card",
       "defaultWidth": 320,
       "defaultHeight": 120,
+      "declaredProperties": [
+        "Header",
+        "Value",
+        "Trend"
+      ],
       "defaultProperties": {
         "Header": "Revenue",
         "Value": "$42K",

@@ -1522,6 +1522,10 @@ public partial class MainWindowViewModel : ViewModelBase
                     NamePrefix = namePrefix,
                     DefaultWidth = target.Width,
                     DefaultHeight = target.Height,
+                    DeclaredProperties = targetDefinition.IsDesignOnly
+                        ? (target.Visual.Tag as DesignerCustomControlMetadata)?.DeclaredProperties.ToList()
+                            ?? targetDefinition.DeclaredProperties?.ToList()
+                        : null,
                     DefaultProperties = properties,
                     DesignOnly = targetDefinition.IsDesignOnly,
                     PreviewText = targetDefinition.PreviewText,
@@ -5165,11 +5169,11 @@ public partial class MainWindowViewModel : ViewModelBase
         DesignElement target,
         DesignerCustomControlMetadata metadata)
         => _componentCatalog.TryGet(target.TypeName, out var definition)
-            && definition.DefaultProperties is { } defaultProperties
-                ? defaultProperties.Keys
+            && definition.DeclaredProperties is { Count: > 0 } declaredProperties
+                ? declaredProperties
                 : metadata.DeclaredProperties.Count > 0
                     ? metadata.DeclaredProperties
-                    : metadata.DefaultProperties.Keys;
+                    : definition?.DefaultProperties?.Keys ?? metadata.DefaultProperties.Keys;
 
     public bool TryGetSelectedLayoutProperties(out LayoutEditorState state)
     {

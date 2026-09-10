@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text.Json;
+using System.Xml;
 using AvaloniaUIDesigner.App.Designer.Contracts;
 using AvaloniaUIDesigner.App.Designer.Core;
 using AvaloniaUIDesigner.App.Models;
@@ -90,9 +91,47 @@ public sealed class ComponentPackLoader
                 return false;
             }
 
-            var properties = component.DefaultProperties?
-                .Where(property => !string.IsNullOrWhiteSpace(property.Key))
-                .ToDictionary(property => property.Key, property => property.Value ?? string.Empty, StringComparer.Ordinal);
+            var properties = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var property in component.DefaultProperties ?? [])
+            {
+                var propertyName = property.Key.Trim();
+                if (propertyName.Length == 0)
+                {
+                    continue;
+                }
+
+                if (!properties.TryAdd(propertyName, property.Value ?? string.Empty))
+                {
+                    error = $"'{component.DisplayName}' duplicates default property '{propertyName}'.";
+                    return false;
+                }
+
+                try
+                {
+                    XmlConvert.VerifyXmlChars(properties[propertyName]);
+                }
+                catch (XmlException)
+                {
+                    error = $"'{component.DisplayName}' default property '{propertyName}' contains an invalid XML character.";
+                    return false;
+                }
+            }
+
+            var proposedDeclarations = (component.DeclaredProperties ?? [])
+                .Select(propertyName => propertyName?.Trim() ?? string.Empty)
+                .ToList();
+            var invalidDeclaration = proposedDeclarations.FirstOrDefault(propertyName =>
+                !DesignerCustomPropertyRuntime.IsValidDeclaredPropertyName(propertyName));
+            if (invalidDeclaration is not null)
+            {
+                error = $"'{component.DisplayName}' has an invalid declared property '{invalidDeclaration}'. Use a CLR property name without dots or spaces.";
+                return false;
+            }
+
+            var declaredProperties = DesignerCustomPropertyRuntime.NormalizeDeclaredPropertyNames(
+                proposedDeclarations.Concat(properties.Keys.Where(propertyName =>
+                    DesignerCustomPropertyRuntime.IsValidDeclaredPropertyName(propertyName)
+                    && !DesignerBindingRuntime.IsSupportedProperty("Border", propertyName))));
             var namePrefix = string.IsNullOrWhiteSpace(component.NamePrefix)
                 ? CreateNamePrefix(component.DisplayName)
                 : component.NamePrefix;
@@ -112,7 +151,8 @@ public sealed class ComponentPackLoader
                 ? () => DesignerCustomControlRuntime.CreatePlaceholder(
                     typeName,
                     previewText,
-                    properties ?? new Dictionary<string, string>(StringComparer.Ordinal))
+                    properties,
+                    declaredProperties)
                 : baseDefinition.VisualFactory;
 
             definitions.Add(new DesignerComponentDefinition(
@@ -126,7 +166,8 @@ public sealed class ComponentPackLoader
                 isDesignOnly,
                 previewText,
                 sourceId,
-                category));
+                category,
+                declaredProperties));
         }
 
         foreach (var definition in definitions)

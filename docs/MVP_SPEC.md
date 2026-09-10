@@ -30,7 +30,7 @@ Users should be able to place controls visually, inspect properties, and validat
 ## Data Model
 - DesignElement: runtime element on canvas (x/y/width/height + visual)
 - DesignerCanvasDocument: serializable snapshot model
-- DesignerComponentDefinition: metadata for toolbox and rendering defaults
+- DesignerComponentDefinition: metadata for toolbox, declared properties, and rendering defaults
 
 ## Non-Functional Requirements
 - Startup under 2 seconds on a typical dev machine

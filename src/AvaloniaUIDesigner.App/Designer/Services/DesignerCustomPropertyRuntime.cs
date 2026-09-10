@@ -12,12 +12,17 @@ public static class DesignerCustomPropertyRuntime
 {
     public const string DeclaredPropertiesMetadataKey = "__customPropertyNames";
 
+    public static bool IsValidDeclaredPropertyName(string propertyName)
+        => !string.IsNullOrWhiteSpace(propertyName)
+            && (char.IsLetter(propertyName[0]) || propertyName[0] == '_')
+            && propertyName.All(character => char.IsLetterOrDigit(character) || character == '_')
+            && !propertyName.StartsWith("__", StringComparison.Ordinal)
+            && !string.Equals(propertyName, "Classes", StringComparison.Ordinal);
+
     public static IReadOnlyList<string> NormalizeDeclaredPropertyNames(
         IEnumerable<string> declaredPropertyNames)
         => declaredPropertyNames
-            .Where(propertyName => !string.IsNullOrWhiteSpace(propertyName)
-                && !propertyName.StartsWith("__", StringComparison.Ordinal)
-                && !string.Equals(propertyName, "Classes", StringComparison.Ordinal))
+            .Where(IsValidDeclaredPropertyName)
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .OrderBy(propertyName => propertyName, StringComparer.Ordinal)
             .ToList();

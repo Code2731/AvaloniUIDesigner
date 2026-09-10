@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
@@ -19,6 +20,7 @@ internal static class CustomControlStateChecks
               "previewText": "Status Gauge",
               "defaultWidth": 220,
               "defaultHeight": 96,
+              "declaredProperties": ["Caption", "Opacity", "Unit"],
               "defaultProperties": {
                 "Caption": "Ready",
                 "Opacity": "0.85"
@@ -394,6 +396,22 @@ internal static class CustomControlStateChecks
 
     private static void RunCustomPropertyEditorChecks()
     {
+        var invalidEditor = new MainWindowViewModel();
+        Assert(!invalidEditor.TryLoadComponentPack("""
+            {
+              "components": [
+                {
+                  "displayName": "Invalid Gauge",
+                  "avaloniaTypeName": "Acme.Controls.InvalidGauge",
+                  "designOnly": true,
+                  "declaredProperties": ["Bad.Name"]
+                }
+              ]
+            }
+            """, out var invalidResult)
+            && invalidResult.Contains("invalid declared property", StringComparison.OrdinalIgnoreCase),
+            "A component pack must reject declared property names that cannot name CLR properties.");
+
         var editor = new MainWindowViewModel();
         Assert(editor.TryLoadComponentPack(ComponentPack, out var result), result);
         var item = editor.Toolbox.FindItemByDisplayName("Status Gauge")
@@ -401,9 +419,9 @@ internal static class CustomControlStateChecks
         editor.PlaceToolboxItem(item, 32, 48);
         Assert(editor.TryGetSelectedCustomProperties(out var state), editor.StatusText);
         Assert(state.TargetType == "Acme.Controls.StatusGauge"
-            && state.EditableProperties.SequenceEqual(["Caption"])
+            && state.EditableProperties.SequenceEqual(["Caption", "Unit"])
             && state.Lines.SequenceEqual(["Caption = Ready"]),
-            "The custom-property editor must expose declared external properties and leave common properties to their dedicated editors.");
+            "The custom-property editor must expose declarations without defaults and leave common properties to their dedicated editors.");
 
         var unchangedSource = editor.ExportDraftAxaml();
         Assert(!editor.SetSelectedCustomProperties(["Unknown = value"])
@@ -426,14 +444,14 @@ internal static class CustomControlStateChecks
         editor.SelectElement(editor.Canvas.Elements.Single());
         Assert(editor.SetSelectedBindings(
         [
-            "Caption | Preview.Caption | OneWay | Standby",
+            "Unit | Preview.Unit | OneWay | percent",
             "Opacity | Preview.Opacity | OneWay | 0.35",
         ]), editor.StatusText);
         Assert(editor.TryGetSelectedCustomProperties(out state)
-            && state.EditableProperties.SequenceEqual(["Caption"])
-            && state.Lines.Count == 0,
-            "A bound custom property must remain declared but must not appear as an effective local value.");
-        Assert(editor.SetSelectedCustomProperties(["Caption = Alert"]), editor.StatusText);
+            && state.EditableProperties.SequenceEqual(["Caption", "Unit"])
+            && state.Lines.SequenceEqual(["Caption = Attention"]),
+            "A bound declaration without a default must remain editable but must not appear as an effective local value.");
+        Assert(editor.SetSelectedCustomProperties(["Caption = Alert", "Unit = ms"]), editor.StatusText);
         var bindings = DesignerBindingRuntime.ReadBindings(editor.Canvas.Elements.Single().Visual);
         Assert(bindings is [{ PropertyName: "Opacity" }],
             "Setting a custom local value must replace only that property's binding.");
@@ -444,18 +462,21 @@ internal static class CustomControlStateChecks
         custom = editor.Canvas.Elements.Single();
         Assert(custom.Visual.Tag is DesignerCustomControlMetadata alertMetadata
             && alertMetadata.DefaultProperties["Caption"] == "Alert"
+            && alertMetadata.DefaultProperties["Unit"] == "ms"
             && DesignerBindingRuntime.ReadBindings(custom.Visual) is [{ PropertyName: "Opacity" }],
             "Redo must restore the local custom value while retaining unrelated bindings.");
 
         var source = editor.ExportDraftAxaml();
         Assert(source.Contains("Caption=\"Alert\"")
+            && source.Contains("Unit=\"ms\"")
             && source.Contains("Opacity=\"{ReflectionBinding Preview.Opacity")
-            && !source.Contains("Caption=\"{ReflectionBinding"),
-            "Draft AXAML must serialize the edited custom value and only the retained binding.");
+            && !source.Contains("Unit=\"{ReflectionBinding"),
+            "Draft AXAML must serialize default-free custom values and only the retained binding.");
         Assert(editor.TryImportDraftAxaml(source, out var importError, out _), importError);
         custom = editor.Canvas.Elements.Single();
         Assert(custom.Visual.Tag is DesignerCustomControlMetadata importedMetadata
-            && importedMetadata.DefaultProperties["Caption"] == "Alert",
+            && importedMetadata.DefaultProperties["Caption"] == "Alert"
+            && importedMetadata.DefaultProperties["Unit"] == "ms",
             "A declared custom-property edit must survive Draft re-import.");
         var preview = new PreviewWindow(editor.CreatePreviewDocument());
         try
@@ -466,8 +487,10 @@ internal static class CustomControlStateChecks
             var previewCanvas = (Canvas)previewViewport.Content!;
             Assert(previewCanvas.Children.Single().Tag is DesignerCustomControlMetadata previewMetadata
                 && previewMetadata.DefaultProperties["Caption"] == "Alert"
+                && previewMetadata.DefaultProperties["Unit"] == "ms"
                 && previewMetadata.DeclaredProperties.Contains("Caption")
-                && previewMetadata.DeclaredProperties.Contains("Opacity"),
+                && previewMetadata.DeclaredProperties.Contains("Opacity")
+                && previewMetadata.DeclaredProperties.Contains("Unit"),
                 "Preview must retain the edited declared custom-property value for the external control.");
         }
         finally
@@ -478,19 +501,49 @@ internal static class CustomControlStateChecks
         editor.SelectElement(editor.Canvas.Elements.Single());
         Assert(editor.SetSelectedCustomProperties([]), editor.StatusText);
         Assert(!editor.ExportDraftAxaml().Contains("Caption=\"", StringComparison.Ordinal)
+            && !editor.ExportDraftAxaml().Contains("Unit=\"", StringComparison.Ordinal)
             && DesignerBindingRuntime.ReadBindings(editor.Canvas.Elements.Single().Visual) is
                 [{ PropertyName: "Opacity" }],
             "Removing a custom-property line must omit its local AXAML value without removing unrelated bindings.");
+        Assert(editor.TryExportSelectedComponentPack(
+            "Exported controls",
+            "Exported Gauge",
+            "ExportedGauge",
+            out var exportedJson,
+            out var exportError), exportError);
+        var exportedPack = JsonSerializer.Deserialize<ComponentPackDocument>(
+            exportedJson,
+            new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+        var exportedComponent = exportedPack?.Components.Single()
+            ?? throw new Exception("The exported component pack could not be read.");
+        Assert(exportedComponent.DeclaredProperties is { } exportedDeclarations
+            && exportedDeclarations.Contains("Caption")
+            && exportedDeclarations.Contains("Unit")
+            && exportedComponent.DefaultProperties is { } exportedDefaults
+            && !exportedDefaults.ContainsKey("Caption")
+            && !exportedDefaults.ContainsKey("Unit"),
+            "Component Pack export must retain declarations whose local values are unset.");
+        var exportedEditor = new MainWindowViewModel();
+        Assert(exportedEditor.TryLoadComponentPack(exportedJson, out var exportedResult), exportedResult);
+        var exportedItem = exportedEditor.Toolbox.FindItemByDisplayName("Exported Gauge")
+            ?? throw new Exception("The exported custom control was not added to Toolbox.");
+        exportedEditor.PlaceToolboxItem(exportedItem, 20, 20);
+        Assert(exportedEditor.TryGetSelectedCustomProperties(out var exportedState)
+            && exportedState.EditableProperties.SequenceEqual(["Caption", "Unit"])
+            && exportedState.Lines.Count == 0,
+            "A reloaded Component Pack must expose declarations that have no default values.");
         var sourceId = editor.ComponentPacks.Single().SourceId;
         Assert(editor.TryRemoveComponentPack(sourceId, out var removeResult), removeResult);
         Assert(editor.TryGetSelectedCustomProperties(out state)
-            && state.EditableProperties.SequenceEqual(["Caption"])
+            && state.EditableProperties.SequenceEqual(["Caption", "Unit"])
             && state.Lines.Count == 0,
             "A removed component pack must not erase declarations retained by an in-use placeholder.");
         editor.Undo();
         Assert(editor.ExportDraftAxaml().Contains("Caption=\"Alert\"")
+            && editor.ExportDraftAxaml().Contains("Unit=\"ms\"")
             && editor.Canvas.Elements.Single().Visual.Tag is DesignerCustomControlMetadata restoredMetadata
-            && restoredMetadata.DeclaredProperties.Contains("Caption"),
+            && restoredMetadata.DeclaredProperties.Contains("Caption")
+            && restoredMetadata.DeclaredProperties.Contains("Unit"),
             "Undo must restore a removed declared custom-property value and its declaration after pack removal.");
     }
 
@@ -540,7 +593,8 @@ internal static class CustomControlStateChecks
         editor.SelectElement(custom);
         Assert(editor.TryGetSelectedBindings(out var bindingState)
             && bindingState.SupportedProperties.Contains("Caption")
-            && bindingState.SupportedProperties.Contains("Opacity"),
+            && bindingState.SupportedProperties.Contains("Opacity")
+            && bindingState.SupportedProperties.Contains("Unit"),
             "Declared binding properties must remain available after a style clears their local values.");
 
         var source = editor.ExportDraftAxaml();

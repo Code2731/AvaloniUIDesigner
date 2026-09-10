@@ -49,6 +49,10 @@ Headless Preview metadata preservation. Binding choices continue to come from
 the component declaration even when a style removes a local value, and an
 in-use placeholder retains those declarations after its component pack is
 removed and its history is rebuilt.
+Component Pack checks also cover explicit declarations without default values,
+invalid CLR property-name rejection, binding-to-local transitions, selected
+component export, and reloading the exported pack without turning unset
+declarations into default AXAML attributes.
 
 Persistence checks cover initial UTF-8 saves, replacement backups, repeated
 backup rotation, invalid backup paths, temporary-file cleanup, and retry after

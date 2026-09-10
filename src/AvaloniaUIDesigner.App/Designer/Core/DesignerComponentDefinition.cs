@@ -15,4 +15,5 @@ public sealed record DesignerComponentDefinition(
     bool IsDesignOnly = false,
     string? PreviewText = null,
     string? SourceId = null,
-    string? Category = null);
+    string? Category = null,
+    IReadOnlyList<string>? DeclaredProperties = null);
