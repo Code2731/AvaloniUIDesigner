@@ -499,6 +499,7 @@ public partial class MainWindow : Window
     private FileSystemWatcher? _projectWorkspaceWatcher;
     private bool _hasPendingPropertyEdit;
     private bool _hasPendingLayoutEdit;
+    private bool _isApplyingDeclaredCustomPropertyEdit;
     private bool _allowCloseWithoutPrompt;
     private string? _lastObservedDocumentPath;
     private string _propertyInspectorFilterText = string.Empty;
@@ -8943,8 +8944,119 @@ public partial class MainWindow : Window
 
         DeclaredCustomPropertyItems.ItemsSource = states;
         DeclaredCustomPropertyPanel.IsVisible = states.Count > 0;
-        DeclaredCustomPropertyEditButton.IsEnabled = _boundElement is { IsLocked: false };
+        var canEdit = _boundElement is { IsLocked: false };
+        DeclaredCustomPropertyItems.IsEnabled = canEdit;
+        DeclaredCustomPropertyEditButton.IsEnabled = canEdit;
     }
+
+    private void OnDeclaredCustomPropertyEditorLostFocus(
+        object? sender,
+        Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        if (sender is TextBox editor)
+        {
+            TryCommitDeclaredCustomProperty(editor);
+        }
+    }
+
+    private void OnDeclaredCustomPropertyEditorKeyDown(object? sender, KeyEventArgs e)
+    {
+        if (sender is not TextBox editor)
+        {
+            return;
+        }
+
+        if (e.Key == Key.Enter)
+        {
+            if (TryCommitDeclaredCustomProperty(editor))
+            {
+                PropGrid.Focus();
+            }
+
+            e.Handled = true;
+            return;
+        }
+
+        if (e.Key == Key.Escape)
+        {
+            var state = GetDeclaredCustomPropertyState(editor.Tag as string);
+            editor.Text = state?.EditorValue ?? string.Empty;
+            PropGrid.Focus();
+            Vm?.StatusText = state is null
+                ? "Custom property edit was canceled."
+                : $"Canceled editing {state.PropertyName}.";
+            e.Handled = true;
+        }
+    }
+
+    private void OnDeclaredCustomPropertyResetClicked(
+        object? sender,
+        Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        if (_isApplyingDeclaredCustomPropertyEdit
+            || sender is not Button { Tag: string propertyName }
+            || Vm is null)
+        {
+            return;
+        }
+
+        _isApplyingDeclaredCustomPropertyEdit = true;
+        try
+        {
+            if (Vm.ResetSelectedCustomPropertyValue(propertyName))
+            {
+                QueueDeclaredCustomPropertySummaryRefresh();
+            }
+        }
+        finally
+        {
+            _isApplyingDeclaredCustomPropertyEdit = false;
+        }
+    }
+
+    private bool TryCommitDeclaredCustomProperty(TextBox editor)
+    {
+        if (_isApplyingDeclaredCustomPropertyEdit
+            || editor.Tag is not string propertyName
+            || Vm is null)
+        {
+            return false;
+        }
+
+        var state = GetDeclaredCustomPropertyState(propertyName);
+        var value = editor.Text ?? string.Empty;
+        if (state is null || string.Equals(state.EditorValue, value, StringComparison.Ordinal))
+        {
+            return true;
+        }
+
+        _isApplyingDeclaredCustomPropertyEdit = true;
+        try
+        {
+            var applied = Vm.SetSelectedCustomPropertyValue(propertyName, value);
+            if (applied)
+            {
+                QueueDeclaredCustomPropertySummaryRefresh();
+            }
+
+            return applied;
+        }
+        finally
+        {
+            _isApplyingDeclaredCustomPropertyEdit = false;
+        }
+    }
+
+    private DesignerCustomPropertyValueState? GetDeclaredCustomPropertyState(string? propertyName)
+        => string.IsNullOrWhiteSpace(propertyName)
+            ? null
+            : Vm?.GetSelectedCustomPropertyValueStates().FirstOrDefault(state =>
+                string.Equals(state.PropertyName, propertyName, StringComparison.Ordinal));
+
+    private void QueueDeclaredCustomPropertySummaryRefresh()
+        => Dispatcher.UIThread.Post(
+            RefreshDeclaredCustomPropertySummary,
+            DispatcherPriority.Background);
 
     private void CapturePropertyInspectorState()
         => Vm?.SetPropertyInspectorState(
@@ -13296,7 +13408,11 @@ public partial class MainWindow : Window
 
         if (e.Property.Name == "Tag")
         {
-            RefreshDeclaredCustomPropertySummary();
+            if (!_isApplyingDeclaredCustomPropertyEdit)
+            {
+                RefreshDeclaredCustomPropertySummary();
+            }
+
             return;
         }
 
@@ -13654,6 +13770,7 @@ public partial class MainWindow : Window
         LayoutYEditor.IsEnabled = canEditLayout;
         LayoutWidthEditor.IsEnabled = canEditLayout;
         LayoutHeightEditor.IsEnabled = canEditLayout;
+        DeclaredCustomPropertyItems.IsEnabled = canEdit;
         DeclaredCustomPropertyEditButton.IsEnabled = canEdit;
 
         HandleNW.IsVisible = canResizeSelection;

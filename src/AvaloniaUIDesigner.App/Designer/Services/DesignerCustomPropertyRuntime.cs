@@ -25,6 +25,21 @@ public sealed record DesignerCustomPropertyValueState(
         ? "(unset)"
         : Value;
 
+    public string EditorValue => Source == DesignerCustomPropertyValueSource.Local
+        ? Value
+        : string.Empty;
+
+    public string EditorWatermark => Source switch
+    {
+        DesignerCustomPropertyValueSource.Binding => $"Binding: {Value}",
+        DesignerCustomPropertyValueSource.Style => $"Style: {Value}",
+        DesignerCustomPropertyValueSource.Unset => "Set local value",
+        _ => string.Empty,
+    };
+
+    public bool CanReset => Source is DesignerCustomPropertyValueSource.Local
+        or DesignerCustomPropertyValueSource.Binding;
+
     public string SourceLabel => Source.ToString().ToUpperInvariant();
 }
 

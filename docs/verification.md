@@ -64,6 +64,12 @@ cover source precedence, binding path/mode/fallback formatting, pseudo-class
 updates, and transitions back to an unset value. A Headless MainWindow check
 also verifies source filtering, no-match hiding, locked read-only visibility,
 unlocking, and immediate refresh after custom metadata changes.
+Inline custom-property checks build the actual Inspector row template and
+exercise its LostFocus commit and Reset button events. Command-level coverage
+includes case-insensitive property names, undeclared and invalid-XML rejection,
+same-value no-op history, Set/Undo/Redo, local and binding Reset, preservation
+of unrelated local values and bindings, and restoration of style or unset
+states.
 
 Persistence checks cover initial UTF-8 saves, replacement backups, repeated
 backup rotation, invalid backup paths, temporary-file cleanup, and retry after

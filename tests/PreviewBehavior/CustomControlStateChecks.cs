@@ -667,9 +667,20 @@ internal static class CustomControlStateChecks
             "A declared custom setter must be calculated separately from local values.");
         var propertyStates = editor.GetSelectedCustomPropertyValueStates();
         Assert(propertyStates.Single(state => state.PropertyName == "Caption") is
-                { Value: "Ready", Source: DesignerCustomPropertyValueSource.Local }
+                {
+                    Value: "Ready",
+                    EditorValue: "Ready",
+                    CanReset: true,
+                    Source: DesignerCustomPropertyValueSource.Local,
+                }
             && propertyStates.Single(state => state.PropertyName == "Unit") is
-                { Value: "percent", Source: DesignerCustomPropertyValueSource.Style },
+                {
+                    Value: "percent",
+                    EditorValue: "",
+                    EditorWatermark: "Style: percent",
+                    CanReset: false,
+                    Source: DesignerCustomPropertyValueSource.Style,
+                },
             "The custom-property summary must distinguish local and calculated style values.");
         Assert(editor.SetSelectedStylePreviewState("disabled"), editor.StatusText);
         Assert(custom.Visual.Tag is DesignerCustomControlMetadata disabledMetadata
@@ -727,7 +738,14 @@ internal static class CustomControlStateChecks
         }
 
         editor.SelectElement(custom);
-        Assert(editor.SetSelectedCustomProperties(["Caption = Ready", "Unit = ms"]), editor.StatusText);
+        var beforeInlineEditSource = editor.ExportDraftAxaml();
+        Assert(!editor.SetSelectedCustomPropertyValue("Unknown", "value")
+            && editor.ExportDraftAxaml() == beforeInlineEditSource,
+            "Inline editing must reject an undeclared custom property without changing the document.");
+        Assert(!editor.SetSelectedCustomPropertyValue("Unit", "invalid\u0001value")
+            && editor.ExportDraftAxaml() == beforeInlineEditSource,
+            "Inline editing must reject invalid XML characters without changing the document.");
+        Assert(editor.SetSelectedCustomPropertyValue("unit", "ms"), editor.StatusText);
         custom = editor.Canvas.Elements.Single();
         Assert(custom.Visual.Tag is DesignerCustomControlMetadata localMetadata
             && localMetadata.DefaultProperties["Unit"] == "ms"
@@ -738,6 +756,7 @@ internal static class CustomControlStateChecks
             "The custom-property summary must report a local override.");
         Assert(editor.ExportDraftAxaml().Contains("Unit=\"ms\""),
             "A local custom value must remain in Draft AXAML even when a style targets the same property.");
+        Assert(editor.SetSelectedCustomPropertyValue("Unit", "ms"), editor.StatusText);
         editor.Undo();
         custom = editor.Canvas.Elements.Single();
         Assert(custom.Visual.Tag is DesignerCustomControlMetadata styleUndoMetadata
@@ -752,27 +771,45 @@ internal static class CustomControlStateChecks
             "Redo must restore the local custom override.");
 
         editor.SelectElement(custom);
-        Assert(editor.SetSelectedCustomProperties(["Caption = Ready"]), editor.StatusText);
+        Assert(editor.ResetSelectedCustomPropertyValue("Unit"), editor.StatusText);
         Assert(editor.Canvas.Elements.Single().Visual.Tag is DesignerCustomControlMetadata clearedMetadata
-            && clearedMetadata.StyleProperties["Unit"] == "percent",
+            && clearedMetadata.StyleProperties["Unit"] == "percent"
+            && clearedMetadata.DefaultProperties["Caption"] == "Ready",
             "Removing a local custom value must immediately reveal its style value.");
-        Assert(editor.SetSelectedBindings(["Unit | Preview.Unit | OneWay | percent"]), editor.StatusText);
+        Assert(editor.SetSelectedBindings([
+            "Opacity | Preview.Opacity | OneWay | 0.35",
+            "Unit | Preview.Unit | OneWay | percent",
+        ]), editor.StatusText);
         Assert(editor.Canvas.Elements.Single().Visual.Tag is DesignerCustomControlMetadata boundMetadata
             && !boundMetadata.StyleProperties.ContainsKey("Unit"),
             "A custom binding must take precedence over a declared custom setter.");
         Assert(editor.GetSelectedCustomPropertyValueStates().Single(state => state.PropertyName == "Unit") is
             {
                 Value: "Preview.Unit | OneWay | fallback percent",
+                EditorValue: "",
+                EditorWatermark: "Binding: Preview.Unit | OneWay | fallback percent",
+                CanReset: true,
                 Source: DesignerCustomPropertyValueSource.Binding,
             }, "The custom-property summary must report the binding path, mode, and fallback.");
         source = editor.ExportDraftAxaml();
         Assert(source.Contains("Unit=\"{ReflectionBinding Preview.Unit")
             && source.Contains("<Setter Property=\"Unit\" Value=\"percent\" />"),
             "Draft AXAML must retain both a custom binding and the lower-precedence custom style.");
-        Assert(editor.SetSelectedBindings([]), editor.StatusText);
+        Assert(editor.ResetSelectedCustomPropertyValue("Unit"), editor.StatusText);
+        Assert(editor.GetSelectedCustomPropertyValueStates().Single(state => state.PropertyName == "Unit") is
+                { Value: "percent", Source: DesignerCustomPropertyValueSource.Style }
+            && DesignerBindingRuntime.ReadBindings(editor.Canvas.Elements.Single().Visual) is
+                [{ PropertyName: "Opacity" }],
+            "Resetting a custom binding must reveal the lower-precedence style value.");
         Assert(editor.SetDocumentStylesFromText(string.Empty), editor.StatusText);
         Assert(editor.GetSelectedCustomPropertyValueStates().Single(state => state.PropertyName == "Unit") is
-            { Source: DesignerCustomPropertyValueSource.Unset, DisplayValue: "(unset)" },
+            {
+                Source: DesignerCustomPropertyValueSource.Unset,
+                DisplayValue: "(unset)",
+                EditorValue: "",
+                EditorWatermark: "Set local value",
+                CanReset: false,
+            },
             "The custom-property summary must identify an unset declaration.");
     }
 
@@ -788,9 +825,12 @@ internal static class CustomControlStateChecks
             Unit = percent
             """), editor.StatusText);
         Assert(editor.SetSelectedStyleClassesFromText("units"), editor.StatusText);
+        Assert(editor.SetSelectedCustomPropertyValue("Unit", "ms"), editor.StatusText);
 
         var window = new MainWindow { DataContext = editor };
         window.Show();
+        window.Measure(new Size(window.Width, window.Height));
+        window.Arrange(new Rect(0, 0, window.Width, window.Height));
         try
         {
             var panel = window.FindControl<Border>("DeclaredCustomPropertyPanel")
@@ -803,11 +843,38 @@ internal static class CustomControlStateChecks
                 ?? throw new Exception("Custom-property Inspector edit button was not created.");
             IReadOnlyList<DesignerCustomPropertyValueState> VisibleStates()
                 => items.ItemsSource?.Cast<DesignerCustomPropertyValueState>().ToList() ?? [];
+            Grid BuildUnitRow()
+            {
+                var state = VisibleStates().Single(candidate => candidate.PropertyName == "Unit");
+                var row = items.ItemTemplate?.Build(state) as Grid
+                    ?? throw new Exception("Custom-property Inspector row template could not be built.");
+                row.DataContext = state;
+                return row;
+            }
 
             Assert(panel.IsVisible
                 && VisibleStates().Any(state => state is
-                    { PropertyName: "Unit", Value: "percent", Source: DesignerCustomPropertyValueSource.Style }),
-                "Property Inspector must show the calculated custom-property state.");
+                    { PropertyName: "Unit", Value: "ms", Source: DesignerCustomPropertyValueSource.Local }),
+                "Property Inspector must show the local custom-property state.");
+            var unitRow = BuildUnitRow();
+            var unitEditor = unitRow.Children.OfType<TextBox>().Single();
+            var resetButton = unitRow.Children.OfType<Button>().Single();
+            Assert(unitEditor.Text == "ms" && resetButton.IsVisible,
+                "A local custom property must render an editable value and visible Reset action.");
+            unitEditor.Text = "seconds";
+            unitEditor.RaiseEvent(new Avalonia.Interactivity.RoutedEventArgs(InputElement.LostFocusEvent));
+            Avalonia.Threading.Dispatcher.UIThread.RunJobs(Avalonia.Threading.DispatcherPriority.Background);
+            Assert(VisibleStates().Single(state => state.PropertyName == "Unit") is
+                { Value: "seconds", Source: DesignerCustomPropertyValueSource.Local },
+                "Leaving an inline custom-property editor must commit its local value.");
+            resetButton.RaiseEvent(new Avalonia.Interactivity.RoutedEventArgs(Button.ClickEvent));
+            Avalonia.Threading.Dispatcher.UIThread.RunJobs(Avalonia.Threading.DispatcherPriority.Background);
+            Assert(VisibleStates().Single(state => state.PropertyName == "Unit") is
+                {
+                    Value: "percent",
+                    EditorWatermark: "Style: percent",
+                    Source: DesignerCustomPropertyValueSource.Style,
+                }, "The inline Reset action must reveal the calculated style value.");
             filter.Text = "style";
             filter.RaiseEvent(new TextChangedEventArgs(TextBox.TextChangedEvent));
             Assert(panel.IsVisible && VisibleStates().All(state => state.SourceLabel == "STYLE"),
@@ -820,14 +887,11 @@ internal static class CustomControlStateChecks
             filter.RaiseEvent(new TextChangedEventArgs(TextBox.TextChangedEvent));
             var selected = editor.Canvas.Elements.Single();
             selected.IsLocked = true;
-            Assert(panel.IsVisible && !editButton.IsEnabled,
+            Assert(panel.IsVisible && !items.IsEnabled && !editButton.IsEnabled,
                 "A locked custom control must keep its summary visible while disabling custom-property editing.");
             selected.IsLocked = false;
-            Assert(editButton.IsEnabled, "Unlocking the custom control must re-enable its Inspector edit action.");
-            Assert(editor.SetSelectedCustomProperties(["Caption = Ready", "Unit = ms"]), editor.StatusText);
-            Assert(VisibleStates().Single(state => state.PropertyName == "Unit") is
-                { Value: "ms", Source: DesignerCustomPropertyValueSource.Local },
-                "Property Inspector must refresh when custom-control metadata changes.");
+            Assert(items.IsEnabled && editButton.IsEnabled,
+                "Unlocking the custom control must re-enable its Inspector edit actions.");
         }
         finally
         {

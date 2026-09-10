@@ -5126,6 +5126,122 @@ public partial class MainWindowViewModel : ViewModelBase
         return DesignerCustomPropertyRuntime.ReadValueStates(target.Visual, editableProperties);
     }
 
+    public bool SetSelectedCustomPropertyValue(string propertyName, string value)
+    {
+        if (!TryResolveSelectedCustomProperty(propertyName, out var target, out var state, out var canonicalName))
+        {
+            return false;
+        }
+
+        try
+        {
+            System.Xml.XmlConvert.VerifyXmlChars(value);
+        }
+        catch (System.Xml.XmlException)
+        {
+            StatusText = $"Custom property {canonicalName} contains an invalid XML character.";
+            return false;
+        }
+
+        var properties = DesignerCustomPropertyRuntime.ReadEditorValues(
+                target.Visual,
+                state.EditableProperties)
+            .ToDictionary(pair => pair.Key, pair => pair.Value, StringComparer.Ordinal);
+        var bindings = DesignerBindingRuntime.ReadBindings(target.Visual);
+        if (properties.TryGetValue(canonicalName, out var currentValue)
+            && string.Equals(currentValue, value, StringComparison.Ordinal)
+            && !bindings.Any(binding => binding.PropertyName == canonicalName))
+        {
+            StatusText = $"Custom property {canonicalName} is unchanged.";
+            return true;
+        }
+
+        properties[canonicalName] = value;
+        BeginCanvasMutation(HistoryActionType.EditProperty, $"Set custom property {canonicalName}.");
+        DesignerCustomPropertyRuntime.ReplaceValues(target.Visual, state.EditableProperties, properties);
+        var retainedBindings = bindings
+            .Where(binding => binding.PropertyName != canonicalName)
+            .ToList();
+        if (retainedBindings.Count != bindings.Count)
+        {
+            DesignerBindingRuntime.ReplaceBindings(
+                target.Visual,
+                retainedBindings,
+                GetCustomBindingProperties(target));
+        }
+
+        RefreshSampleDataPreview();
+        Canvas.RefreshDocumentStyles(target.Visual);
+        CommitCanvasMutation();
+        StatusText = $"Set {target.DisplayName}.{canonicalName}.";
+        return true;
+    }
+
+    public bool ResetSelectedCustomPropertyValue(string propertyName)
+    {
+        if (!TryResolveSelectedCustomProperty(propertyName, out var target, out var state, out var canonicalName))
+        {
+            return false;
+        }
+
+        var metadata = (DesignerCustomControlMetadata)target.Visual.Tag!;
+        var bindings = DesignerBindingRuntime.ReadBindings(target.Visual);
+        var hasBinding = bindings.Any(binding => binding.PropertyName == canonicalName);
+        if (!metadata.DefaultProperties.ContainsKey(canonicalName) && !hasBinding)
+        {
+            StatusText = $"Custom property {canonicalName} is already reset.";
+            return true;
+        }
+
+        var properties = DesignerCustomPropertyRuntime.ReadEditorValues(
+                target.Visual,
+                state.EditableProperties)
+            .Where(pair => pair.Key != canonicalName)
+            .ToDictionary(pair => pair.Key, pair => pair.Value, StringComparer.Ordinal);
+        BeginCanvasMutation(HistoryActionType.EditProperty, $"Reset custom property {canonicalName}.");
+        DesignerCustomPropertyRuntime.ReplaceValues(target.Visual, state.EditableProperties, properties);
+        if (hasBinding)
+        {
+            DesignerBindingRuntime.ReplaceBindings(
+                target.Visual,
+                bindings.Where(binding => binding.PropertyName != canonicalName).ToList(),
+                GetCustomBindingProperties(target));
+        }
+
+        RefreshSampleDataPreview();
+        Canvas.RefreshDocumentStyles(target.Visual);
+        CommitCanvasMutation();
+        StatusText = $"Reset {target.DisplayName}.{canonicalName}.";
+        return true;
+    }
+
+    private bool TryResolveSelectedCustomProperty(
+        string propertyName,
+        out DesignElement target,
+        out CustomPropertyEditorState state,
+        out string canonicalName)
+    {
+        if (!TryGetSelectedCustomProperties(out state)
+            || Canvas.SelectedElement is not { } selected)
+        {
+            target = null!;
+            canonicalName = string.Empty;
+            return false;
+        }
+
+        target = selected;
+        canonicalName = state.EditableProperties.FirstOrDefault(candidate =>
+                string.Equals(candidate, propertyName.Trim(), StringComparison.OrdinalIgnoreCase))
+            ?? string.Empty;
+        if (canonicalName.Length > 0)
+        {
+            return true;
+        }
+
+        StatusText = $"Custom property '{propertyName}' is not declared by {target.TypeName}.";
+        return false;
+    }
+
     public bool SetSelectedCustomProperties(IEnumerable<string> lines)
     {
         if (!TryGetSelectedCustomProperties(out var state)

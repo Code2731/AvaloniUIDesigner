@@ -2309,28 +2309,43 @@
                                     <ItemsControl Name="DeclaredCustomPropertyItems">
                                         <ItemsControl.ItemTemplate>
                                             <DataTemplate x:DataType="designer:DesignerCustomPropertyValueState">
-                                                <Grid ColumnDefinitions="88,*,Auto" Margin="0,2">
+                                                <Grid ColumnDefinitions="82,*,Auto,Auto" Margin="0,2">
                                                     <TextBlock Text="{Binding PropertyName}"
                                                                FontSize="10"
                                                                Foreground="#CCCCCC"
+                                                               VerticalAlignment="Center"
                                                                TextTrimming="CharacterEllipsis"
                                                                ToolTip.Tip="{Binding PropertyName}"/>
-                                                    <TextBlock Grid.Column="1"
-                                                               Text="{Binding DisplayValue}"
-                                                               Margin="6,0"
-                                                               FontSize="10"
-                                                               Foreground="#DCDCAA"
-                                                               TextTrimming="CharacterEllipsis"
-                                                               ToolTip.Tip="{Binding DisplayValue}"/>
+                                                    <TextBox Grid.Column="1"
+                                                             Text="{Binding EditorValue, Mode=OneTime}"
+                                                             Watermark="{Binding EditorWatermark}"
+                                                             Tag="{Binding PropertyName}"
+                                                             Margin="4,0"
+                                                             Padding="4,1"
+                                                             MinHeight="24"
+                                                             FontSize="10"
+                                                             ToolTip.Tip="Type a local value. Enter or leave the field to apply; Escape cancels."
+                                                             LostFocus="OnDeclaredCustomPropertyEditorLostFocus"
+                                                             KeyDown="OnDeclaredCustomPropertyEditorKeyDown"/>
                                                     <Border Grid.Column="2"
                                                             Padding="4,1"
                                                             Background="#334155"
-                                                            CornerRadius="3">
+                                                            CornerRadius="3"
+                                                            VerticalAlignment="Center">
                                                         <TextBlock Text="{Binding SourceLabel}"
                                                                    FontSize="8"
                                                                    FontWeight="SemiBold"
                                                                    Foreground="#CBD5E1"/>
                                                     </Border>
+                                                    <Button Grid.Column="3"
+                                                            Content="Reset"
+                                                            IsVisible="{Binding CanReset}"
+                                                            Tag="{Binding PropertyName}"
+                                                            Margin="4,0,0,0"
+                                                            Padding="4,1"
+                                                            FontSize="9"
+                                                            ToolTip.Tip="Remove this local value or binding"
+                                                            Click="OnDeclaredCustomPropertyResetClicked"/>
                                                 </Grid>
                                             </DataTemplate>
                                         </ItemsControl.ItemTemplate>
