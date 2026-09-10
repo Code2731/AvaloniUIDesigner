@@ -12,6 +12,7 @@ public enum DesignerCustomPropertyType
     Enum,
     Thickness,
     CornerRadius,
+    GridLength,
 }
 
 public sealed record DesignerCustomPropertyDefinition(

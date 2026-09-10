@@ -49,6 +49,12 @@
           "type": "CornerRadius",
           "displayName": "Card corners",
           "category": "Appearance"
+        },
+        {
+          "name": "PreferredTrack",
+          "type": "GridLength",
+          "displayName": "Preferred track",
+          "category": "Layout"
         }
       ],
       "defaultProperties": {
@@ -58,6 +64,7 @@
         "Target": "50000",
         "ContentPadding": "16,12",
         "CardCorners": "8",
+        "PreferredTrack": "2*",
         "Opacity": "0.85"
       }
     }

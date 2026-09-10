@@ -302,6 +302,14 @@ public sealed class DesignerCustomPropertyEditorPanel : Border
             };
         }
 
+        if (state.UsesGridLengthEditor)
+        {
+            return new DesignerCustomPropertyGridLengthEditor(state)
+            {
+                HorizontalAlignment = HorizontalAlignment.Stretch,
+            };
+        }
+
         return new TextBox
         {
             Text = state.Source is DesignerCustomPropertyValueSource.Local
@@ -373,6 +381,14 @@ public sealed class DesignerCustomPropertyEditorPanel : Border
                 break;
             case DesignerCustomPropertyFourValueEditor fourValueEditor:
                 if (!fourValueEditor.TryGetValue(out value, out error))
+                {
+                    error = $"{row.State.DisplayName} ({row.State.PropertyName}) {error}";
+                    return false;
+                }
+
+                break;
+            case DesignerCustomPropertyGridLengthEditor gridLengthEditor:
+                if (!gridLengthEditor.TryGetValue(out value, out error))
                 {
                     error = $"{row.State.DisplayName} ({row.State.PropertyName}) {error}";
                     return false;

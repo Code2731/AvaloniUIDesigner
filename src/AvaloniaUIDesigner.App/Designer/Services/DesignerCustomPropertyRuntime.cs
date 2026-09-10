@@ -19,6 +19,13 @@ public enum DesignerCustomPropertyValueSource
     Unset,
 }
 
+public enum DesignerCustomGridLengthUnit
+{
+    Pixel,
+    Star,
+    Auto,
+}
+
 public sealed record DesignerCustomPropertyValueState(
     string PropertyName,
     string Value,
@@ -84,13 +91,23 @@ public sealed record DesignerCustomPropertyValueState(
                 Value,
                 out var values,
                 out _)
-            && values.All(value => value >= (double)decimal.MinValue
-                && value <= (double)decimal.MaxValue));
+            && values.All(FitsDecimalEditor));
+
+    public bool UsesGridLengthEditor => Type == DesignerCustomPropertyType.GridLength
+        && (Source is DesignerCustomPropertyValueSource.Binding
+                or DesignerCustomPropertyValueSource.Unset
+            || DesignerCustomPropertyRuntime.TryGetGridLengthParts(
+                Value,
+                out var value,
+                out _,
+                out _)
+            && FitsDecimalEditor(value));
 
     public bool UsesTextEditor => !UsesChoiceEditor
         && !UsesNumericEditor
         && !UsesColorEditor
-        && !UsesFourValueEditor;
+        && !UsesFourValueEditor
+        && !UsesGridLengthEditor;
 
     public decimal? NumericEditorValue
         => UsesNumericEditor
@@ -148,6 +165,19 @@ public sealed record DesignerCustomPropertyValueState(
         : "Bind";
 
     public string SourceLabel => Source.ToString().ToUpperInvariant();
+
+    private static bool FitsDecimalEditor(double value)
+    {
+        try
+        {
+            _ = (decimal)value;
+            return true;
+        }
+        catch (OverflowException)
+        {
+            return false;
+        }
+    }
 
     private bool TryGetNumericEditorSettings(
         out decimal minimum,
@@ -522,11 +552,76 @@ public static class DesignerCustomPropertyRuntime
 
                 normalizedValue = string.Empty;
                 return false;
+            case DesignerCustomPropertyType.GridLength:
+                if (TryGetGridLengthParts(value, out var gridValue, out var unit, out error))
+                {
+                    normalizedValue = unit switch
+                    {
+                        DesignerCustomGridLengthUnit.Auto => "Auto",
+                        DesignerCustomGridLengthUnit.Star when gridValue == 1 => "*",
+                        DesignerCustomGridLengthUnit.Star
+                            => $"{gridValue.ToString("G", CultureInfo.InvariantCulture)}*",
+                        _ => gridValue.ToString("G", CultureInfo.InvariantCulture),
+                    };
+                    return true;
+                }
+
+                normalizedValue = string.Empty;
+                return false;
             default:
                 normalizedValue = string.Empty;
                 error = "value uses an unsupported custom property type.";
                 return false;
         }
+    }
+
+    public static bool TryGetGridLengthParts(
+        string rawValue,
+        out double value,
+        out DesignerCustomGridLengthUnit unit,
+        out string error)
+    {
+        var candidate = rawValue.Trim();
+        if (string.Equals(candidate, "Auto", StringComparison.OrdinalIgnoreCase))
+        {
+            value = 1;
+            unit = DesignerCustomGridLengthUnit.Auto;
+            error = string.Empty;
+            return true;
+        }
+
+        var isStar = candidate.EndsWith('*');
+        var number = isStar ? candidate[..^1].Trim() : candidate;
+        if (isStar && number.Length == 0)
+        {
+            number = "1";
+        }
+
+        if (!double.TryParse(
+                number,
+                NumberStyles.Float,
+                CultureInfo.InvariantCulture,
+                out value)
+            || !double.IsFinite(value)
+            || value < 0)
+        {
+            value = 0;
+            unit = DesignerCustomGridLengthUnit.Pixel;
+            error = "value must be Auto, a non-negative pixel number, *, or a non-negative N* ratio.";
+            return false;
+        }
+
+        unit = isStar
+            ? DesignerCustomGridLengthUnit.Star
+            : DesignerCustomGridLengthUnit.Pixel;
+        if (value == 0)
+        {
+            // Remove a negative-zero sign from canonical AXAML output.
+            value = 0;
+        }
+
+        error = string.Empty;
+        return true;
     }
 
     public static bool TryGetFourValueComponents(

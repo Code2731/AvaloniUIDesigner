@@ -62,6 +62,13 @@ public sealed class AcmeComponentPackPlugin : IComponentPackPlugin
                             DisplayName = "Card corners",
                             Category = "Appearance",
                         },
+                        new()
+                        {
+                            Name = "PreferredTrack",
+                            Type = "GridLength",
+                            DisplayName = "Preferred track",
+                            Category = "Layout",
+                        },
                     ],
                     DefaultProperties = new Dictionary<string, string?>
                     {
@@ -70,6 +77,7 @@ public sealed class AcmeComponentPackPlugin : IComponentPackPlugin
                         ["Trend"] = "Up",
                         ["ContentPadding"] = "16,12",
                         ["CardCorners"] = "8",
+                        ["PreferredTrack"] = "2*",
                     },
                 },
             ],

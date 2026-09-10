@@ -2408,6 +2408,25 @@
                                                                            TextTrimming="CharacterEllipsis"/>
                                                             </StackPanel>
                                                         </Button>
+                                                        <Button Tag="{Binding PropertyName}"
+                                                                IsVisible="{Binding UsesGridLengthEditor}"
+                                                                Padding="4,1"
+                                                                MinHeight="24"
+                                                                HorizontalContentAlignment="Stretch"
+                                                                ToolTip.Tip="Edit Auto, pixel, or star sizing"
+                                                                Click="OnDeclaredCustomPropertyGridLengthClicked">
+                                                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                                                <TextBlock Text="Length"
+                                                                           FontSize="8"
+                                                                           FontWeight="SemiBold"
+                                                                           Foreground="#93C5FD"
+                                                                           VerticalAlignment="Center"/>
+                                                                <TextBlock Text="{Binding DisplayValue}"
+                                                                           FontSize="10"
+                                                                           VerticalAlignment="Center"
+                                                                           TextTrimming="CharacterEllipsis"/>
+                                                            </StackPanel>
+                                                        </Button>
                                                     </Grid>
                                                     <Border Grid.Row="1"
                                                             Grid.Column="2"
