@@ -2,6 +2,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vm="using:AvaloniaUIDesigner.App.ViewModels"
         xmlns:views="using:AvaloniaUIDesigner.App.Views"
+        xmlns:designer="using:AvaloniaUIDesigner.App.Designer.Services"
         xmlns:pg="using:Avalonia.PropertyGrid.Controls"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
@@ -2280,6 +2281,63 @@
                                     ToolTip.Tip="Clear the property filter"
                                     Click="OnPropertyInspectorFilterClearClicked"/>
                         </Grid>
+                        <Border Name="DeclaredCustomPropertyPanel"
+                                DockPanel.Dock="Top"
+                                IsVisible="False"
+                                Margin="8,0,8,8"
+                                Padding="8"
+                                Background="#20242A"
+                                BorderBrush="#3F596B"
+                                BorderThickness="1"
+                                CornerRadius="4">
+                            <Grid RowDefinitions="Auto,Auto" RowSpacing="6">
+                                <Grid ColumnDefinitions="*,Auto">
+                                    <TextBlock Text="Custom properties"
+                                               FontSize="11"
+                                               FontWeight="SemiBold"
+                                               Foreground="#9CDCFE"
+                                               VerticalAlignment="Center"/>
+                                    <Button Name="DeclaredCustomPropertyEditButton"
+                                            Grid.Column="1"
+                                            Content="Edit..."
+                                            Padding="6,2"
+                                            FontSize="10"
+                                            ToolTip.Tip="Edit local values for declared custom properties"
+                                            Click="OnEditCustomPropertiesMenuClicked"/>
+                                </Grid>
+                                <ScrollViewer Grid.Row="1" MaxHeight="150" VerticalScrollBarVisibility="Auto">
+                                    <ItemsControl Name="DeclaredCustomPropertyItems">
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate x:DataType="designer:DesignerCustomPropertyValueState">
+                                                <Grid ColumnDefinitions="88,*,Auto" Margin="0,2">
+                                                    <TextBlock Text="{Binding PropertyName}"
+                                                               FontSize="10"
+                                                               Foreground="#CCCCCC"
+                                                               TextTrimming="CharacterEllipsis"
+                                                               ToolTip.Tip="{Binding PropertyName}"/>
+                                                    <TextBlock Grid.Column="1"
+                                                               Text="{Binding DisplayValue}"
+                                                               Margin="6,0"
+                                                               FontSize="10"
+                                                               Foreground="#DCDCAA"
+                                                               TextTrimming="CharacterEllipsis"
+                                                               ToolTip.Tip="{Binding DisplayValue}"/>
+                                                    <Border Grid.Column="2"
+                                                            Padding="4,1"
+                                                            Background="#334155"
+                                                            CornerRadius="3">
+                                                        <TextBlock Text="{Binding SourceLabel}"
+                                                                   FontSize="8"
+                                                                   FontWeight="SemiBold"
+                                                                   Foreground="#CBD5E1"/>
+                                                    </Border>
+                                                </Grid>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                </ScrollViewer>
+                            </Grid>
+                        </Border>
                         <pg:PropertyGrid Name="PropGrid"
                                          Focusable="True"
                                          IsQuickFilterVisible="True"

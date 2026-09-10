@@ -58,6 +58,12 @@ pseudo-class calculation, undeclared-setter rejection, Draft re-import,
 Headless Preview and Reset, local-value and binding precedence, and Undo/Redo.
 Calculated values remain separate from local AXAML attributes while explicit
 local values survive style-aware history capture.
+The Property Inspector summary uses the same runtime state to distinguish
+local, binding, calculated style, and unset declarations. Regression checks
+cover source precedence, binding path/mode/fallback formatting, pseudo-class
+updates, and transitions back to an unset value. A Headless MainWindow check
+also verifies source filtering, no-match hiding, locked read-only visibility,
+unlocking, and immediate refresh after custom metadata changes.
 
 Persistence checks cover initial UTF-8 saves, replacement backups, repeated
 backup rotation, invalid backup paths, temporary-file cleanup, and retry after

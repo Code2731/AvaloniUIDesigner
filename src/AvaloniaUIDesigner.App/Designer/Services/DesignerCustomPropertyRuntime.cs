@@ -8,6 +8,26 @@ using AvaloniaUIDesigner.App.Models;
 
 namespace AvaloniaUIDesigner.App.Designer.Services;
 
+public enum DesignerCustomPropertyValueSource
+{
+    Local,
+    Binding,
+    Style,
+    Unset,
+}
+
+public sealed record DesignerCustomPropertyValueState(
+    string PropertyName,
+    string Value,
+    DesignerCustomPropertyValueSource Source)
+{
+    public string DisplayValue => Source == DesignerCustomPropertyValueSource.Unset
+        ? "(unset)"
+        : Value;
+
+    public string SourceLabel => Source.ToString().ToUpperInvariant();
+}
+
 public static class DesignerCustomPropertyRuntime
 {
     public const string DeclaredPropertiesMetadataKey = "__customPropertyNames";
@@ -82,6 +102,53 @@ public static class DesignerCustomPropertyRuntime
                 propertyName => propertyName,
                 propertyName => metadata.DefaultProperties[propertyName],
                 StringComparer.Ordinal);
+    }
+
+    public static IReadOnlyList<DesignerCustomPropertyValueState> ReadValueStates(
+        Control control,
+        IEnumerable<string> editablePropertyNames)
+    {
+        if (control.Tag is not DesignerCustomControlMetadata metadata)
+        {
+            return [];
+        }
+
+        var bindings = DesignerBindingRuntime.ReadBindings(control)
+            .GroupBy(binding => binding.PropertyName, StringComparer.Ordinal)
+            .ToDictionary(group => group.Key, group => group.Last(), StringComparer.Ordinal);
+        return NormalizeDeclaredPropertyNames(editablePropertyNames)
+            .Select(propertyName =>
+            {
+                if (bindings.TryGetValue(propertyName, out var binding))
+                {
+                    return new DesignerCustomPropertyValueState(
+                        propertyName,
+                        FormatBindingValue(binding),
+                        DesignerCustomPropertyValueSource.Binding);
+                }
+
+                if (metadata.DefaultProperties.TryGetValue(propertyName, out var localValue))
+                {
+                    return new DesignerCustomPropertyValueState(
+                        propertyName,
+                        localValue,
+                        DesignerCustomPropertyValueSource.Local);
+                }
+
+                if (metadata.StyleProperties.TryGetValue(propertyName, out var styleValue))
+                {
+                    return new DesignerCustomPropertyValueState(
+                        propertyName,
+                        styleValue,
+                        DesignerCustomPropertyValueSource.Style);
+                }
+
+                return new DesignerCustomPropertyValueState(
+                    propertyName,
+                    string.Empty,
+                    DesignerCustomPropertyValueSource.Unset);
+            })
+            .ToList();
     }
 
     public static bool TryParseEditorLines(
@@ -172,5 +239,21 @@ public static class DesignerCustomPropertyRuntime
         }
 
         control.Tag = metadata with { DefaultProperties = currentProperties };
+    }
+
+    private static string FormatBindingValue(DesignerBindingDefinition binding)
+    {
+        var parts = new List<string> { binding.Path };
+        if (binding.Mode != DesignerBindingMode.Default)
+        {
+            parts.Add(binding.Mode.ToString());
+        }
+
+        if (!string.IsNullOrEmpty(binding.FallbackValue))
+        {
+            parts.Add($"fallback {binding.FallbackValue}");
+        }
+
+        return string.Join(" | ", parts);
     }
 }

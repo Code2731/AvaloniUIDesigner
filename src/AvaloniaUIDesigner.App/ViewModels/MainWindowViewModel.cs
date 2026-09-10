@@ -5112,6 +5112,20 @@ public partial class MainWindowViewModel : ViewModelBase
         return true;
     }
 
+    public IReadOnlyList<DesignerCustomPropertyValueState> GetSelectedCustomPropertyValueStates()
+    {
+        if (Canvas.SelectedElement is not { } target
+            || target.Visual.Tag is not DesignerCustomControlMetadata metadata)
+        {
+            return [];
+        }
+
+        var editableProperties = DesignerCustomPropertyRuntime.GetEditablePropertyNames(
+            target.Visual,
+            GetDeclaredCustomPropertyNames(target, metadata));
+        return DesignerCustomPropertyRuntime.ReadValueStates(target.Visual, editableProperties);
+    }
+
     public bool SetSelectedCustomProperties(IEnumerable<string> lines)
     {
         if (!TryGetSelectedCustomProperties(out var state)

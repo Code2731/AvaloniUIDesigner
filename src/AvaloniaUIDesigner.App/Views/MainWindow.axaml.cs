@@ -8924,8 +8924,26 @@ public partial class MainWindow : Window
     private void ApplyPropertyInspectorFilter()
     {
         _propertyInspectorFilterText = PropertyInspectorFilter.Text?.Trim() ?? string.Empty;
+        RefreshDeclaredCustomPropertySummary();
         PropGrid.Content = null;
         PropGrid.Content = _boundElement?.Visual;
+    }
+
+    private void RefreshDeclaredCustomPropertySummary()
+    {
+        var states = Vm?.GetSelectedCustomPropertyValueStates() ?? [];
+        if (!string.IsNullOrWhiteSpace(_propertyInspectorFilterText))
+        {
+            states = states
+                .Where(state => state.PropertyName.Contains(_propertyInspectorFilterText, StringComparison.OrdinalIgnoreCase)
+                    || state.DisplayValue.Contains(_propertyInspectorFilterText, StringComparison.OrdinalIgnoreCase)
+                    || state.SourceLabel.Contains(_propertyInspectorFilterText, StringComparison.OrdinalIgnoreCase))
+                .ToList();
+        }
+
+        DeclaredCustomPropertyItems.ItemsSource = states;
+        DeclaredCustomPropertyPanel.IsVisible = states.Count > 0;
+        DeclaredCustomPropertyEditButton.IsEnabled = _boundElement is { IsLocked: false };
     }
 
     private void CapturePropertyInspectorState()
@@ -13271,8 +13289,18 @@ public partial class MainWindow : Window
 
     private void OnSelectedVisualPropertyChanged(object? sender, AvaloniaPropertyChangedEventArgs e)
     {
-        if (sender is not Control control
-            || DesignerStyleApplicationMetadata.IsProgrammaticUpdate(control)
+        if (sender is not Control control)
+        {
+            return;
+        }
+
+        if (e.Property.Name == "Tag")
+        {
+            RefreshDeclaredCustomPropertySummary();
+            return;
+        }
+
+        if (DesignerStyleApplicationMetadata.IsProgrammaticUpdate(control)
             || !IsUndoTrackedVisualProperty(control, e.Property.Name))
         {
             return;
@@ -13626,6 +13654,7 @@ public partial class MainWindow : Window
         LayoutYEditor.IsEnabled = canEditLayout;
         LayoutWidthEditor.IsEnabled = canEditLayout;
         LayoutHeightEditor.IsEnabled = canEditLayout;
+        DeclaredCustomPropertyEditButton.IsEnabled = canEdit;
 
         HandleNW.IsVisible = canResizeSelection;
         HandleN.IsVisible = canResizeSelection;
