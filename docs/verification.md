@@ -94,6 +94,14 @@ selected-pack export, and in-use pack removal. Inspector-state and template
 checks cover category/display-name ordering, uncategorized fallback placement,
 category headers, technical-name/type labels, and display-name, category, and
 description filtering with header recomputation.
+The structured bulk custom-property editor is exercised as a real Avalonia
+control tree. Checks cover category headers, Local toggles, String, choice,
+numeric, and alpha-color editors, per-property accessibility names, invalid
+Integer rejection, canonical result generation, multi-value apply and unset in
+one Undo action, pending RESET and
+LOCAL source labels, Clear local behavior, retained bindings and their lower
+local values, binding replacement, and Undo restoration of both bulk values
+and bindings.
 
 Persistence checks cover initial UTF-8 saves, replacement backups, repeated
 backup rotation, invalid backup paths, temporary-file cleanup, and retry after

@@ -1,8 +1,11 @@
 using System.Text.Json;
 using Avalonia;
+using Avalonia.Automation;
 using Avalonia.Controls;
 using Avalonia.Input;
+using Avalonia.LogicalTree;
 using Avalonia.VisualTree;
+using AvaloniaUIDesigner.App.Designer.Controls;
 using AvaloniaUIDesigner.App.Designer.Services;
 using AvaloniaUIDesigner.App.Models;
 using AvaloniaUIDesigner.App.ViewModels;
@@ -456,6 +459,7 @@ internal static class CustomControlStateChecks
         RunCustomStyleChecks();
         RunCustomDeclaredStyleChecks();
         RunTypedCustomPropertyChecks();
+        RunStructuredCustomPropertyEditorChecks();
         RunCustomPropertyInspectorSummaryChecks();
         Console.WriteLine("Custom control state checks passed.");
     }
@@ -1437,6 +1441,179 @@ internal static class CustomControlStateChecks
             window.DataContext = null;
             window.Close();
         }
+    }
+
+    private static void RunStructuredCustomPropertyEditorChecks()
+    {
+        var editor = new MainWindowViewModel();
+        Assert(editor.TryLoadComponentPack(TypedComponentPack, out var result), result);
+        var item = editor.Toolbox.FindItemByDisplayName("Typed Gauge")
+            ?? throw new Exception("The structured editor test component was not added to Toolbox.");
+        editor.PlaceToolboxItem(item, 40, 56);
+        Assert(editor.TryGetSelectedCustomProperties(out var state)
+            && state.ValueStates.Count == 6,
+            "The bulk custom-property state must include source-aware typed rows.");
+
+        var panel = new DesignerCustomPropertyEditorPanel(state.ValueStates);
+        var categoryHeaders = panel.GetLogicalDescendants()
+            .OfType<TextBlock>()
+            .Select(text => text.Text)
+            .Where(text => text is "Appearance" or "Behavior" or "Data" or "Custom")
+            .ToList();
+        var localToggles = panel.GetLogicalDescendants()
+            .OfType<CheckBox>()
+            .Where(toggle => toggle.Classes.Contains("custom-property-local-toggle"))
+            .ToList();
+        var countToggle = localToggles.Single(toggle => Equals(toggle.Tag, "Count"));
+        var countEditor = panel.GetLogicalDescendants()
+            .OfType<NumericUpDown>()
+            .Single(control => Equals(control.Tag, "Count"));
+        var stateEditor = panel.GetLogicalDescendants()
+            .OfType<ComboBox>()
+            .Single(control => Equals(control.Tag, "State"));
+        var accentEditor = panel.GetLogicalDescendants()
+            .OfType<ColorPicker>()
+            .Single(control => Equals(control.Tag, "Accent"));
+        var noteEditor = panel.GetLogicalDescendants()
+            .OfType<TextBox>()
+            .Single(control => Equals(control.Tag, "Note"));
+        Assert(categoryHeaders.SequenceEqual(["Appearance", "Behavior", "Data", "Custom"])
+            && localToggles.Count == 6
+            && localToggles.All(toggle => toggle.IsChecked == true)
+            && countEditor.IsEnabled
+            && countEditor.Value == 2
+            && countEditor.Minimum == 0
+            && countEditor.Maximum == 10
+            && AutomationProperties.GetName(countToggle) == "Write Item count as a local value"
+            && AutomationProperties.GetName(countEditor) == "Item count value"
+            && stateEditor.SelectedItem?.ToString() == "Idle"
+            && accentEditor.Color == Avalonia.Media.Color.Parse("#FF3B82F6")
+            && noteEditor.Text == "Ready",
+            "The structured editor must render grouped, enabled, type-specific controls for local values.");
+
+        countEditor.Value = 2.5m;
+        Assert(!panel.TryCreateEditorLines(out _, out var invalidError)
+            && invalidError.Contains("whole number", StringComparison.OrdinalIgnoreCase),
+            "The structured editor must block an invalid fractional Integer before applying.");
+        countEditor.Value = 3;
+        stateEditor.SelectedItem = "Busy";
+        accentEditor.Color = Avalonia.Media.Color.Parse("#803B82F6");
+        noteEditor.Text = "Updated";
+        var ratioToggle = localToggles.Single(toggle => Equals(toggle.Tag, "Ratio"));
+        ratioToggle.IsChecked = false;
+        var ratioSource = panel.GetLogicalDescendants()
+            .OfType<TextBlock>()
+            .Single(text => text.Classes.Contains("custom-property-source-label")
+                && Equals(text.Tag, "Ratio"));
+        Assert(!panel.GetLogicalDescendants()
+                .OfType<NumericUpDown>()
+                .Single(control => Equals(control.Tag, "Ratio"))
+                .IsEnabled
+            && ratioSource.Text == "RESET",
+            "Unchecking Local must disable that property's editor and mark the pending reset.");
+        Assert(panel.TryCreateEditorLines(out var updatedLines, out var updateError), updateError);
+        Assert(DesignerCustomPropertyRuntime.TryParseEditorLines(
+                updatedLines,
+                state.EditableProperties,
+                out var updatedValues,
+                out var parseError,
+                state.PropertyDefinitions), parseError);
+        Assert(!updatedValues.ContainsKey("Ratio")
+            && updatedValues["Count"] == "3"
+            && updatedValues["State"] == "Busy"
+            && updatedValues["Accent"] == "#803b82f6"
+            && updatedValues["Note"] == "Updated",
+            "The structured editor must emit canonical lines only for checked local overrides.");
+        Assert(editor.SetSelectedCustomProperties(updatedLines), editor.StatusText);
+        var updatedStates = editor.GetSelectedCustomPropertyValueStates();
+        Assert(updatedStates.Single(value => value.PropertyName == "Ratio") is
+                { Source: DesignerCustomPropertyValueSource.Unset }
+            && updatedStates.Single(value => value.PropertyName == "Count") is
+                { Value: "3", Source: DesignerCustomPropertyValueSource.Local }
+            && updatedStates.Single(value => value.PropertyName == "Accent") is
+                { Value: "#803b82f6", Source: DesignerCustomPropertyValueSource.Local },
+            "Applying structured values must update and unset all rows atomically.");
+        editor.Undo();
+        editor.SelectElement(editor.Canvas.Elements.Single());
+        Assert(editor.GetSelectedCustomPropertyValueStates().Single(value =>
+                value.PropertyName == "Ratio") is
+                { Value: "0.5", Source: DesignerCustomPropertyValueSource.Local }
+            && editor.GetSelectedCustomPropertyValueStates().Single(value =>
+                value.PropertyName == "Count") is
+                { Value: "2", Source: DesignerCustomPropertyValueSource.Local },
+            "Undo must restore every value changed by one structured bulk apply.");
+
+        Assert(editor.SetSelectedCustomPropertyBinding(
+            "Count",
+            "Preview.Count",
+            nameof(DesignerBindingMode.OneWay),
+            "4"), editor.StatusText);
+        Assert(editor.TryGetSelectedCustomProperties(out var boundState), editor.StatusText);
+        var clearPanel = new DesignerCustomPropertyEditorPanel(boundState.ValueStates);
+        var boundCountToggle = clearPanel.GetLogicalDescendants()
+            .OfType<CheckBox>()
+            .Single(toggle => Equals(toggle.Tag, "Count"));
+        var boundCountEditor = clearPanel.GetLogicalDescendants()
+            .OfType<NumericUpDown>()
+            .Single(control => Equals(control.Tag, "Count"));
+        Assert(boundCountToggle.IsChecked == false
+            && !boundCountEditor.IsEnabled,
+            "A bound property must start as a disabled, unchecked local override.");
+        clearPanel.ClearLocalValues();
+        Assert(clearPanel.GetLogicalDescendants()
+                .OfType<CheckBox>()
+                .Where(toggle => toggle.Classes.Contains("custom-property-local-toggle"))
+                .All(toggle => toggle.IsChecked == false),
+            "Clear local must uncheck every structured editor row.");
+        Assert(clearPanel.TryCreateEditorLines(out var clearedLines, out var clearError), clearError);
+        Assert(clearedLines.Count == 0,
+            "An editor with every local override cleared must produce an empty value set.");
+        Assert(editor.SetSelectedCustomProperties(clearedLines), editor.StatusText);
+        var clearedStates = editor.GetSelectedCustomPropertyValueStates();
+        Assert(clearedStates.Single(value => value.PropertyName == "Count") is
+                { Source: DesignerCustomPropertyValueSource.Binding }
+            && clearedStates.Where(value => value.PropertyName != "Count")
+                .All(value => value.Source == DesignerCustomPropertyValueSource.Unset)
+            && editor.Canvas.Elements.Single().Visual.Tag is DesignerCustomControlMetadata clearedMetadata
+            && clearedMetadata.DefaultProperties["Count"] == "2",
+            "Clear local must remove visible local values while retaining a binding and its lower local value.");
+        editor.Undo();
+        editor.SelectElement(editor.Canvas.Elements.Single());
+
+        Assert(editor.TryGetSelectedCustomProperties(out boundState), editor.StatusText);
+        var replacementPanel = new DesignerCustomPropertyEditorPanel(boundState.ValueStates);
+        boundCountToggle = replacementPanel.GetLogicalDescendants()
+            .OfType<CheckBox>()
+            .Single(toggle => Equals(toggle.Tag, "Count"));
+        boundCountEditor = replacementPanel.GetLogicalDescendants()
+            .OfType<NumericUpDown>()
+            .Single(control => Equals(control.Tag, "Count"));
+        boundCountToggle.IsChecked = true;
+        boundCountEditor.Value = 4;
+        var replacementSource = replacementPanel.GetLogicalDescendants()
+            .OfType<TextBlock>()
+            .Single(text => text.Classes.Contains("custom-property-source-label")
+                && Equals(text.Tag, "Count"));
+        Assert(boundCountEditor.IsEnabled,
+            "Checking a local override must enable its value editor.");
+        Assert(replacementSource.Text == "LOCAL",
+            "Checking a bound row must show that it will become a local value.");
+        Assert(replacementPanel.TryCreateEditorLines(
+            out var replacementLines,
+            out var replacementError), replacementError);
+        Assert(editor.SetSelectedCustomProperties(replacementLines), editor.StatusText);
+        Assert(editor.GetSelectedCustomPropertyValueStates().Single(value =>
+                value.PropertyName == "Count") is
+                { Value: "4", Source: DesignerCustomPropertyValueSource.Local }
+            && DesignerBindingRuntime.ReadBindings(editor.Canvas.Elements.Single().Visual)
+                .All(binding => binding.PropertyName != "Count"),
+            "Checking a bound property must replace that binding with one local value.");
+        editor.Undo();
+        editor.SelectElement(editor.Canvas.Elements.Single());
+        Assert(editor.GetSelectedCustomPropertyValueStates().Single(value =>
+                value.PropertyName == "Count") is
+                { Source: DesignerCustomPropertyValueSource.Binding },
+            "Undo must restore a binding replaced through the structured bulk editor.");
     }
 
     private static void RunCustomPropertyInspectorSummaryChecks()

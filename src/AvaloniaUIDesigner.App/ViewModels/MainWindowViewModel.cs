@@ -182,7 +182,10 @@ public sealed record CustomPropertyEditorState(
     string TargetType,
     IReadOnlyList<string> Lines,
     IReadOnlyList<string> EditableProperties,
-    IReadOnlyList<DesignerCustomPropertyDefinition>? PropertyDefinitions = null);
+    IReadOnlyList<DesignerCustomPropertyDefinition>? PropertyDefinitions = null)
+{
+    public IReadOnlyList<DesignerCustomPropertyValueState> ValueStates { get; init; } = [];
+}
 
 public sealed record LayoutEditorState(
     string ControlName,
@@ -5196,16 +5199,23 @@ public partial class MainWindowViewModel : ViewModelBase
             return false;
         }
 
+        var editableDefinitions = propertyDefinitions
+            .Where(definition => editableProperties.Contains(
+                definition.Name,
+                StringComparer.Ordinal))
+            .ToList();
         state = new CustomPropertyEditorState(
             target.DisplayName,
             target.TypeName,
             DesignerCustomPropertyRuntime.FormatEditorLines(target.Visual, editableProperties),
             editableProperties,
-            propertyDefinitions
-                .Where(definition => editableProperties.Contains(
-                    definition.Name,
-                    StringComparer.Ordinal))
-                .ToList());
+            editableDefinitions)
+        {
+            ValueStates = DesignerCustomPropertyRuntime.ReadValueStates(
+                target.Visual,
+                editableProperties,
+                editableDefinitions),
+        };
         return true;
     }
 
@@ -5526,10 +5536,33 @@ public partial class MainWindowViewModel : ViewModelBase
         }
 
         BeginCanvasMutation(HistoryActionType.EditProperty, "Updated declared custom properties.");
+        var storedProperties = properties.ToDictionary(
+            pair => pair.Key,
+            pair => pair.Value,
+            StringComparer.Ordinal);
+        if (target.Visual.Tag is DesignerCustomControlMetadata metadata)
+        {
+            var editablePropertyNames = state.EditableProperties.ToHashSet(
+                StringComparer.OrdinalIgnoreCase);
+            foreach (var binding in retainedBindings.Where(binding =>
+                         editablePropertyNames.Contains(binding.PropertyName)))
+            {
+                var preservedLocal = metadata.DefaultProperties.FirstOrDefault(pair =>
+                    string.Equals(
+                        pair.Key,
+                        binding.PropertyName,
+                        StringComparison.OrdinalIgnoreCase));
+                if (preservedLocal.Key is not null)
+                {
+                    storedProperties[binding.PropertyName] = preservedLocal.Value;
+                }
+            }
+        }
+
         DesignerCustomPropertyRuntime.ReplaceValues(
             target.Visual,
             state.EditableProperties,
-            properties);
+            storedProperties);
         if (retainedBindings.Count != currentBindings.Count)
         {
             DesignerBindingRuntime.ReplaceBindings(

@@ -37,7 +37,7 @@ Preview 동작 회귀 검증: `dotnet run --project tests/PreviewBehavior -p:Use
 - **Component Pack 관리**: `File > Manage Component Packs...`에서 JSON/DLL 팩의 출처·컴포넌트 목록을 확인하고 Toolbox에서 제거하며, 현재 문서가 사용하는 타입은 디자인 전용 placeholder로 보존
 - **Custom Control Metadata**: `DesignOnly: true` 컴포넌트 팩으로 외부 Avalonia 타입을 디자인 타임 플레이스홀더로 등록하고, 커스텀 기본 속성·Preview 문구·AXAML 타입명을 보존
 - **Custom Control Style Preview**: 디자인 전용 플레이스홀더에서도 원래 Avalonia 타입을 기준으로 문서 스타일과 pseudo-class를 매칭하고, 스타일과 충돌하는 로컬 기본값을 정리해 Design Surface·Undo/Redo·Draft AXAML·Preview Reset에서 같은 결과를 유지
-- **Declared Custom Property Editor**: `Edit > Edit Declared Custom Properties...`와 요소 context menu에서 디자인 전용 컨트롤의 `Caption`, `Value` 같은 컴포넌트 팩 선언 속성을 `Property = Value` 형식으로 편집하고, 줄 삭제로 로컬 값을 해제하며 해당 속성의 바인딩만 선택적으로 대체
+- **Declared Custom Property Editor**: `Edit > Edit Declared Custom Properties...`와 요소 context menu에서 디자인 전용 속성을 카테고리·표시 이름·출처와 타입별 입력으로 일괄 편집하고, `Local` 체크와 `Clear local`로 로컬 값을 해제하거나 해당 속성의 바인딩만 선택적으로 대체
 - **Default-free Custom Properties**: 컴포넌트 팩의 선택적 `declaredProperties` 목록으로 초깃값 없는 외부 CLR 속성도 선언해 편집·바인딩하고, 선택 컨트롤을 다시 팩으로 내보내거나 팩을 제거한 뒤에도 선언을 보존
 - **Declared Custom Property Styles**: 문서 스타일에서 `declaredProperties` 속성을 setter로 사용하고 기본·pseudo-class 계산값을 로컬 값과 분리하며, 명시 값·바인딩 우선순위와 Draft/Preview/Undo/Redo를 일관되게 유지
 - **Custom Property Value Sources**: Property Inspector에서 디자인 전용 속성의 현재 값과 `LOCAL`·`BINDING`·`STYLE`·`UNSET` 출처를 표시하고 검색·잠금 상태를 반영하며 전용 편집기로 바로 연결
@@ -875,6 +875,7 @@ AXAML 소스 편집기의 `Validate`와 `Preview`는 현재 디자인과 Undo �
 - v3.28: Component Pack typed custom property 정의와 Boolean·Enum 선택형 Inspector, 숫자 범위·색상·Enum 검증, 로컬·스타일·binding fallback 정규화, Draft/Preview/팩 제거 후 메타데이터 보존을 추가합니다.
 - v3.29: Property Inspector의 Integer·Double에 범위 기반 스핀 편집기, Color에 유효 값 스와치와 전용 ColorView 선택 창을 추가하고 잘못된 숫자 복구·Undo/Redo를 보강합니다.
 - v3.30: Component Pack 사용자 정의 속성에 `displayName`·`category`·`description` 메타데이터를 추가하고 Property Inspector 카테고리 헤더·표시 이름 정렬·설명 툴팁·메타데이터 검색과 전체 보존 경로를 지원합니다.
+- v3.31: 선언형 사용자 정의 속성 일괄 창을 카테고리형 typed editor로 교체하고 `Local` override·`Clear local`·예정 출처 배지·원자적 검증과 Undo를 지원하며, 유지되는 바인딩 아래의 로컬 값도 보존합니다.
 
 ## 컴포넌트 팩
 
@@ -884,7 +885,7 @@ AXAML 소스 편집기의 `Validate`와 `Preview`는 현재 디자인과 Undo �
 
 선택적 `propertyDefinitions`는 이름만 있는 `declaredProperties`를 타입과 Inspector 표시 정보로 확장하며, 정의된 이름은 별도 선언 없이도 자동으로 사용자 정의 속성에 포함됩니다. `type`은 `String`(생략 시 기본값), `Boolean`, `Integer`, `Double`, `Color`, `Enum`을 지원합니다. `Integer`와 `Double`은 `minimum`·`maximum`, `Enum`은 중복 없는 `options`를 사용할 수 있습니다. 선택적 `displayName`은 읽기 쉬운 표시 이름, `category`는 Inspector 그룹, `description`은 상세 툴팁을 지정합니다. 표시 이름과 카테고리는 한 줄이어야 하며 빈 메타데이터는 각각 CLR 속성명·`Custom` 그룹·빈 설명으로 호환됩니다. 팩 기본값, Inspector 인라인/일괄 값, 문서 스타일 setter, 바인딩 fallback은 같은 규칙으로 검증되고 Boolean·숫자·색상·Enum 대소문자는 안정적인 AXAML 값으로 정규화됩니다. 잘못된 정의나 기본값은 팩 전체를 등록하기 전에 거부하며, 잘못된 외부 AXAML 속성은 경고 후 해당 값만 제외합니다. 기존 `declaredProperties` 팩은 모두 `String` 정의로 호환됩니다.
 
-디자인 전용 컨트롤을 선택한 뒤 `Edit > Edit Declared Custom Properties...`에서 `declaredProperties` 또는 외부 전용 `defaultProperties`로 선언된 속성을 편집할 수 있습니다. `Opacity`처럼 디자이너의 공통 편집기가 직접 지원하는 속성은 중복 표시하지 않으며, 목록에서 줄을 제거하면 해당 로컬 AXAML 값이 생략됩니다. 바인딩된 속성은 로컬 값 목록에서 숨겨지고 같은 속성에 값을 다시 입력하면 그 바인딩만 로컬 값으로 대체됩니다. 선언 이름은 현재 값과 별도로 스냅샷에 보존되어 사용 중인 컴포넌트 팩을 제거한 뒤에도 편집과 Undo/Redo를 이어갈 수 있습니다. 외부 assembly를 로드하지 않으므로 외부 전용 속성의 실제 시각 효과는 실행하지 않고 AXAML 및 Preview 메타데이터로 보존합니다.
+디자인 전용 컨트롤을 선택한 뒤 `Edit > Edit Declared Custom Properties...`에서 `declaredProperties` 또는 외부 전용 `defaultProperties`로 선언된 속성을 한 번에 편집할 수 있습니다. 창은 Inspector와 같은 카테고리·표시 이름·설명을 사용하며 String은 텍스트, Boolean·Enum은 선택 목록, Integer·Double은 범위형 스핀 입력, Color는 알파 지원 ColorPicker로 표시합니다. 각 행의 `Local`을 체크하면 로컬 AXAML override를 쓰고 해제하면 해당 로컬 값을 제거하며, `Clear local`은 모든 행을 적용 전 해제합니다. 기존 LOCAL 행을 해제하면 출처 배지가 `RESET`, 바인딩·스타일·unset 행을 체크하면 `LOCAL`로 바뀌어 적용 결과를 미리 알 수 있습니다. 바인딩 행은 체크하지 않으면 바인딩과 그 아래 보존된 로컬 값을 모두 유지하고, 체크하면 해당 바인딩만 새 로컬 값으로 대체합니다. 모든 값은 적용 전에 함께 검증되고 성공 시 하나의 Undo/Redo 작업으로 반영됩니다. `Opacity`처럼 공통 편집기가 직접 지원하는 속성은 중복 표시하지 않습니다. 선언과 메타데이터는 스냅샷에 보존되어 사용 중인 컴포넌트 팩을 제거한 뒤에도 편집을 이어갈 수 있으며, 외부 assembly의 실제 시각 효과는 실행하지 않고 AXAML 및 Preview 메타데이터로 보존합니다.
 
 문서 스타일 편집기에서도 선언된 외부 속성을 `Unit = percent`처럼 사용할 수 있습니다. 디자인 전용 placeholder는 기본 스타일과 활성 pseudo-class의 계산값을 별도 메타데이터로 유지해 Draft AXAML에 로컬 값으로 잘못 출력하지 않으며, 같은 속성의 명시 값이나 바인딩이 있으면 이를 우선합니다. 실제 외부 assembly의 렌더링은 실행하지 않지만 Design Surface와 Headless Preview는 계산 상태를 동일하게 보존합니다.
 

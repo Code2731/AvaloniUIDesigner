@@ -23,6 +23,7 @@ using Avalonia.Platform.Storage;
 using Avalonia.Styling;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
+using AvaloniaUIDesigner.App.Designer.Controls;
 using AvaloniaUIDesigner.App.Designer.Core;
 using AvaloniaUIDesigner.App.Designer.Services;
 using AvaloniaUIDesigner.App.Models;
@@ -21123,12 +21124,7 @@ public partial class MainWindow : Window
     private async Task<IReadOnlyList<string>?> ShowCustomPropertyEditorDialogAsync(
         CustomPropertyEditorState state)
     {
-        var editor = new TextBox
-        {
-            Text = string.Join(Environment.NewLine, state.Lines),
-            AcceptsReturn = true,
-            MinHeight = 220,
-        };
+        var editor = new DesignerCustomPropertyEditorPanel(state.ValueStates);
         var errorText = new TextBlock
         {
             Foreground = Avalonia.Media.Brushes.IndianRed,
@@ -21137,26 +21133,18 @@ public partial class MainWindow : Window
         var dialog = new Window
         {
             Title = $"Edit Declared Custom Properties - {state.ControlName}",
-            Width = 720,
-            Height = 470,
-            MinWidth = 520,
-            MinHeight = 340,
+            Width = 860,
+            Height = 640,
+            MinWidth = 680,
+            MinHeight = 460,
             WindowStartupLocation = WindowStartupLocation.CenterOwner,
         };
         var applyButton = new Button { Content = "Apply", MinWidth = 84 };
         void ApplyProperties()
         {
-            var lines = (editor.Text ?? string.Empty)
-                .Replace("\r\n", "\n", StringComparison.Ordinal)
-                .Split('\n', StringSplitOptions.None)
-                .ToList();
-            if (!DesignerCustomPropertyRuntime.TryParseEditorLines(
-                    lines,
-                    state.EditableProperties,
-                    out _,
-                    out var error,
-                    state.PropertyDefinitions))
+            if (!editor.TryCreateEditorLines(out var lines, out var error))
             {
+                errorText.Foreground = Avalonia.Media.Brushes.IndianRed;
                 errorText.Text = error;
                 return;
             }
@@ -21165,21 +21153,25 @@ public partial class MainWindow : Window
         }
 
         applyButton.Click += (_, _) => ApplyProperties();
-        editor.KeyDown += (_, e) =>
-        {
-            HandleTextEditorShortcut(
-                e,
-                () => dialog.Close(null),
-                ApplyProperties);
-        };
+        WireEditorDialogShortcuts(
+            dialog,
+            () => dialog.Close(null),
+            ApplyProperties);
         var cancelButton = new Button { Content = "Cancel", MinWidth = 84 };
         cancelButton.Click += (_, _) => dialog.Close(null);
+        var clearButton = new Button { Content = "Clear local", MinWidth = 96 };
+        clearButton.Click += (_, _) =>
+        {
+            editor.ClearLocalValues();
+            errorText.Text = "Local values will be cleared when you apply.";
+            errorText.Foreground = Avalonia.Media.Brushes.SlateGray;
+        };
         var buttons = new StackPanel
         {
             Orientation = Orientation.Horizontal,
             Spacing = 8,
             HorizontalAlignment = HorizontalAlignment.Right,
-            Children = { cancelButton, applyButton },
+            Children = { clearButton, cancelButton, applyButton },
         };
         var content = new Grid
         {
@@ -21190,12 +21182,12 @@ public partial class MainWindow : Window
             {
                 new TextBlock
                 {
-                    Text = "One local AXAML value per line: Property = Value. Remove a line to unset it. Setting a bound property replaces that binding.",
+                    Text = "Check Local to write an AXAML value. Uncheck it to remove the local value; checking a bound property replaces that binding when applied.",
                     TextWrapping = Avalonia.Media.TextWrapping.Wrap,
                 },
                 new TextBlock
                 {
-                    Text = $"Declared by {state.TargetType}: {string.Join(", ", state.EditableProperties)}",
+                    Text = $"Declared by {state.TargetType}. Values are grouped by category and use their Component Pack editor type.",
                     Foreground = Avalonia.Media.Brushes.SlateGray,
                     TextWrapping = Avalonia.Media.TextWrapping.Wrap,
                 },
