@@ -96,6 +96,22 @@ try
     window.ResetPreview();
     Assert(Input().Text == "Original" && liveUpdates.IsChecked == false,
         "Explicit reset must apply pending design without resuming automatic updates.");
+    var errorText = toolbar.Children.OfType<TextBlock>().Single();
+    Input().Text = "Keep paused input";
+    window.UpdateLiveDocument(document with
+    {
+        ColorResources = new Dictionary<string, string> { ["Invalid"] = "not-a-color" },
+    });
+    reset.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+    Assert(Input().Text == "Keep paused input" && !string.IsNullOrEmpty(errorText.Text),
+        "Failed Reset button must retain input and show an error without throwing.");
+    liveUpdates.IsChecked = true;
+    Assert(liveUpdates.IsChecked == false && !string.IsNullOrEmpty(errorText.Text),
+        "Failed resume must remain paused and show the failure.");
+    window.UpdateLiveDocument(pending);
+    reset.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+    Assert(Input().Text == "Resumed design" && string.IsNullOrEmpty(errorText.Text),
+        "Reset retry must apply corrected data and clear the failure message.");
     Console.WriteLine("Preview behavior checks passed.");
 }
 finally

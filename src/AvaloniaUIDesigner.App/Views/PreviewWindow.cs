@@ -99,7 +99,6 @@ public sealed class PreviewWindow : Window
             HorizontalAlignment = HorizontalAlignment.Left,
         };
         ToolTip.SetTip(resetPreview, "Restart interactions using the latest design values and sample data.");
-        resetPreview.Click += (_, _) => ResetPreview();
         _liveUpdates = new CheckBox
         {
             Content = "Live updates",
@@ -108,6 +107,18 @@ public sealed class PreviewWindow : Window
             VerticalAlignment = VerticalAlignment.Center,
         };
         var updateError = new TextBlock { TextWrapping = TextWrapping.Wrap };
+        resetPreview.Click += (_, _) =>
+        {
+            try
+            {
+                ResetPreview();
+                updateError.Text = string.Empty;
+            }
+            catch (Exception exception)
+            {
+                updateError.Text = $"Preview could not reset: {exception.Message}";
+            }
+        };
         _liveUpdates.IsCheckedChanged += (_, _) =>
         {
             updateError.Text = string.Empty;
