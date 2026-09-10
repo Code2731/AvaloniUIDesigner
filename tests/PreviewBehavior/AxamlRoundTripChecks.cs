@@ -61,6 +61,17 @@ internal static class AxamlRoundTripChecks
         }
         Assert(editor.TryCreatePreviewDocumentFromAxaml(serializer.Serialize(document), out _, out _),
             "A rejected value must not prevent a later valid serialization.");
+        Assert(editor.TryImportDraftAxaml(serializer.Serialize(document), out var importError, out _), importError);
+        var inputControl = (Avalonia.Controls.TextBox)editor.Canvas.Elements.Single(element => element.DisplayName == "Input").Visual;
+        inputControl.Text = "invalid\0text";
+        Assert(!editor.TryExportAxamlForSave(out var invalidOutput, out var saveError)
+            && invalidOutput == string.Empty && !string.IsNullOrEmpty(saveError),
+            "Save preflight must report invalid XML without returning output to write.");
+        Assert(inputControl.Text == "invalid\0text", "Failed save preflight must not modify the user's input.");
+        inputControl.Text = text;
+        Assert(editor.TryExportAxamlForSave(out var validOutput, out saveError)
+            && !string.IsNullOrEmpty(validOutput) && saveError == string.Empty,
+            "Corrected input must pass save preflight.");
         Console.WriteLine("AXAML round-trip checks passed.");
     }
 

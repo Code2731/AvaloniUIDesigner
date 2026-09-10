@@ -10718,6 +10718,23 @@ public partial class MainWindowViewModel : ViewModelBase
 
     public string ExportFullAxaml() => ExportAxamlDocument(_rootSettings.Kind);
 
+    public bool TryExportAxamlForSave(out string axaml, out string error)
+    {
+        try
+        {
+            axaml = ExportFullAxaml();
+            XDocument.Parse(axaml, LoadOptions.PreserveWhitespace);
+            error = string.Empty;
+            return true;
+        }
+        catch (Exception exception) when (exception is System.Xml.XmlException or EncoderFallbackException)
+        {
+            axaml = string.Empty;
+            error = $"Could not save AXAML: {exception.Message}";
+            return false;
+        }
+    }
+
     public string ExportUserControlAxaml() => ExportAxamlDocument(DesignerRootKind.UserControl);
 
     public bool TryExportSelectedAxaml(

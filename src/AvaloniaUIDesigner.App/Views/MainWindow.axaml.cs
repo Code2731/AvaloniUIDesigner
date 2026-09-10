@@ -15627,7 +15627,11 @@ public partial class MainWindow : Window
 
         FlushPendingPropertyHistory();
 
-        var axaml = Vm.ExportFullAxaml();
+        if (!Vm.TryExportAxamlForSave(out var axaml, out var exportError))
+        {
+            Vm.StatusText = exportError;
+            return false;
+        }
         var targetPath = forceSaveAs ? null : Vm.CurrentDocumentPath;
         if (string.IsNullOrWhiteSpace(targetPath))
         {
