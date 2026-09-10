@@ -13,6 +13,11 @@ The script runs these checks sequentially and stops on the first failure:
 3. File persistence regression checks using isolated temporary files.
 4. Avalonia Headless Preview behavior regression checks.
 
+The Headless suite also exercises the editor's AXAML round trips, save
+preflight, session serialization, and movement undo/redo history. History
+checks include redo after session restoration, no-op edits, and replacing a
+redo branch with a new edit. These call editor commands rather than OS input.
+
 Persistence checks cover initial UTF-8 saves, replacement backups, repeated
 backup rotation, invalid backup paths, temporary-file cleanup, and retry after
 a failed replacement. They do not simulate power loss or hardware failure.
