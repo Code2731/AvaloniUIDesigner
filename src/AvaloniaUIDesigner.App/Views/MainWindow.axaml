@@ -2310,23 +2310,37 @@
                                         <ItemsControl.ItemTemplate>
                                             <DataTemplate x:DataType="designer:DesignerCustomPropertyValueState">
                                                 <Grid ColumnDefinitions="76,*,Auto,Auto,Auto" Margin="0,2">
-                                                    <TextBlock Text="{Binding PropertyName}"
-                                                               FontSize="10"
-                                                               Foreground="#CCCCCC"
-                                                               VerticalAlignment="Center"
-                                                               TextTrimming="CharacterEllipsis"
-                                                               ToolTip.Tip="{Binding PropertyName}"/>
-                                                    <TextBox Grid.Column="1"
-                                                             Text="{Binding EditorValue, Mode=OneTime}"
-                                                             Watermark="{Binding EditorWatermark}"
-                                                             Tag="{Binding PropertyName}"
-                                                             Margin="4,0"
-                                                             Padding="4,1"
-                                                             MinHeight="24"
-                                                             FontSize="10"
-                                                             ToolTip.Tip="Type a local value. Enter or leave the field to apply; Escape cancels."
-                                                             LostFocus="OnDeclaredCustomPropertyEditorLostFocus"
-                                                             KeyDown="OnDeclaredCustomPropertyEditorKeyDown"/>
+                                                    <StackPanel VerticalAlignment="Center"
+                                                                ToolTip.Tip="{Binding PropertyName}">
+                                                        <TextBlock Text="{Binding PropertyName}"
+                                                                   FontSize="10"
+                                                                   Foreground="#CCCCCC"
+                                                                   TextTrimming="CharacterEllipsis"/>
+                                                        <TextBlock Text="{Binding TypeLabel}"
+                                                                   FontSize="8"
+                                                                   Foreground="#7F8C98"/>
+                                                    </StackPanel>
+                                                    <Grid Grid.Column="1" Margin="4,0">
+                                                        <TextBox Text="{Binding EditorValue, Mode=OneTime}"
+                                                                 Watermark="{Binding EditorWatermark}"
+                                                                 Tag="{Binding PropertyName}"
+                                                                 IsVisible="{Binding UsesTextEditor}"
+                                                                 Padding="4,1"
+                                                                 MinHeight="24"
+                                                                 FontSize="10"
+                                                                 ToolTip.Tip="Type a local value. Enter or leave the field to apply; Escape cancels."
+                                                                 LostFocus="OnDeclaredCustomPropertyEditorLostFocus"
+                                                                 KeyDown="OnDeclaredCustomPropertyEditorKeyDown"/>
+                                                        <ComboBox ItemsSource="{Binding EditorChoices}"
+                                                                  SelectedItem="{Binding EditorChoiceValue, Mode=OneTime}"
+                                                                  Tag="{Binding PropertyName}"
+                                                                  IsVisible="{Binding UsesChoiceEditor}"
+                                                                  MinHeight="24"
+                                                                  FontSize="10"
+                                                                  ToolTip.Tip="{Binding DisplayValue}"
+                                                                  SelectionChanged="OnDeclaredCustomPropertyChoiceChanged"
+                                                                  KeyDown="OnDeclaredCustomPropertyChoiceKeyDown"/>
+                                                    </Grid>
                                                     <Border Grid.Column="2"
                                                             Padding="4,1"
                                                             Background="#334155"

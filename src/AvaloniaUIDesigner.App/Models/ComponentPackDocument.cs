@@ -16,8 +16,18 @@ public sealed class ComponentPackComponent
     public double? DefaultWidth { get; set; }
     public double? DefaultHeight { get; set; }
     public List<string>? DeclaredProperties { get; set; }
+    public List<ComponentPackPropertyDefinition>? PropertyDefinitions { get; set; }
     public Dictionary<string, string?>? DefaultProperties { get; set; }
     public bool DesignOnly { get; set; }
     public string? PreviewText { get; set; }
     public string? Category { get; set; }
+}
+
+public sealed class ComponentPackPropertyDefinition
+{
+    public string? Name { get; set; }
+    public string? Type { get; set; }
+    public List<string>? Options { get; set; }
+    public double? Minimum { get; set; }
+    public double? Maximum { get; set; }
 }

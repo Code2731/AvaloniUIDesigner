@@ -76,6 +76,14 @@ same-binding no-op history, and Undo/Redo for both binding creation and removal.
 They also verify that removing only a binding reveals its preserved local value
 while unrelated bindings remain untouched. The actual Inspector row template
 must expose a Bind action beside the independent Reset action.
+Typed custom-property checks load a backward-compatible Component Pack with
+String, Boolean, Integer, Double, Color, and Enum definitions. They reject
+invalid Enum definitions and out-of-range defaults, normalize every default,
+enforce the same validation for inline and bulk local edits, style setters, and
+binding fallbacks, and preserve ranges/options through Draft re-import,
+Headless Preview, selected-pack export, and in-use pack removal. The actual
+Inspector template is built to verify that Boolean values use a choice editor
+and that a selection event commits the canonical value.
 
 Persistence checks cover initial UTF-8 saves, replacement backups, repeated
 backup rotation, invalid backup paths, temporary-file cleanup, and retry after

@@ -4081,11 +4081,24 @@ public partial class CanvasViewModel : ViewModelBase
                 out var persistedDeclaredProperties)
                 ? persistedDeclaredProperties
                 : metadata.DeclaredProperties;
+        var propertyDefinitions = properties.TryGetValue(
+                DesignerCustomPropertyRuntime.PropertyDefinitionsMetadataKey,
+                out var propertyDefinitionsJson)
+            && DesignerCustomPropertyRuntime.TryDeserializePropertyDefinitions(
+                propertyDefinitionsJson,
+                out var persistedPropertyDefinitions)
+                ? DesignerCustomPropertyRuntime.NormalizePropertyDefinitions(
+                    persistedPropertyDefinitions,
+                    declaredProperties)
+                : DesignerCustomPropertyRuntime.NormalizePropertyDefinitions(
+                    metadata.PropertyDefinitions,
+                    declaredProperties);
         visual.Tag = metadata with
         {
             PreviewText = previewText,
             DefaultProperties = defaultProperties,
             DeclaredProperties = declaredProperties,
+            PropertyDefinitions = propertyDefinitions,
         };
     }
 

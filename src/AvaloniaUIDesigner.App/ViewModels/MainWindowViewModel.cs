@@ -181,7 +181,8 @@ public sealed record CustomPropertyEditorState(
     string ControlName,
     string TargetType,
     IReadOnlyList<string> Lines,
-    IReadOnlyList<string> EditableProperties);
+    IReadOnlyList<string> EditableProperties,
+    IReadOnlyList<DesignerCustomPropertyDefinition>? PropertyDefinitions = null);
 
 public sealed record LayoutEditorState(
     string ControlName,
@@ -1534,6 +1535,19 @@ public partial class MainWindowViewModel : ViewModelBase
                     DeclaredProperties = targetDefinition.IsDesignOnly
                         ? (target.Visual.Tag as DesignerCustomControlMetadata)?.DeclaredProperties.ToList()
                             ?? targetDefinition.DeclaredProperties?.ToList()
+                        : null,
+                    PropertyDefinitions = targetDefinition.IsDesignOnly
+                        ? ((target.Visual.Tag as DesignerCustomControlMetadata)?.PropertyDefinitions
+                                ?? targetDefinition.PropertyDefinitions)?
+                            .Select(definition => new ComponentPackPropertyDefinition
+                            {
+                                Name = definition.Name,
+                                Type = definition.Type.ToString(),
+                                Options = definition.Options?.ToList(),
+                                Minimum = definition.Minimum,
+                                Maximum = definition.Maximum,
+                            })
+                            .ToList()
                         : null,
                     DefaultProperties = properties,
                     DesignOnly = targetDefinition.IsDesignOnly,
@@ -5037,6 +5051,18 @@ public partial class MainWindowViewModel : ViewModelBase
             return false;
         }
 
+        if (!TryNormalizeCustomBindingFallbacks(
+                target,
+                definitions,
+                out var normalizedDefinitions,
+                out var fallbackError))
+        {
+            StatusText = $"Bindings were not changed. {fallbackError}";
+            return false;
+        }
+
+        definitions = normalizedDefinitions;
+
         var currentDefinitions = DesignerBindingRuntime.ReadBindings(target.Visual);
         if (string.Equals(
                 DesignerBindingRuntime.Serialize(currentDefinitions),
@@ -5078,6 +5104,56 @@ public partial class MainWindowViewModel : ViewModelBase
             .ToList();
     }
 
+    private bool TryNormalizeCustomBindingFallbacks(
+        DesignElement target,
+        IEnumerable<DesignerBindingDefinition> bindings,
+        out List<DesignerBindingDefinition> normalizedBindings,
+        out string error)
+    {
+        normalizedBindings = [];
+        error = string.Empty;
+        if (target.Visual.Tag is not DesignerCustomControlMetadata metadata)
+        {
+            normalizedBindings = bindings.ToList();
+            return true;
+        }
+
+        var declaredProperties = GetDeclaredCustomPropertyNames(target, metadata).ToList();
+        var editableProperties = DesignerCustomPropertyRuntime.GetEditablePropertyNames(
+                target.Visual,
+                declaredProperties)
+            .ToHashSet(StringComparer.Ordinal);
+        var propertyDefinitions = GetDeclaredCustomPropertyDefinitions(
+                target,
+                metadata,
+                declaredProperties)
+            .ToDictionary(definition => definition.Name, StringComparer.OrdinalIgnoreCase);
+        foreach (var binding in bindings)
+        {
+            if (!editableProperties.Contains(binding.PropertyName)
+                || string.IsNullOrWhiteSpace(binding.FallbackValue))
+            {
+                normalizedBindings.Add(binding);
+                continue;
+            }
+
+            if (!DesignerCustomPropertyRuntime.TryNormalizeValue(
+                    propertyDefinitions[binding.PropertyName],
+                    binding.FallbackValue,
+                    out var normalizedFallback,
+                    out var valueError))
+            {
+                normalizedBindings = [];
+                error = $"Fallback for {binding.PropertyName} {valueError}";
+                return false;
+            }
+
+            normalizedBindings.Add(binding with { FallbackValue = normalizedFallback });
+        }
+
+        return true;
+    }
+
     public bool TryGetSelectedCustomProperties(out CustomPropertyEditorState state)
     {
         var target = Canvas.SelectedElement;
@@ -5103,6 +5179,10 @@ public partial class MainWindowViewModel : ViewModelBase
         }
 
         var declaredProperties = GetDeclaredCustomPropertyNames(target, metadata);
+        var propertyDefinitions = GetDeclaredCustomPropertyDefinitions(
+            target,
+            metadata,
+            declaredProperties);
         var editableProperties = DesignerCustomPropertyRuntime.GetEditablePropertyNames(
             target.Visual,
             declaredProperties);
@@ -5117,7 +5197,12 @@ public partial class MainWindowViewModel : ViewModelBase
             target.DisplayName,
             target.TypeName,
             DesignerCustomPropertyRuntime.FormatEditorLines(target.Visual, editableProperties),
-            editableProperties);
+            editableProperties,
+            propertyDefinitions
+                .Where(definition => editableProperties.Contains(
+                    definition.Name,
+                    StringComparer.Ordinal))
+                .ToList());
         return true;
     }
 
@@ -5132,7 +5217,10 @@ public partial class MainWindowViewModel : ViewModelBase
         var editableProperties = DesignerCustomPropertyRuntime.GetEditablePropertyNames(
             target.Visual,
             GetDeclaredCustomPropertyNames(target, metadata));
-        return DesignerCustomPropertyRuntime.ReadValueStates(target.Visual, editableProperties);
+        return DesignerCustomPropertyRuntime.ReadValueStates(
+            target.Visual,
+            editableProperties,
+            GetDeclaredCustomPropertyDefinitions(target, metadata, editableProperties));
     }
 
     public bool SetSelectedCustomPropertyValue(string propertyName, string value)
@@ -5142,13 +5230,17 @@ public partial class MainWindowViewModel : ViewModelBase
             return false;
         }
 
-        try
+        var definition = state.PropertyDefinitions?.FirstOrDefault(candidate => string.Equals(
+            candidate.Name,
+            canonicalName,
+            StringComparison.OrdinalIgnoreCase));
+        if (!DesignerCustomPropertyRuntime.TryNormalizeValue(
+                definition,
+                value,
+                out var normalizedValue,
+                out var valueError))
         {
-            System.Xml.XmlConvert.VerifyXmlChars(value);
-        }
-        catch (System.Xml.XmlException)
-        {
-            StatusText = $"Custom property {canonicalName} contains an invalid XML character.";
+            StatusText = $"Custom property {canonicalName} {valueError}";
             return false;
         }
 
@@ -5158,14 +5250,14 @@ public partial class MainWindowViewModel : ViewModelBase
             .ToDictionary(pair => pair.Key, pair => pair.Value, StringComparer.Ordinal);
         var bindings = DesignerBindingRuntime.ReadBindings(target.Visual);
         if (properties.TryGetValue(canonicalName, out var currentValue)
-            && string.Equals(currentValue, value, StringComparison.Ordinal)
+            && string.Equals(currentValue, normalizedValue, StringComparison.Ordinal)
             && !bindings.Any(binding => binding.PropertyName == canonicalName))
         {
             StatusText = $"Custom property {canonicalName} is unchanged.";
             return true;
         }
 
-        properties[canonicalName] = value;
+        properties[canonicalName] = normalizedValue;
         BeginCanvasMutation(HistoryActionType.EditProperty, $"Set custom property {canonicalName}.");
         DesignerCustomPropertyRuntime.ReplaceValues(target.Visual, state.EditableProperties, properties);
         var retainedBindings = bindings
@@ -5289,7 +5381,17 @@ public partial class MainWindowViewModel : ViewModelBase
             return false;
         }
 
-        var binding = parsed.Single();
+        if (!TryNormalizeCustomBindingFallbacks(
+                target,
+                parsed,
+                out var normalizedBindings,
+                out var fallbackError))
+        {
+            StatusText = $"Binding for {canonicalName} was not changed. {fallbackError}";
+            return false;
+        }
+
+        var binding = normalizedBindings.Single();
         var currentBindings = DesignerBindingRuntime.ReadBindings(target.Visual);
         var existingIndex = currentBindings.FindIndex(candidate => string.Equals(
             candidate.PropertyName,
@@ -5398,7 +5500,8 @@ public partial class MainWindowViewModel : ViewModelBase
                 lines,
                 state.EditableProperties,
                 out var properties,
-                out var error))
+                out var error,
+                state.PropertyDefinitions))
         {
             StatusText = $"Custom properties were not changed. {error}";
             return false;
@@ -5450,6 +5553,20 @@ public partial class MainWindowViewModel : ViewModelBase
                 : metadata.DeclaredProperties.Count > 0
                     ? metadata.DeclaredProperties
                     : definition?.DefaultProperties?.Keys ?? metadata.DefaultProperties.Keys;
+
+    private IReadOnlyList<DesignerCustomPropertyDefinition> GetDeclaredCustomPropertyDefinitions(
+        DesignElement target,
+        DesignerCustomControlMetadata metadata,
+        IEnumerable<string> fallbackPropertyNames)
+    {
+        var definitions = _componentCatalog.TryGet(target.TypeName, out var componentDefinition)
+            && componentDefinition.PropertyDefinitions is { Count: > 0 } catalogDefinitions
+                ? catalogDefinitions
+                : metadata.PropertyDefinitions;
+        return DesignerCustomPropertyRuntime.NormalizePropertyDefinitions(
+            definitions,
+            fallbackPropertyNames);
+    }
 
     public bool TryGetSelectedLayoutProperties(out LayoutEditorState state)
     {
@@ -12454,6 +12571,12 @@ public partial class MainWindowViewModel : ViewModelBase
                         customMetadata.DeclaredProperties);
             }
 
+            if (customMetadata.PropertyDefinitions is { Count: > 0 } propertyDefinitions)
+            {
+                customProperties[DesignerCustomPropertyRuntime.PropertyDefinitionsMetadataKey]
+                    = DesignerCustomPropertyRuntime.SerializePropertyDefinitions(propertyDefinitions);
+            }
+
             DesignerEventHandlerRuntime.Capture(visual, customProperties);
             DesignerAccessibilityRuntime.CaptureLocallySet(visual, customProperties);
             DesignerInteractionRuntime.Capture(visual, customProperties);
@@ -13711,7 +13834,8 @@ public partial class MainWindowViewModel : ViewModelBase
                         targetType,
                         rawPropertyName,
                         out var propertyName,
-                        out var isCustomProperty))
+                        out var isCustomProperty,
+                        out var customPropertyDefinition))
                 {
                     warnings.Add($"Ignored unsupported setter {selector}.{rawPropertyName}.");
                     continue;
@@ -13722,6 +13846,7 @@ public partial class MainWindowViewModel : ViewModelBase
                         propertyName,
                         rawValue,
                         isCustomProperty,
+                        customPropertyDefinition,
                         colorResources,
                         out var normalizedValue,
                         out var setterError))
@@ -14194,6 +14319,14 @@ public partial class MainWindowViewModel : ViewModelBase
         var tagName = element.Name.LocalName;
         var isDesignOnly = _componentCatalog.TryGet(typeName, out var componentDefinition)
             && componentDefinition.IsDesignOnly;
+        var customPropertyDefinitions = isDesignOnly
+            ? DesignerCustomPropertyRuntime.NormalizePropertyDefinitions(
+                    componentDefinition.PropertyDefinitions,
+                    componentDefinition.DeclaredProperties
+                        ?? componentDefinition.DefaultProperties?.Keys
+                        ?? [])
+                .ToDictionary(definition => definition.Name, StringComparer.OrdinalIgnoreCase)
+            : new Dictionary<string, DesignerCustomPropertyDefinition>(StringComparer.OrdinalIgnoreCase);
         var bindings = new List<DesignerBindingDefinition>();
         var eventHandlers = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
 
@@ -14705,7 +14838,23 @@ public partial class MainWindowViewModel : ViewModelBase
                 continue;
             }
 
-            if (IsSupportedVisualProperty(tagName, name) || isDesignOnly)
+            if (isDesignOnly
+                && customPropertyDefinitions.TryGetValue(name, out var customPropertyDefinition))
+            {
+                if (DesignerCustomPropertyRuntime.TryNormalizeValue(
+                        customPropertyDefinition,
+                        attr.Value,
+                        out var normalizedCustomValue,
+                        out var customValueError))
+                {
+                    map[customPropertyDefinition.Name] = normalizedCustomValue;
+                }
+                else
+                {
+                    warnings.Add($"Ignored {tagName}.{customPropertyDefinition.Name}: {customValueError}");
+                }
+            }
+            else if (IsSupportedVisualProperty(tagName, name) || isDesignOnly)
             {
                 map[name] = attr.Value;
             }
@@ -14914,7 +15063,38 @@ public partial class MainWindowViewModel : ViewModelBase
 
         if (bindings.Count > 0)
         {
-            map["__bindings"] = DesignerBindingRuntime.Serialize(bindings);
+            var normalizedBindings = new List<DesignerBindingDefinition>();
+            foreach (var binding in bindings)
+            {
+                if (customPropertyDefinitions.TryGetValue(binding.PropertyName, out var definition))
+                {
+                    var normalizedFallback = binding.FallbackValue;
+                    if (!string.IsNullOrWhiteSpace(binding.FallbackValue)
+                        && !DesignerCustomPropertyRuntime.TryNormalizeValue(
+                            definition,
+                            binding.FallbackValue,
+                            out normalizedFallback,
+                            out var fallbackError))
+                    {
+                        warnings.Add($"Ignored binding {tagName}.{definition.Name}: fallback {fallbackError}");
+                        continue;
+                    }
+
+                    normalizedBindings.Add(binding with
+                    {
+                        PropertyName = definition.Name,
+                        FallbackValue = normalizedFallback,
+                    });
+                    continue;
+                }
+
+                normalizedBindings.Add(binding);
+            }
+
+            if (normalizedBindings.Count > 0)
+            {
+                map["__bindings"] = DesignerBindingRuntime.Serialize(normalizedBindings);
+            }
         }
 
         if (eventHandlers.Count > 0)
@@ -17034,7 +17214,8 @@ public partial class MainWindowViewModel : ViewModelBase
                     currentTargetType,
                     rawPropertyName,
                     out var propertyName,
-                    out var isCustomProperty))
+                    out var isCustomProperty,
+                    out var customPropertyDefinition))
             {
                 styles = parsedStyles;
                 error = $"Style line {index + 1}: setter '{rawPropertyName}' is not supported.";
@@ -17046,6 +17227,7 @@ public partial class MainWindowViewModel : ViewModelBase
                     propertyName,
                     rawValue,
                     isCustomProperty,
+                    customPropertyDefinition,
                     _colorResources,
                     out var normalizedValue,
                     out error))
@@ -17161,12 +17343,14 @@ public partial class MainWindowViewModel : ViewModelBase
         string targetType,
         string proposedName,
         out string propertyName,
-        out bool isCustomProperty)
+        out bool isCustomProperty,
+        out DesignerCustomPropertyDefinition? customPropertyDefinition)
     {
         var hasCanonicalProperty = TryGetCanonicalStylePropertyName(proposedName, out propertyName);
         if (hasCanonicalProperty && DesignerStyleRuntime.IsSupportedProperty(targetType, propertyName))
         {
             isCustomProperty = false;
+            customPropertyDefinition = null;
             return true;
         }
 
@@ -17177,29 +17361,35 @@ public partial class MainWindowViewModel : ViewModelBase
                     targetType,
                     StringComparison.Ordinal))
             .SelectMany(definition =>
-                definition.DeclaredProperties
-                ?? definition.DefaultProperties?.Keys
-                ?? [])
+                DesignerCustomPropertyRuntime.NormalizePropertyDefinitions(
+                    definition.PropertyDefinitions,
+                    definition.DeclaredProperties
+                        ?? definition.DefaultProperties?.Keys
+                        ?? []))
             .Concat(Canvas.Elements
                 .Where(element => string.Equals(
                     GetStyleTargetType(element.TypeName),
                     targetType,
                     StringComparison.Ordinal))
                 .SelectMany(element => element.Visual.Tag is DesignerCustomControlMetadata metadata
-                    ? metadata.DeclaredProperties
+                    ? DesignerCustomPropertyRuntime.NormalizePropertyDefinitions(
+                        metadata.PropertyDefinitions,
+                        metadata.DeclaredProperties)
                     : []))
             .FirstOrDefault(candidate => string.Equals(
-                candidate,
+                candidate.Name,
                 proposedName.Trim(),
                 StringComparison.OrdinalIgnoreCase));
         if (declaredProperty is not null)
         {
-            propertyName = declaredProperty;
+            propertyName = declaredProperty.Name;
             isCustomProperty = true;
+            customPropertyDefinition = declaredProperty;
             return true;
         }
 
         isCustomProperty = false;
+        customPropertyDefinition = null;
         return hasCanonicalProperty;
     }
 
@@ -17208,6 +17398,7 @@ public partial class MainWindowViewModel : ViewModelBase
         string propertyName,
         string rawValue,
         bool isCustomProperty,
+        DesignerCustomPropertyDefinition? customPropertyDefinition,
         IReadOnlyDictionary<string, string> colorResources,
         out string normalizedValue,
         out string error)
@@ -17215,18 +17406,18 @@ public partial class MainWindowViewModel : ViewModelBase
         normalizedValue = string.Empty;
         if (isCustomProperty)
         {
-            try
+            if (DesignerCustomPropertyRuntime.TryNormalizeValue(
+                    customPropertyDefinition,
+                    rawValue,
+                    out normalizedValue,
+                    out var valueError))
             {
-                System.Xml.XmlConvert.VerifyXmlChars(rawValue);
-                normalizedValue = rawValue;
                 error = string.Empty;
                 return true;
             }
-            catch (System.Xml.XmlException)
-            {
-                error = $"{propertyName} contains an invalid XML character.";
-                return false;
-            }
+
+            error = $"{propertyName} {valueError}";
+            return false;
         }
 
         if (!DesignerStyleRuntime.IsSupportedProperty(targetType, propertyName))

@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using Avalonia.Controls;
+using AvaloniaUIDesigner.App.Models;
 
 namespace AvaloniaUIDesigner.App.Designer.Core;
 
@@ -16,4 +17,5 @@ public sealed record DesignerComponentDefinition(
     string? PreviewText = null,
     string? SourceId = null,
     string? Category = null,
-    IReadOnlyList<string>? DeclaredProperties = null);
+    IReadOnlyList<string>? DeclaredProperties = null,
+    IReadOnlyList<DesignerCustomPropertyDefinition>? PropertyDefinitions = null);

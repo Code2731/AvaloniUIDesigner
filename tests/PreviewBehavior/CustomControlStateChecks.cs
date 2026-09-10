@@ -2,6 +2,7 @@ using System.Text.Json;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
+using Avalonia.VisualTree;
 using AvaloniaUIDesigner.App.Designer.Services;
 using AvaloniaUIDesigner.App.Models;
 using AvaloniaUIDesigner.App.ViewModels;
@@ -24,6 +25,35 @@ internal static class CustomControlStateChecks
               "defaultProperties": {
                 "Caption": "Ready",
                 "Opacity": "0.85"
+              }
+            }
+          ]
+        }
+        """;
+
+    private const string TypedComponentPack = """
+        {
+          "name": "Typed state checks",
+          "components": [
+            {
+              "displayName": "Typed Gauge",
+              "avaloniaTypeName": "Acme.Controls.TypedGauge",
+              "designOnly": true,
+              "propertyDefinitions": [
+                { "name": "IsActive", "type": "Boolean" },
+                { "name": "Count", "type": "Integer", "minimum": 0, "maximum": 10 },
+                { "name": "Ratio", "type": "Double", "minimum": 0, "maximum": 1 },
+                { "name": "Accent", "type": "Color" },
+                { "name": "State", "type": "Enum", "options": ["Idle", "Busy"] },
+                { "name": "Note" }
+              ],
+              "defaultProperties": {
+                "IsActive": "true",
+                "Count": "02",
+                "Ratio": ".5",
+                "Accent": "#3B82F6",
+                "State": "idle",
+                "Note": "Ready"
               }
             }
           ]
@@ -392,6 +422,7 @@ internal static class CustomControlStateChecks
         RunCustomPropertyEditorChecks();
         RunCustomStyleChecks();
         RunCustomDeclaredStyleChecks();
+        RunTypedCustomPropertyChecks();
         RunCustomPropertyInspectorSummaryChecks();
         Console.WriteLine("Custom control state checks passed.");
     }
@@ -906,6 +937,287 @@ internal static class CustomControlStateChecks
             "The custom-property summary must identify an unset declaration.");
     }
 
+    private static void RunTypedCustomPropertyChecks()
+    {
+        var invalidEditor = new MainWindowViewModel();
+        Assert(!invalidEditor.TryLoadComponentPack("""
+            {
+              "components": [
+                {
+                  "displayName": "Invalid Typed Gauge",
+                  "avaloniaTypeName": "Acme.Controls.InvalidTypedGauge",
+                  "designOnly": true,
+                  "propertyDefinitions": [
+                    { "name": "State", "type": "Enum" }
+                  ]
+                }
+              ]
+            }
+            """, out var invalidDefinitionResult)
+            && invalidDefinitionResult.Contains("at least one option", StringComparison.OrdinalIgnoreCase),
+            "An Enum custom property must declare at least one option.");
+        Assert(!invalidEditor.TryLoadComponentPack("""
+            {
+              "components": [
+                {
+                  "displayName": "Invalid Typed Default",
+                  "avaloniaTypeName": "Acme.Controls.InvalidTypedDefault",
+                  "designOnly": true,
+                  "propertyDefinitions": [
+                    { "name": "Count", "type": "Integer", "minimum": 0, "maximum": 4 }
+                  ],
+                  "defaultProperties": { "Count": "5" }
+                }
+              ]
+            }
+            """, out var invalidDefaultResult)
+            && invalidDefaultResult.Contains("whole number", StringComparison.OrdinalIgnoreCase),
+            "A typed default outside its declared range must reject the component pack.");
+
+        var editor = new MainWindowViewModel();
+        Assert(editor.TryLoadComponentPack(TypedComponentPack, out var result), result);
+        var item = editor.Toolbox.FindItemByDisplayName("Typed Gauge")
+            ?? throw new Exception("The typed custom control was not added to Toolbox.");
+        editor.PlaceToolboxItem(item, 40, 56);
+        var custom = editor.Canvas.Elements.Single();
+        Assert(custom.Visual.Tag is DesignerCustomControlMetadata metadata
+            && metadata.DeclaredProperties.Count == 6
+            && metadata.PropertyDefinitions is { Count: 6 }
+            && metadata.DefaultProperties["IsActive"] == "True"
+            && metadata.DefaultProperties["Count"] == "2"
+            && metadata.DefaultProperties["Ratio"] == "0.5"
+            && metadata.DefaultProperties["Accent"] == "#ff3b82f6"
+            && metadata.DefaultProperties["State"] == "Idle",
+            "Loading a typed pack must normalize declarations and all typed defaults.");
+
+        var states = editor.GetSelectedCustomPropertyValueStates();
+        Assert(states.Single(state => state.PropertyName == "IsActive") is
+            {
+                Type: DesignerCustomPropertyType.Boolean,
+                UsesChoiceEditor: true,
+                EditorChoiceValue: "True",
+            } booleanState
+            && booleanState.EditorChoices.SequenceEqual(["False", "True"]),
+            "A Boolean declaration must expose canonical choices and its local selection.");
+        Assert(states.Single(state => state.PropertyName == "State") is
+            {
+                Type: DesignerCustomPropertyType.Enum,
+                UsesChoiceEditor: true,
+                TypeLabel: "Enum",
+            } enumState
+            && enumState.EditorChoices.SequenceEqual(["Idle", "Busy"]),
+            "An Enum declaration must expose the component pack options.");
+        Assert(states.Single(state => state.PropertyName == "Count") is
+            {
+                Type: DesignerCustomPropertyType.Integer,
+                UsesTextEditor: true,
+                EditorValue: "2",
+            }, "A numeric declaration must use the typed text editor state.");
+
+        var beforeInvalidEdit = editor.ExportDraftAxaml();
+        Assert(!editor.SetSelectedCustomPropertyValue("Count", "11")
+            && editor.ExportDraftAxaml() == beforeInvalidEdit,
+            "An inline integer outside its range must not change the document.");
+        Assert(!editor.SetSelectedCustomProperties(["Accent = not-a-color"])
+            && editor.ExportDraftAxaml() == beforeInvalidEdit,
+            "The bulk custom-property editor must enforce typed color validation.");
+        Assert(editor.SetSelectedCustomPropertyValue("Count", "07"), editor.StatusText);
+        Assert(editor.SetSelectedCustomPropertyValue("State", "busy"), editor.StatusText);
+        Assert(editor.SetSelectedCustomPropertyValue("IsActive", "false"), editor.StatusText);
+        custom = editor.Canvas.Elements.Single();
+        Assert(custom.Visual.Tag is DesignerCustomControlMetadata editedMetadata
+            && editedMetadata.DefaultProperties["Count"] == "7"
+            && editedMetadata.DefaultProperties["State"] == "Busy"
+            && editedMetadata.DefaultProperties["IsActive"] == "False",
+            "Typed inline edits must store canonical AXAML values.");
+
+        Assert(editor.ResetSelectedCustomPropertyValue("Count"), editor.StatusText);
+        var beforeInvalidStyle = editor.ExportDraftAxaml();
+        Assert(!editor.SetDocumentStylesFromText("""
+            [TypedGauge.limit]
+            Count = 12
+            """) && editor.ExportDraftAxaml() == beforeInvalidStyle,
+            "A typed custom style setter outside its range must not change the document.");
+        Assert(editor.SetDocumentStylesFromText("""
+            [TypedGauge.limit]
+            Count = 04
+            """), editor.StatusText);
+        Assert(editor.SetSelectedStyleClassesFromText("limit"), editor.StatusText);
+        Assert(editor.GetSelectedCustomPropertyValueStates().Single(state => state.PropertyName == "Count") is
+            {
+                Value: "4",
+                Source: DesignerCustomPropertyValueSource.Style,
+                Type: DesignerCustomPropertyType.Integer,
+            }, "A valid typed custom setter must be normalized and exposed as a style value.");
+
+        var beforeInvalidFallback = editor.ExportDraftAxaml();
+        Assert(!editor.SetSelectedCustomPropertyBinding(
+                "Count",
+                "Preview.Count",
+                nameof(DesignerBindingMode.OneWay),
+                "20")
+            && editor.ExportDraftAxaml() == beforeInvalidFallback,
+            "A typed binding fallback outside its range must not change the document.");
+        Assert(editor.SetSelectedCustomPropertyBinding(
+            "Count",
+            "Preview.Count",
+            nameof(DesignerBindingMode.OneWay),
+            "03"), editor.StatusText);
+        Assert(DesignerBindingRuntime.ReadBindings(editor.Canvas.Elements.Single().Visual).Single() is
+            { PropertyName: "Count", FallbackValue: "3" },
+            "A typed binding fallback must be normalized before storage.");
+        Assert(editor.RemoveSelectedCustomPropertyBinding("Count"), editor.StatusText);
+        Assert(editor.GetSelectedCustomPropertyValueStates().Single(state => state.PropertyName == "Count") is
+            { Value: "4", Source: DesignerCustomPropertyValueSource.Style },
+            "Removing a typed binding must reveal the validated style value.");
+
+        var source = editor.ExportDraftAxaml();
+        Assert(source.Contains("IsActive=\"False\"")
+            && source.Contains("State=\"Busy\"")
+            && source.Contains("<Setter Property=\"Count\" Value=\"4\" />"),
+            "Draft AXAML must use canonical typed values for local attributes and style setters.");
+        var invalidImportEditor = new MainWindowViewModel();
+        Assert(invalidImportEditor.TryLoadComponentPack(TypedComponentPack, out var importPackResult),
+            importPackResult);
+        var invalidTypedSource = source.Replace(
+            "State=\"Busy\"",
+            "State=\"Unknown\"",
+            StringComparison.Ordinal);
+        Assert(invalidImportEditor.TryImportDraftAxaml(
+                invalidTypedSource,
+                out var invalidImportError,
+                out var invalidImportWarning), invalidImportError);
+        Assert(invalidImportWarning.Contains("State", StringComparison.Ordinal)
+            && invalidImportEditor.Canvas.Elements.Single().Visual.Tag is
+                DesignerCustomControlMetadata invalidImportMetadata
+            && !invalidImportMetadata.DefaultProperties.ContainsKey("State"),
+            "Draft import must warn and omit an invalid typed custom-property value.");
+        var bindingImportEditor = new MainWindowViewModel();
+        Assert(bindingImportEditor.TryLoadComponentPack(TypedComponentPack, out var bindingPackResult),
+            bindingPackResult);
+        var typedBindingSource = source.Replace(
+            "State=\"Busy\"",
+            "state=\"{ReflectionBinding Preview.State}\"",
+            StringComparison.Ordinal);
+        Assert(bindingImportEditor.TryImportDraftAxaml(
+            typedBindingSource,
+            out var bindingImportError,
+            out _), bindingImportError);
+        Assert(DesignerBindingRuntime.ReadBindings(
+                bindingImportEditor.Canvas.Elements.Single().Visual).Single(binding =>
+                binding.PropertyName == "State") is { Path: "Preview.State" },
+            "Draft import must canonicalize a typed binding property name even without a fallback.");
+        Assert(editor.TryImportDraftAxaml(source, out var importError, out _), importError);
+        custom = editor.Canvas.Elements.Single();
+        Assert(custom.Visual.Tag is DesignerCustomControlMetadata importedMetadata
+            && importedMetadata.PropertyDefinitions?.Single(definition => definition.Name == "Count") is
+            {
+                Type: DesignerCustomPropertyType.Integer,
+                Minimum: 0,
+                Maximum: 10,
+            }, "Draft re-import with the component pack must restore typed property metadata.");
+        var preview = new PreviewWindow(editor.CreatePreviewDocument());
+        try
+        {
+            var previewLayout = (Grid)preview.Content!;
+            var previewSurface = previewLayout.Children.OfType<Border>().Single();
+            var previewViewport = (ScrollViewer)previewSurface.Child!;
+            var previewCanvas = (Canvas)previewViewport.Content!;
+            Assert(previewCanvas.Children.Single().Tag is DesignerCustomControlMetadata previewMetadata
+                && previewMetadata.PropertyDefinitions?.Single(definition => definition.Name == "State") is
+                    { Type: DesignerCustomPropertyType.Enum } previewStateDefinition
+                && previewStateDefinition.Options?.SequenceEqual(["Idle", "Busy"]) == true,
+                "Headless Preview must retain typed custom-property definitions and Enum options.");
+        }
+        finally
+        {
+            preview.Close();
+        }
+
+        editor.SelectElement(custom);
+        Assert(editor.TryExportSelectedComponentPack(
+            "Typed export",
+            "Typed Gauge Export",
+            "TypedGaugeExport",
+            out var exportedJson,
+            out var exportError), exportError);
+        var exportedPack = JsonSerializer.Deserialize<ComponentPackDocument>(
+            exportedJson,
+            new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+        var exportedDefinitions = exportedPack?.Components.Single().PropertyDefinitions
+            ?? throw new Exception("Typed definitions were not exported with the selected component.");
+        Assert(exportedDefinitions.Single(definition => definition.Name == "Count") is
+            { Type: "Integer", Minimum: 0, Maximum: 10 }
+            && exportedDefinitions.Single(definition => definition.Name == "State").Options?
+                .SequenceEqual(["Idle", "Busy"]) == true,
+            "Selected Component Pack export must retain typed ranges and Enum options.");
+
+        var sourceId = editor.ComponentPacks.Single().SourceId;
+        Assert(editor.TryRemoveComponentPack(sourceId, out var removeResult), removeResult);
+        Assert(editor.GetSelectedCustomPropertyValueStates().Single(state => state.PropertyName == "IsActive") is
+            { Type: DesignerCustomPropertyType.Boolean, EditorChoiceValue: "False" },
+            "An in-use placeholder must retain typed editor metadata after its pack is removed.");
+
+        var window = new MainWindow { DataContext = editor };
+        window.Show();
+        window.Measure(new Size(window.Width, window.Height));
+        window.Arrange(new Rect(0, 0, window.Width, window.Height));
+        try
+        {
+            var items = window.FindControl<ItemsControl>("DeclaredCustomPropertyItems")
+                ?? throw new Exception("Custom-property Inspector list was not created.");
+            var filter = window.FindControl<TextBox>("PropertyInspectorFilter")
+                ?? throw new Exception("Property Inspector filter was not created.");
+            filter.Text = "boolean";
+            filter.RaiseEvent(new TextChangedEventArgs(TextBox.TextChangedEvent));
+            Assert(items.ItemsSource?.Cast<DesignerCustomPropertyValueState>().Single() is
+                { PropertyName: "IsActive", Type: DesignerCustomPropertyType.Boolean },
+                "Property Inspector filtering must include typed custom-property labels.");
+            filter.Text = string.Empty;
+            filter.RaiseEvent(new TextChangedEventArgs(TextBox.TextChangedEvent));
+            var activeState = items.ItemsSource?.Cast<DesignerCustomPropertyValueState>()
+                .Single(state => state.PropertyName == "IsActive")
+                ?? throw new Exception("Typed Boolean state was not shown in the Inspector.");
+            var row = items.ItemTemplate?.Build(activeState) as Grid
+                ?? throw new Exception("Typed custom-property Inspector row could not be built.");
+            row.DataContext = activeState;
+            var textEditor = row.GetVisualDescendants().OfType<TextBox>().Single();
+            var choiceEditor = row.GetVisualDescendants().OfType<ComboBox>().Single();
+            Assert(!textEditor.IsVisible
+                && choiceEditor.IsVisible
+                && row.GetVisualDescendants().OfType<TextBlock>().Any(text =>
+                    Equals(text.Text, "Boolean"))
+                && choiceEditor.ItemsSource?.Cast<string>().SequenceEqual(["False", "True"]) == true,
+                "The actual Inspector template must show the type and use a choice editor for Boolean properties.");
+            choiceEditor.SelectedItem = "True";
+            Avalonia.Threading.Dispatcher.UIThread.RunJobs(Avalonia.Threading.DispatcherPriority.Background);
+            Assert(editor.GetSelectedCustomPropertyValueStates().Single(state =>
+                    state.PropertyName == "IsActive") is
+                { Value: "True", Source: DesignerCustomPropertyValueSource.Local },
+                "Selecting a Boolean choice in the Inspector must commit the typed value.");
+            editor.Undo();
+            editor.SelectElement(editor.Canvas.Elements.Single());
+            Assert(editor.GetSelectedCustomPropertyValueStates().Single(state =>
+                    state.PropertyName == "IsActive") is
+                {
+                    Value: "False",
+                    Type: DesignerCustomPropertyType.Boolean,
+                    EditorChoiceValue: "False",
+                }, "Undo after pack removal must restore the typed Boolean state from snapshot metadata.");
+            editor.Redo();
+            editor.SelectElement(editor.Canvas.Elements.Single());
+            Assert(editor.GetSelectedCustomPropertyValueStates().Single(state =>
+                    state.PropertyName == "IsActive") is
+                { Value: "True", Type: DesignerCustomPropertyType.Boolean },
+                "Redo after pack removal must retain the typed definition and edited Boolean value.");
+        }
+        finally
+        {
+            window.DataContext = null;
+            window.Close();
+        }
+    }
+
     private static void RunCustomPropertyInspectorSummaryChecks()
     {
         var editor = new MainWindowViewModel();
@@ -950,7 +1262,7 @@ internal static class CustomControlStateChecks
                     { PropertyName: "Unit", Value: "ms", Source: DesignerCustomPropertyValueSource.Local }),
                 "Property Inspector must show the local custom-property state.");
             var unitRow = BuildUnitRow();
-            var unitEditor = unitRow.Children.OfType<TextBox>().Single();
+            var unitEditor = unitRow.GetVisualDescendants().OfType<TextBox>().Single();
             var bindingButton = unitRow.Children.OfType<Button>().Single(button =>
                 Equals(button.Content, "Bind"));
             var resetButton = unitRow.Children.OfType<Button>().Single(button =>

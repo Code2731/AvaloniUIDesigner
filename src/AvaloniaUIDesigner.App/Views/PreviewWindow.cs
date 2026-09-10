@@ -703,7 +703,8 @@ public sealed class PreviewWindow : Window
                 snapshot.TypeName,
                 ReadDesignOnlyPreviewText(snapshot),
                 ReadDesignOnlyProperties(snapshot.VisualProperties),
-                ReadDesignOnlyDeclaredProperties(snapshot.VisualProperties)),
+                ReadDesignOnlyDeclaredProperties(snapshot.VisualProperties),
+                ReadDesignOnlyPropertyDefinitions(snapshot.VisualProperties)),
         };
 
         ApplyProperties(control, snapshot.VisualProperties, colorResources);
@@ -737,6 +738,18 @@ public sealed class PreviewWindow : Window
                 declaredPropertiesJson,
                 out var declaredProperties)
                 ? declaredProperties
+                : null;
+
+    private static IReadOnlyList<DesignerCustomPropertyDefinition>? ReadDesignOnlyPropertyDefinitions(
+        IReadOnlyDictionary<string, string>? properties)
+        => properties is not null
+            && properties.TryGetValue(
+                DesignerCustomPropertyRuntime.PropertyDefinitionsMetadataKey,
+                out var propertyDefinitionsJson)
+            && DesignerCustomPropertyRuntime.TryDeserializePropertyDefinitions(
+                propertyDefinitionsJson,
+                out var propertyDefinitions)
+                ? propertyDefinitions
                 : null;
 
     private static void WireInteractiveStyleStates(

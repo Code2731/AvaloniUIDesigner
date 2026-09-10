@@ -8938,6 +8938,7 @@ public partial class MainWindow : Window
             states = states
                 .Where(state => state.PropertyName.Contains(_propertyInspectorFilterText, StringComparison.OrdinalIgnoreCase)
                     || state.DisplayValue.Contains(_propertyInspectorFilterText, StringComparison.OrdinalIgnoreCase)
+                    || state.TypeLabel.Contains(_propertyInspectorFilterText, StringComparison.OrdinalIgnoreCase)
                     || state.SourceLabel.Contains(_propertyInspectorFilterText, StringComparison.OrdinalIgnoreCase))
                 .ToList();
         }
@@ -8987,6 +8988,72 @@ public partial class MainWindow : Window
                 : $"Canceled editing {state.PropertyName}.";
             e.Handled = true;
         }
+    }
+
+    private void OnDeclaredCustomPropertyChoiceChanged(
+        object? sender,
+        SelectionChangedEventArgs e)
+    {
+        if (_isApplyingDeclaredCustomPropertyEdit
+            || sender is not ComboBox
+            {
+                Tag: string propertyName,
+                SelectedItem: string selectedValue,
+            } editor
+            || Vm is null)
+        {
+            return;
+        }
+
+        var state = GetDeclaredCustomPropertyState(propertyName);
+        if (state is null
+            || string.Equals(state.EditorChoiceValue, selectedValue, StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        _isApplyingDeclaredCustomPropertyEdit = true;
+        try
+        {
+            if (Vm.SetSelectedCustomPropertyValue(propertyName, selectedValue))
+            {
+                QueueDeclaredCustomPropertySummaryRefresh();
+            }
+            else
+            {
+                editor.SelectedItem = state.EditorChoiceValue;
+            }
+        }
+        finally
+        {
+            _isApplyingDeclaredCustomPropertyEdit = false;
+        }
+    }
+
+    private void OnDeclaredCustomPropertyChoiceKeyDown(object? sender, KeyEventArgs e)
+    {
+        if (e.Key != Key.Escape
+            || sender is not ComboBox { Tag: string propertyName } editor)
+        {
+            return;
+        }
+
+        var state = GetDeclaredCustomPropertyState(propertyName);
+        _isApplyingDeclaredCustomPropertyEdit = true;
+        try
+        {
+            editor.SelectedItem = state?.EditorChoiceValue;
+        }
+        finally
+        {
+            _isApplyingDeclaredCustomPropertyEdit = false;
+        }
+
+        PropGrid.Focus();
+        Vm?.StatusText = state is null
+            ? "Custom property edit was canceled."
+            : $"Canceled editing {state.PropertyName}.";
+        e.Handled = true;
     }
 
     private void OnDeclaredCustomPropertyResetClicked(
@@ -20914,7 +20981,8 @@ public partial class MainWindow : Window
                     lines,
                     state.EditableProperties,
                     out _,
-                    out var error))
+                    out var error,
+                    state.PropertyDefinitions))
             {
                 errorText.Text = error;
                 return;

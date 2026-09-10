@@ -111,9 +111,13 @@ public static class DesignerStyleRuntime
                         DesignerStyleApplicationMetadata.MarkApplied(control, setter.Key);
                     }
                     else if (customStyleProperties is not null
-                        && CanApplyCustomStyleValue(control, setter.Key))
+                        && TryGetCustomStyleValue(
+                            control,
+                            setter.Key,
+                            setter.Value,
+                            out var customStyleValue))
                     {
-                        customStyleProperties[setter.Key] = setter.Value;
+                        customStyleProperties[setter.Key] = customStyleValue;
                     }
                 }
             }
@@ -187,11 +191,31 @@ public static class DesignerStyleRuntime
             && control.Classes.Contains(style.ClassName)
             && (style.PseudoClass is null || activePseudoClasses.Contains(style.PseudoClass));
 
-    private static bool CanApplyCustomStyleValue(Control control, string propertyName)
-        => control.Tag is DesignerCustomControlMetadata metadata
-            && metadata.DeclaredProperties.Contains(propertyName, StringComparer.Ordinal)
-            && !metadata.DefaultProperties.ContainsKey(propertyName)
-            && !DesignerBindingRuntime.HasBinding(control, propertyName);
+    private static bool TryGetCustomStyleValue(
+        Control control,
+        string propertyName,
+        string rawValue,
+        out string value)
+    {
+        value = string.Empty;
+        if (control.Tag is not DesignerCustomControlMetadata metadata
+            || !metadata.DeclaredProperties.Contains(propertyName, StringComparer.Ordinal)
+            || metadata.DefaultProperties.ContainsKey(propertyName)
+            || DesignerBindingRuntime.HasBinding(control, propertyName))
+        {
+            return false;
+        }
+
+        var definition = metadata.PropertyDefinitions?.FirstOrDefault(candidate => string.Equals(
+            candidate.Name,
+            propertyName,
+            StringComparison.OrdinalIgnoreCase));
+        return DesignerCustomPropertyRuntime.TryNormalizeValue(
+            definition,
+            rawValue,
+            out value,
+            out _);
+    }
 
     private static IReadOnlySet<string> GetActivePseudoClasses(
         Control control,

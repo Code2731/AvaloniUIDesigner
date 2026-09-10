@@ -43,6 +43,7 @@ Preview 동작 회귀 검증: `dotnet run --project tests/PreviewBehavior -p:Use
 - **Custom Property Value Sources**: Property Inspector에서 디자인 전용 속성의 현재 값과 `LOCAL`·`BINDING`·`STYLE`·`UNSET` 출처를 표시하고 검색·잠금 상태를 반영하며 전용 편집기로 바로 연결
 - **Inline Custom Property Editing**: Property Inspector에서 외부 CLR 속성을 직접 입력해 Enter·포커스 이동으로 적용하고 Escape로 취소하며, `Reset`으로 해당 로컬 값이나 바인딩만 제거해 하위 스타일 또는 unset 상태를 복원
 - **Per-property Custom Bindings**: 각 사용자 정의 속성 행의 `Bind`·`Edit`에서 Path·Mode·Fallback을 직접 편집하고, 바인딩만 제거해 보존된 로컬 값 또는 스타일 값을 다시 표시
+- **Typed Custom Properties**: Component Pack의 `propertyDefinitions`로 String·Boolean·Integer·Double·Color·Enum과 숫자 범위·Enum 옵션을 선언하고, Inspector 선택형 편집기와 로컬 값·스타일·fallback 공통 검증 및 정규화를 적용
 - **선택 영역 Toolbox 프리셋**: 여러 root 컨트롤을 상대 좌표·현재 속성과 함께 Toolbox에 등록하고 JSON 팩으로 저장·불러오기
 - **배치**: 클릭-투-플레이스와 드래그 앤 드롭으로 실제 Avalonia 컨트롤 생성
 - **캔버스 뷰포트**: 큰 아트보드와 확대 상태를 양축 자동 스크롤로 탐색하고, Desktop·Tablet·Mobile·사용자 지정 아트보드 크기와 회전, Zoom In/Out·Actual Size·Fit to View·Fit Selected to View·25~200% Zoom Presets와 스크롤 콘텐츠 크기를 동기화하며 `Ctrl+=`/`Ctrl+-`/`Ctrl+0`/`F`/`Ctrl+Shift+F` 단축키, `Ctrl+Alt+Arrow` 키보드 팬, 중간 마우스 드래그 팬, Ctrl+휠 포인터 중심 줌, 키보드·View 메뉴·Zoom Preset viewport 중심 줌, 아트보드 크기 변경 시 문서 중심 보존을 지원
@@ -871,12 +872,15 @@ AXAML 소스 편집기의 `Validate`와 `Preview`는 현재 디자인과 Undo �
 - v3.25: Property Inspector에 디자인 전용 커스텀 속성의 유효 값과 Local·Binding·Style·Unset 출처 요약, 필터 연동 및 빠른 편집 진입을 추가합니다.
 - v3.26: Property Inspector의 디자인 전용 속성에 source-aware 인라인 편집과 Escape 취소, 속성별 Reset, 원자적 검증 및 단일 Undo/Redo 기록을 추가합니다.
 - v3.27: Property Inspector의 커스텀 속성별 Bind·Edit 대화상자에서 Path·Mode·Fallback을 추가·수정하고, 다른 바인딩을 보존한 채 해당 바인딩만 제거해 하위 로컬·스타일 값을 복원합니다.
+- v3.28: Component Pack typed custom property 정의와 Boolean·Enum 선택형 Inspector, 숫자 범위·색상·Enum 검증, 로컬·스타일·binding fallback 정규화, Draft/Preview/팩 제거 후 메타데이터 보존을 추가합니다.
 
 ## 컴포넌트 팩
 
 `File > Load Component Pack...`에서 JSON 팩을 불러오면 현재 세션의 Toolbox에 별칭 컨트롤을 추가할 수 있습니다. 각 항목은 이미 지원되는 Avalonia 타입을 기반으로 하며, 표시 이름, 기본 크기, 기본 속성, 선택적 `category`를 지정합니다. `category`를 생략하면 내장 타입은 기본 카테고리로 분류되고, 외부 디자인 전용 타입은 `General`로 표시됩니다. 예시는 [component-pack.example.json](docs/component-pack.example.json)을 참고하세요. 캔버스에서 컨트롤 하나를 선택한 뒤 `File > Export Selected as Component Pack...`을 사용하면 해당 크기·시각 속성과 원본 Component Pack의 `category`를 재사용 가능한 JSON 팩으로 저장할 수 있습니다. 파일 경로는 워크스페이스 세션에 함께 저장되므로 앱을 다시 실행해도 팩을 다시 선택할 필요가 없습니다.
 
 외부 프로젝트의 커스텀 컨트롤은 `designOnly: true`를 사용해야 합니다. 디자이너는 실제 외부 assembly를 실행하지 않고 청색 플레이스홀더를 렌더링하며, 플레이스홀더에 표시할 문구는 `previewText`, 초깃값 없이 편집·바인딩할 CLR 속성 이름은 `declaredProperties`, 원래 컨트롤에 전달할 초기 AXAML 값은 `defaultProperties`, Toolbox 필터 이름은 `category`로 정의합니다. 단순한 기존 팩은 외부 전용 `defaultProperties` 이름을 선언으로 자동 추론합니다. 명시 선언은 점이나 공백이 없는 유효한 CLR 속성 이름이어야 합니다. `DesignOnly`가 없는 알 수 없는 타입은 팩 로드를 거부해 잘못된 AXAML 생성을 방지합니다. 예시는 [custom-component-pack.example.json](docs/custom-component-pack.example.json)을 참고하세요.
+
+선택적 `propertyDefinitions`는 이름만 있는 `declaredProperties`를 타입 정보와 함께 확장하며, 정의된 이름은 별도 선언 없이도 자동으로 사용자 정의 속성에 포함됩니다. `type`은 `String`(생략 시 기본값), `Boolean`, `Integer`, `Double`, `Color`, `Enum`을 지원합니다. `Integer`와 `Double`은 `minimum`·`maximum`, `Enum`은 중복 없는 `options`를 사용할 수 있습니다. 팩 기본값, Inspector 인라인/일괄 값, 문서 스타일 setter, 바인딩 fallback은 같은 규칙으로 검증되고 Boolean·숫자·색상·Enum 대소문자는 안정적인 AXAML 값으로 정규화됩니다. 잘못된 정의나 기본값은 팩 전체를 등록하기 전에 거부하며, 잘못된 외부 AXAML 속성은 경고 후 해당 값만 제외합니다. 기존 `declaredProperties` 팩은 모두 `String` 정의로 호환됩니다.
 
 디자인 전용 컨트롤을 선택한 뒤 `Edit > Edit Declared Custom Properties...`에서 `declaredProperties` 또는 외부 전용 `defaultProperties`로 선언된 속성을 편집할 수 있습니다. `Opacity`처럼 디자이너의 공통 편집기가 직접 지원하는 속성은 중복 표시하지 않으며, 목록에서 줄을 제거하면 해당 로컬 AXAML 값이 생략됩니다. 바인딩된 속성은 로컬 값 목록에서 숨겨지고 같은 속성에 값을 다시 입력하면 그 바인딩만 로컬 값으로 대체됩니다. 선언 이름은 현재 값과 별도로 스냅샷에 보존되어 사용 중인 컴포넌트 팩을 제거한 뒤에도 편집과 Undo/Redo를 이어갈 수 있습니다. 외부 assembly를 로드하지 않으므로 외부 전용 속성의 실제 시각 효과는 실행하지 않고 AXAML 및 Preview 메타데이터로 보존합니다.
 

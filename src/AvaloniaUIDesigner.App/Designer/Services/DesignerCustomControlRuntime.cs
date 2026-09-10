@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Linq;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Media;
@@ -12,13 +13,21 @@ public static class DesignerCustomControlRuntime
         string typeName,
         string previewText,
         IReadOnlyDictionary<string, string>? defaultProperties = null,
-        IEnumerable<string>? declaredProperties = null)
+        IEnumerable<string>? declaredProperties = null,
+        IEnumerable<DesignerCustomPropertyDefinition>? propertyDefinitions = null)
     {
         var properties = new Dictionary<string, string>(
             defaultProperties ?? new Dictionary<string, string>(),
             System.StringComparer.Ordinal);
-        var declarations = DesignerCustomPropertyRuntime.NormalizeDeclaredPropertyNames(
+        var definitions = DesignerCustomPropertyRuntime.NormalizePropertyDefinitions(
+            propertyDefinitions,
             declaredProperties ?? properties.Keys);
+        var declarations = DesignerCustomPropertyRuntime.NormalizeDeclaredPropertyNames(
+            (declaredProperties ?? properties.Keys)
+                .Concat(definitions.Select(definition => definition.Name)));
+        definitions = DesignerCustomPropertyRuntime.NormalizePropertyDefinitions(
+            definitions,
+            declarations);
         return new Border
         {
             Background = Brush.Parse("#E0F2FE"),
@@ -31,7 +40,8 @@ public static class DesignerCustomControlRuntime
                 previewText,
                 properties,
                 declarations,
-                new Dictionary<string, string>(System.StringComparer.Ordinal)),
+                new Dictionary<string, string>(System.StringComparer.Ordinal),
+                definitions),
             Child = new StackPanel
             {
                 Spacing = 3,

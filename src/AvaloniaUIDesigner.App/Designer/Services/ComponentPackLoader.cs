@@ -82,6 +82,12 @@ public sealed class ComponentPackLoader
                 return false;
             }
 
+            if (!isDesignOnly && component.PropertyDefinitions is { Count: > 0 })
+            {
+                error = $"'{component.DisplayName}' can use PropertyDefinitions only for a DesignOnly component.";
+                return false;
+            }
+
             var width = component.DefaultWidth ?? (hasBaseDefinition ? baseDefinition.DefaultWidth : 240);
             var height = component.DefaultHeight ?? (hasBaseDefinition ? baseDefinition.DefaultHeight : 96);
             if (!double.IsFinite(width) || width < 10 || width > 3840
@@ -128,10 +134,82 @@ public sealed class ComponentPackLoader
                 return false;
             }
 
+            var explicitDefinitions = new List<DesignerCustomPropertyDefinition>();
+            var explicitDefinitionNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var propertyDefinition in component.PropertyDefinitions ?? [])
+            {
+                var propertyName = propertyDefinition.Name?.Trim() ?? string.Empty;
+                var proposedType = string.IsNullOrWhiteSpace(propertyDefinition.Type)
+                    ? nameof(DesignerCustomPropertyType.String)
+                    : propertyDefinition.Type.Trim();
+                if (!Enum.TryParse<DesignerCustomPropertyType>(
+                        proposedType,
+                        ignoreCase: true,
+                        out var propertyType)
+                    || !Enum.IsDefined(propertyType))
+                {
+                    error = $"'{component.DisplayName}' property '{propertyName}' uses unsupported type '{proposedType}'.";
+                    return false;
+                }
+
+                var proposedDefinition = new DesignerCustomPropertyDefinition(
+                    propertyName,
+                    propertyType,
+                    propertyDefinition.Options,
+                    propertyDefinition.Minimum,
+                    propertyDefinition.Maximum);
+                if (!DesignerCustomPropertyRuntime.TryNormalizePropertyDefinition(
+                        proposedDefinition,
+                        out var normalizedDefinition,
+                        out var definitionError))
+                {
+                    error = $"'{component.DisplayName}' has an invalid property definition. {definitionError}";
+                    return false;
+                }
+
+                if (!explicitDefinitionNames.Add(normalizedDefinition.Name))
+                {
+                    error = $"'{component.DisplayName}' duplicates property definition '{normalizedDefinition.Name}'.";
+                    return false;
+                }
+
+                explicitDefinitions.Add(normalizedDefinition);
+            }
+
             var declaredProperties = DesignerCustomPropertyRuntime.NormalizeDeclaredPropertyNames(
-                proposedDeclarations.Concat(properties.Keys.Where(propertyName =>
+                proposedDeclarations
+                    .Concat(explicitDefinitions.Select(definition => definition.Name))
+                    .Concat(properties.Keys.Where(propertyName =>
                     DesignerCustomPropertyRuntime.IsValidDeclaredPropertyName(propertyName)
                     && !DesignerBindingRuntime.IsSupportedProperty("Border", propertyName))));
+            var propertyDefinitions = DesignerCustomPropertyRuntime.NormalizePropertyDefinitions(
+                explicitDefinitions,
+                declaredProperties);
+            foreach (var definition in propertyDefinitions)
+            {
+                var existingProperty = properties.FirstOrDefault(pair => string.Equals(
+                    pair.Key,
+                    definition.Name,
+                    StringComparison.OrdinalIgnoreCase));
+                if (existingProperty.Key is null)
+                {
+                    continue;
+                }
+
+                if (!DesignerCustomPropertyRuntime.TryNormalizeValue(
+                        definition,
+                        existingProperty.Value,
+                        out var normalizedValue,
+                        out var valueError))
+                {
+                    error = $"'{component.DisplayName}' default property '{definition.Name}' {valueError}";
+                    return false;
+                }
+
+                properties.Remove(existingProperty.Key);
+                properties[definition.Name] = normalizedValue;
+            }
+
             var namePrefix = string.IsNullOrWhiteSpace(component.NamePrefix)
                 ? CreateNamePrefix(component.DisplayName)
                 : component.NamePrefix;
@@ -152,7 +230,8 @@ public sealed class ComponentPackLoader
                     typeName,
                     previewText,
                     properties,
-                    declaredProperties)
+                    declaredProperties,
+                    propertyDefinitions)
                 : baseDefinition.VisualFactory;
 
             definitions.Add(new DesignerComponentDefinition(
@@ -167,7 +246,8 @@ public sealed class ComponentPackLoader
                 previewText,
                 sourceId,
                 category,
-                declaredProperties));
+                declaredProperties,
+                propertyDefinitions));
         }
 
         foreach (var definition in definitions)

@@ -9,14 +9,25 @@
       "previewText": "Analytics Card",
       "defaultWidth": 320,
       "defaultHeight": 120,
-      "declaredProperties": [
-        "Header",
-        "Value",
-        "Trend"
+      "propertyDefinitions": [
+        { "name": "Header", "type": "String" },
+        { "name": "Value", "type": "String" },
+        {
+          "name": "Trend",
+          "type": "Enum",
+          "options": ["Up", "Flat", "Down"]
+        },
+        {
+          "name": "Target",
+          "type": "Double",
+          "minimum": 0
+        }
       ],
       "defaultProperties": {
         "Header": "Revenue",
         "Value": "$42K",
+        "Trend": "Up",
+        "Target": "50000",
         "Opacity": "0.85"
       }
     }

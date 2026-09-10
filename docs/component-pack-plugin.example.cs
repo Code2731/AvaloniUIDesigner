@@ -22,11 +22,22 @@ public sealed class AcmeComponentPackPlugin : IComponentPackPlugin
                     PreviewText = "Analytics Card",
                     DefaultWidth = 320,
                     DefaultHeight = 120,
-                    DeclaredProperties = ["Header", "Value", "Trend"],
+                    PropertyDefinitions =
+                    [
+                        new() { Name = "Header", Type = "String" },
+                        new() { Name = "Value", Type = "String" },
+                        new()
+                        {
+                            Name = "Trend",
+                            Type = "Enum",
+                            Options = ["Up", "Flat", "Down"],
+                        },
+                    ],
                     DefaultProperties = new Dictionary<string, string?>
                     {
                         ["Header"] = "Revenue",
                         ["Value"] = "$42K",
+                        ["Trend"] = "Up",
                     },
                 },
             ],
