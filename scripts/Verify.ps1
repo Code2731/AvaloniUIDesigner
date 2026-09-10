@@ -25,6 +25,7 @@ try {
 
     Invoke-DotNetStep -Label 'Release build' -Arguments (@('build', 'AvaloniaUIDesigner.slnx') + $common)
     Invoke-DotNetStep -Label 'Layout regression checks' -Arguments (@('run', '--project', 'tests/LayoutValidation') + $common)
+    Invoke-DotNetStep -Label 'File persistence regression checks' -Arguments (@('run', '--project', 'tests/FilePersistence') + $common)
     Invoke-DotNetStep -Label 'Preview regression checks' -Arguments (@('run', '--project', 'tests/PreviewBehavior') + $common)
     Write-Host "`nAll verification steps passed."
 }

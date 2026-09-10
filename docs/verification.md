@@ -10,7 +10,12 @@ The script runs these checks sequentially and stops on the first failure:
 
 1. Release build of the application solution.
 2. Layout validation regression checks.
-3. Avalonia Headless Preview behavior regression checks.
+3. File persistence regression checks using isolated temporary files.
+4. Avalonia Headless Preview behavior regression checks.
+
+Persistence checks cover initial UTF-8 saves, replacement backups, repeated
+backup rotation, invalid backup paths, temporary-file cleanup, and retry after
+a failed replacement. They do not simulate power loss or hardware failure.
 
 The script resolves paths relative to its own location, so it can also be
 invoked by absolute path from another directory. It restores the caller's
