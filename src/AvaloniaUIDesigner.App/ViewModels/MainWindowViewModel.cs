@@ -168,6 +168,15 @@ public sealed record BindingEditorState(
     IReadOnlyList<string> Lines,
     IReadOnlyList<string> SupportedProperties);
 
+public sealed record CustomPropertyBindingEditorState(
+    string ControlName,
+    string TargetType,
+    string PropertyName,
+    string Path,
+    DesignerBindingMode Mode,
+    string FallbackValue,
+    bool HasBinding);
+
 public sealed record CustomPropertyEditorState(
     string ControlName,
     string TargetType,
@@ -5212,6 +5221,141 @@ public partial class MainWindowViewModel : ViewModelBase
         Canvas.RefreshDocumentStyles(target.Visual);
         CommitCanvasMutation();
         StatusText = $"Reset {target.DisplayName}.{canonicalName}.";
+        return true;
+    }
+
+    public bool TryGetSelectedCustomPropertyBinding(
+        string propertyName,
+        out CustomPropertyBindingEditorState state)
+    {
+        if (!TryResolveSelectedCustomProperty(
+                propertyName,
+                out var target,
+                out _,
+                out var canonicalName))
+        {
+            state = new CustomPropertyBindingEditorState(
+                string.Empty,
+                string.Empty,
+                string.Empty,
+                string.Empty,
+                DesignerBindingMode.Default,
+                string.Empty,
+                false);
+            return false;
+        }
+
+        var binding = DesignerBindingRuntime.ReadBindings(target.Visual)
+            .FirstOrDefault(candidate => string.Equals(
+                candidate.PropertyName,
+                canonicalName,
+                StringComparison.Ordinal));
+        state = new CustomPropertyBindingEditorState(
+            target.DisplayName,
+            target.TypeName,
+            canonicalName,
+            binding?.Path ?? string.Empty,
+            binding?.Mode ?? DesignerBindingMode.Default,
+            binding?.FallbackValue ?? string.Empty,
+            binding is not null);
+        return true;
+    }
+
+    public bool SetSelectedCustomPropertyBinding(
+        string propertyName,
+        string path,
+        string mode,
+        string fallbackValue)
+    {
+        if (!TryResolveSelectedCustomProperty(
+                propertyName,
+                out var target,
+                out _,
+                out var canonicalName))
+        {
+            return false;
+        }
+
+        var additionalProperties = GetCustomBindingProperties(target);
+        var line = $"{canonicalName} | {path} | {mode} | {fallbackValue}";
+        if (!DesignerBindingRuntime.TryParseEditorLines(
+                target.TypeName,
+                [line],
+                out var parsed,
+                out var error,
+                additionalProperties))
+        {
+            StatusText = $"Binding for {canonicalName} was not changed. {error}";
+            return false;
+        }
+
+        var binding = parsed.Single();
+        var currentBindings = DesignerBindingRuntime.ReadBindings(target.Visual);
+        var existingIndex = currentBindings.FindIndex(candidate => string.Equals(
+            candidate.PropertyName,
+            canonicalName,
+            StringComparison.Ordinal));
+        var nextBindings = currentBindings.ToList();
+        if (existingIndex >= 0)
+        {
+            nextBindings[existingIndex] = binding;
+        }
+        else
+        {
+            nextBindings.Add(binding);
+        }
+
+        if (string.Equals(
+                DesignerBindingRuntime.Serialize(currentBindings),
+                DesignerBindingRuntime.Serialize(nextBindings),
+                StringComparison.Ordinal))
+        {
+            StatusText = $"Binding for {target.DisplayName}.{canonicalName} is unchanged.";
+            return true;
+        }
+
+        BeginCanvasMutation(HistoryActionType.EditProperty, $"Bind custom property {canonicalName}.");
+        DesignerBindingRuntime.ReplaceBindings(target.Visual, nextBindings, additionalProperties);
+        RefreshSampleDataPreview();
+        Canvas.RefreshDocumentStyles(target.Visual);
+        CommitCanvasMutation();
+        StatusText = $"Bound {target.DisplayName}.{canonicalName} to {binding.Path}.";
+        return true;
+    }
+
+    public bool RemoveSelectedCustomPropertyBinding(string propertyName)
+    {
+        if (!TryResolveSelectedCustomProperty(
+                propertyName,
+                out var target,
+                out _,
+                out var canonicalName))
+        {
+            return false;
+        }
+
+        var currentBindings = DesignerBindingRuntime.ReadBindings(target.Visual);
+        var nextBindings = currentBindings
+            .Where(binding => !string.Equals(
+                binding.PropertyName,
+                canonicalName,
+                StringComparison.Ordinal))
+            .ToList();
+        if (nextBindings.Count == currentBindings.Count)
+        {
+            StatusText = $"{target.DisplayName}.{canonicalName} does not have a binding.";
+            return true;
+        }
+
+        BeginCanvasMutation(HistoryActionType.EditProperty, $"Remove custom property binding {canonicalName}.");
+        DesignerBindingRuntime.ReplaceBindings(
+            target.Visual,
+            nextBindings,
+            GetCustomBindingProperties(target));
+        RefreshSampleDataPreview();
+        Canvas.RefreshDocumentStyles(target.Visual);
+        CommitCanvasMutation();
+        StatusText = $"Removed the binding from {target.DisplayName}.{canonicalName}.";
         return true;
     }
 

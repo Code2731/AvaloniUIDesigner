@@ -42,6 +42,7 @@ Preview 동작 회귀 검증: `dotnet run --project tests/PreviewBehavior -p:Use
 - **Declared Custom Property Styles**: 문서 스타일에서 `declaredProperties` 속성을 setter로 사용하고 기본·pseudo-class 계산값을 로컬 값과 분리하며, 명시 값·바인딩 우선순위와 Draft/Preview/Undo/Redo를 일관되게 유지
 - **Custom Property Value Sources**: Property Inspector에서 디자인 전용 속성의 현재 값과 `LOCAL`·`BINDING`·`STYLE`·`UNSET` 출처를 표시하고 검색·잠금 상태를 반영하며 전용 편집기로 바로 연결
 - **Inline Custom Property Editing**: Property Inspector에서 외부 CLR 속성을 직접 입력해 Enter·포커스 이동으로 적용하고 Escape로 취소하며, `Reset`으로 해당 로컬 값이나 바인딩만 제거해 하위 스타일 또는 unset 상태를 복원
+- **Per-property Custom Bindings**: 각 사용자 정의 속성 행의 `Bind`·`Edit`에서 Path·Mode·Fallback을 직접 편집하고, 바인딩만 제거해 보존된 로컬 값 또는 스타일 값을 다시 표시
 - **선택 영역 Toolbox 프리셋**: 여러 root 컨트롤을 상대 좌표·현재 속성과 함께 Toolbox에 등록하고 JSON 팩으로 저장·불러오기
 - **배치**: 클릭-투-플레이스와 드래그 앤 드롭으로 실제 Avalonia 컨트롤 생성
 - **캔버스 뷰포트**: 큰 아트보드와 확대 상태를 양축 자동 스크롤로 탐색하고, Desktop·Tablet·Mobile·사용자 지정 아트보드 크기와 회전, Zoom In/Out·Actual Size·Fit to View·Fit Selected to View·25~200% Zoom Presets와 스크롤 콘텐츠 크기를 동기화하며 `Ctrl+=`/`Ctrl+-`/`Ctrl+0`/`F`/`Ctrl+Shift+F` 단축키, `Ctrl+Alt+Arrow` 키보드 팬, 중간 마우스 드래그 팬, Ctrl+휠 포인터 중심 줌, 키보드·View 메뉴·Zoom Preset viewport 중심 줌, 아트보드 크기 변경 시 문서 중심 보존을 지원
@@ -869,6 +870,7 @@ AXAML 소스 편집기의 `Validate`와 `Preview`는 현재 디자인과 Undo �
 - v3.24: 문서 스타일에서 선언형 커스텀 속성 setter를 지원하고 기본·pseudo-class 계산값, 로컬 값·바인딩 우선순위, Draft/Preview/Undo/Redo 보존을 추가합니다.
 - v3.25: Property Inspector에 디자인 전용 커스텀 속성의 유효 값과 Local·Binding·Style·Unset 출처 요약, 필터 연동 및 빠른 편집 진입을 추가합니다.
 - v3.26: Property Inspector의 디자인 전용 속성에 source-aware 인라인 편집과 Escape 취소, 속성별 Reset, 원자적 검증 및 단일 Undo/Redo 기록을 추가합니다.
+- v3.27: Property Inspector의 커스텀 속성별 Bind·Edit 대화상자에서 Path·Mode·Fallback을 추가·수정하고, 다른 바인딩을 보존한 채 해당 바인딩만 제거해 하위 로컬·스타일 값을 복원합니다.
 
 ## 컴포넌트 팩
 
@@ -883,6 +885,8 @@ AXAML 소스 편집기의 `Validate`와 `Preview`는 현재 디자인과 Undo �
 디자인 전용 컨트롤을 선택하면 Property Inspector의 `Custom properties` 영역에서 각 외부 속성의 현재 표시값과 값 출처를 확인할 수 있습니다. `LOCAL`은 명시 AXAML 값, `BINDING`은 경로·모드·fallback, `STYLE`은 현재 클래스와 pseudo-class로 계산된 setter, `UNSET`은 아직 값이 없는 선언을 뜻합니다. Inspector 검색은 이 이름·값·출처에도 적용되고 `Edit...`은 기존 선언 속성 편집기로 연결되며, 잠긴 컨트롤에서는 편집만 비활성화하고 상태 확인은 유지합니다.
 
 같은 Inspector 행의 입력칸에서 외부 속성을 바로 편집할 수 있습니다. `LOCAL` 값은 현재 입력값으로 보이고 `STYLE`·`BINDING`·`UNSET`은 원본을 덮어쓰지 않는 안내 문구로 표시됩니다. 새 값을 입력하면 해당 속성의 로컬 override가 되며 Enter 또는 포커스 이동으로 적용하고 Escape로 취소합니다. `Reset`은 해당 로컬 값 또는 바인딩만 제거해 스타일 계산값이나 unset 상태를 다시 표시하며, 다른 속성과 바인딩은 유지됩니다.
+
+행의 `Bind`를 누르면 해당 속성만 대상으로 Path·Mode·Fallback을 입력할 수 있고, 이미 바인딩된 행은 `Edit`으로 현재 값을 다시 엽니다. `Remove Binding`은 바인딩만 제거하므로 바인딩 아래에 보존되어 있던 로컬 값이나 문서 스타일 값이 다시 표시됩니다. 반면 Inspector의 `Reset`은 해당 속성의 로컬 값과 바인딩을 함께 비워 스타일 또는 unset 상태로 되돌립니다. 추가·수정·제거는 각각 하나의 Undo/Redo 작업이며 다른 속성의 바인딩은 변경하지 않습니다.
 
 `File > Load Component Pack Plugin...`은 선택한 DLL에서 public parameterless `IComponentPackPlugin` 구현을 정확히 하나 찾아 `CreatePack()` 결과를 기존 Component Pack 검증기로 등록합니다. 플러그인 assembly는 로드 시 코드를 실행할 수 있으므로 신뢰할 수 있는 빌드만 불러와야 하며, 예제 구현은 [component-pack-plugin.example.cs](docs/component-pack-plugin.example.cs)을 참고하세요. 플러그인에서 제공하는 커스텀 타입은 `DesignOnly: true`와 `PreviewText`를 사용하면 외부 assembly의 실제 컨트롤을 디자이너 프로세스에서 실행하지 않고도 설계할 수 있습니다.
 

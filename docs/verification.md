@@ -70,6 +70,12 @@ includes case-insensitive property names, undeclared and invalid-XML rejection,
 same-value no-op history, Set/Undo/Redo, local and binding Reset, preservation
 of unrelated local values and bindings, and restoration of style or unset
 states.
+Property-specific custom binding checks cover an unbound editor state, invalid
+path rejection, case-insensitive declaration lookup, Add/Edit field recovery,
+same-binding no-op history, and Undo/Redo for both binding creation and removal.
+They also verify that removing only a binding reveals its preserved local value
+while unrelated bindings remain untouched. The actual Inspector row template
+must expose a Bind action beside the independent Reset action.
 
 Persistence checks cover initial UTF-8 saves, replacement backups, repeated
 backup rotation, invalid backup paths, temporary-file cleanup, and retry after

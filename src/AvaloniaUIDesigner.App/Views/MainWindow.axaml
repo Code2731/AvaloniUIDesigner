@@ -2309,7 +2309,7 @@
                                     <ItemsControl Name="DeclaredCustomPropertyItems">
                                         <ItemsControl.ItemTemplate>
                                             <DataTemplate x:DataType="designer:DesignerCustomPropertyValueState">
-                                                <Grid ColumnDefinitions="82,*,Auto,Auto" Margin="0,2">
+                                                <Grid ColumnDefinitions="76,*,Auto,Auto,Auto" Margin="0,2">
                                                     <TextBlock Text="{Binding PropertyName}"
                                                                FontSize="10"
                                                                Foreground="#CCCCCC"
@@ -2338,6 +2338,14 @@
                                                                    Foreground="#CBD5E1"/>
                                                     </Border>
                                                     <Button Grid.Column="3"
+                                                            Content="{Binding BindingActionLabel}"
+                                                            Tag="{Binding PropertyName}"
+                                                            Margin="4,0,0,0"
+                                                            Padding="4,1"
+                                                            FontSize="9"
+                                                            ToolTip.Tip="Add or edit a binding for this property"
+                                                            Click="OnDeclaredCustomPropertyBindingClicked"/>
+                                                    <Button Grid.Column="4"
                                                             Content="Reset"
                                                             IsVisible="{Binding CanReset}"
                                                             Tag="{Binding PropertyName}"

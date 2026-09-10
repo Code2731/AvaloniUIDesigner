@@ -9014,6 +9014,27 @@ public partial class MainWindow : Window
         }
     }
 
+    private async void OnDeclaredCustomPropertyBindingClicked(
+        object? sender,
+        Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        if (_isApplyingDeclaredCustomPropertyEdit
+            || sender is not Button { Tag: string propertyName }
+            || Vm is null)
+        {
+            return;
+        }
+
+        FlushPendingPropertyHistory();
+        if (!Vm.TryGetSelectedCustomPropertyBinding(propertyName, out var state))
+        {
+            return;
+        }
+
+        await ShowCustomPropertyBindingDialogAsync(state);
+        QueueDeclaredCustomPropertySummaryRefresh();
+    }
+
     private bool TryCommitDeclaredCustomProperty(TextBox editor)
     {
         if (_isApplyingDeclaredCustomPropertyEdit
@@ -20948,6 +20969,158 @@ public partial class MainWindow : Window
         Grid.SetRow(buttons, 4);
         dialog.Content = content;
         return await dialog.ShowDialog<IReadOnlyList<string>?>(this);
+    }
+
+    private async Task ShowCustomPropertyBindingDialogAsync(
+        CustomPropertyBindingEditorState state)
+    {
+        if (Vm is null)
+        {
+            return;
+        }
+
+        var pathEditor = new TextBox
+        {
+            Text = state.Path,
+            Watermark = "ViewModel.Property",
+        };
+        var modeEditor = new ComboBox
+        {
+            ItemsSource = Enum.GetNames<DesignerBindingMode>(),
+            SelectedItem = state.Mode.ToString(),
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+        };
+        var fallbackEditor = new TextBox
+        {
+            Text = state.FallbackValue,
+            Watermark = "Optional fallback value",
+        };
+        var errorText = new TextBlock
+        {
+            Foreground = Avalonia.Media.Brushes.IndianRed,
+            TextWrapping = Avalonia.Media.TextWrapping.Wrap,
+        };
+        var dialog = new Window
+        {
+            Title = $"{(state.HasBinding ? "Edit" : "Add")} Binding - {state.ControlName}.{state.PropertyName}",
+            Width = 560,
+            Height = 390,
+            MinWidth = 460,
+            MinHeight = 340,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner,
+        };
+        void ApplyBinding()
+        {
+            if (!Vm.SetSelectedCustomPropertyBinding(
+                    state.PropertyName,
+                    pathEditor.Text ?? string.Empty,
+                    modeEditor.SelectedItem?.ToString() ?? string.Empty,
+                    fallbackEditor.Text ?? string.Empty))
+            {
+                errorText.Text = Vm.StatusText;
+                return;
+            }
+
+            dialog.Close();
+        }
+
+        var applyButton = new Button
+        {
+            Content = state.HasBinding ? "Update" : "Add Binding",
+            MinWidth = 96,
+        };
+        applyButton.Click += (_, _) => ApplyBinding();
+        WireEditorDialogShortcuts(dialog, dialog.Close, ApplyBinding);
+        var cancelButton = new Button { Content = "Cancel", MinWidth = 84 };
+        cancelButton.Click += (_, _) => dialog.Close();
+        var removeButton = new Button
+        {
+            Content = "Remove Binding",
+            MinWidth = 112,
+            IsVisible = state.HasBinding,
+        };
+        removeButton.Click += (_, _) =>
+        {
+            if (!Vm.RemoveSelectedCustomPropertyBinding(state.PropertyName))
+            {
+                errorText.Text = Vm.StatusText;
+                return;
+            }
+
+            dialog.Close();
+        };
+        var buttons = new Grid
+        {
+            ColumnDefinitions = new ColumnDefinitions("Auto,*,Auto,Auto"),
+            ColumnSpacing = 8,
+            Children =
+            {
+                removeButton,
+                cancelButton,
+                applyButton,
+            },
+        };
+        Grid.SetColumn(cancelButton, 2);
+        Grid.SetColumn(applyButton, 3);
+        var fields = new Grid
+        {
+            ColumnDefinitions = new ColumnDefinitions("*,*"),
+            RowDefinitions = new RowDefinitions("Auto,Auto"),
+            ColumnSpacing = 12,
+            RowSpacing = 10,
+        };
+        var pathField = CreateField("Path", pathEditor, 0);
+        Grid.SetColumnSpan(pathField, 2);
+        fields.Children.Add(pathField);
+        fields.Children.Add(CreateField("Mode", modeEditor, 1));
+        var fallbackField = CreateField("Fallback", fallbackEditor, 1);
+        Grid.SetColumn(fallbackField, 1);
+        fields.Children.Add(fallbackField);
+        var content = new Grid
+        {
+            Margin = new Thickness(16),
+            RowDefinitions = new RowDefinitions("Auto,Auto,*,Auto,Auto"),
+            RowSpacing = 12,
+            Children =
+            {
+                new TextBlock
+                {
+                    Text = $"Bind {state.TargetType}.{state.PropertyName} to sample or runtime data. Removing only the binding reveals the preserved local or style value; Inspector Reset clears both.",
+                    TextWrapping = Avalonia.Media.TextWrapping.Wrap,
+                },
+                fields,
+                new TextBlock
+                {
+                    Text = "Use a dotted CLR path such as Order.Total. Fallback cannot contain commas, braces, quotes, or pipes.",
+                    Foreground = Avalonia.Media.Brushes.SlateGray,
+                    TextWrapping = Avalonia.Media.TextWrapping.Wrap,
+                },
+                errorText,
+                buttons,
+            },
+        };
+        Grid.SetRow(fields, 1);
+        Grid.SetRow(content.Children[2], 2);
+        Grid.SetRow(errorText, 3);
+        Grid.SetRow(buttons, 4);
+        dialog.Content = content;
+        await dialog.ShowDialog(this);
+        return;
+
+        static StackPanel CreateField(string label, Control editor, int row)
+        {
+            var field = new StackPanel
+            {
+                Spacing = 4,
+                Children =
+                {
+                    new TextBlock { Text = label },
+                    editor,
+                },
+            };
+            Grid.SetRow(field, row);
+            return field;
+        }
     }
 
     private async Task<GridDefinitionOptions?> ShowGridDefinitionsDialogAsync(GridDefinitionEditorState state)

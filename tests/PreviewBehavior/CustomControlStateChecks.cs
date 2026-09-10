@@ -752,7 +752,11 @@ internal static class CustomControlStateChecks
             && !localMetadata.StyleProperties.ContainsKey("Unit"),
             "A local custom value must override and hide the calculated style value.");
         Assert(editor.GetSelectedCustomPropertyValueStates().Single(state => state.PropertyName == "Unit") is
-            { Value: "ms", Source: DesignerCustomPropertyValueSource.Local },
+            {
+                Value: "ms",
+                BindingActionLabel: "Bind",
+                Source: DesignerCustomPropertyValueSource.Local,
+            },
             "The custom-property summary must report a local override.");
         Assert(editor.ExportDraftAxaml().Contains("Unit=\"ms\""),
             "A local custom value must remain in Draft AXAML even when a style targets the same property.");
@@ -769,6 +773,93 @@ internal static class CustomControlStateChecks
             && styleRedoMetadata.DefaultProperties["Unit"] == "ms"
             && !styleRedoMetadata.StyleProperties.ContainsKey("Unit"),
             "Redo must restore the local custom override.");
+
+        editor.SelectElement(custom);
+        Assert(editor.SetSelectedBindings([
+            "Opacity | Preview.Opacity | OneWay | 0.35",
+        ]), editor.StatusText);
+        Assert(editor.TryGetSelectedCustomPropertyBinding("unit", out var newBindingState)
+            && newBindingState is
+            {
+                PropertyName: "Unit",
+                Path: "",
+                Mode: DesignerBindingMode.Default,
+                FallbackValue: "",
+                HasBinding: false,
+            }, "The property binding editor must initialize an unbound declaration.");
+        var beforeInvalidPropertyBinding = editor.ExportDraftAxaml();
+        Assert(!editor.SetSelectedCustomPropertyBinding(
+                "Unit",
+                "invalid path",
+                nameof(DesignerBindingMode.OneWay),
+                "percent")
+            && editor.ExportDraftAxaml() == beforeInvalidPropertyBinding,
+            "A property binding with an invalid path must not change the document.");
+        Assert(editor.SetSelectedCustomPropertyBinding(
+            "unit",
+            "Preview.Unit",
+            nameof(DesignerBindingMode.OneWay),
+            "percent"), editor.StatusText);
+        custom = editor.Canvas.Elements.Single();
+        Assert(custom.Visual.Tag is DesignerCustomControlMetadata bindingMetadata
+            && bindingMetadata.DefaultProperties["Unit"] == "ms"
+            && DesignerBindingRuntime.ReadBindings(custom.Visual).Count == 2
+            && DesignerBindingRuntime.ReadBindings(custom.Visual).Single(binding =>
+                binding.PropertyName == "Unit") is
+            {
+                PropertyName: "Unit",
+                Path: "Preview.Unit",
+                Mode: DesignerBindingMode.OneWay,
+                FallbackValue: "percent",
+            }, "Adding a property binding must preserve its lower-precedence local value.");
+        Assert(editor.TryGetSelectedCustomPropertyBinding("Unit", out var existingBindingState)
+            && existingBindingState is
+            {
+                Path: "Preview.Unit",
+                Mode: DesignerBindingMode.OneWay,
+                FallbackValue: "percent",
+                HasBinding: true,
+            }, "The property binding editor must load the existing binding fields.");
+        Assert(editor.GetSelectedCustomPropertyValueStates().Single(state => state.PropertyName == "Unit") is
+            {
+                BindingActionLabel: "Edit",
+                Source: DesignerCustomPropertyValueSource.Binding,
+            }, "A bound custom property must expose an Edit binding action.");
+        Assert(editor.SetSelectedCustomPropertyBinding(
+            "Unit",
+            "Preview.Unit",
+            nameof(DesignerBindingMode.OneWay),
+            "percent"), editor.StatusText);
+        editor.Undo();
+        custom = editor.Canvas.Elements.Single();
+        Assert(DesignerBindingRuntime.ReadBindings(custom.Visual) is [{ PropertyName: "Opacity" }]
+            && custom.Visual.Tag is DesignerCustomControlMetadata bindingUndoMetadata
+            && bindingUndoMetadata.DefaultProperties["Unit"] == "ms",
+            "An unchanged property binding must not add history, and Undo must retain unrelated bindings while revealing the local value.");
+        editor.Redo();
+        custom = editor.Canvas.Elements.Single();
+        Assert(DesignerBindingRuntime.ReadBindings(custom.Visual).Count == 2
+            && DesignerBindingRuntime.ReadBindings(custom.Visual).Any(binding =>
+                binding.PropertyName == "Unit"),
+            "Redo must restore the property-specific binding beside unrelated bindings.");
+        editor.SelectElement(custom);
+        Assert(editor.RemoveSelectedCustomPropertyBinding("Unit"), editor.StatusText);
+        custom = editor.Canvas.Elements.Single();
+        Assert(DesignerBindingRuntime.ReadBindings(custom.Visual) is [{ PropertyName: "Opacity" }]
+            && custom.Visual.Tag is DesignerCustomControlMetadata bindingRemovedMetadata
+            && bindingRemovedMetadata.DefaultProperties["Unit"] == "ms"
+            && editor.GetSelectedCustomPropertyValueStates().Single(state => state.PropertyName == "Unit") is
+                { Value: "ms", Source: DesignerCustomPropertyValueSource.Local },
+            "Removing only the binding must reveal the preserved local value.");
+        editor.Undo();
+        Assert(DesignerBindingRuntime.ReadBindings(editor.Canvas.Elements.Single().Visual).Count == 2
+            && DesignerBindingRuntime.ReadBindings(editor.Canvas.Elements.Single().Visual).Any(binding =>
+                binding.PropertyName == "Unit"),
+            "Undo must restore a removed property-specific binding.");
+        editor.Redo();
+        custom = editor.Canvas.Elements.Single();
+        Assert(DesignerBindingRuntime.ReadBindings(custom.Visual) is [{ PropertyName: "Opacity" }],
+            "Redo must remove only the property-specific binding again while preserving unrelated bindings.");
 
         editor.SelectElement(custom);
         Assert(editor.ResetSelectedCustomPropertyValue("Unit"), editor.StatusText);
@@ -789,6 +880,7 @@ internal static class CustomControlStateChecks
                 EditorValue: "",
                 EditorWatermark: "Binding: Preview.Unit | OneWay | fallback percent",
                 CanReset: true,
+                BindingActionLabel: "Edit",
                 Source: DesignerCustomPropertyValueSource.Binding,
             }, "The custom-property summary must report the binding path, mode, and fallback.");
         source = editor.ExportDraftAxaml();
@@ -809,6 +901,7 @@ internal static class CustomControlStateChecks
                 EditorValue: "",
                 EditorWatermark: "Set local value",
                 CanReset: false,
+                BindingActionLabel: "Bind",
             },
             "The custom-property summary must identify an unset declaration.");
     }
@@ -858,9 +951,15 @@ internal static class CustomControlStateChecks
                 "Property Inspector must show the local custom-property state.");
             var unitRow = BuildUnitRow();
             var unitEditor = unitRow.Children.OfType<TextBox>().Single();
-            var resetButton = unitRow.Children.OfType<Button>().Single();
-            Assert(unitEditor.Text == "ms" && resetButton.IsVisible,
-                "A local custom property must render an editable value and visible Reset action.");
+            var bindingButton = unitRow.Children.OfType<Button>().Single(button =>
+                Equals(button.Content, "Bind"));
+            var resetButton = unitRow.Children.OfType<Button>().Single(button =>
+                Equals(button.Content, "Reset"));
+            Assert(unitEditor.Text == "ms"
+                && bindingButton.IsVisible
+                && Equals(bindingButton.Tag, "Unit")
+                && resetButton.IsVisible,
+                "A local custom property must render editable, Bind, and Reset actions.");
             unitEditor.Text = "seconds";
             unitEditor.RaiseEvent(new Avalonia.Interactivity.RoutedEventArgs(InputElement.LostFocusEvent));
             Avalonia.Threading.Dispatcher.UIThread.RunJobs(Avalonia.Threading.DispatcherPriority.Background);
@@ -873,6 +972,7 @@ internal static class CustomControlStateChecks
                 {
                     Value: "percent",
                     EditorWatermark: "Style: percent",
+                    BindingActionLabel: "Bind",
                     Source: DesignerCustomPropertyValueSource.Style,
                 }, "The inline Reset action must reveal the calculated style value.");
             filter.Text = "style";

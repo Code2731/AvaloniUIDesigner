@@ -40,6 +40,10 @@ public sealed record DesignerCustomPropertyValueState(
     public bool CanReset => Source is DesignerCustomPropertyValueSource.Local
         or DesignerCustomPropertyValueSource.Binding;
 
+    public string BindingActionLabel => Source == DesignerCustomPropertyValueSource.Binding
+        ? "Edit"
+        : "Bind";
+
     public string SourceLabel => Source.ToString().ToUpperInvariant();
 }
 
