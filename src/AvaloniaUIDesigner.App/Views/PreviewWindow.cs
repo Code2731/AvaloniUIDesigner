@@ -167,13 +167,21 @@ public sealed class PreviewWindow : Window
 
     public void UpdateLiveDocument(DesignerCanvasDocument document)
     {
+        _pendingDocument = document;
         if (_liveUpdates.IsChecked != true)
         {
-            _pendingDocument = document;
             return;
         }
 
-        RefreshDocument(document);
+        try
+        {
+            RefreshDocument(document);
+        }
+        catch (Exception exception)
+        {
+            _updateError.Text = $"Preview could not update: {exception.Message}";
+            throw;
+        }
     }
 
     public void ResetPreview()

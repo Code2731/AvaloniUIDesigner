@@ -148,6 +148,32 @@ try
     reset.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
     Assert(Input().Text == "Resumed design" && string.IsNullOrEmpty(errorText.Text),
         "Reset retry must apply corrected data and clear the failure message.");
+    liveUpdates.IsChecked = true;
+    Input().Text = "Keep live input";
+    var liveCanvas = Canvas();
+    var liveFailure = false;
+    try
+    {
+        window.UpdateLiveDocument(document with
+        {
+            ColorResources = new Dictionary<string, string> { ["Invalid"] = "not-a-color" },
+        });
+    }
+    catch (FormatException) { liveFailure = true; }
+    Assert(liveFailure && !string.IsNullOrEmpty(errorText.Text),
+        "Live failures must be visible in Preview and still propagate to the editor.");
+    Assert(ReferenceEquals(Canvas(), liveCanvas) && Input().Text == "Keep live input"
+        && liveUpdates.IsChecked == true,
+        "Live failure must preserve the test state without disabling future updates.");
+    reset.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+    Assert(ReferenceEquals(Canvas(), liveCanvas) && Input().Text == "Keep live input"
+        && errorText.Text!.StartsWith("Preview could not reset:"),
+        "Reset after live failure must retry the failed latest design, not silently restore stale data.");
+    window.UpdateLiveDocument(document);
+    Assert(Input().Text == "Original" && string.IsNullOrEmpty(errorText.Text),
+        "The next valid live update must recover automatically and clear the error.");
+    window.ResetPreview();
+    Assert(Input().Text == "Original", "Recovery must clear the invalid pending snapshot.");
     var action = new DesignerElementSnapshot("Action", "Avalonia.Controls.Button", 10, 10, 120, 32,
         new Dictionary<string, string> { ["__eventHandlers"] = "{\"Click\":\"OnAction\"}" });
     window.RefreshDocument(new DesignerCanvasDocument([action]));
