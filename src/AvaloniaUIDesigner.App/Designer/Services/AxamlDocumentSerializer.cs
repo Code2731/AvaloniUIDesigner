@@ -156,6 +156,12 @@ public sealed class AxamlDocumentSerializer : IDesignerSerializer
         IReadOnlyDictionary<string, List<DesignerElementSnapshot>> childrenByParent,
         DesignerElementSnapshot? parent)
     {
+        if (element.IsLocked)
+        {
+            sb.Append(indent);
+            sb.AppendLine("<!-- AvaloniaUIDesigner: IsLocked=true -->");
+        }
+
         sb.Append(indent);
         sb.Append('<');
         sb.Append(MapToTagName(element.TypeName));

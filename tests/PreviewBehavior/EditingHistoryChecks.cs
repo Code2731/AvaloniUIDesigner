@@ -40,7 +40,8 @@ internal static class EditingHistoryChecks
              new("Second", "Avalonia.Controls.Button", 100, 80, 80, 30),
              new("Locked", "Avalonia.Controls.Button", 0, 0, 80, 30, IsLocked: true)]));
         Assert(editor.TryImportDraftAxaml(groupSource, out error, out _), error);
-        editor.Canvas.Elements.Single(element => element.DisplayName == "Locked").IsLocked = true;
+        Assert(editor.Canvas.Elements.Single(element => element.DisplayName == "Locked").IsLocked,
+            "Draft import must retain locked controls used by editing commands.");
         editor.SelectElements(editor.Canvas.Elements.ToList());
         editor.MoveSelectedElement(-50, -50);
         var moved = editor.CreatePreviewDocument().Elements;

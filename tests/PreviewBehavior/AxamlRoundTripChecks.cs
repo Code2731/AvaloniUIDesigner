@@ -45,6 +45,29 @@ internal static class AxamlRoundTripChecks
             Assert(loaded.RootSettings == document.RootSettings, "Round trip must retain root settings.");
             source = serializer.Serialize(loaded);
         }
+        var lockDocument = document with
+        {
+            Elements =
+            [
+                new("LockedRoot", "Avalonia.Controls.Canvas", 0, 0, 300, 200, IsLocked: true),
+                new("LockedChild", "Avalonia.Controls.Button", 8, 16, 100, 30,
+                    IsLocked: true, ParentName: "LockedRoot", ParentLayout: DesignerParentLayoutKind.Canvas,
+                    CanvasChildIndex: 0, CanvasChildLeft: 8, CanvasChildTop: 16),
+                new("UnlockedRoot", "Avalonia.Controls.Button", 320, 0, 100, 30),
+            ],
+        };
+        var lockSource = serializer.Serialize(lockDocument);
+        for (var pass = 0; pass < 2; pass++)
+        {
+            Assert(editor.TryCreatePreviewDocumentFromAxaml(lockSource, out var loaded, out var lockResult), lockResult);
+            Assert(loaded.Elements.Single(element => element.DisplayName == "LockedRoot").IsLocked,
+                "Draft round trip must retain a locked root control.");
+            Assert(loaded.Elements.Single(element => element.DisplayName == "LockedChild").IsLocked,
+                "Draft round trip must retain a locked nested control.");
+            Assert(!loaded.Elements.Single(element => element.DisplayName == "UnlockedRoot").IsLocked,
+                "Lock metadata must not leak into the following control.");
+            lockSource = serializer.Serialize(loaded);
+        }
         foreach (var invalidText in new[] { "before\0after", "\u0001", "\uD800", "\uFFFF" })
         {
             var rejected = false;
