@@ -42,7 +42,9 @@ public static class AtomicFileWriter
                 bufferSize: 4096,
                 options: FileOptions.Asynchronous))
             {
-                using (var writer = new StreamWriter(stream, new UTF8Encoding(encoderShouldEmitUTF8Identifier: false), leaveOpen: true))
+                // Reject malformed text rather than silently committing replacement characters.
+                using (var writer = new StreamWriter(stream, new UTF8Encoding(
+                    encoderShouldEmitUTF8Identifier: false, throwOnInvalidBytes: true), leaveOpen: true))
                 {
                     await writer.WriteAsync(content);
                     writer.Flush();

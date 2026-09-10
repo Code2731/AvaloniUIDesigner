@@ -6,7 +6,7 @@ try
 {
     var target = Path.Combine(directory, "nested", "MainView.axaml");
     var backup = target + ".bak";
-    const string original = "<TextBlock Text=\"\uD55C\uAE00\" />";
+    const string original = "<TextBlock Text=\"\uD55C\uAE00 \U0001F600\" />";
     await AtomicFileWriter.WriteAllTextAsync(target, original, backup);
     Assert(File.ReadAllText(target) == original, "First save must preserve Unicode text.");
     Assert(!File.Exists(backup), "First save must not invent a previous version.");
@@ -20,6 +20,17 @@ try
     await AtomicFileWriter.WriteAllTextAsync(target, "third", backup);
     Assert(File.ReadAllText(target) == "third" && File.ReadAllText(backup) == "second",
         "Repeated saves must advance the recovery snapshot.");
+
+    foreach (var invalidText in new[] { "invalid\uD800", "\uDC00invalid", new string('a', 8192) + "\uD800" })
+    {
+        var encodingFailed = false;
+        try { await AtomicFileWriter.WriteAllTextAsync(target, invalidText, backup); }
+        catch (System.Text.EncoderFallbackException) { encodingFailed = true; }
+        Assert(encodingFailed && File.ReadAllText(target) == "third" && File.ReadAllText(backup) == "second",
+            "Malformed Unicode must be rejected without changing the document or backup.");
+        Assert(!Directory.EnumerateFiles(directory, "*.tmp", SearchOption.AllDirectories).Any(),
+            "Encoding failure must clean up even partially written temporary files.");
+    }
 
     var rejected = false;
     try { await AtomicFileWriter.WriteAllTextAsync(target, "invalid", target); }
