@@ -10307,6 +10307,24 @@ public partial class MainWindow : Window
         };
 
     private void OpenPreviewWindow(bool refreshDocument)
+        => RunPreviewAction(() => OpenPreviewWindowCore(refreshDocument));
+
+    private void RunPreviewAction(Action action)
+    {
+        try
+        {
+            action();
+        }
+        catch (Exception exception)
+        {
+            if (Vm is not null)
+            {
+                Vm.StatusText = $"Preview could not update: {exception.Message}";
+            }
+        }
+    }
+
+    private void OpenPreviewWindowCore(bool refreshDocument)
     {
         if (Vm is null)
         {
@@ -12857,7 +12875,7 @@ public partial class MainWindow : Window
         ScheduleSessionCheckpoint();
         if (Vm is not null && _previewWindow is not null)
         {
-            _previewWindow.RefreshDocument(Vm.CreatePreviewDocument());
+            RunPreviewAction(() => _previewWindow.RefreshDocument(Vm.CreatePreviewDocument()));
         }
     }
 
