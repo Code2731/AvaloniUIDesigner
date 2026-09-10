@@ -64,11 +64,20 @@ internal static class AxamlRoundTripChecks
         Assert(editor.TryImportDraftAxaml(serializer.Serialize(document), out var importError, out _), importError);
         var inputControl = (Avalonia.Controls.TextBox)editor.Canvas.Elements.Single(element => element.DisplayName == "Input").Visual;
         inputControl.Text = "invalid\0text";
+        var sessionRejected = false;
+        try { editor.ExportSessionJson(); }
+        catch (System.Xml.XmlException) { sessionRejected = true; }
+        Assert(sessionRejected, "Session export must reject unreadable recovery documents.");
         Assert(!editor.TryExportAxamlForSave(out var invalidOutput, out var saveError)
             && invalidOutput == string.Empty && !string.IsNullOrEmpty(saveError),
             "Save preflight must report invalid XML without returning output to write.");
         Assert(inputControl.Text == "invalid\0text", "Failed save preflight must not modify the user's input.");
         inputControl.Text = text;
+        var recoveredSession = editor.ExportSessionJson();
+        var restoredEditor = new MainWindowViewModel();
+        Assert(restoredEditor.TryRestoreSessionJson(recoveredSession, out var sessionError), sessionError);
+        var restoredInput = (Avalonia.Controls.TextBox)restoredEditor.Canvas.Elements.Single(element => element.DisplayName == "Input").Visual;
+        Assert(restoredInput.Text == text, "Session recovery must preserve corrected input after an export failure.");
         Assert(editor.TryExportAxamlForSave(out var validOutput, out saveError)
             && !string.IsNullOrEmpty(validOutput) && saveError == string.Empty,
             "Corrected input must pass save preflight.");

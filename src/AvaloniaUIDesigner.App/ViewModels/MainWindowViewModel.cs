@@ -10377,9 +10377,10 @@ public partial class MainWindowViewModel : ViewModelBase
                 }
             }
         }
-        catch
+        catch (Exception exception)
         {
             // Session persistence is best effort and must not block application shutdown.
+            StatusText = $"Session recovery checkpoint could not be saved: {exception.Message}";
         }
     }
 
